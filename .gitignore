@@ -1,0 +1,21 @@
+# 환경변수 (절대 커밋 금지)
+.env
+.env.local
+backend/.env
+
+# 파이썬
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# 벡터 DB (재생성 가능)
+backend/chroma_db/
+
+# Next.js
+frontend/.next/
+frontend/node_modules/
+
+# 기타
+.DS_Store
+*.log

@@ -1,4 +1,3 @@
-
 """
 팩토핏 ROI 시뮬레이션 계산 엔진 (Pure Logic)
 
@@ -92,7 +91,7 @@ BENCHMARKS = {
     "press": {
         "avg_energy_cost_manwon": 3480,
         "avg_defect_rate_pct": 1.8,
-        "avg_replacement_cycle_yr": 12,
+        "avg_replacement_cycle_yr": 10,
         "maintenance_ratio": 0.25,
         "defect_unit_cost_manwon_per_pct": 400,
         "scenario_a": {
@@ -136,7 +135,7 @@ BENCHMARKS = {
     "injection": {
         "avg_energy_cost_manwon": 3900,
         "avg_defect_rate_pct": 2.1,
-        "avg_replacement_cycle_yr": 13,
+        "avg_replacement_cycle_yr": 10,
         "maintenance_ratio": 0.20,
         "defect_unit_cost_manwon_per_pct": 250,
         "scenario_a": {

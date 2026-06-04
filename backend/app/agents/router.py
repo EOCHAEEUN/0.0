@@ -1,21 +1,38 @@
-"""Router Agent — 의도 분류 후 전문 에이전트로 라우팅"""
-from typing import AsyncGenerator
 from langchain_openai import ChatOpenAI
+from langchain_core.messages import SystemMessage, HumanMessage
+from app.state import FactofitState
+from app.prompts.router import ROUTER_SYSTEM_PROMPT
 from app.core.config import settings
+from app.core.llm import llm
 
-llm = ChatOpenAI(
-    model="qwen/qwen3-235b-a22b",
-    openai_api_key=settings.openrouter_api_key,
-    openai_api_base="https://openrouter.ai/api/v1",
-    streaming=True,
-)
+VALID_INTENTS = ["investment_advice", "subsidy_search", "application_help", "info_missing"]
 
-async def run_agent(
-    message: str,
-    company_context: dict,
-    history: list[dict],
-) -> AsyncGenerator[bytes, None]:
-    """SSE 스트리밍 응답 생성 — TODO: LangGraph Router 패턴으로 교체"""
-    async for chunk in llm.astream(message):
-        if chunk.content:
-            yield f"data: {chunk.content}\n\n".encode()
+def router_node(state: FactofitState) -> FactofitState:
+    # 기업 컨텍스트 꺼내기
+    company = state.get("company_info")
+    equipment = state.get("equipment")
+
+    industry_code = company.industry_code if company else "정보 없음"
+    region = company.region if company else "정보 없음"
+    equipment_info = equipment.equipment.name if equipment else "정보 없음"
+
+    # 프롬프트에 컨텍스트 주입
+    prompt = ROUTER_SYSTEM_PROMPT.format(
+        industry_code=industry_code,
+        region=region,
+        equipment_info=equipment_info,
+        user_message=state["user_query"]
+    )
+
+    response = llm.invoke([
+        SystemMessage(content=prompt)
+    ])
+
+    intent = response.content.strip().lower()
+
+    # 유효하지 않은 intent면 info_missing으로 fallback
+    if intent not in VALID_INTENTS:
+        intent = "info_missing"
+
+    state["intent"] = intent
+    return state

@@ -1,6 +1,18 @@
+
 """
-팩토핏 ROI 시뮬레이션 엔진
-계산 엔진 + AI 판단 레이어
+팩토핏 ROI 시뮬레이션 계산 엔진 (Pure Logic)
+
+이 파일은 ROI 계산에 필요한 **순수 비즈니스 로직**만을 담고 있습니다.
+LangChain, Tool, Agent와는 완전히 독립적이며, 
+단순한 함수 호출만으로도 사용할 수 있습니다.
+
+주요 기능:
+- 설비 교체 시나리오 A/B ROI 계산
+- 에너지 절감, 유지보수비 절감, 불량비용 절감 계산
+- 투자금 자동 추정
+- 데이터 품질 평가 및 AI 추천 로직
+
+이 파일은 tools/roi_calculator_tool.py에서 import되어 Tool 형태로 사용됩니다.
 """
 
 from __future__ import annotations

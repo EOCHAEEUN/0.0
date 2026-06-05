@@ -275,14 +275,19 @@ POST /api/chat
 }
 ```
 
-### intent 값
+intent
 | 값 | 설명 |
 |---|---|
 | `roi` | ROI 분석 |
-| `policy` | 정책 매칭 |
+| `policy` | 정책 매칭 (마감일 조회 포함) |
 | `draft` | 신청서 초안 |
-| `calendar` | 마감 일정 |
-| `general` | 일반 답변 |
+| `info_missing` | 기업/설비 정보 부족 시 추가 수집 |
+| `general` | 서비스 소개 등 일반 답변 |
+
+변경 이유:
+- `calendar` 제거 → policy_node 안에서 deadline tool로 처리
+- `info_missing` 추가 → 정보 부족할 때 되물어보는 용도
+- `general` 추가 → "팩토핏이 뭐야?" 같은 서비스 소개 질문 처리
 
 ---
 

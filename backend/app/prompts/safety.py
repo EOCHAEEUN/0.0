@@ -24,7 +24,7 @@ SAFETY_SYSTEM_PROMPT = """
 4. KC 인증 갱신에 평균 2~3개월 소요됨을 항상 안내하세요.
 
 ## 기업 컨텍스트
-업종코드: {industry_code}
+업종코드: {industry_codes}
 지역: {region}
 
 ## 점검 데이터

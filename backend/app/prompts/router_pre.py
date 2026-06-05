@@ -32,7 +32,7 @@ general
 3. 기업 컨텍스트(업종, 지역, 설비)는 분류 힌트로만 사용하세요.
 
 ## 기업 컨텍스트
-업종: {industry_code}
+업종: {industry_codes}
 지역: {region}
 설비: {equipment_info}
 

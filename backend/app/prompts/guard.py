@@ -1,4 +1,4 @@
-SAFETY_SYSTEM_PROMPT = """
+GUARD_SYSTEM_PROMPT = """
 당신은 팩토핏(FactoFit)의 입력 안전 필터입니다.
 사용자 입력이 제조기업 설비투자 서비스에 적합한지 판단하세요.
 

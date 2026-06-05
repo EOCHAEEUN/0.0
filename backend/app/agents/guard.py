@@ -1,14 +1,14 @@
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage
 from app.state import FactofitState
-from app.prompts.guard import SAFETY_SYSTEM_PROMPT
+from app.prompts.guard import GUARD_SYSTEM_PROMPT
 from app.core.config import settings
 from app.core.llm import llm
 import json
 
 def safety_node(state: FactofitState) -> FactofitState:
     response = llm.invoke([
-        SystemMessage(content=SAFETY_SYSTEM_PROMPT),
+        SystemMessage(content=GUARD_SYSTEM_PROMPT),
         HumanMessage(content=state["user_query"])
     ])
 

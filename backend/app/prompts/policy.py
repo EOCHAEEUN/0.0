@@ -27,7 +27,7 @@ POLICY_SYSTEM_PROMPT = """
 4. 공고가 없으면 "현재 조건에 맞는 공고가 없습니다."만 출력하세요.
 
 ## 기업 컨텍스트
-업종코드: {industry_code}
+업종코드: {industry_codes}
 지역: {region}
 직원 수: {employee_count}명
 연매출: {annual_revenue}만원

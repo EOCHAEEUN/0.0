@@ -1,0 +1,22 @@
+{
+  "policy_id": "massprod-2026-001",
+  "title": "2026년 소재·부품·장비 양산성능평가 지원사업",
+  "organization": "한국산업기술진흥원",
+  "max_amount": null,
+  "deadline": "2026-03-06",
+  "deadline_note": "2026년 3월 6일 18:00 마감",
+  "policy_category": "양산성능평가",
+  "policy_subcategory": "소부장 양산라인 평가·검증",
+  "industry_codes": [
+    "C24",
+    "C25",
+    "C22",
+    "C29"
+  ],
+  "region": null,
+  "url": "https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=018004&bsnsAncmSn=1&bsnsYyDetail=2026",
+  "summary": "국내 소재·부품·장비 공급기업 또는 수요기업을 대상으로 기술개발이 완료된 소재·부품·장비를 실제 양산라인 등에서 평가·검증하도록 지원.",
+  "max_employee_count": null,
+  "min_revenue": null,
+  "max_revenue": null
+}

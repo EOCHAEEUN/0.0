@@ -1,0 +1,21 @@
+{
+  "policy_id": "energy-2026-003",
+  "title": "중소중견 에너지효율 혁신 선도 프로젝트(KEEP+)",
+  "organization": "한국에너지공단",
+  "max_amount": null,
+  "deadline": null,
+  "deadline_note": "공고별 상이",
+  "industry_codes": [
+    "C24",
+    "C25",
+    "C22"
+  ],
+  "region": null,
+  "url": "https://www.energy.or.kr/front/board/View2.do?boardMngNo=2&boardNo=24349",
+  "summary": "연간 에너지사용량 300toe 이상 중소·중견기업을 대상으로 에너지진단을 무상 지원하고 보조사업·자금지원 인센티브를 제공.",
+  "max_employee_count": null,
+  "min_revenue": null,
+  "max_revenue": null,
+  "policy_category": "에너지효율",
+  "policy_subcategory": "KEEP+"
+}

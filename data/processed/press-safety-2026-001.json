@@ -1,0 +1,22 @@
+{
+  "policy_id": "press-safety-2026-001",
+  "title": "2026년 고위험산업 사각지대 집중관리사업 재정지원",
+  "organization": "수행기관 확인 필요",
+  "max_amount": null,
+  "deadline": null,
+  "deadline_note": "공고문 기준 확인 필요",
+  "policy_category": "설비특화",
+  "policy_subcategory": "프레스·전단기 안전장치",
+  "industry_codes": [
+    "C24",
+    "C25",
+    "C22",
+    "C29"
+  ],
+  "region": null,
+  "url": "https://bizinfo.go.kr/cmm/fms/fileDown.do?atchFileId=FILE_000000000754015&fileSn=2",
+  "summary": "고위험 산업 사업장의 사고위험 개선을 지원하는 사업으로, 뿌리산업 지원품목 예시에 프레스 및 전단기 방호장치, 사출성형기 안전장치 및 자동화 설비가 포함됨.",
+  "max_employee_count": null,
+  "min_revenue": null,
+  "max_revenue": null
+}

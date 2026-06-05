@@ -1,0 +1,22 @@
+{
+  "policy_id": "mss-2026-011",
+  "title": "2026년 R&D성과확산 스마트공장 지원사업",
+  "organization": "중소벤처기업부",
+  "max_amount": 50000,
+  "deadline": null,
+  "deadline_note": "2026년 2월 신청접수 예정",
+  "industry_codes": [
+    "C24",
+    "C25",
+    "C22",
+    "C29"
+  ],
+  "region": null,
+  "url": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000116022",
+  "summary": "R&D로 개발된 공급기술을 활용하여 중소·중견 제조기업의 고도화 스마트공장 구축과 로봇 등 도입을 지원. 최대 5억원.",
+  "max_employee_count": null,
+  "min_revenue": null,
+  "max_revenue": null,
+  "policy_category": "스마트공장",
+  "policy_subcategory": "R&D성과확산 스마트공장"
+}

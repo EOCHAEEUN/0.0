@@ -1,0 +1,22 @@
+{
+  "policy_id": "mss-2026-019",
+  "title": "2026년 중소제조 특화 Multi AI Agent 개발 사업",
+  "organization": "중소벤처기업부",
+  "max_amount": 30000,
+  "deadline": null,
+  "deadline_note": "2026년 3월 신청접수 예정",
+  "industry_codes": [
+    "C24",
+    "C25",
+    "C22",
+    "C29"
+  ],
+  "region": null,
+  "url": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000116022",
+  "summary": "중소 제조업의 공정·품질 최적화를 위한 Multi AI Agent 기술개발 PoC를 지원. 2026년 PoC 기준 최대 3억원.",
+  "max_employee_count": null,
+  "min_revenue": null,
+  "max_revenue": null,
+  "policy_category": "제조데이터/제조AI",
+  "policy_subcategory": "Multi AI Agent"
+}

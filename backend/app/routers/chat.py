@@ -1,20 +1,33 @@
 from fastapi import APIRouter
-from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from app.agents.router import run_agent
+from app.graph import factofit_graph
+from app.state import FactofitState
 
 router = APIRouter()
 
 class ChatRequest(BaseModel):
     message: str
-    company_context: dict = {}
-    history: list[dict] = []
+    company_id: str = ""
 
 @router.post("/chat")
 async def chat(req: ChatRequest):
-    """SSE 스트리밍 채팅 엔드포인트"""
-    return StreamingResponse(
-        run_agent(req.message, req.company_context, req.history),
-        media_type="text/event-stream",
-        headers={"X-Accel-Buffering": "no"},
-    )
+    # 초기 State 세팅
+    initial_state: FactofitState = {
+        "user_query": req.message,
+        "intent": "",
+        "is_safe": False,
+        "company_info": None,
+        "equipment": None,
+        "matched_policies": [],
+        "roi_result": None,
+        "draft_result": None,
+        "final_response": ""
+    }
+
+    result = await factofit_graph.ainvoke(initial_state)
+
+    return {
+        "intent": result["intent"],
+        "is_safe": result["is_safe"],
+        "response": result["final_response"]
+    }

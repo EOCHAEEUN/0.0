@@ -15,9 +15,3 @@ class PolicyAnnouncement(BaseModel):
     max_employee_count: Optional[int] = None  # 예: 300 (중소기업 기준)
     min_revenue: Optional[int] = None         # 만원
     max_revenue: Optional[int] = None         # 만원
-<<<<<<< HEAD
-
-
-    #유진님 요청 추가 min, max 
-=======
->>>>>>> origin/feat/eochaeeun-prompt

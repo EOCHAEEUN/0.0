@@ -5,7 +5,9 @@ from app.prompts.router import ROUTER_SYSTEM_PROMPT
 from app.core.config import settings
 from app.core.llm import llm
 
-VALID_INTENTS = ["investment_advice", "subsidy_search", "application_help", "info_missing"]
+# 신버전 라벨로 변경
+VALID_INTENTS = ["roi", "policy", "draft", "info_missing", "general"]
+
 
 def router_node(state: FactofitState) -> FactofitState:
     # 기업 컨텍스트 꺼내기

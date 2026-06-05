@@ -1,0 +1,20 @@
+{
+  "policy_id": "hwaseong-semicon-demo-2026-001",
+  "title": "2026년 화성시 반도체 소부장기업 실증 시제품 제작 지원사업",
+  "organization": "화성산업진흥원",
+  "max_amount": 4000,
+  "deadline": "2026-04-10",
+  "deadline_note": "2026년 4월 10일 마감",
+  "policy_category": "양산성능평가",
+  "policy_subcategory": "소부장 실증·시제품 제작",
+  "industry_codes": [
+    "C26",
+    "C29"
+  ],
+  "region": "경기도 화성시",
+  "url": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000120002",
+  "summary": "화성시 관내 반도체 소재·부품·장비 중소·중견기업을 대상으로 시제품 개발 및 제작에 필요한 인건비, 재료비, 시험·평가비, 전문가 활용비 등을 지원. 기업당 최대 4,000만원.",
+  "max_employee_count": null,
+  "min_revenue": null,
+  "max_revenue": null
+}

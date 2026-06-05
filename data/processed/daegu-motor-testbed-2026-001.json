@@ -1,0 +1,21 @@
+{
+  "policy_id": "daegu-motor-testbed-2026-001",
+  "title": "2026년 모빌리티 모터 소부장 성능평가 인증 테스트베드 구축 기업지원사업",
+  "organization": "대구기계부품연구원",
+  "max_amount": null,
+  "deadline": "2026-04-10",
+  "deadline_note": "2026년 4월 10일 마감",
+  "policy_category": "신뢰성기반활용",
+  "policy_subcategory": "성능평가·인증·테스트베드",
+  "industry_codes": [
+    "C24",
+    "C25",
+    "C29"
+  ],
+  "region": "대구 지역 내·외 모빌리티 모터 유관 소부장 기업",
+  "url": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000119718",
+  "summary": "모빌리티 모터 유관 소재·부품·장비 분야 중소·중견기업을 대상으로 시제품 제작, 성능평가인증, 전문가 활용 애로기술지도를 지원.",
+  "max_employee_count": null,
+  "min_revenue": null,
+  "max_revenue": null
+}

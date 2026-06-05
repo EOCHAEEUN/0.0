@@ -1,0 +1,22 @@
+{
+  "policy_id": "mss-2026-009",
+  "title": "2026년 대중소 상생형 AI트랙 스마트공장 지원사업",
+  "organization": "중소벤처기업부",
+  "max_amount": 50000,
+  "deadline": null,
+  "deadline_note": "2026년 3월~4월 신청접수 예정",
+  "industry_codes": [
+    "C24",
+    "C25",
+    "C22",
+    "C29"
+  ],
+  "region": null,
+  "url": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000116022",
+  "summary": "민관 협업을 통해 중소·중견 제조기업의 AI 기반 스마트공장 구축을 지원. 최대 5억원.",
+  "max_employee_count": null,
+  "min_revenue": null,
+  "max_revenue": null,
+  "policy_category": "스마트공장",
+  "policy_subcategory": "대중소 상생형 AI트랙"
+}

@@ -14,6 +14,9 @@ LangChain, Tool, Agent와는 완전히 독립적이며,
 이 파일은 tools/roi_calculator_tool.py에서 import되어 Tool 형태로 사용됩니다.
 """
 
+# TODO: Policy Matching 에이전트 연동 후 실제 매칭 지원금으로 대체
+# 현재는 BENCHMARKS default_subsidy 기반 추정치 사용
+
 from __future__ import annotations
 from typing import Optional
 from pydantic import BaseModel

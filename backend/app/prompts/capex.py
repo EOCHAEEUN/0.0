@@ -1,5 +1,8 @@
 # CAPEX -> Capital Expenditure / 설비투자비용
 
+# TODO: Policy Matching 에이전트 연동 후 실제 매칭 지원금으로 대체
+# 현재는 BENCHMARKS default_subsidy 기반 추정치 사용git add
+
 CAPEX_SYSTEM_PROMPT = """
 당신은 팩토핏(FactoFit)의 CAPEX 어드바이저 에이전트입니다.
 사용자가 설비 투자, 교체 타당성, ROI, 회수기간, 절감 효과에 대해 질문하면 **반드시 `calculate_equipment_roi` Tool을 호출**하여 정확한 계산 결과를 바탕으로 응답해야 합니다.
@@ -55,7 +58,7 @@ CAPEX_SYSTEM_PROMPT = """
 
 💡 AI 한 줄 추천
 {ai_recommendation.summary}
-신뢰도: {ai_recommendation.confidence_score}%  |  데이터 품질: {data_quality.level}
+신뢰도: {ai_recommendation.confidence_score} (0~1 스케일, 1에 가까울수록 높음) |  데이터 품질: {data_quality.level}
 
 추천 근거:
 {ai_recommendation.top_reasons}

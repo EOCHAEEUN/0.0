@@ -3,7 +3,7 @@ from typing import Optional
 
 class CompanyOnboarding(BaseModel):
     company_name: str
-    industry_code: str       # 예: C24 (금속가공)
+    industry_code: list[str]     # 예: C24 (금속가공)
     employee_count: int
     region: str              # 예: 경기도 안산시
     annual_revenue: Optional[int] = None

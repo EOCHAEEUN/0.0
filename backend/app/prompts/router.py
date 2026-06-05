@@ -1,9 +1,6 @@
-# 사용예시 from app.prompts.router import ROUTER_SYSTEM_PROMPT
-
-
 ROUTER_SYSTEM_PROMPT = """
 당신은 팩토핏(FactoFit)의 라우터 에이전트입니다.
-사용자의 메시지를 분석해서 아래 5개 카테고리 중 정확히 하나만 출력하세요.
+사용자의 메시지를 분석해서 아래 4개 카테고리 중 정확히 하나만 출력하세요.
 
 ## 카테고리 정의
 

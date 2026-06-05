@@ -23,6 +23,4 @@ async def simulate_roi(body: RoiSimulateRequest):
             },
         )
 
-    # TODO: calculate_roi를 시나리오 A/B 전체 응답 형식으로 확장 예정
-    result = calculate_roi(body.equipment)
-    return result
+    return calculate_roi(body)

@@ -6,12 +6,12 @@ from app.state import FactofitState
 router = APIRouter()
 
 class ChatRequest(BaseModel):
-    message: str
     company_id: str = ""
+    message: str
+    chat_history: list[dict] = []
 
 @router.post("/chat")
 async def chat(req: ChatRequest):
-    # 초기 State 세팅
     initial_state: FactofitState = {
         "user_query": req.message,
         "intent": "",
@@ -21,13 +21,26 @@ async def chat(req: ChatRequest):
         "matched_policies": [],
         "roi_result": None,
         "draft_result": None,
+        "chat_history": req.chat_history[-10:],  # 최근 10개만
         "final_response": ""
     }
 
     result = await factofit_graph.ainvoke(initial_state)
 
+    intent = result["intent"]
+    if intent == "roi":
+        cards = [{"type": "roi_result", "data": result.get("roi_result", {})}]
+    elif intent == "policy":
+        cards = [{"type": "policy_card", "data": p} for p in result.get("matched_policies", [])]
+    elif intent == "draft":                                                    
+        cards = [{"type": "draft_result", "data": result.get("draft_result", "")}]
+    else:
+        cards = []
+
     return {
         "intent": result["intent"],
-        "is_safe": result["is_safe"],
-        "response": result["final_response"]
+        "response": result["final_response"],
+        "cards": cards,
+        "next_questions": [],
+        "chat_id": ""
     }

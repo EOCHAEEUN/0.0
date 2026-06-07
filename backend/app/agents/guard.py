@@ -11,9 +11,14 @@ def safety_node(state: FactofitState) -> FactofitState:
         SystemMessage(content=SAFETY_SYSTEM_PROMPT),
         HumanMessage(content=state["user_query"])
     ])
-
+    
     try:
-        result = json.loads(response.content)
+        content = response.content.strip()
+        if content.startswith("```"):
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+        result = json.loads(content.strip())
         is_safe = result.get("is_safe", False)
         reason = result.get("reason", "")
     except json.JSONDecodeError:

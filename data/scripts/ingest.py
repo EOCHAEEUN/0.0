@@ -18,8 +18,17 @@ def ingest():
         col.add(
             ids=[p["policy_id"]],
             documents=[p["summary"]],
-            metadatas=[{"title": p["title"], "organization": p["organization"],
-                        "max_amount": p["max_amount"], "deadline": str(p["deadline"]), "url": p["url"]}],
+            metadatas=[{
+                "title": p["title"],
+                "organization": p["organization"],
+                "max_amount": p.get("max_amount"),
+                "deadline": str(p.get("deadline")),
+                "url": p["url"],
+                "policy_category": p.get("policy_category", ""),
+                "service_category": p.get("service_category", ""),
+                "industry_codes": ",".join(p.get("industry_codes", [])),
+                "region": p.get("region", "")
+            }],
         )
         print(f"  ✓ {p['title']}")
     print(f"완료: {col.count()}개 임베딩")

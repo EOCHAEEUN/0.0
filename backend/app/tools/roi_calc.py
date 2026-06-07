@@ -1,9 +1,8 @@
-<<<<<<< HEAD
 """
 팩토핏 ROI 시뮬레이션 계산 엔진 (Pure Logic)
 
 이 파일은 ROI 계산에 필요한 **순수 비즈니스 로직**만을 담고 있습니다.
-LangChain, Tool, Agent와는 완전히 독립적이며, 
+LangChain, Tool, Agent와는 완전히 독립적이며,
 단순한 함수 호출만으로도 사용할 수 있습니다.
 
 주요 기능:
@@ -23,7 +22,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 
-#==================== 1. 입력 모델 ====================
+# ==================== 1. 입력 모델 ====================
 class EquipmentInput(BaseModel):
     name: str
     category: str
@@ -157,27 +156,277 @@ BENCHMARKS = {
             "reduction_rates": "에너지공단 전동식 사출성형기 도입효과 조사 2023",
             "investment_cost": "한국기계산업진흥회 설비가격 동향 2023",
         },
-
-    },
-    "default": {
-        "avg_energy_cost": 3000,
-        "avg_defect_rate": 2.0,
-        "avg_replacement_cycle": 10,
-        "energy_reduction_rate": 0.25,
     },
 }
 
-def calculate_roi(equipment: EquipmentInput) -> dict:
-    """설비 교체 ROI 계산 — 시나리오 A/B 기반"""
-    bench = BENCHMARKS.get(equipment.category, BENCHMARKS["default"])
-    energy_saving = int(equipment.energy_cost_annual * bench["energy_reduction_rate"])
+
+# ==================== 4. 시나리오 계산 헬퍼 ====================
+def _build_scenario(
+    equipment: EquipmentInput,
+    bench: dict,
+    scenario_key: str,
+    investment_override: Optional[int],
+    subsidy_override: Optional[int],
+) -> dict:
+    s = bench[scenario_key]
+
+    # 에너지 절감
+    energy_saving = int(equipment.energy_cost_annual * s["energy_reduction_rate"])
+    energy_method = "비용 기반 폴백"
+
+    # 유지보수비 절감 (실입력 우선, 없으면 에너지비 비율로 추정)
+    if equipment.maintenance_cost_annual is not None:
+        maint_saving = int(equipment.maintenance_cost_annual * s["maintenance_reduction_rate"])
+    else:
+        est_maint = int(equipment.energy_cost_annual * bench["maintenance_ratio"])
+        maint_saving = int(est_maint * s["maintenance_reduction_rate"])
+
+    # 불량비용 절감
     defect_saving = 0
-    if equipment.defect_rate:
-        defect_saving = int(max(0, equipment.defect_rate - bench["avg_defect_rate"]) * 300)
+    defect_method = "절감 없음"
+    if equipment.defect_rate is not None:
+        rate_diff = equipment.defect_rate - s["target_defect_rate_pct"]
+        if rate_diff > 0:
+            if equipment.production_qty and equipment.contribution_margin_won:
+                defect_saving = int(
+                    equipment.production_qty
+                    * (equipment.contribution_margin_won / 10000)
+                    * (rate_diff / 100)
+                )
+                defect_method = "생산량 기반"
+            else:
+                defect_saving = int(rate_diff * bench["defect_unit_cost_manwon_per_pct"])
+                defect_method = "업종 평균 기반"
+
+    annual_net = energy_saving + maint_saving + defect_saving
+
+    # 투자금 (직접 입력 → 용량 기반 추정 순)
+    inv_estimation = None
+    if investment_override is not None:
+        investment = investment_override
+    else:
+        est = estimate_investment(equipment.category, equipment.capacity_value)
+        if est:
+            investment = est[scenario_key]["mid"]
+            inv_estimation = est
+        else:
+            investment = None
+
+    # 지원금
+    subsidy = subsidy_override if subsidy_override is not None else s["default_subsidy"]
+
+    # 실부담, 회수기간, ROI
+    if investment is not None:
+        net_inv = max(0, investment - subsidy)
+        payback = round(net_inv / annual_net, 1) if annual_net > 0 else None
+        roi_pct = round(annual_net / net_inv * 100, 1) if net_inv > 0 else None
+    else:
+        net_inv = None
+        payback = None
+        roi_pct = None
+
+    result = {
+        "label": s["label"],
+        "investment_manwon": investment,
+        "subsidy_manwon": subsidy,
+        "net_investment_manwon": net_inv,
+        "breakdown": {
+            "energy_saving_manwon": energy_saving,
+            "energy_saving_method": energy_method,
+            "maintenance_saving_manwon": maint_saving,
+            "defect_saving_manwon": defect_saving,
+            "defect_saving_method": defect_method,
+        },
+        "annual_net_benefit_manwon": annual_net,
+        "payback_years": payback,
+        "roi_pct": roi_pct,
+    }
+    if inv_estimation:
+        result["investment_estimation"] = inv_estimation
+    return result
+
+
+def _calc_data_quality(equipment: EquipmentInput) -> dict:
+    optional_fields = [
+        "defect_rate",
+        "maintenance_cost_annual",
+        "capacity_value",
+        "production_qty",
+        "contribution_margin_won",
+    ]
+    missing = [f for f in optional_fields if getattr(equipment, f) is None]
+    score = round((len(optional_fields) - len(missing)) / len(optional_fields), 2)
+
+    if score < 0.4:
+        level, message = "low", "핵심 데이터가 부족합니다."
+    elif score < 0.7:
+        level, message = "medium", "일부 핵심 데이터가 부족합니다."
+    else:
+        level, message = "high", "충분한 데이터가 입력되었습니다."
+
+    return {"score": score, "level": level, "missing_fields": missing, "message": message}
+
+
+def _calc_ai_recommendation(
+    scenario_a: dict,
+    scenario_b: dict,
+    equipment: EquipmentInput,
+    bench: dict,
+    equipment_status: dict,
+    data_quality: dict,
+) -> dict:
+    a_payback = scenario_a["payback_years"]
+    b_payback = scenario_b["payback_years"]
+    a_net = scenario_a["annual_net_benefit_manwon"]
+    b_net = scenario_b["annual_net_benefit_manwon"]
+    is_overdue = equipment_status["is_overdue"]
+
+    # 추천 결정 (연간 순효과 2배 가중, 노후 설비는 전체 교체 우선)
+    score_a = score_b = 0
+    if a_payback is not None and b_payback is not None:
+        score_a += 1 if a_payback <= b_payback else 0
+        score_b += 1 if b_payback < a_payback else 0
+    score_a += 2 if a_net >= b_net else 0
+    score_b += 1 if b_net > a_net else 0
+    if is_overdue:
+        score_a += 1
+
+    decision = "A" if score_a >= score_b else "B"
+
+    # 신뢰도
+    base = 0.4 + data_quality["score"] * 0.4
+    confidence = round(min(0.95, base + (0.1 if abs(score_a - score_b) >= 2 else 0.0)), 2)
+
+    # 추천 근거
+    top_reasons = []
+    if is_overdue:
+        top_reasons.append({
+            "factor": "설비 노후도",
+            "impact": "high",
+            "message": (
+                f"설비 연령이 업종 평균 교체주기({bench['avg_replacement_cycle_yr']}년)를 "
+                f"{equipment_status['age_vs_cycle']}년 초과했습니다."
+            ),
+            "source": "법인세법 시행규칙 별표6",
+        })
+    if equipment.energy_cost_annual > bench["avg_energy_cost_manwon"]:
+        ratio = round(equipment.energy_cost_annual / bench["avg_energy_cost_manwon"], 2)
+        top_reasons.append({
+            "factor": "에너지 비용",
+            "impact": "medium",
+            "message": f"현재 에너지비용이 업종 평균({bench['avg_energy_cost_manwon']}만원) 대비 {ratio}배 수준입니다.",
+            "source": bench["sources"]["avg_energy_cost"],
+        })
+    if not top_reasons:
+        top_reasons.append({
+            "factor": "ROI",
+            "impact": "medium",
+            "message": f"시나리오 {decision}의 연간 순효과가 더 높습니다.",
+            "source": "",
+        })
+
+    # 리스크
+    risks = []
+    chosen = scenario_a if decision == "A" else scenario_b
+    if chosen["net_investment_manwon"] is not None and chosen["net_investment_manwon"] > 5000:
+        risks.append({
+            "type": "cashflow_risk",
+            "level": "medium",
+            "message": "초기 실투자금이 커서 현금흐름 부담이 있을 수 있습니다.",
+        })
+    if data_quality["level"] == "low":
+        risks.append({
+            "type": "data_quality_risk",
+            "level": "high",
+            "message": "입력 데이터 부족으로 계산 정확도가 낮습니다.",
+        })
+
+    # 전환 조건 (두 시나리오 회수기간이 같아지는 지원금 임계점)
+    switching_conditions = []
+    other_label = "B" if decision == "A" else "A"
+    other = scenario_b if decision == "A" else scenario_a
+    if (
+        chosen["investment_manwon"] is not None
+        and other["net_investment_manwon"] is not None
+        and chosen["annual_net_benefit_manwon"] > 0
+        and other["annual_net_benefit_manwon"] > 0
+    ):
+        threshold = int(
+            chosen["investment_manwon"]
+            - other["net_investment_manwon"]
+            * chosen["annual_net_benefit_manwon"]
+            / other["annual_net_benefit_manwon"]
+        )
+        if threshold > 0:
+            switching_conditions.append({
+                "condition": f"지원금이 {threshold:,}만원 이하로 낮아질 경우",
+                "effect": f"시나리오 {other_label}가 더 유리해질 수 있습니다.",
+            })
+
+    # 다음 질문
+    next_questions = []
+    missing = data_quality["missing_fields"]
+    if "maintenance_cost_annual" in missing:
+        next_questions.append("연간 유지보수비를 입력하면 절감 효과 계산이 더 정확해집니다.")
+    if "production_qty" in missing or "contribution_margin_won" in missing:
+        next_questions.append("연간 생산량과 제품당 기여이익을 입력하면 불량비용 계산이 더 정확해집니다.")
+    if "capacity_value" in missing:
+        next_questions.append("설비 용량을 입력하면 투자금 추정이 더 정확해집니다.")
+
     return {
-        "annual_energy_saving": energy_saving,
-        "annual_defect_saving": defect_saving,
-        "total_annual_saving": energy_saving + defect_saving,
-        "age_vs_cycle": equipment.age_years - bench["avg_replacement_cycle"],
-        "benchmark": bench,
+        "decision": decision,
+        "confidence_score": confidence,
+        "summary": f"AI는 시나리오 {decision}를 추천합니다. (신뢰도 {int(confidence * 100)}%, 데이터 품질 {data_quality['level']})",
+        "top_reasons": top_reasons,
+        "risks": risks,
+        "switching_conditions": switching_conditions,
+        "next_questions": next_questions,
+    }
+
+
+# ==================== 5. 메인 계산 ====================
+def calculate_roi(roi_input: RoiInput) -> dict:
+    equipment = roi_input.equipment
+    bench = BENCHMARKS.get(equipment.category)
+    if bench is None:
+        raise ValueError(f"지원하지 않는 설비 카테고리입니다: {equipment.category}")
+
+    scenario_a = _build_scenario(
+        equipment, bench, "scenario_a",
+        roi_input.scenario_a_investment_manwon,
+        roi_input.scenario_a_subsidy_manwon,
+    )
+    scenario_b = _build_scenario(
+        equipment, bench, "scenario_b",
+        roi_input.scenario_b_investment_manwon,
+        roi_input.scenario_b_subsidy_manwon,
+    )
+
+    equipment_status = {
+        "age_vs_cycle": equipment.age_years - bench["avg_replacement_cycle_yr"],
+        "is_overdue": equipment.age_years > bench["avg_replacement_cycle_yr"],
+    }
+
+    data_quality = _calc_data_quality(equipment)
+
+    benchmark = {
+        "avg_energy_cost_manwon": bench["avg_energy_cost_manwon"],
+        "avg_defect_rate_pct": bench["avg_defect_rate_pct"],
+        "avg_replacement_cycle_yr": bench["avg_replacement_cycle_yr"],
+        "energy_vs_avg": round(equipment.energy_cost_annual / bench["avg_energy_cost_manwon"], 2),
+        "sources": bench["sources"],
+    }
+
+    ai_recommendation = _calc_ai_recommendation(
+        scenario_a, scenario_b, equipment, bench, equipment_status, data_quality
+    )
+
+    return {
+        "scenario_a": scenario_a,
+        "scenario_b": scenario_b,
+        "recommended": ai_recommendation["decision"],
+        "ai_recommendation": ai_recommendation,
+        "data_quality": data_quality,
+        "benchmark": benchmark,
+        "equipment_status": equipment_status,
     }

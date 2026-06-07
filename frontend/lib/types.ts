@@ -11,8 +11,19 @@ export interface PolicyAnnouncement {
   policy_id: string;
   title: string;
   organization: string;
-  max_amount: number;   // 만원
-  deadline: string;     // ISO date
+  
+  // 분류
+  policy_category?: string;      // 기업마당 원본 분류
+  service_category?: string;     // 우리 서비스 분류
+  service_subcategory?: string;  // 우리 서비스 세부분류
+  
+  // 지원 정보
+  max_amount: number;            // 만원
+  max_amount_note?: string;      // 금액 설명
+  max_amount_source?: string;    // 추출 출처
+  deadline: string;              // ISO date
+  deadline_note?: string;        // 마감일 설명
+  
   d_day: number;
   match_score?: number;
   url: string;

@@ -38,6 +38,7 @@ def build_graph():
         {
             "roi": "capex_advisor_node",
             "policy": "policy_matching_node",
+            "calendar": "policy_matching_node",
             "draft": "application_draft_node",
             "info_missing": "info_collector_node",
             "general": "response_node",

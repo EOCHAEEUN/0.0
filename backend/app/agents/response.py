@@ -1,7 +1,7 @@
 from app.state import FactofitState
 from app.core.database import get_db
 from datetime import datetime
-
+import json
 
 def response_node(state: FactofitState) -> FactofitState:
     if state.get("intent") == "general" and not state.get("final_response"):
@@ -47,20 +47,13 @@ def response_node(state: FactofitState) -> FactofitState:
             print(f"draft_result 저장 실패: {e}")
 
     # roi_result 있으면 roi_output 테이블에 저장
+    # roi_result 있으면 roi_output 테이블에 저장
     if state.get("roi_result"):
         try:
+            import json
             supabase.table("roi_output").insert({
                 "company_id": company_id,
-                "annual_energy_saving": state["roi_result"].annual_energy_saving,     
-                "annual_defect_saving": state["roi_result"].annual_defect_saving,     
-                "total_annual_saving": state["roi_result"].total_annual_saving,     
-                "scenario_a_investment": state["roi_result"].scenario_a_investment,    
-                "scenario_b_investment": state["roi_result"].scenario_b_investment,    
-                "scenario_a_payback_years": state["roi_result"].scenario_a_payback_years, 
-                "scenario_b_payback_years": state["roi_result"].scenario_b_payback_years, 
-                "scenario_a_roi_pct": state["roi_result"].scenario_a_roi_pct,          
-                "scenario_b_roi_pct": state["roi_result"].scenario_b_roi_pct,          
-                "recommendation": state["roi_result"].recommendation,                  
+                "roi_data": state["roi_result"],
                 "created_at": datetime.now().isoformat()
             }).execute()
         except Exception as e:

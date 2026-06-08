@@ -22,7 +22,7 @@ def router_node(state: FactofitState) -> FactofitState:
 
     # 프롬프트에 컨텍스트 주입
     prompt = ROUTER_SYSTEM_PROMPT.format(
-        industry_code=industry_code,
+        industry_codes=industry_code,
         region=region,
         equipment_info=equipment_info,
         chat_history=history_text if history_text else "없음",

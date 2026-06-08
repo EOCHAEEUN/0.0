@@ -22,7 +22,8 @@ from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 from typing import Optional
 
-from app.models.equipment import EquipmentInput, RoiInput
+from app.models.equipment import EquipmentInput
+from app.models.roi_input import RoiInput
 from app.tools.roi_calc import calculate_roi as _calculate_roi
 
 

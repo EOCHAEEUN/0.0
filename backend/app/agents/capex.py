@@ -1,6 +1,5 @@
 from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage
 from app.state import FactofitState
-from app.models.roi_output import RoiOutput 
 from app.prompts.capex import CAPEX_SYSTEM_PROMPT
 from app.tools.roi_calc_tool import calculate_equipment_roi
 from app.core.llm import llm
@@ -48,7 +47,7 @@ def capex_advisor_node(state: FactofitState) -> FactofitState:
             )
 
             # State에 roi_result 저장
-            state["roi_result"] = RoiOutput(**tool_result) 
+            state["roi_result"] = tool_result
 
         # 2차 호출 - tool 결과 보고 최종 응답 생성
         final_response = llm.invoke(messages)

@@ -23,6 +23,7 @@ def response_node(state: FactofitState) -> FactofitState:
             "company_id": company_id,
             "intent": state.get("intent", ""),
             "user_query": state.get("user_query", ""),
+            "chat_history": state.get("chat_history", []), 
             "roi_result": state.get("roi_result"),
             "matched_policies": state.get("matched_policies", []),
             "final_response": state.get("final_response", ""),
@@ -47,7 +48,6 @@ def response_node(state: FactofitState) -> FactofitState:
             print(f"draft_result 저장 실패: {e}")
 
     # roi_result 있으면 roi_output 테이블에 저장
-    # roi_result 있으면 roi_output 테이블에 저장
     if state.get("roi_result"):
         try:
             import json
@@ -58,5 +58,21 @@ def response_node(state: FactofitState) -> FactofitState:
             }).execute()
         except Exception as e:
             print(f"roi_output 저장 실패: {e}")
+
+    # matched_policies 있으면 matched_policy 테이블에 저장
+    if state.get("matched_policies"):
+        try:
+            for policy in state.get("matched_policies", []):
+                supabase.table("matched_policy").insert({
+                    "company_id": company_id,
+                    "policy_id": policy.get("id", ""),
+                    "title": policy.get("metadata", {}).get("title", ""),
+                    "match_score": round(1 - policy.get("distance", 1), 3),
+                    "eligible": True,                   
+                    "reason": "RAG 유사도 기반 매칭",    
+                    "created_at": datetime.now().isoformat()
+                }).execute()
+        except Exception as e:
+            print(f"matched_policy 저장 실패: {e}")
 
     return state

@@ -65,7 +65,6 @@ INVESTMENT_TABLE = {
     ],
 }
 
-
 def estimate_investment(category: str, capacity: Optional[float]) -> Optional[dict]:
     table = INVESTMENT_TABLE.get(category)
     if not table or capacity is None:

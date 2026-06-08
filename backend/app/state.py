@@ -1,8 +1,7 @@
 from typing import TypedDict, Optional
 from app.models.company import CompanyContext
-from app.models.equipment import RoiInput
+from app.models.roi_input import RoiInput
 from app.models.matched_policy import MatchedPolicy
-
 
 class FactofitState(TypedDict):
     user_query: str                           # 사용자 원본 입력

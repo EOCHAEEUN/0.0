@@ -18,13 +18,14 @@ graph TD;
 	capex_advisor_node --> response_node;
 	guard_node -.-> __end__;
 	guard_node -.-> router_node;
+	info_collector_node -.-> __end__;
+	info_collector_node -.-> router_node;
 	policy_matching_node --> response_node;
 	router_node -. &nbsp;draft&nbsp; .-> application_draft_node;
 	router_node -. &nbsp;roi&nbsp; .-> capex_advisor_node;
 	router_node -. &nbsp;info_missing&nbsp; .-> info_collector_node;
-	router_node -. &nbsp;policy&nbsp; .-> policy_matching_node;
+	router_node -. &nbsp;calendar&nbsp; .-> policy_matching_node;
 	router_node -. &nbsp;general&nbsp; .-> response_node;
-	info_collector_node --> __end__;
 	response_node --> __end__;
 	classDef default fill:#f2f0ff,line-height:1.2
 	classDef first fill-opacity:0

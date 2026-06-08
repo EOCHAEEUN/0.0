@@ -1,7 +1,8 @@
 from langchain_core.messages import SystemMessage, HumanMessage
 from app.state import FactofitState
 from app.prompts.info_collector import INFO_COLLECTOR_SYSTEM_PROMPT
-from app.models.equipment import EquipmentInput, RoiInput
+from app.models.equipment import EquipmentInput
+from app.models.roi_input import RoiInput
 from app.models.company import CompanyContext
 from app.core.llm import llm
 import json

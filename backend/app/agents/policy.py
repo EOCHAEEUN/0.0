@@ -21,9 +21,13 @@ def match_policies(company_context: dict, query: str) -> list[dict]:
     where_filters = []
 
     # 업종코드 필터 (optional)
-    if company_context.get("industry_code"):
+    industry_code = company_context.get("industry_code")
+    if isinstance(industry_code, list):
+        industry_code = ",".join(industry_code)
+
+    if industry_code:
         where_filters.append({
-            "industry_codes": {"$contains": company_context["industry_code"]}
+            "industry_codes": {"$contains": industry_code}
         })
 
     # 지역 필터 — 전국 공고(region="") 또는 해당 지역 포함 공고
@@ -68,7 +72,7 @@ def policy_matching_node(state: FactofitState) -> FactofitState:
 
     # 프롬프트 구성
     prompt = POLICY_SYSTEM_PROMPT.format(
-        industry_codes=company.industry_code if company else "정보 없음",
+        industry_code=", ".join(company.industry_code) if company and isinstance(company.industry_code, list) else company.industry_code if company else "정보 없음",
         region=company.region if company else "정보 없음",
         employee_count=company.employee_count if company else "정보 없음",
         annual_revenue=company.annual_revenue or "정보 없음" if company else "정보 없음",

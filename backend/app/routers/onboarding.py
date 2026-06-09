@@ -2,7 +2,6 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from app.models.company import CompanyOnboarding
 from app.core.database import get_db
-from datetime import datetime
 
 router = APIRouter()
 
@@ -12,14 +11,12 @@ async def register_company(body: CompanyOnboarding):
     db = get_db()
 
     payload = {
-        "name": body.company_name,
+        "company_name": body.company_name,
         "industry_code": ",".join(body.industry_code),
         "employee_count": body.employee_count,
         "region": body.region,
         "annual_revenue": body.annual_revenue,
         "energy_cost_annual": body.energy_cost_annual,
-        "created_at": datetime.utcnow().isoformat(),
-        "updated_at": datetime.utcnow().isoformat(),
     }
 
     try:
@@ -30,7 +27,7 @@ async def register_company(body: CompanyOnboarding):
         return {
             "success": True,
             "data": {
-                "company_id": company.get("id"),
+                "company_id": company.get("company_id"),
                 "company": company
             }
         }
@@ -54,7 +51,7 @@ async def get_company(company_id: str):
         result = (
             db.table("company")
             .select("*")
-            .eq("id", company_id)
+            .eq("company_id", company_id)
             .single()
             .execute()
         )

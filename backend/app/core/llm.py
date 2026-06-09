@@ -1,5 +1,6 @@
 from langchain_openai import ChatOpenAI
 from app.core.config import settings
+# from langchain_ollama import ChatOllama
 
 llm = ChatOpenAI(
     model="nvidia/nemotron-3-super-120b-a12b:free",

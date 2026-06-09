@@ -5,24 +5,27 @@ from app.prompts.router import ROUTER_SYSTEM_PROMPT
 from app.core.config import settings
 from app.core.llm import llm
 
-# 신버전 라벨로 변경
-VALID_INTENTS = ["roi", "policy", "draft", "info_missing", "general"]
-
+VALID_INTENTS = ["roi", "policy", "calendar", "draft", "info_missing", "general"]
 
 def router_node(state: FactofitState) -> FactofitState:
     # 기업 컨텍스트 꺼내기
     company = state.get("company_info")
     equipment = state.get("equipment")
 
-    industry_code = company.industry_code if company else "정보 없음"
+    industry_codes = company.industry_code if company else "정보 없음"
     region = company.region if company else "정보 없음"
     equipment_info = equipment.equipment.name if equipment else "정보 없음"
+    history_text = ""
+    for msg in state.get("chat_history", []):
+        role = "사용자" if msg["role"] == "user" else "AI"
+        history_text += f"{role}: {msg['content']}\n"
 
     # 프롬프트에 컨텍스트 주입
     prompt = ROUTER_SYSTEM_PROMPT.format(
-        industry_code=industry_code,
+        industry_codes=industry_codes,
         region=region,
         equipment_info=equipment_info,
+        chat_history=history_text if history_text else "없음",
         user_message=state["user_query"]
     )
 

@@ -1,50 +1,72 @@
-import uuid
-import re
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from typing import Optional, List
+from fastapi import APIRouter
+from fastapi.responses import JSONResponse
+from app.models.company import CompanyOnboarding
+from app.core.database import get_db
 
 router = APIRouter()
 
-_INDUSTRY_CODE_RE = re.compile(r"^[A-Z]\d{2}$")
-
-
-class EquipmentCreate(BaseModel):
-    name: str
-    category: str
-    age_years: int
-    defect_rate: Optional[float] = None
-
-
-class OnboardingRequest(BaseModel):
-    company_name: str
-    industry_code: str          # 예: "C24"
-    region: str                 # 예: "경기도 안산시"
-    employee_count: int
-    annual_energy_cost: int     # 만원/년
-    equipments: List[EquipmentCreate]
-
 
 @router.post("/onboarding")
-async def register_company(body: OnboardingRequest):
-    if not _INDUSTRY_CODE_RE.match(body.industry_code):
-        raise HTTPException(
-            status_code=422,
-            detail={"error": "업종코드 형식이 올바르지 않습니다.", "code": "INVALID_INDUSTRY"},
-        )
+async def register_company(body: CompanyOnboarding):
+    db = get_db()
 
-    company_id = str(uuid.uuid4())
-
-    # TODO: Supabase companies + equipments 테이블 upsert
-
-    return {
-        "company_id": company_id,
-        "message": "등록 완료",
-        "dashboard_ready": True,
+    payload = {
+        "company_name": body.company_name,
+        "industry_code": ",".join(body.industry_code),
+        "employee_count": body.employee_count,
+        "region": body.region,
+        "annual_revenue": body.annual_revenue,
+        "energy_cost_annual": body.energy_cost_annual,
     }
+
+    try:
+        result = db.table("company").insert(payload).execute()
+
+        company = result.data[0] if result.data else payload
+
+        return {
+            "success": True,
+            "data": {
+                "company_id": company.get("company_id"),
+                "company": company
+            }
+        }
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "message": "온보딩 정보를 Supabase에 저장하지 못했습니다.",
+                "error": str(e)
+            }
+        )
 
 
 @router.get("/onboarding/{company_id}")
 async def get_company(company_id: str):
-    # TODO: Supabase 조회
-    return {}
+    db = get_db()
+
+    try:
+        result = (
+            db.table("company")
+            .select("*")
+            .eq("company_id", company_id)
+            .single()
+            .execute()
+        )
+
+        return {
+            "success": True,
+            "data": result.data
+        }
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "success": False,
+                "message": "회사를 찾을 수 없습니다.",
+                "error": str(e)
+            }
+        )

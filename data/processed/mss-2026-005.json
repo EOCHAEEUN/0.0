@@ -1,0 +1,22 @@
+{
+  "policy_id": "mss-2026-005",
+  "title": "2026년 도약(Jump-Up) 프로그램 연계 스마트공장 지원사업",
+  "organization": "중소벤처기업부",
+  "max_amount": 50000,
+  "deadline": null,
+  "deadline_note": "2026년 4월~5월 신청접수 예정",
+  "industry_codes": [
+    "C24",
+    "C25",
+    "C22",
+    "C29"
+  ],
+  "region": null,
+  "url": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000116022",
+  "summary": "도약 프로그램 선정 중소 제조기업의 스마트공장 구축을 지원하여 제조혁신과 글로벌 경쟁력 확보를 지원. 최대 5억원.",
+  "max_employee_count": null,
+  "min_revenue": null,
+  "max_revenue": null,
+  "policy_category": "스마트공장",
+  "policy_subcategory": "도약 프로그램 연계"
+}

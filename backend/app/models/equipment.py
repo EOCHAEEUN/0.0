@@ -3,11 +3,14 @@ from typing import Optional
 
 class EquipmentInput(BaseModel):
     name: str
-    category: str            # press / cnc / compressor 등
+    category: str
     age_years: int
-    energy_cost_annual: int  # 만원/년
-    defect_rate: Optional[float] = None  # %
+    energy_cost_annual: int
+    defect_rate: Optional[float] = None
+    new_energy_cost_annual: Optional[int] = None
+    new_investment_manwon: Optional[int] = None
+    maintenance_cost_annual: Optional[int] = None   
+    capacity_value: Optional[float] = None          
+    production_qty: Optional[int] = None            
+    contribution_margin_won: Optional[int] = None   
 
-class RoiInput(BaseModel):
-    equipment: EquipmentInput
-    company_context: dict = {}

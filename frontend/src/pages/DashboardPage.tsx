@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef } from "react"
 import { useLocation } from "react-router-dom"
 
 type FactoFitIframeWindow = Window & {
@@ -10,7 +10,6 @@ type FactoFitIframeWindow = Window & {
 export default function DashboardPage() {
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
   const location = useLocation()
-  const [showAiAdvisorModal, setShowAiAdvisorModal] = useState(false)
 
   const params = new URLSearchParams(location.search)
   const screen = params.get("screen")
@@ -99,83 +98,6 @@ export default function DashboardPage() {
       })
     }
 
-    const getEventPoint = (event: Event) => {
-      if (event instanceof MouseEvent) {
-        return {
-          clientX: event.clientX,
-          clientY: event.clientY,
-        }
-      }
-
-      if (event instanceof TouchEvent && event.touches.length > 0) {
-        return {
-          clientX: event.touches[0].clientX,
-          clientY: event.touches[0].clientY,
-        }
-      }
-
-      return null
-    }
-
-    const isChatbotTarget = (event: Event) => {
-      const frame = getFrame()
-      const win = frame?.win
-      const point = getEventPoint(event)
-
-      let isBottomRightClick = false
-
-      if (win && point) {
-        isBottomRightClick =
-          point.clientX > win.innerWidth - 210 &&
-          point.clientY > win.innerHeight - 210
-      }
-
-      const path = event.composedPath()
-
-      const matchedByElement = path.some((item) => {
-        if (!(item instanceof HTMLElement)) return false
-
-        const text = getText(item)
-        const className = String(item.className || "").toLowerCase()
-        const id = String(item.id || "").toLowerCase()
-        const aria = String(item.getAttribute("aria-label") || "").toLowerCase()
-        const title = String(item.getAttribute("title") || "").toLowerCase()
-        const src = String((item as HTMLImageElement).src || "").toLowerCase()
-
-        return (
-          text.includes("FactoFit AI") ||
-          text.includes("팩토핏 AI") ||
-          text.includes("챗봇") ||
-          text.includes("AI 상담") ||
-          text.includes("어드바이저") ||
-          className.includes("chat") ||
-          className.includes("bot") ||
-          className.includes("assistant") ||
-          className.includes("floating") ||
-          className.includes("advisor") ||
-          id.includes("chat") ||
-          id.includes("bot") ||
-          id.includes("assistant") ||
-          id.includes("floating") ||
-          id.includes("advisor") ||
-          aria.includes("chat") ||
-          aria.includes("bot") ||
-          aria.includes("assistant") ||
-          aria.includes("advisor") ||
-          title.includes("chat") ||
-          title.includes("bot") ||
-          title.includes("assistant") ||
-          title.includes("advisor") ||
-          src.includes("chat") ||
-          src.includes("bot") ||
-          src.includes("assistant") ||
-          src.includes("advisor")
-        )
-      })
-
-      return Boolean(isBottomRightClick || matchedByElement)
-    }
-
     const handleIframeEvent = (event: Event) => {
       const target = event.target as Element | null
       if (!target) return
@@ -188,20 +110,28 @@ export default function DashboardPage() {
 
       const text = getText(clicked)
 
-      if (isChatbotTarget(event)) {
+      // 기존 HTML 챗봇이 남아 있을 경우 클릭/팝업만 막음.
+      const isLegacyChatbot =
+        text.includes("FactoFit AI") ||
+        text.includes("팩토핏 AI") ||
+        text.includes("챗봇") ||
+        text.includes("AI 상담") ||
+        text.includes("어드바이저") ||
+        clicked.className?.toString().toLowerCase().includes("chat") ||
+        clicked.className?.toString().toLowerCase().includes("bot") ||
+        clicked.className?.toString().toLowerCase().includes("advisor") ||
+        clicked.id?.toLowerCase().includes("chat") ||
+        clicked.id?.toLowerCase().includes("bot") ||
+        clicked.id?.toLowerCase().includes("advisor")
+
+      if (isLegacyChatbot) {
         event.preventDefault()
         event.stopPropagation()
         event.stopImmediatePropagation()
 
         hideLegacyChatbotPopup()
 
-        console.log("[FactoFit] iframe 챗봇 클릭 → React AI Advisor 팝업 열기")
-        setShowAiAdvisorModal(true)
-
-        window.setTimeout(hideLegacyChatbotPopup, 50)
-        window.setTimeout(hideLegacyChatbotPopup, 150)
-        window.setTimeout(hideLegacyChatbotPopup, 300)
-
+        console.log("[FactoFit] 기존 HTML 챗봇 클릭 차단")
         return
       }
 
@@ -284,7 +214,6 @@ export default function DashboardPage() {
 
         console.log("[FactoFit] 안전점검 React 이동:", text)
         moveToReactPage("/safety")
-        return
       }
     }
 
@@ -511,95 +440,6 @@ export default function DashboardPage() {
           display: "block",
         }}
       />
-
-      <button
-        type="button"
-        onClick={() => setShowAiAdvisorModal(true)}
-        aria-label="FactoFit AI 어드바이저 열기"
-        style={{
-          position: "fixed",
-          right: "32px",
-          bottom: "32px",
-          zIndex: 99998,
-          width: "86px",
-          height: "86px",
-          borderRadius: "999px",
-          border: "8px solid rgba(255,255,255,0.88)",
-          background:
-            "linear-gradient(145deg, #0f1b33 0%, #1f3b6d 52%, #d69b45 100%)",
-          boxShadow:
-            "0 24px 60px rgba(15, 23, 42, 0.34), 0 0 0 10px rgba(15, 23, 42, 0.08)",
-          color: "white",
-          fontSize: "30px",
-          fontWeight: 900,
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        AI
-      </button>
-
-      <div
-        onClick={() => setShowAiAdvisorModal(false)}
-        style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 99999,
-          background: "rgba(15, 23, 42, 0.58)",
-          backdropFilter: "blur(6px)",
-          display: showAiAdvisorModal ? "flex" : "none",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "28px",
-        }}
-      >
-        <div
-          onClick={(event) => event.stopPropagation()}
-          style={{
-            width: "min(520px, 94vw)",
-            height: "min(720px, 88vh)",
-            background: "#f8fafc",
-            borderRadius: "30px",
-            overflow: "hidden",
-            boxShadow: "0 30px 90px rgba(15, 23, 42, 0.45)",
-            position: "relative",
-          }}
-        >
-          <button
-            onClick={() => setShowAiAdvisorModal(false)}
-            style={{
-              position: "absolute",
-              top: "16px",
-              right: "16px",
-              zIndex: 3,
-              width: "38px",
-              height: "38px",
-              borderRadius: "999px",
-              border: "0",
-              background: "rgba(226, 232, 240, 0.95)",
-              color: "#0f172a",
-              fontSize: "22px",
-              fontWeight: 900,
-              cursor: "pointer",
-            }}
-          >
-            ×
-          </button>
-
-          <iframe
-            src="/ai-advisor"
-            title="FactoFit AI Advisor"
-            style={{
-              width: "100%",
-              height: "100%",
-              border: "0",
-              display: "block",
-            }}
-          />
-        </div>
-      </div>
     </div>
   )
 }

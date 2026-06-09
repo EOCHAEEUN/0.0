@@ -76,6 +76,16 @@ def capex_advisor_node(state: FactofitState) -> FactofitState:
     if not equipment or equipment.equipment.category not in supported:
         state["final_response"] = "죄송해요, 현재 ROI 계산은 프레스(press), CNC, 사출성형기(injection) 설비만 지원하고 있어요. 추후 더 많은 설비 유형을 지원할 예정입니다!"
         return state
+    
+    # matched_policies 없으면 ChromaDB에서 직접 검색
+    if not matched_policies and company:
+        from app.agents.policy import match_policies
+        company_context = {
+            "industry_code": company.industry_code or "",
+            "region": company.region or ""
+        }
+        matched_policies = match_policies(company_context, state["user_query"])
+        state["matched_policies"] = matched_policies
 
     # LLM에 Tool 바인딩
     llm_with_tools = llm.bind_tools([calculate_equipment_roi])
@@ -116,6 +126,13 @@ def capex_advisor_node(state: FactofitState) -> FactofitState:
         # 2차 호출 - tool 결과 보고 최종 응답 생성
         final_response = llm.invoke(messages)
         state["final_response"] = final_response.content
+
+        if matched_policies:
+            title = matched_policies[0]["metadata"].get("title", "")
+            amount = matched_policies[0]["metadata"].get("max_amount", 0)
+            if title and amount:
+                state["final_response"] += f"\n\n📋 매칭 지원사업: [{title}] 최대 {amount}만원 활용 가능"
+
     else:
         state["final_response"] = response.content
 

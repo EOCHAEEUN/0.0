@@ -17,9 +17,6 @@ def info_collector_node(state: FactofitState) -> FactofitState:
 
     history_text += f"사용자: {state['user_query']}\n"
 
-    print("=== history_text ===")
-    print(history_text)  # 추가
-
     # 프롬프트 구성
     prompt = INFO_COLLECTOR_SYSTEM_PROMPT.format(
         chat_history=history_text if history_text else "없음",
@@ -27,8 +24,6 @@ def info_collector_node(state: FactofitState) -> FactofitState:
     )
 
     response = llm.invoke([SystemMessage(content=prompt)])
-    print("=== LLM 응답 ===")
-    print(response.content)
 
     try:
         content = response.content.strip()
@@ -67,9 +62,7 @@ def info_collector_node(state: FactofitState) -> FactofitState:
                 state["final_response"] = ""
                 state["user_query"] = f"{data.get('industry_code', '')} {data.get('region', '')} 제조기업 지원사업"
                 # 안내 메시지는 matched_policies 결과랑 같이 보여줌
-                # prompts/policy.py에서 처리
-                print("=== user_query ===")
-                print(state["user_query"])    
+                # prompts/policy.py에서 처리  
                 return state
             
             state["equipment"] = RoiInput(

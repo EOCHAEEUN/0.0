@@ -220,9 +220,6 @@ def _build_scenario(
         else:
             # 업종 평균 중간값으로 폴백
             table = INVESTMENT_TABLE.get(category, [])
-            print("=== 투자금 폴백 ===")
-            print(f"category: {equipment.category}")
-            print(f"table: {table}")
             if table:
                 mid_row = table[len(table)//2]
                 if scenario_key == "scenario_a":

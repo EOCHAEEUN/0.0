@@ -33,9 +33,6 @@ def router_node(state: FactofitState) -> FactofitState:
         SystemMessage(content=prompt)
     ])
 
-    print("=== ROUTER 응답 ===")
-    print(response.content)
-
     intent = response.content.strip().lower()
 
     # 유효하지 않은 intent면 info_missing으로 fallback

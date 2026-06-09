@@ -58,6 +58,32 @@ def response_node(state: FactofitState) -> FactofitState:
             }).execute()
         except Exception as e:
             print(f"roi_output 저장 실패: {e}")
+    
+    # roi_input 저장
+    if state.get("equipment") and state.get("intent") == "roi":
+        try:
+            eq = state["equipment"].equipment
+            roi = state["equipment"]
+            supabase.table("roi_input").insert({
+                "company_id": company_id,
+                "equipment_name": eq.name,
+                "category": eq.category,
+                "age_years": eq.age_years,
+                "energy_cost_annual": eq.energy_cost_annual,
+                "defect_rate": eq.defect_rate,
+                "new_energy_cost_annual": eq.new_energy_cost_annual,
+                "maintenance_cost_annual": eq.maintenance_cost_annual,
+                "capacity_value": eq.capacity_value,
+                "production_qty": eq.production_qty,
+                "contribution_margin_won": eq.contribution_margin_won,
+                "scenario_a_investment_manwon": roi.scenario_a_investment_manwon,
+                "scenario_a_subsidy_manwon": roi.scenario_a_subsidy_manwon,
+                "scenario_b_investment_manwon": roi.scenario_b_investment_manwon,
+                "scenario_b_subsidy_manwon": roi.scenario_b_subsidy_manwon,
+                "created_at": datetime.now().isoformat()
+            }).execute()
+        except Exception as e:
+            print(f"roi_input 저장 실패: {e}")
 
     # matched_policies 있으면 matched_policy 테이블에 저장
     if state.get("matched_policies"):

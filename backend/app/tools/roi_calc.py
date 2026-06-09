@@ -167,6 +167,15 @@ def _build_scenario(
     investment_override: Optional[int],
     subsidy_override: Optional[int],
 ) -> dict:
+    # category 정규화 추가
+    category = equipment.category.lower()
+    if "프레스" in category or "press" in category:
+        category = "press"
+    elif "cnc" in category:
+        category = "cnc"
+    elif "사출" in category or "injection" in category:
+        category = "injection"
+
     s = bench[scenario_key]
 
     # 에너지 절감
@@ -204,13 +213,24 @@ def _build_scenario(
     if investment_override is not None:
         investment = investment_override
     else:
-        est = estimate_investment(equipment.category, equipment.capacity_value)
+        est = estimate_investment(category, equipment.capacity_value)
         if est:
             investment = est[scenario_key]["mid"]
             inv_estimation = est
         else:
-            investment = None
-
+            # 업종 평균 중간값으로 폴백
+            table = INVESTMENT_TABLE.get(category, [])
+            print("=== 투자금 폴백 ===")
+            print(f"category: {equipment.category}")
+            print(f"table: {table}")
+            if table:
+                mid_row = table[len(table)//2]
+                if scenario_key == "scenario_a":
+                    investment = (mid_row["a_low"] + mid_row["a_high"]) // 2
+                else:
+                    investment = (mid_row["b_low"] + mid_row["b_high"]) // 2
+            else:
+                investment = None
     # 지원금
     subsidy = subsidy_override if subsidy_override is not None else s["default_subsidy"]
 
@@ -386,7 +406,18 @@ def _calc_ai_recommendation(
 # ==================== 5. 메인 계산 ====================
 def calculate_roi(roi_input: RoiInput) -> dict:
     equipment = roi_input.equipment
-    bench = BENCHMARKS.get(equipment.category)
+
+    # category 정규화
+    category = equipment.category.lower()
+    if "프레스" in category or "press" in category:
+        category = "press"
+    elif "cnc" in category:
+        category = "cnc"
+    elif "사출" in category or "injection" in category:
+        category = "injection"
+
+    bench = BENCHMARKS.get(category)
+
     if bench is None:
         raise ValueError(f"지원하지 않는 설비 카테고리입니다: {equipment.category}")
 

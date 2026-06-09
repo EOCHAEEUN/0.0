@@ -7,4 +7,4 @@ router = APIRouter()
 @router.post("/roi/simulate")
 async def simulate_roi(body: RoiInput):
     """ROI 시뮬레이션 REST 엔드포인트"""
-    return calculate_roi(body.equipment)
+    return calculate_roi(body)

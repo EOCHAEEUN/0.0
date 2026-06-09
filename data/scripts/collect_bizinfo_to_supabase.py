@@ -6,6 +6,7 @@ from html import unescape
 from datetime import datetime
 from dotenv import load_dotenv
 from supabase import create_client, Client
+from langchain_openai import ChatOpenAI
 
 
 # =========================
@@ -27,7 +28,11 @@ MIN_RELEVANCE_SCORE = 4
 load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip()
-SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+SUPABASE_SERVICE_ROLE_KEY = (
+    os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    or os.getenv("SUPABASE_SERVICE_KEY")
+    or ""
+).strip()
 BIZINFO_API_KEY = os.getenv("BIZINFO_API_KEY", "").strip()
 
 if not SUPABASE_URL:
@@ -39,7 +44,17 @@ if not SUPABASE_SERVICE_ROLE_KEY:
 if not BIZINFO_API_KEY:
     raise ValueError("BIZINFO_API_KEY가 .env에 없습니다.")
 
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
+DATA_LLM_MODEL = os.getenv("DATA_LLM_MODEL", "nvidia/nemotron-3-super-120b-a12b:free").strip()
+
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
+llm = ChatOpenAI(
+    model=DATA_LLM_MODEL,
+    openai_api_key=OPENROUTER_API_KEY,
+    openai_api_base="https://openrouter.ai/api/v1",
+    temperature=0,
+) if OPENROUTER_API_KEY else None
 
 
 # =========================
@@ -101,6 +116,15 @@ MANUFACTURING_KEYWORDS = [
 EXCLUDE_KEYWORDS = [
     "음식점", "외식", "카페", "숙박", "관광",
     "농업", "어업", "문화예술", "공연", "예비창업"
+]
+
+# 팩토핏 서비스 핵심 키워드 — "제조", "에너지" 같은 단독 범용어는 제외한다.
+# 단순 제조기업/R&D/사업화 공고가 아니라 설비투자·공정개선·효율화 맥락만 통과시킨다.
+CAPEX_KEYWORDS = [
+    "설비", "제조설비", "생산설비", "노후설비", "설비투자",
+    "스마트공장", "스마트제조", "공정개선", "공정자동화",
+    "자동화설비", "로봇자동화", "노후", "교체",
+    "에너지효율", "에너지절감", "고효율", "CAPEX",
 ]
 
 
@@ -194,6 +218,47 @@ def split_hashtags(raw: str):
         for tag in raw.split(",")
         if tag.strip()
     ]
+
+
+def has_capex_keyword(title: str, body: str) -> bool:
+    text = f"{title} {body}"
+    return any(kw in text for kw in CAPEX_KEYWORDS)
+
+
+def has_manufacturing_industry_code(industry_codes: list[str]) -> bool:
+    return any(str(code).startswith("C") for code in industry_codes or [])
+
+
+def extract_amount_with_llm(text: str) -> int | None:
+    if not llm or not text or len(text) < 50:
+        return None
+
+    prompt = (
+        "다음 정부 지원사업 공고에서 최대 지원 금액을 만원 단위 정수로만 반환해줘. "
+        "없으면 null 반환. 설명 금지.\n\n"
+        + text[:2000]
+    )
+
+    try:
+        response = llm.invoke(prompt)
+        raw = response.content.strip()
+
+        if not raw or raw.lower() in ("null", "none", "없음"):
+            return None
+
+        cleaned = raw.replace(",", "").strip()
+
+        if cleaned.isdigit():
+            return int(cleaned)
+
+        match = re.search(r"\d+", cleaned)
+        if match:
+            return int(match.group())
+
+    except Exception as e:
+        print(f"  → LLM 금액 추출 실패: {e}")
+
+    return None
 
 
 # =========================
@@ -451,6 +516,13 @@ def main():
 
             seen_policy_ids.add(policy_id)
 
+            # CAPEX 키워드 + 제조업(C계열) 업종코드 기준을 모두 만족한 공고만 저장
+            if not has_capex_keyword(row.get("title", ""), row.get("summary", "")):
+                continue
+
+            if not has_manufacturing_industry_code(row.get("industry_codes", [])):
+                continue
+
             score = calculate_relevance_score(row)
 
             # 제조업 관련성이 낮은 공고는 제외
@@ -459,11 +531,19 @@ def main():
 
             row["relevance_score"] = score
             row["is_selected"] = True
-            row["selected_reason"] = "제조업 관련 키워드 기준 통과"
+            row["selected_reason"] = "CAPEX 키워드 + 제조업 업종코드 기준 통과"
+
+            # LLM 금액 추출 (실패해도 저장은 계속)
+            amount = extract_amount_with_llm(row.get("summary", ""))
+            if amount is not None:
+                row["max_amount"] = amount
+                row["amount_extraction_status"] = "extracted"
+                row["max_amount_source"] = "llm_summary"
+                print(f"  → LLM 금액 추출: {amount}만원 ({policy_id})")
 
             page_rows.append(row)
 
-        print(f"  → 제조업 관련 필터 통과: {len(page_rows)}건")
+        print(f"  → CAPEX 키워드 + 제조업 필터 통과: {len(page_rows)}건")
 
         if page_rows:
             upsert_policies(page_rows)

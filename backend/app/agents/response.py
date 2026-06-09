@@ -19,16 +19,19 @@ def response_node(state: FactofitState) -> FactofitState:
 
     # chat_history 테이블에 저장
     try:
-        supabase.table("chat_history").insert({
-            "company_id": company_id,
-            "intent": state.get("intent", ""),
-            "user_query": state.get("user_query", ""),
-            "chat_history": state.get("chat_history", []), 
-            "roi_result": state.get("roi_result"),
-            "matched_policies": state.get("matched_policies", []),
-            "final_response": state.get("final_response", ""),
-            "created_at": datetime.now().isoformat()
-        }).execute()
+        insert_result = supabase.table("chat_history").insert({
+    "company_id": company_id,
+    "intent": state.get("intent", ""),
+    "user_query": state.get("user_query", ""),
+    "chat_history": state.get("chat_history", []),
+    "roi_result": state.get("roi_result"),
+    "matched_policies": state.get("matched_policies", []),
+    "final_response": state.get("final_response", ""),
+    "created_at": datetime.now().isoformat()
+}).execute()
+
+if insert_result.data and len(insert_result.data) > 0:
+    state["chat_id"] = insert_result.data[0].get("chat_id")
     except Exception as e:
         print(f"chat_history 저장 실패: {e}")
 

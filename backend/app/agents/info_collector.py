@@ -27,7 +27,9 @@ def info_collector_node(state: FactofitState) -> FactofitState:
     )
 
     response = llm.invoke([SystemMessage(content=prompt)])
-    
+    print("=== LLM 응답 ===")
+    print(response.content)
+
     try:
         content = response.content.strip()
         if content.startswith("```"):
@@ -46,11 +48,30 @@ def info_collector_node(state: FactofitState) -> FactofitState:
                 category = "press"
             elif "cnc" in name:
                 category = "cnc"
-            elif "컴프레셔" in name or "compressor" in name:
-                category = "compressor"
+            elif "사출" in name or "injection" in name:
+                category = "injection"
             else:
-                category = "default"
+                category = "unsupported"
 
+            if category == "unsupported":
+                state["unsupported_equipment"] = True
+                # company_info 저장
+                state["company_info"] = CompanyContext(
+                    company_name="",
+                    industry_code=data.get("industry_code", ""),
+                    employee_count=int(data.get("employee_count")or 0),
+                    region=data.get("region", "")
+                )
+                # policy로 넘기되 user_query를 지원사업 검색으로 변경
+                state["intent"] = "policy"
+                state["final_response"] = ""
+                state["user_query"] = f"{data.get('industry_code', '')} {data.get('region', '')} 제조기업 지원사업"
+                # 안내 메시지는 matched_policies 결과랑 같이 보여줌
+                # prompts/policy.py에서 처리
+                print("=== user_query ===")
+                print(state["user_query"])    
+                return state
+            
             state["equipment"] = RoiInput(
                 equipment=EquipmentInput(
                     name=data.get("equipment_name", ""),
@@ -58,16 +79,19 @@ def info_collector_node(state: FactofitState) -> FactofitState:
                     age_years=int(data.get("age_years", 0)),
                     energy_cost_annual=int(data.get("energy_cost_annual", 0)),
                     new_energy_cost_annual=int(data["new_energy_cost_annual"]) if data.get("new_energy_cost_annual") else None,
-                    new_investment_manwon=int(data["new_investment_manwon"]) if data.get("new_investment_manwon") else None
+                    new_investment_manwon=int(data["new_investment_manwon"]) if data.get("new_investment_manwon") else None,
+                    defect_rate=float(data["defect_rate"]) if data.get("defect_rate") else None,
+                    maintenance_cost_annual=int(data["maintenance_cost_annual"]) if data.get("maintenance_cost_annual") else None
                 )
             )
 
             state["company_info"] = CompanyContext(
                 company_name="",
                 industry_code=data.get("industry_code", ""),
-                employee_count=0,
-                region=data.get("region", "")
-            ) 
+                employee_count=int(data.get("employee_count", 0)),
+                region=data.get("region", ""),
+                annual_revenue=data.get("annual_revenue")
+            )
 
             # router로 돌아가도록 intent 비우고 final_response 비움
             state["intent"] = ""

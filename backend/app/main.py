@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import chat, onboarding, roi
+from app.routers import chat, onboarding, roi, dashboard, policies
 
 app = FastAPI(
     title="FactoFit API",
@@ -10,7 +10,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:5173"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -19,7 +22,5 @@ app.add_middleware(
 app.include_router(chat.router, prefix="/api", tags=["chat"])
 app.include_router(onboarding.router, prefix="/api", tags=["onboarding"])
 app.include_router(roi.router, prefix="/api", tags=["roi"])
-
-@app.get("/health")
-async def health():
-    return {"status": "ok", "service": "FactoFit API"}
+app.include_router(dashboard.router, prefix="/api", tags=["dashboard"])
+app.include_router(policies.router, prefix="/api", tags=["policies"])

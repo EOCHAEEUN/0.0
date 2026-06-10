@@ -1,110 +1,445 @@
-import { useNavigate } from "react-router-dom"
+import { useEffect, useRef } from "react"
+import { useLocation } from "react-router-dom"
 
-import SupportRecommendCard from "../components/dashboard/SupportRecommendCard"
-import MainLayout from "../components/layout/MainLayout"
-import KpiCard from "../components/dashboard/KpiCard"
-import EquipmentStatusList from "../components/dashboard/EquipmentStatusList"
-import EnergyChart from "../components/dashboard/EnergyChart"
-import { kpiData, equipmentData } from "../data/dashboard.mock"
+type FactoFitIframeWindow = Window & {
+  openFactoFitLoginDashboard?: () => void
+  showDashboard?: () => void
+  showView?: (id: string) => void
+}
 
 export default function DashboardPage() {
-  const navigate = useNavigate()
+  const iframeRef = useRef<HTMLIFrameElement | null>(null)
+  const location = useLocation()
+
+  const params = new URLSearchParams(location.search)
+  const screen = params.get("screen")
+
+  const iframeSrc = "/factofit-main.html"
+
+  useEffect(() => {
+    const iframe = iframeRef.current
+    if (!iframe) return
+
+    const timers: number[] = []
+    let observer: MutationObserver | null = null
+
+    const getFrame = () => {
+      const win = iframe.contentWindow as FactoFitIframeWindow | null
+      const doc = iframe.contentDocument
+
+      if (!win || !doc) return null
+
+      return { win, doc }
+    }
+
+    const getText = (el: Element | null) => {
+      if (!el) return ""
+
+      return (
+        (el as HTMLElement).innerText ||
+        el.textContent ||
+        el.getAttribute("aria-label") ||
+        el.getAttribute("title") ||
+        ""
+      ).trim()
+    }
+
+    const moveToReactPage = (path: string) => {
+      window.location.href = window.location.origin + path
+    }
+
+    const hideLegacyChatbotPopup = () => {
+      const frame = getFrame()
+      if (!frame) return
+
+      const { doc } = frame
+
+      const selectors = [
+        ".ai-modal",
+        ".advisor-modal",
+        ".chat-modal",
+        ".chatbot-modal",
+        ".chatbot-panel",
+        ".bot-modal",
+        ".assistant-modal",
+        ".floating-chat-modal",
+        ".modal",
+        "[id*='chat']",
+        "[id*='Chat']",
+        "[id*='bot']",
+        "[id*='Bot']",
+        "[id*='advisor']",
+        "[id*='Advisor']",
+        "[class*='chat']",
+        "[class*='Chat']",
+        "[class*='bot']",
+        "[class*='Bot']",
+        "[class*='advisor']",
+        "[class*='Advisor']",
+      ]
+
+      doc.querySelectorAll(selectors.join(",")).forEach((el) => {
+        const htmlEl = el as HTMLElement
+        const text = getText(htmlEl)
+
+        const looksLikeLegacyPopup =
+          text.includes("FactoFit AI 어드바이저") ||
+          text.includes("AI 진단") ||
+          text.includes("시나리오 A") ||
+          text.includes("지원사업 보여줘") ||
+          text.includes("안전점검 위험 항목") ||
+          text.includes("Dashboard Experience 보기")
+
+        if (looksLikeLegacyPopup) {
+          htmlEl.style.display = "none"
+          htmlEl.style.visibility = "hidden"
+          htmlEl.style.pointerEvents = "none"
+        }
+      })
+    }
+
+    const handleIframeEvent = (event: Event) => {
+      const target = event.target as Element | null
+      if (!target) return
+
+      const clicked = target.closest(
+        "button, a, [role='button'], div"
+      ) as HTMLElement | null
+
+      if (!clicked) return
+
+      const text = getText(clicked)
+
+      // 기존 HTML 챗봇이 남아 있을 경우 클릭/팝업만 막음.
+      const isLegacyChatbot =
+        text.includes("FactoFit AI") ||
+        text.includes("팩토핏 AI") ||
+        text.includes("챗봇") ||
+        text.includes("AI 상담") ||
+        text.includes("어드바이저") ||
+        clicked.className?.toString().toLowerCase().includes("chat") ||
+        clicked.className?.toString().toLowerCase().includes("bot") ||
+        clicked.className?.toString().toLowerCase().includes("advisor") ||
+        clicked.id?.toLowerCase().includes("chat") ||
+        clicked.id?.toLowerCase().includes("bot") ||
+        clicked.id?.toLowerCase().includes("advisor")
+
+      if (isLegacyChatbot) {
+        event.preventDefault()
+        event.stopPropagation()
+        event.stopImmediatePropagation()
+
+        hideLegacyChatbotPopup()
+
+        console.log("[FactoFit] 기존 HTML 챗봇 클릭 차단")
+        return
+      }
+
+      const isMainButton =
+        text.trim() === "← 메인으로" ||
+        text.trim() === "메인으로" ||
+        text.includes("메인으로")
+
+      if (isMainButton) {
+        event.preventDefault()
+        event.stopPropagation()
+        event.stopImmediatePropagation()
+
+        console.log("[FactoFit] 메인 화면으로 이동:", text)
+        window.location.href = window.location.origin + "/"
+        return
+      }
+
+      const isRoiDetail =
+        text.includes("ROI 상세 리포트 보기") ||
+        text.includes("AI 상세 리포트 분석") ||
+        text.includes("상세 리포트 보기") ||
+        text.includes("리포트 보기")
+
+      const isSupportPage =
+        text.trim() === "지원사업" ||
+        text.includes("지원사업 보기") ||
+        text.includes("추천 지원사업") ||
+        text.includes("지원사업 현황") ||
+        text.includes("SCREEN 02 지원사업 보여줘")
+
+      const isApplicationDraft =
+        text.trim() === "신청서 생성" ||
+        text.includes("신청서 초안 생성") ||
+        text.includes("신청서 생성 보기") ||
+        text.includes("신청서 초안 보기") ||
+        text.includes("신청서 초안 만들어줘") ||
+        text.includes("시나리오 A 신청서 초안")
+
+      const isSafetyPage =
+        text.trim() === "안전점검" ||
+        text.includes("안전점검 현황") ||
+        text.includes("안전점검 보기") ||
+        text.includes("안전점검 위험 항목")
+
+      if (isRoiDetail) {
+        event.preventDefault()
+        event.stopPropagation()
+        event.stopImmediatePropagation()
+
+        console.log("[FactoFit] ROI 상세 리포트 React 이동:", text)
+        moveToReactPage("/roi")
+        return
+      }
+
+      if (isSupportPage) {
+        event.preventDefault()
+        event.stopPropagation()
+        event.stopImmediatePropagation()
+
+        console.log("[FactoFit] 지원사업 React 이동:", text)
+        moveToReactPage("/support-projects")
+        return
+      }
+
+      if (isApplicationDraft) {
+        event.preventDefault()
+        event.stopPropagation()
+        event.stopImmediatePropagation()
+
+        console.log("[FactoFit] 신청서 생성 React 이동:", text)
+        moveToReactPage("/application-draft")
+        return
+      }
+
+      if (isSafetyPage) {
+        event.preventDefault()
+        event.stopPropagation()
+        event.stopImmediatePropagation()
+
+        console.log("[FactoFit] 안전점검 React 이동:", text)
+        moveToReactPage("/safety")
+      }
+    }
+
+    const bindClickRouter = () => {
+      const frame = getFrame()
+      if (!frame) return false
+
+      const { doc } = frame
+
+      doc.removeEventListener("pointerdown", handleIframeEvent, true)
+      doc.removeEventListener("mousedown", handleIframeEvent, true)
+      doc.removeEventListener("touchstart", handleIframeEvent, true)
+      doc.removeEventListener("click", handleIframeEvent, true)
+
+      doc.addEventListener("pointerdown", handleIframeEvent, true)
+      doc.addEventListener("mousedown", handleIframeEvent, true)
+      doc.addEventListener("touchstart", handleIframeEvent, true)
+      doc.addEventListener("click", handleIframeEvent, true)
+
+      console.log("[FactoFit] iframe 클릭 라우터 재연결 완료")
+      return true
+    }
+
+    const observeCurrentDocument = () => {
+      const frame = getFrame()
+      if (!frame) return
+
+      const { doc } = frame
+
+      if (observer) {
+        observer.disconnect()
+        observer = null
+      }
+
+      if (!doc.body) return
+
+      observer = new MutationObserver(() => {
+        bindClickRouter()
+      })
+
+      observer.observe(doc.body, {
+        childList: true,
+        subtree: true,
+      })
+
+      bindClickRouter()
+    }
+
+    const openLoginDashboardHtml = () => {
+      const frame = getFrame()
+      if (!frame) return false
+
+      const { win, doc } = frame
+
+      const alreadyInnerDashboard = Boolean(doc.getElementById("dashboard"))
+
+      if (alreadyInnerDashboard) {
+        console.log("[FactoFit] 이미 로그인 후 HTML 문서 상태")
+        return true
+      }
+
+      if (typeof win.openFactoFitLoginDashboard === "function") {
+        console.log("[FactoFit] 겉 HTML → 로그인 이후 HTML로 전환")
+        win.openFactoFitLoginDashboard()
+        return true
+      }
+
+      console.log("[FactoFit] openFactoFitLoginDashboard 함수를 못 찾음")
+      return false
+    }
+
+    const showRealDashboard = () => {
+      const frame = getFrame()
+      if (!frame) return false
+
+      const { win, doc } = frame
+
+      if (typeof win.showDashboard === "function") {
+        console.log("[FactoFit] 내부 showDashboard 실행")
+        win.showDashboard()
+
+        if (typeof win.showView === "function") {
+          win.showView("home")
+        }
+
+        observeCurrentDocument()
+        return true
+      }
+
+      const dashboard = doc.getElementById("dashboard")
+
+      if (dashboard) {
+        console.log("[FactoFit] showDashboard 함수 없이 dashboard 직접 표시")
+
+        dashboard.classList.add("show")
+        doc.body.classList.add("dashboard-mode")
+
+        doc.querySelectorAll(".view").forEach((view) => {
+          view.classList.toggle("active", view.id === "home")
+        })
+
+        observeCurrentDocument()
+        return true
+      }
+
+      console.log("[FactoFit] 내부 dashboard 아직 못 찾음")
+      return false
+    }
+
+    const showRoiSummary = () => {
+      const frame = getFrame()
+      if (!frame) return false
+
+      const { win, doc } = frame
+
+      if (typeof win.showDashboard === "function") {
+        console.log("[FactoFit] 내부 showDashboard 실행 후 ROI 화면 이동")
+        win.showDashboard()
+      }
+
+      if (typeof win.showView === "function") {
+        win.showView("roi")
+        observeCurrentDocument()
+        console.log("[FactoFit] HTML ROI 분석 화면 이동 성공")
+        return true
+      }
+
+      const dashboard = doc.getElementById("dashboard")
+      const roiView = doc.getElementById("roi")
+
+      if (dashboard && roiView) {
+        console.log("[FactoFit] showView 함수 없이 ROI view 직접 표시")
+
+        dashboard.classList.add("show")
+        doc.body.classList.add("dashboard-mode")
+
+        doc.querySelectorAll(".view").forEach((view) => {
+          view.classList.toggle("active", view.id === "roi")
+        })
+
+        observeCurrentDocument()
+        return true
+      }
+
+      console.log("[FactoFit] HTML ROI 분석 화면 아직 못 찾음")
+      return false
+    }
+
+    const bootDashboard = () => {
+      bindClickRouter()
+
+      if (screen === "dashboard") {
+        console.log("[FactoFit] ?screen=dashboard 감지")
+
+        openLoginDashboardHtml()
+
+        timers.push(window.setTimeout(showRealDashboard, 300))
+        timers.push(window.setTimeout(showRealDashboard, 800))
+        timers.push(window.setTimeout(showRealDashboard, 1400))
+        timers.push(window.setTimeout(showRealDashboard, 2200))
+        timers.push(window.setTimeout(showRealDashboard, 3500))
+
+        timers.push(window.setTimeout(bindClickRouter, 4500))
+        timers.push(window.setTimeout(bindClickRouter, 5500))
+        timers.push(window.setTimeout(bindClickRouter, 6500))
+
+        return
+      }
+
+      if (screen === "roi-summary") {
+        console.log("[FactoFit] ?screen=roi-summary 감지")
+
+        openLoginDashboardHtml()
+
+        timers.push(window.setTimeout(showRoiSummary, 300))
+        timers.push(window.setTimeout(showRoiSummary, 800))
+        timers.push(window.setTimeout(showRoiSummary, 1400))
+        timers.push(window.setTimeout(showRoiSummary, 2200))
+        timers.push(window.setTimeout(showRoiSummary, 3500))
+
+        timers.push(window.setTimeout(bindClickRouter, 4500))
+        timers.push(window.setTimeout(bindClickRouter, 5500))
+        timers.push(window.setTimeout(bindClickRouter, 6500))
+
+        return
+      }
+
+      observeCurrentDocument()
+    }
+
+    iframe.addEventListener("load", bootDashboard)
+
+    if (iframe.contentDocument?.readyState === "complete") {
+      timers.push(window.setTimeout(bootDashboard, 0))
+    }
+
+    return () => {
+      iframe.removeEventListener("load", bootDashboard)
+      timers.forEach((timer) => window.clearTimeout(timer))
+
+      if (observer) {
+        observer.disconnect()
+      }
+    }
+  }, [screen])
 
   return (
-    <MainLayout>
-      <div className="space-y-6">
-        <div>
-          <p className="text-sm font-semibold text-blue-600">
-            FactoFit Dashboard
-          </p>
-
-          <h2 className="mt-2 text-3xl font-bold text-slate-950">
-            안산금속(주) 설비 투자 진단
-          </h2>
-
-          <p className="mt-2 text-slate-500">
-            설비 노후도, 에너지 비용, 지원사업 매칭 현황을 한눈에 확인합니다.
-          </p>
-
-          <div className="mt-5 flex flex-wrap gap-3">
-            <button
-              onClick={() => navigate("/roi")}
-              className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700"
-            >
-              ROI 분석 시작하기
-            </button>
-
-            <button
-              onClick={() => navigate("/support-projects")}
-              className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-800"
-            >
-              지원사업 보기
-            </button>
-
-            <button
-              onClick={() => navigate("/safety")}
-              className="rounded-xl bg-amber-500 px-5 py-3 text-sm font-bold text-white transition hover:bg-amber-600"
-            >
-              안전점검 현황
-            </button>
-
-            <button
-              onClick={() => navigate("/advisor")}
-              className="rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-700"
-            >
-              AI 어드바이저
-            </button>
-          </div>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {kpiData.map((item) => (
-            <KpiCard
-              key={item.title}
-              title={item.title}
-              value={item.value}
-              unit={item.unit}
-              status={item.status}
-              type={item.type}
-            />
-          ))}
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-2">
-          <EquipmentStatusList items={equipmentData} />
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-bold text-slate-900">
-              AI 추천
-            </h2>
-
-            <p className="mt-3 text-sm leading-6 text-slate-600">
-              유압 프레스 라인 A는 평균 교체 주기를 초과했습니다.
-              에너지공단 노후설비 교체 지원사업과 함께 ROI 분석을 진행해보세요.
-            </p>
-
-            <div className="mt-5 flex flex-wrap gap-3">
-              <button
-                onClick={() => navigate("/roi")}
-                className="rounded-xl bg-blue-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-blue-700"
-              >
-                ROI 분석 시작하기
-              </button>
-
-              <button
-                onClick={() => navigate("/application-draft")}
-                className="rounded-xl bg-slate-100 px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-200"
-              >
-                신청서 초안 보기
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <EnergyChart />
-
-        <SupportRecommendCard />
-      </div>
-    </MainLayout>
+    <div
+      style={{
+        width: "100%",
+        height: "100vh",
+        overflow: "hidden",
+        position: "relative",
+      }}
+    >
+      <iframe
+        ref={iframeRef}
+        src={iframeSrc}
+        title="FactoFit Main Mockup"
+        style={{
+          width: "100%",
+          height: "100vh",
+          border: "0",
+          display: "block",
+        }}
+      />
+    </div>
   )
 }

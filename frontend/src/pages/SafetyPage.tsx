@@ -6,8 +6,8 @@ export default function SafetyPage() {
   return (
     <div className="min-h-screen bg-slate-50 p-8">
       <button
-        onClick={() => navigate("/")}
-        className="mb-6 rounded-xl bg-slate-200 px-4 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-300"
+        onClick={() => navigate("/?screen=dashboard")}
+        className="factofit-back-button"
       >
         ← 대시보드로 돌아가기
       </button>

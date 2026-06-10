@@ -24,12 +24,16 @@ def match_policies(company_context: dict, query: str) -> list[dict]:
         meta = p["metadata"]
         
         # 업종 필터
+        meta_code = meta.get("industry_code", "")
+        # 쉼표로 분리해서 정확하게 비교
+        codes = [c.strip() for c in meta_code.split(",")]
+
         code_match = (
             not industry_code  # 업종 없으면 통과
-            or industry_code in meta.get("industry_code", "")  # C24 포함
-            or industry_code[:1] in meta.get("industry_code", "")  # C 포함
+            or industry_code in codes  # "C24" 정확히 포함
+            or "C" in codes  # "C" (전체 제조업) 정확히 포함
         )
-        
+
         # 지역 필터
         region_match = (
             not region  # 지역 없으면 통과
@@ -40,8 +44,6 @@ def match_policies(company_context: dict, query: str) -> list[dict]:
         if code_match and region_match:
             filtered.append(p)
 
-    print("=== retrieved ===")
-    print(filtered[:10])
     return filtered[:10]
 
 
@@ -55,8 +57,6 @@ def policy_matching_node(state: FactofitState) -> FactofitState:
         "region": company.region if company else None,
     }
     retrieved = match_policies(company_context, state["user_query"])
-    print("=== retrieved ===")
-    print(retrieved)
 
     # 마감 지난 공고 제거 + 마감일 기준 정렬
     today = date.today()

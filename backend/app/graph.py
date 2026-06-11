@@ -45,12 +45,16 @@ def build_graph():
         }
     )
 
-    # info_collector_node → 정보 다 모였으면 router로, 아니면 END
+    # info_collector_node
     graph.add_conditional_edges(
     "info_collector_node",
-    lambda state: "router_node" if state["final_response"] == "" else "__end__",
-    {"router_node": "router_node", "__end__": END}
-    )
+    lambda state: state["intent"] if state["final_response"] == "" else "__end__",
+    {
+        "roi": "capex_advisor_node",
+        "policy": "policy_matching_node",
+        "__end__": END
+    }
+)
 
     # 각 specialist → response_node
     graph.add_edge("capex_advisor_node", "response_node")

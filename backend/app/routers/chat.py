@@ -14,7 +14,7 @@ class ChatRequest(BaseModel):
 
 @router.post("/chat")
 async def chat(req: ChatRequest):
-    # company_id로 DB에서 기업 정보 불러오기
+    # company_id로 DB에서 기업 정보 불러오기 
     company_info = None
     equipment_info = None
     if req.company_id:
@@ -68,7 +68,7 @@ async def chat(req: ChatRequest):
         cards = [{"type": "roi_result", "data": result.get("roi_result", {})}]
     elif intent == "policy":
         cards = [{"type": "policy_card", "data": p} for p in result.get("matched_policies", [])]
-    elif intent == "draft":
+    elif intent == "draft":                                                    
         cards = [{"type": "draft_result", "data": result.get("draft_result", "")}]
     else:
         cards = []

@@ -24,7 +24,7 @@ async def chat(req: ChatRequest):
         if company_data.data:
             company_info = CompanyContext(**company_data.data[0])
 
-         # equipment 테이블 조회
+        # equipment 테이블 조회
         equipment_data = supabase.table("equipment").select("*").eq("company_id", req.company_id).execute()
         if equipment_data.data:
             from app.models.roi_input import RoiInput

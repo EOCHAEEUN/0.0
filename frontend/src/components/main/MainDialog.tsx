@@ -1,3 +1,5 @@
+import { useState } from "react"
+
 type DialogType =
   | "why"
   | "services"
@@ -38,10 +40,10 @@ export default function MainDialog({
 
         {type === "why" && <WhyFactoFitDialog />}
         {type === "services" && <ServicesDialog />}
-        {type === "dashboard" && <DashboardDialog onLoginClick={onLoginClick} />}
-        {type === "support" && (
-          <SupportDialog onLoginClick={onLoginClick} onClose={onClose} />
+        {type === "dashboard" && (
+          <DashboardDialog onLoginClick={onLoginClick} />
         )}
+        {type === "support" && <SupportDialog />}
         {type === "newsletter" && <NewsletterDialog onClose={onClose} />}
       </section>
     </div>
@@ -363,50 +365,115 @@ function DashboardDialog({ onLoginClick }: { onLoginClick: () => void }) {
   )
 }
 
-function SupportDialog({
-  onLoginClick,
-  onClose,
-}: {
-  onLoginClick: () => void
-  onClose: () => void
-}) {
+function SupportDialog() {
+  const supportEmail = "factofit.team@example.com"
+  const [openFaqIndex, setOpenFaqIndex] = useState(0)
+
+  const faqs = [
+    {
+      question: "지원사업 추천 기준은 무엇인가요?",
+      answer:
+        "FactoFit은 기업의 업종, 지역, 종업원 수, 설비 상태, 투자 목적을 기준으로 현재 조건에 맞는 지원사업을 우선 추천합니다. 단순 공고 나열이 아니라 우리 공장에 맞는 가능성을 먼저 보여주는 방식입니다.",
+    },
+    {
+      question: "ROI 분석 결과는 실제 확정 금액인가요?",
+      answer:
+        "ROI 분석 결과는 입력한 설비 비용, 예상 지원금, 절감액, 불량률 개선 효과를 바탕으로 계산한 예측값입니다. 실제 지원금 확정 금액은 기관 심사와 신청 결과에 따라 달라질 수 있습니다.",
+    },
+    {
+      question: "신청서 초안은 어디까지 자동 작성되나요?",
+      answer:
+        "기업 기본정보, 설비 교체 목적, 기대효과, 투자 필요성 등 반복적으로 작성해야 하는 항목을 초안 형태로 정리합니다. 최종 제출 전에는 담당자가 공고 양식에 맞게 검토하고 보완해야 합니다.",
+    },
+    {
+      question: "기업정보와 설비정보는 저장되나요?",
+      answer:
+        "로그인 후에는 대시보드에서 기업정보, 설비 분석 기록, 저장한 지원사업, 신청 준비 상태를 이어서 관리할 수 있도록 설계하고 있습니다. 개인정보와 기업 데이터는 서비스 정책에 따라 안전하게 관리되는 흐름을 목표로 합니다.",
+    },
+  ]
+
   return (
-    <div className="ff-dialog-content ff-support-dialog-content">
-      <p className="ff-section-label">CUSTOMER SUPPORT</p>
+    <div className="ff-dialog-content ff-support-split">
+      <div className="ff-dialog-title-row">
+        <div>
+          <div className="ff-gold-line" />
+          <p className="ff-section-label">CUSTOMER SUPPORT</p>
+          <h2>
+            고객 지원
+            <br />
+            궁금한 흐름을
+            <br />
+            빠르게 확인합니다.
+          </h2>
+        </div>
 
-      <h2>
-        고객 지원
-        <br />
-        필요한 문의만 빠르게 연결합니다.
-      </h2>
+        <p className="ff-dialog-side-desc">
+          지원사업 추천 기준, ROI 분석 결과, 신청서 초안, 기업·설비정보 관리
+          방식처럼 FactoFit 사용 중 자주 확인하는 내용을 정리했습니다. 추가
+          문의는 이메일로 연결됩니다.
+        </p>
+      </div>
 
-      <div className="ff-support-menu-grid">
-        <button
-          type="button"
-          onClick={() => window.alert("고객센터는 고도화 단계에서 연결합니다.")}
-        >
-          <strong>고객센터</strong>
-          <span>FAQ, 이용 안내, 계정/서비스 도움말</span>
-        </button>
+      <div className="ff-support-split-layout">
+        <section className="ff-support-faq-panel">
+          <div className="ff-support-panel-head">
+            <span>FAQ</span>
+            <h3>고객센터</h3>
+            <p>자주 하는 질문을 열어 답변을 바로 확인할 수 있습니다.</p>
+          </div>
 
-        <button
-          type="button"
-          onClick={() => window.alert("문의하기 폼은 고도화 단계에서 연결합니다.")}
-        >
-          <strong>문의하기</strong>
-          <span>도입 문의, 제휴 문의, 기술 문의</span>
-        </button>
+          <ul className="ff-support-accordion-list">
+            {faqs.map((faq, index) => {
+              const isOpen = openFaqIndex === index
 
-        <button
-          type="button"
-          onClick={() => {
-            onClose()
-            onLoginClick()
-          }}
-        >
-          <strong>로그인하기</strong>
-          <span>FactoFit 계정으로 대시보드 이용</span>
-        </button>
+              return (
+                <li
+                  className={
+                    isOpen
+                      ? "ff-support-accordion-item is-open"
+                      : "ff-support-accordion-item"
+                  }
+                  key={faq.question}
+                >
+                  <button
+                    type="button"
+                    className="ff-support-accordion-question"
+                    onClick={() => setOpenFaqIndex(isOpen ? -1 : index)}
+                    aria-expanded={isOpen}
+                  >
+                    <span>{faq.question}</span>
+                    <b>Q</b>
+                  </button>
+
+                  {isOpen && (
+                    <div className="ff-support-accordion-answer">
+                      <b>A</b>
+                      <p>{faq.answer}</p>
+                    </div>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        </section>
+
+        <aside className="ff-support-contact-panel">
+          <div className="ff-support-panel-head">
+            <span>CONTACT</span>
+            <h3>문의하기</h3>
+            <p>도입 문의, 제휴 문의, 기술 문의는 아래 이메일로 보내주세요.</p>
+          </div>
+
+          <div className="ff-support-email-box">
+            <small>문의 이메일</small>
+            <a href={`mailto:${supportEmail}`}>{supportEmail}</a>
+          </div>
+
+          <p className="ff-support-contact-note">
+            문의 시 회사명, 문의 목적, 현재 확인이 필요한 화면이나 기능을 함께
+            남겨주시면 더 빠르게 확인할 수 있습니다.
+          </p>
+        </aside>
       </div>
     </div>
   )

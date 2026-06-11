@@ -56,12 +56,18 @@ def calculate_equipment_roi(
     설비 교체 ROI 계산 Tool.
     내부적으로 roi_calc.py의 calculate_roi를 호출하여 결과를 반환합니다.
     """
+    # 'None' 문자열 처리
+    def parse_int(val):
+        if val is None or val == 'None' or val == '':
+            return None
+        return int(val)
+    
     roi_input = RoiInput(
         equipment=equipment,
-        scenario_a_investment_manwon=scenario_a_investment_manwon,
-        scenario_a_subsidy_manwon=scenario_a_subsidy_manwon,
-        scenario_b_investment_manwon=scenario_b_investment_manwon,
-        scenario_b_subsidy_manwon=scenario_b_subsidy_manwon,
+        scenario_a_investment_manwon=parse_int(scenario_a_investment_manwon),
+        scenario_a_subsidy_manwon=parse_int(scenario_a_subsidy_manwon),        
+        scenario_b_investment_manwon=parse_int(scenario_b_investment_manwon),  
+        scenario_b_subsidy_manwon=parse_int(scenario_b_subsidy_manwon),        
     )
     
     return _calculate_roi(roi_input)

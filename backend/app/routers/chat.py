@@ -22,7 +22,14 @@ async def chat(req: ChatRequest):
         # company 테이블 조회
         company_data = supabase.table("company").select("*").eq("company_id", req.company_id).execute()
         if company_data.data:
-            company_info = CompanyContext(**company_data.data[0])
+            print("=== DB company_data ===")
+            print(company_data.data[0])
+            data = company_data.data[0]
+            if isinstance(data.get("industry_code"), str):
+                data["industry_code"] = [c.strip() for c in data["industry_code"].split(",")]
+            company_info = CompanyContext(**data)
+            print("=== company_info.company_id ===")
+            print(company_info.company_id)
 
         # equipment 테이블 조회
         equipment_data = supabase.table("equipment").select("*").eq("company_id", req.company_id).execute()

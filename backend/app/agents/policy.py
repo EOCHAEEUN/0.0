@@ -8,15 +8,15 @@ from datetime import date
 
 
 def match_policies(company_context: dict, query: str) -> list[dict]:
-    industry_code = company_context.get("industry_code", "")
+    industry_code = company_context.get("industry_code", [])
     if isinstance(industry_code, list):
         industry_code = ",".join(industry_code)
-    
+
     region = company_context.get("region", "")
     region_short = region.split()[0] if region else ""  # "경기도 안산시" → "경기도"
 
-    # ChromaDB에서 필터 없이 많이 가져옴
-    results = search_policies(query, n_results=20, where=None)
+    policy_query = f"{industry_code} {region} 지원사업" if (industry_code or region) else query
+    results = search_policies(policy_query, n_results=20, where=None)
 
     # 코드로 필터링
     filtered = []
@@ -70,7 +70,7 @@ def policy_matching_node(state: FactofitState) -> FactofitState:
 
     # 프롬프트 구성
     prompt = POLICY_SYSTEM_PROMPT.format(
-        industry_code=", ".join(company.industry_code) if company and isinstance(company.industry_code, list) else company.industry_code if company else "정보 없음",
+        industry_code=", ".join(company.industry_code) if company else "정보 없음",
         region=company.region if company else "정보 없음",
         employee_count=company.employee_count if company else "정보 없음",
         annual_revenue=company.annual_revenue or "정보 없음" if company else "정보 없음",

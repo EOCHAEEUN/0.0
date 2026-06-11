@@ -7,72 +7,51 @@ from app.models.company import CompanyContext
 
 router = APIRouter()
 
-
 class ChatRequest(BaseModel):
     company_id: str = ""
     message: str
     chat_history: list[dict] = []
 
-
-def load_company_context(company_id: str):
-    if not company_id:
-        return None
-
-    try:
-        db = get_db()
-
-        result = (
-            db.table("company")
-            .select("*")
-            .eq("id", company_id)
-            .single()
-            .execute()
-        )
-
-        data = result.data
-        if not data:
-            return None
-
-        industry_code = data.get("industry_code") or ""
-
-        if isinstance(industry_code, str):
-            industry_code = [
-                code.strip()
-                for code in industry_code.split(",")
-                if code.strip()
-            ]
-
-        return CompanyContext(
-            company_id=data.get("id"),
-            company_name=data.get("name", ""),
-            industry_code=industry_code,
-            employee_count=data.get("employee_count") or 0,
-            region=data.get("region", ""),
-            annual_revenue=data.get("annual_revenue"),
-            energy_cost_annual=data.get("energy_cost_annual"),
-        )
-
-    except Exception as e:
-        print(f"company 조회 실패: {e}")
-        return None
-
-
 @router.post("/chat")
 async def chat(req: ChatRequest):
-    company_info = load_company_context(req.company_id)
+    # company_id로 DB에서 기업 정보 불러오기
+    company_info = None
+    equipment_info = None
+    if req.company_id:
+        supabase = get_db()
+        # company 테이블 조회
+        company_data = supabase.table("company").select("*").eq("company_id", req.company_id).execute()
+        if company_data.data:
+            company_info = CompanyContext(**company_data.data[0])
+
+         # equipment 테이블 조회
+        equipment_data = supabase.table("equipment").select("*").eq("company_id", req.company_id).execute()
+        if equipment_data.data:
+            from app.models.roi_input import RoiInput
+            from app.models.equipment import EquipmentInput
+            eq = equipment_data.data[0]
+            equipment_info = RoiInput(
+                equipment=EquipmentInput(
+                    name=eq.get("name", ""),
+                    category=eq.get("category", ""),
+                    age_years=eq.get("age_years", 0),
+                    energy_cost_annual=eq.get("energy_cost_annual", 0),
+                    defect_rate=eq.get("defect_rate"),
+                    capacity_value=eq.get("capacity_value")
+                )
+            )
 
     initial_state: FactofitState = {
         "user_query": req.message,
         "intent": "",
         "is_safe": False,
         "company_info": company_info,
-        "equipment": None,
+        "equipment": equipment_info,
         "matched_policies": [],
         "roi_result": None,
         "draft_result": None,
-        "chat_history": req.chat_history[-10:],
-        "final_response": "",
-        "chat_id": None
+        "chat_history": req.chat_history[-10:],  # 최근 10개만
+        "final_response": ""
     }
 
     result = await factofit_graph.ainvoke(initial_state)
@@ -92,5 +71,5 @@ async def chat(req: ChatRequest):
         "response": result["final_response"],
         "cards": cards,
         "next_questions": [],
-        "chat_id": result.get("chat_id")
+        "chat_id": result.get("chat_id", "")
     }

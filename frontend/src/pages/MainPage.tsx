@@ -39,16 +39,16 @@ export default function MainPage() {
           <p className="ff-hero-kicker">FACTOFIT ONE-PAGE AI DIAGNOSIS</p>
 
           <h1>
-            우리 공장의 설비투자 ROI와
+            지원사업을 찾기 전에,
             <br />
-            <span>숨은 정부 지원금</span>을 1분 만에
+            <span>우리 공장에 맞게</span> 1분 만에
             <br />
-            확인하세요
+            먼저 해석합니다
           </h1>
 
           <p className="ff-hero-description">
-            노후 설비·에너지 비용·불량률을 입력하면 AI가 투자 시나리오,
-            예상 지원금, 회수기간, 안전점검 리스크까지 한 번에 진단합니다.
+            <span>흩어진 제조업 지원정보를 모아 지원사업 추천,</span>
+            <span>ROI 분석, 신청 준비까지 하나의 흐름으로 연결합니다.</span>
           </p>
 
           <div className="ff-hero-metrics">
@@ -82,16 +82,17 @@ export default function MainPage() {
             <p className="ff-section-label">WHY FACTOFIT</p>
 
             <h2>
-              지원사업을 찾기 전에,
+              우리 공장의 설비투자 ROI와
               <br />
-              우리 공장에 맞게
+              숨은 정부 지원금을 1분 만에
               <br />
-              먼저 해석합니다.
+              확인하세요
             </h2>
 
             <p>
-              흩어진 제조업 지원정보를 모아 지원사업 추천, ROI 분석,
-              신청 준비까지 하나의 흐름으로 연결합니다.
+              노후 설비·에너지 비용·불량률을 입력하면 AI가 투자 시나리오,
+              예상 지원금, 회수기간, 안전점검 리스크까지 한 번에 진단합니다.
+
             </p>
 
             <button

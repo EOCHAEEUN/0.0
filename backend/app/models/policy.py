@@ -34,6 +34,18 @@ class PolicyAnnouncement(BaseModel):
     max_revenue: Optional[int] = None              # 만원
 
     # 기타
+    # Eligibility conditions
+    employee_min: Optional[int] = None
+    employee_max: Optional[int] = None
+    revenue_min_manwon: Optional[int] = None
+    revenue_max_manwon: Optional[int] = None
+    company_age_min: Optional[int] = None
+    company_age_max: Optional[int] = None
+    eligible_company_types: Optional[list[str]] = None
+    eligibility_text: Optional[str] = None
+    eligibility_extraction_status: Optional[str] = None
+    eligibility_evidence: Optional[str] = None
+
     url: str
     summary: Optional[str] = None
     

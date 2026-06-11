@@ -14,5 +14,5 @@ class FactofitState(TypedDict):
     draft_result: Optional[str]              # application_draft 초안서 결과
     chat_history: list[dict]                 # 이전 대화 이력 [{"role": "user/assistant", "content": "..."}]
     final_response: str                       # response_node 최종 응답
-    chat_id: Optional[str]
     unsupported_equipment: bool = False
+    chat_id: Optional[str]

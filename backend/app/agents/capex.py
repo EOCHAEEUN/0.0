@@ -84,22 +84,31 @@ def capex_advisor_node(state: FactofitState) -> FactofitState:
             "industry_code": company.industry_code or "",
             "region": company.region or ""
         }
-        matched_policies = match_policies(company_context, state["user_query"])
+
+        industry_code_str = ", ".join(company.industry_code) if company and company.industry_code else ""
+        policy_query = f"{industry_code_str} {company.region if company else ''} 설비 지원사업"
+        matched_policies = match_policies(company_context, policy_query)
         state["matched_policies"] = matched_policies
 
     # LLM에 Tool 바인딩
     llm_with_tools = llm.bind_tools([calculate_equipment_roi])
 
+    if matched_policies :
+        policy_summary = [{"title": p.get("metadata", {}).get("title", ""), "max_amount": p.get("metadata", {}).get("max_amount", 0)} for p in matched_policies[:3]]
+        matched_policies_text = str(policy_summary)
+    else:
+        matched_policies_text = "매칭된 지원사업 없음"
+
     # 프롬프트 구성
     prompt = CAPEX_SYSTEM_PROMPT.format(
-        industry_code=company.industry_code if company else "정보 없음",
+        industry_code=", ".join(company.industry_code) if company and company.industry_code else "정보 없음",
         region=company.region if company else "정보 없음",
         equipment_name=equipment.equipment.name if equipment else "정보 없음",
         age_years=equipment.equipment.age_years if equipment else 0,
         energy_cost=equipment.equipment.energy_cost_annual if equipment else 0,
         defect_rate=equipment.equipment.defect_rate if equipment and equipment.equipment.defect_rate else "정보 없음",
         roi_result="Tool을 호출해서 계산하세요.",
-        matched_policies=matched_policies if matched_policies else "매칭된 지원사업 없음"
+        matched_policies=matched_policies_text
     )
 
     messages = [

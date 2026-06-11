@@ -13,7 +13,18 @@ POLICY_SYSTEM_PROMPT = """
 
 {{
   "response": "---\n공고명: {{공고명}}\n주관기관: {{주관기관}}\n최대지원금액: {{금액}}만원\n마감일: {{마감일}} (D-{{d_day}})\n적합도: {{●●●●● / ●●●●○ / ●●●○○}} {{한 줄 이유}}\n신청링크: {{url}}\n---",
-  "matched_policy_ids": ["policy_id_1", "policy_id_2"]
+  "matched_policies": [
+    {{
+      "id": "policy_id_1",
+      "score": "●●●●●",
+      "reason": "업종 C24 일치, 경기도 지역 일치"
+    }},
+    {{
+      "id": "policy_id_2",
+      "score": "●●●●○",
+      "reason": "업종 일치, 지역 전국 공고"
+    }}
+  ]
 }}
 
 ## 규칙

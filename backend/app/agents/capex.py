@@ -81,12 +81,14 @@ def capex_advisor_node(state: FactofitState) -> FactofitState:
     if not matched_policies and company:
         from app.agents.policy import match_policies
         company_context = {
-            "industry_code": company.industry_code or "",
-            "region": company.region or ""
+            "industry_code": company.industry_code or [],
+            "region": company.region or "",
+            "company_type": company.company_type if company.company_type else "",
         }
 
         industry_code_str = ", ".join(company.industry_code) if company and company.industry_code else ""
-        policy_query = f"{industry_code_str} {company.region if company else ''} 설비 지원사업"
+        equipment_name = equipment.equipment.name if equipment else ""
+        policy_query = f"{equipment_name} 지원사업" if equipment_name else "제조설비 지원사업"
         matched_policies = match_policies(company_context, policy_query)
         state["matched_policies"] = matched_policies
 

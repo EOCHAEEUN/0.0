@@ -6,6 +6,13 @@ type IndustryOption = {
   codes: string[]
 }
 
+type IndustryInputRow = {
+  id: string
+  industryName: string
+  industryCode: string
+  selectedIndustry: IndustryOption | null
+}
+
 type SignupModalProps = {
   onClose: () => void
   onLoginClick?: () => void
@@ -54,6 +61,13 @@ const PURPOSE_OPTIONS = [
   "안전점검 관리",
 ]
 
+const createIndustryInputRow = (): IndustryInputRow => ({
+  id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  industryName: "",
+  industryCode: "",
+  selectedIndustry: null,
+})
+
 export default function SignupModal({ onClose, onLoginClick }: SignupModalProps) {
   const [email, setEmail] = useState("")
   const [emailCode, setEmailCode] = useState("")
@@ -68,12 +82,10 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
   const [businessNumber, setBusinessNumber] = useState("")
 
   const [companyName, setCompanyName] = useState("")
-  const [industryName, setIndustryName] = useState("")
-  const [industryCode, setIndustryCode] = useState("")
-  const [selectedIndustry, setSelectedIndustry] = useState<IndustryOption | null>(
-    null,
-  )
-  const [isIndustryOpen, setIsIndustryOpen] = useState(false)
+  const [industryRows, setIndustryRows] = useState<IndustryInputRow[]>(() => [
+    createIndustryInputRow(),
+  ])
+  const [openIndustryRowId, setOpenIndustryRowId] = useState<string | null>(null)
   const [isOptionalOpen, setIsOptionalOpen] = useState(false)
 
   const [region, setRegion] = useState("")
@@ -86,21 +98,6 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
 
   const [agreeService, setAgreeService] = useState(true)
   const [agreePrivacy, setAgreePrivacy] = useState(true)
-
-  const filteredIndustries = useMemo(() => {
-    const keyword = `${industryName} ${industryCode}`.trim().toLowerCase()
-
-    if (!keyword) return INDUSTRY_OPTIONS.slice(0, 8)
-
-    return INDUSTRY_OPTIONS.filter((item) => {
-      const nameMatched = item.name.toLowerCase().includes(keyword)
-      const codeMatched = item.codes.some((code) =>
-        code.toLowerCase().includes(keyword),
-      )
-
-      return nameMatched || codeMatched
-    }).slice(0, 8)
-  }, [industryName, industryCode])
 
   const passwordChecks = useMemo(() => {
     return [
@@ -149,6 +146,23 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
   const isPasswordMismatch =
     password.length > 0 && passwordCheck.length > 0 && password !== passwordCheck
 
+  const getFilteredIndustries = (row: IndustryInputRow) => {
+    const keyword = `${row.industryName} ${row.industryCode}`
+      .trim()
+      .toLowerCase()
+
+    if (!keyword) return INDUSTRY_OPTIONS.slice(0, 8)
+
+    return INDUSTRY_OPTIONS.filter((item) => {
+      const nameMatched = item.name.toLowerCase().includes(keyword)
+      const codeMatched = item.codes.some((code) =>
+        code.toLowerCase().includes(keyword),
+      )
+
+      return nameMatched || codeMatched
+    }).slice(0, 8)
+  }
+
   const handleSendEmailCode = () => {
     if (!email.includes("@")) {
       alert("이메일 형식을 확인해주세요.")
@@ -175,49 +189,119 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
     alert("이메일 인증이 완료되었습니다.")
   }
 
-  const handleSelectIndustry = (industry: IndustryOption) => {
-    setSelectedIndustry(industry)
-    setIndustryName(industry.name)
-    setIndustryCode(industry.codes.join(", "))
-    setIsIndustryOpen(false)
+  const handleAddIndustryRow = () => {
+    setIndustryRows((prev) => [...prev, createIndustryInputRow()])
   }
 
-  const handleIndustryNameChange = (value: string) => {
-    setIndustryName(value)
-    setIsIndustryOpen(true)
+  const handleRemoveIndustryRow = (rowId: string) => {
+    setIndustryRows((prev) => {
+      if (prev.length <= 1) return prev
+      return prev.filter((row) => row.id !== rowId)
+    })
 
-    const exact = INDUSTRY_OPTIONS.find((item) => item.name === value)
-
-    if (exact) {
-      setSelectedIndustry(exact)
-      setIndustryCode(exact.codes.join(", "))
-    } else {
-      setSelectedIndustry(null)
+    if (openIndustryRowId === rowId) {
+      setOpenIndustryRowId(null)
     }
   }
 
-  const handleIndustryCodeChange = (value: string) => {
-    const nextValue = value.toUpperCase()
-    setIndustryCode(nextValue)
-    setIsIndustryOpen(true)
-
-    const normalizedValue = nextValue.replace(/\s/g, "")
-
-    const exact = INDUSTRY_OPTIONS.find((item) =>
-      item.codes.some((code) => code === normalizedValue),
+  const handleSelectIndustry = (rowId: string, industry: IndustryOption) => {
+    setIndustryRows((prev) =>
+      prev.map((row) =>
+        row.id === rowId
+          ? {
+              ...row,
+              selectedIndustry: industry,
+              industryName: industry.name,
+              industryCode: industry.codes.join(", "),
+            }
+          : row,
+      ),
     )
 
-    if (exact) {
-      setSelectedIndustry(exact)
-      setIndustryName(exact.name)
-    } else {
-      setSelectedIndustry(null)
-    }
+    setOpenIndustryRowId(null)
+  }
+
+  const handleIndustryNameChange = (rowId: string, value: string) => {
+    setIndustryRows((prev) =>
+      prev.map((row) => {
+        if (row.id !== rowId) return row
+
+        const exact = INDUSTRY_OPTIONS.find((item) => item.name === value)
+
+        if (exact) {
+          return {
+            ...row,
+            industryName: value,
+            industryCode: exact.codes.join(", "),
+            selectedIndustry: exact,
+          }
+        }
+
+        return {
+          ...row,
+          industryName: value,
+          selectedIndustry: null,
+        }
+      }),
+    )
+
+    setOpenIndustryRowId(rowId)
+  }
+
+  const handleIndustryCodeChange = (rowId: string, value: string) => {
+    const nextValue = value.toUpperCase()
+    const normalizedValue = nextValue.replace(/\s/g, "")
+
+    setIndustryRows((prev) =>
+      prev.map((row) => {
+        if (row.id !== rowId) return row
+
+        const exact = INDUSTRY_OPTIONS.find((item) =>
+          item.codes.some((code) => code === normalizedValue),
+        )
+
+        if (exact) {
+          return {
+            ...row,
+            industryName: exact.name,
+            industryCode: nextValue,
+            selectedIndustry: exact,
+          }
+        }
+
+        return {
+          ...row,
+          industryCode: nextValue,
+          selectedIndustry: null,
+        }
+      }),
+    )
+
+    setOpenIndustryRowId(rowId)
   }
 
   const toNullableNumber = (value: string) => {
     if (!value.trim()) return null
     return Number(value)
+  }
+
+  const getNormalizedIndustries = () => {
+    return industryRows
+      .map((row) => {
+        const industryName = row.selectedIndustry?.name ?? row.industryName.trim()
+        const industryCodes =
+          row.selectedIndustry?.codes ??
+          row.industryCode
+            .split(",")
+            .map((code) => code.trim().toUpperCase())
+            .filter(Boolean)
+
+        return {
+          industry_name: industryName,
+          industry_code: industryCodes,
+        }
+      })
+      .filter((item) => item.industry_name || item.industry_code.length > 0)
   }
 
   const handleSubmit = () => {
@@ -241,8 +325,24 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
       return
     }
 
-    if (!companyName || !industryName || !industryCode || !region) {
-      alert("기업명, 업종, 지역을 입력해주세요.")
+    const normalizedIndustries = getNormalizedIndustries()
+
+    if (!companyName || !region) {
+      alert("기업명, 지역을 입력해주세요.")
+      return
+    }
+
+    if (normalizedIndustries.length === 0) {
+      alert("업종을 1개 이상 입력해주세요.")
+      return
+    }
+
+    const hasIncompleteIndustry = normalizedIndustries.some(
+      (item) => !item.industry_name || item.industry_code.length === 0,
+    )
+
+    if (hasIncompleteIndustry) {
+      alert("추가한 업종의 업종명과 업종코드를 모두 입력해주세요.")
       return
     }
 
@@ -251,12 +351,9 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
       return
     }
 
-    const industryCodes =
-      selectedIndustry?.codes ??
-      industryCode
-        .split(",")
-        .map((code) => code.trim())
-        .filter(Boolean)
+    const uniqueIndustryCodes = Array.from(
+      new Set(normalizedIndustries.flatMap((item) => item.industry_code)),
+    )
 
     const payload = {
       account: {
@@ -270,8 +367,22 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
       },
       company: {
         company_name: companyName,
-        industry_name: selectedIndustry?.name ?? industryName,
-        industry_code: industryCodes,
+
+        /**
+         * 기존 단일 업종 저장 구조와의 호환을 위해 유지합니다.
+         * 여러 업종을 추가하면 쉼표로 묶어서 저장됩니다.
+         */
+        industry_name: normalizedIndustries
+          .map((item) => item.industry_name)
+          .join(", "),
+        industry_code: uniqueIndustryCodes,
+
+        /**
+         * 신규 다중 업종 저장용 필드입니다.
+         * DB 연결 시 이 배열을 기준으로 별도 테이블에 저장하면 됩니다.
+         */
+        industries: normalizedIndustries,
+
         region,
         company_size: companySize,
         main_purpose: mainPurpose,
@@ -466,44 +577,83 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
             />
           </div>
 
-          <div className="ff-signup-two-col">
-            <div className="ff-signup-field ff-signup-combo">
-              <FieldLabel text="업종명" required />
-              <input
-                placeholder="예: 금속가공"
-                value={industryName}
-                onFocus={() => setIsIndustryOpen(true)}
-                onChange={(event) => handleIndustryNameChange(event.target.value)}
-              />
+          <div className="ff-signup-industry-list">
+            {industryRows.map((row, index) => {
+              const filteredIndustries = getFilteredIndustries(row)
+              const isSuggestionOpen =
+                openIndustryRowId === row.id &&
+                Boolean(row.industryName || row.industryCode) &&
+                filteredIndustries.length > 0
 
-              {isIndustryOpen &&
-                (industryName || industryCode) &&
-                filteredIndustries.length > 0 && (
-                  <div className="ff-signup-suggest-box">
-                    {filteredIndustries.map((item) => (
+              return (
+                <div className="ff-signup-industry-row" key={row.id}>
+                  {industryRows.length > 1 && (
+                    <div className="ff-signup-industry-row-top">
+                      <span>업종 {index + 1}</span>
+
                       <button
                         type="button"
-                        key={`${item.name}-${item.codes.join("-")}`}
-                        onClick={() => handleSelectIndustry(item)}
+                        onClick={() => handleRemoveIndustryRow(row.id)}
                       >
-                        <span>{item.name}</span>
-                        <b>{item.codes.join(", ")}</b>
+                        삭제
                       </button>
-                    ))}
-                  </div>
-                )}
-            </div>
+                    </div>
+                  )}
 
-            <div className="ff-signup-field">
-              <FieldLabel text="업종코드" required />
-              <input
-                placeholder="예: C25"
-                value={industryCode}
-                onFocus={() => setIsIndustryOpen(true)}
-                onChange={(event) => handleIndustryCodeChange(event.target.value)}
-              />
-            </div>
+                  <div className="ff-signup-two-col">
+                    <div className="ff-signup-field ff-signup-combo">
+                      <FieldLabel text="업종명" required />
+                      <input
+                        placeholder="예: 금속가공"
+                        value={row.industryName}
+                        onFocus={() => setOpenIndustryRowId(row.id)}
+                        onChange={(event) =>
+                          handleIndustryNameChange(row.id, event.target.value)
+                        }
+                      />
+
+                      {isSuggestionOpen && (
+                        <div className="ff-signup-suggest-box">
+                          {filteredIndustries.map((item) => (
+                            <button
+                              type="button"
+                              key={`${row.id}-${item.name}-${item.codes.join(
+                                "-",
+                              )}`}
+                              onClick={() => handleSelectIndustry(row.id, item)}
+                            >
+                              <span>{item.name}</span>
+                              <b>{item.codes.join(", ")}</b>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="ff-signup-field">
+                      <FieldLabel text="업종코드" required />
+                      <input
+                        placeholder="예: C25"
+                        value={row.industryCode}
+                        onFocus={() => setOpenIndustryRowId(row.id)}
+                        onChange={(event) =>
+                          handleIndustryCodeChange(row.id, event.target.value)
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
           </div>
+
+          <button
+            type="button"
+            className="ff-signup-add-industry"
+            onClick={handleAddIndustryRow}
+          >
+            + 업종 추가하기
+          </button>
 
           <div className="ff-signup-field">
             <FieldLabel text="지역" required />

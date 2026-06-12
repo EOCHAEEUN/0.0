@@ -13,6 +13,7 @@ async def register_company(body: CompanyOnboarding):
     payload = {
         "company_name": body.company_name,
         "industry_code": ",".join(body.industry_code),
+        "company_type": body.company_type,
         "employee_count": body.employee_count,
         "region": body.region,
         "annual_revenue": body.annual_revenue,

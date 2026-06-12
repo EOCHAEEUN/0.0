@@ -27,7 +27,16 @@ async def chat(req: ChatRequest):
             data = company_data.data[0]
             if isinstance(data.get("industry_code"), str):
                 data["industry_code"] = [c.strip() for c in data["industry_code"].split(",")]
-            company_info = CompanyContext(**data)
+            company_info = CompanyContext(
+                company_id=data.get("company_id"),
+                company_name=data.get("company_name", ""),
+                industry_code=data.get("industry_code", []),
+                employee_count=data.get("employee_count"),
+                region=data.get("region", ""),
+                annual_revenue=data.get("annual_revenue"),
+                energy_cost_annual=data.get("energy_cost_annual"),
+                company_type=data.get("company_type", "")
+            )
             print("=== company_info.company_id ===")
             print(company_info.company_id)
 

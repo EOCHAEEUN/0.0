@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import AppHeader from "../components/AppHeader"
+import ParkManagerSummaryCards from "../components/dashboard/ParkManagerSummaryCards"
 
 type Tone = "green" | "blue" | "orange" | "red"
 
@@ -46,6 +47,8 @@ type DdayItem = {
   amount: string
   dday: string
 }
+
+const PARK_MANAGER_CUSTOMER_ID = "d7b57d58-f54b-4f6e-a35a-9a5ac095015e"
 
 const kpiCards: KpiCard[] = [
   {
@@ -591,6 +594,14 @@ export default function DashboardPage() {
               </p>
             </div>
           ))}
+        </div>
+        <div
+          style={{
+            width: "min(1180px, 100%)",
+            margin: "28px auto 0",
+          }}
+        >
+          <ParkManagerSummaryCards companyId={PARK_MANAGER_CUSTOMER_ID} />
         </div>
       </section>
 

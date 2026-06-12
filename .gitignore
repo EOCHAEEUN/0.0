@@ -1,22 +1,33 @@
+<<<<<<< HEAD
 # 환경변수 (절대 커밋 금지)
+=======
+# Environment files
+>>>>>>> 0a77dc514a0627236e0e8b2c5adec04a0485b03a
 .env
 .env.local
 backend/.env
 **/.env
+<<<<<<< HEAD
 
 # 데이터 / 모델
 data/raw/*.csv
 data/models/*.pkl
+=======
+>>>>>>> 0a77dc514a0627236e0e8b2c5adec04a0485b03a
 
-# 파이썬
+# Python
 __pycache__/
 *.pyc
 venv/
 .venv/
+backend/venv/
 
+<<<<<<< HEAD
 # 벡터 DB (재생성 가능)
 backend/chroma_db/
 
+=======
+>>>>>>> 0a77dc514a0627236e0e8b2c5adec04a0485b03a
 # Node / frontend
 node_modules/
 frontend/node_modules/
@@ -24,7 +35,21 @@ frontend/.next/
 dist/
 .vite/
 
+<<<<<<< HEAD
 # 기타
 .DS_Store
 *.log
+=======
+# Local databases and generated data
+chroma_db/
+backend/chroma_db/
+backend/backend/chroma_db/
+data/debug_amount_texts/
+
+# Raw/local artifacts
+data/raw/*.csv
+data/models/*.pkl
+*.log
+.DS_Store
+>>>>>>> 0a77dc514a0627236e0e8b2c5adec04a0485b03a
 .vscode/

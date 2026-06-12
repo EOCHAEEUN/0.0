@@ -3,6 +3,7 @@ from typing import Optional
 from pydantic import BaseModel, Field
 from app.models.equipment import EquipmentInput
 
+
 class CompanyOnboarding(BaseModel):
     # 기업 기본정보
     company_name: str
@@ -26,7 +27,7 @@ class CompanyOnboarding(BaseModel):
 
     # 기업규모 판단용 정보
     employee_count: Optional[int] = Field(default=None, ge=0)
-    annual_revenue: Optional[int] = Field(default=None, ge=0)
+    annual_revenue: Optional[int] = Field(default=None, ge=0)  # 만원 단위
     avg_revenue_3y_manwon: Optional[int] = Field(default=None, ge=0)
     total_assets_manwon: Optional[int] = Field(default=None, ge=0)
 
@@ -37,8 +38,10 @@ class CompanyOnboarding(BaseModel):
     # ROI 관련 기업정보
     energy_cost_annual: Optional[int] = Field(default=None, ge=0)
 
+
     # 최초 등록 설비
     equipment: Optional[EquipmentInput] = None
+
 
 class CompanyContext(CompanyOnboarding):
     # DB 및 인증 연결정보

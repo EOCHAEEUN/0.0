@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import chat, onboarding, roi, dashboard, policies, industry #safety
+from app.routers import chat, dashboard, industry, onboarding, policies, roi, safety
 
 app = FastAPI(
     title="FactoFit API",
@@ -29,4 +29,4 @@ app.include_router(roi.router, prefix="/api", tags=["roi"])
 app.include_router(dashboard.router, prefix="/api", tags=["dashboard"])
 app.include_router(policies.router, prefix="/api", tags=["policies"])
 app.include_router(industry.router, prefix="/api", tags=["industry"])
-# app.include_router(safety.router, prefix="/api", tags=["safety"])
+app.include_router(safety.router, prefix="/api", tags=["safety"])

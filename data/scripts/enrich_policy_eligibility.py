@@ -533,8 +533,8 @@ def fetch_policies(limit: int = LIMIT) -> list[dict[str, Any]]:
             "eligibility_text,eligibility_extraction_status,eligibility_evidence"
         )
         .or_(
-            "eligibility_extraction_status.is.null,"
-            "eligibility_extraction_status.in.(pending,failed),"
+            'eligibility_extraction_status.is.null,'
+            'eligibility_extraction_status.in.("pending","failed"),'
             "revenue_min_manwon.eq.0,"
             "revenue_max_manwon.eq.0"
         )

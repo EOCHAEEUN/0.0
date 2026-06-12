@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { simulateRoi } from "../services/api"
 
 type RoiForm = {
   equipmentName: string
@@ -24,6 +25,29 @@ type RoiResult = {
   description: string
 }
 
+type ApiStatus = "idle" | "loading" | "success" | "error" | "empty"
+
+type RoiApiScenario = {
+  label?: string
+  investment_manwon?: number
+  subsidy_manwon?: number
+  net_investment_manwon?: number
+  annual_net_benefit_manwon?: number
+  payback_years?: number
+  roi_pct?: number
+}
+
+type RoiApiData = {
+  scenario_a?: RoiApiScenario
+  scenario_b?: RoiApiScenario
+  recommended?: string
+}
+
+type RoiApiResponse = {
+  success?: boolean
+  data?: RoiApiData | null
+}
+
 const initialForm: RoiForm = {
   equipmentName: "프레스 설비",
   industry: "금속가공 제조업",
@@ -39,12 +63,12 @@ function calculateRoi(form: RoiForm): RoiResult {
   const actualCost = Math.max(form.totalInvestment - form.expectedSupport, 0.1)
   const roi = Math.round((form.annualSaving / actualCost) * 1000) / 10
   const paybackMonths = Math.max(
-    Math.round((actualCost / form.annualSaving) * 12),
+    Math.round((actualCost / Math.max(form.annualSaving, 0.1)) * 12),
     1,
   )
 
   const supportFitScore = Math.min(
-    Math.round((form.expectedSupport / form.totalInvestment) * 220),
+    Math.round((form.expectedSupport / Math.max(form.totalInvestment, 0.1)) * 220),
     98,
   )
 
@@ -95,6 +119,265 @@ function formatEok(value: number) {
   return `${value.toFixed(1)}억`
 }
 
+function safeNumber(value: unknown, fallback = 0) {
+  const numberValue = Number(value)
+  return Number.isFinite(numberValue) ? numberValue : fallback
+}
+
+function roundTo(value: number, digits = 1) {
+  const unit = 10 ** digits
+  return Math.round(value * unit) / unit
+}
+
+function getEquipmentCategory(equipmentName: string) {
+  const normalized = equipmentName.trim().toLowerCase()
+
+  if (normalized.includes("프레스")) return "프레스"
+  if (normalized.includes("press")) return "프레스"
+  if (normalized.includes("cnc")) return "CNC"
+  if (normalized.includes("사출")) return "사출"
+  if (normalized.includes("용접")) return "용접"
+  if (normalized.includes("컨베이어")) return "컨베이어"
+
+  return equipmentName.trim() || "프레스"
+}
+
+function buildRoiPayload(form: RoiForm) {
+  const investmentManwon = Math.max(Math.round(form.totalInvestment * 10000), 1)
+  const subsidyManwon = Math.min(
+    Math.max(Math.round(form.expectedSupport * 10000), 0),
+    investmentManwon,
+  )
+
+  const scenarioBInvestmentManwon = Math.max(
+    Math.round(investmentManwon * 0.8),
+    1,
+  )
+
+  const scenarioBSubsidyManwon = Math.min(
+    Math.max(Math.round(subsidyManwon * 1.1), 0),
+    scenarioBInvestmentManwon,
+  )
+
+  const energyCostAnnual = Math.max(
+    Math.round(form.annualSaving * 100000000),
+    1000000,
+  )
+
+  const newEnergyCostAnnual = Math.max(Math.round(energyCostAnnual * 0.72), 0)
+
+  const maintenanceCostAnnual = Math.max(
+    Math.round(form.maintenanceCost * 100000000),
+    0,
+  )
+
+  return {
+    equipment: {
+      name: form.equipmentName || "프레스 설비",
+      category: getEquipmentCategory(form.equipmentName),
+      age_years: safeNumber(form.equipmentAge, 0),
+      energy_cost_annual: energyCostAnnual,
+      defect_rate: safeNumber(form.defectRate, 0),
+      new_energy_cost_annual: newEnergyCostAnnual,
+      new_investment_manwon: investmentManwon,
+      maintenance_cost_annual: maintenanceCostAnnual,
+      capacity_value: 0,
+      production_qty: 100000,
+      contribution_margin_won: 1500,
+    },
+    company_context: {
+      industry_name: form.industry || "제조업",
+    },
+    scenario_a_investment_manwon: investmentManwon,
+    scenario_a_subsidy_manwon: subsidyManwon,
+    scenario_b_investment_manwon: scenarioBInvestmentManwon,
+    scenario_b_subsidy_manwon: scenarioBSubsidyManwon,
+  }
+}
+
+function normalizeRoiApiData(response: unknown): RoiApiData | null {
+  if (!response || typeof response !== "object") {
+    return null
+  }
+
+  const responseObject = response as RoiApiResponse & RoiApiData
+
+  if (
+    responseObject.data &&
+    typeof responseObject.data === "object" &&
+    (responseObject.data.scenario_a || responseObject.data.scenario_b)
+  ) {
+    return responseObject.data
+  }
+
+  if (responseObject.scenario_a || responseObject.scenario_b) {
+    return {
+      scenario_a: responseObject.scenario_a,
+      scenario_b: responseObject.scenario_b,
+      recommended: responseObject.recommended,
+    }
+  }
+
+  return null
+}
+
+function isValidScenario(scenario: RoiApiScenario | undefined) {
+  return Boolean(scenario && typeof scenario === "object")
+}
+
+function getRecommendedScenario(apiData: RoiApiData) {
+  const recommended = String(apiData.recommended || "").toUpperCase()
+
+  if (recommended === "A" && isValidScenario(apiData.scenario_a)) {
+    return apiData.scenario_a
+  }
+
+  if (recommended === "B" && isValidScenario(apiData.scenario_b)) {
+    return apiData.scenario_b
+  }
+
+  const scenarioCandidates = [apiData.scenario_a, apiData.scenario_b].filter(
+    isValidScenario,
+  ) as RoiApiScenario[]
+
+  if (scenarioCandidates.length === 0) {
+    return null
+  }
+
+  return [...scenarioCandidates].sort(
+    (a, b) => safeNumber(b.roi_pct, -999999) - safeNumber(a.roi_pct, -999999),
+  )[0]
+}
+
+function normalizeDisplayRoi(apiRoi: number, fallbackRoi: number) {
+  if (!Number.isFinite(apiRoi) || apiRoi <= 0) {
+    return fallbackRoi
+  }
+
+  if (apiRoi > 1000) {
+    return fallbackRoi
+  }
+
+  return roundTo(apiRoi, 1)
+}
+
+function normalizePaybackMonths(apiPaybackYears: number, fallbackMonths: number) {
+  if (!Number.isFinite(apiPaybackYears) || apiPaybackYears <= 0) {
+    return fallbackMonths
+  }
+
+  if (apiPaybackYears > 30) {
+    return fallbackMonths
+  }
+
+  return Math.max(Math.round(apiPaybackYears * 12), 1)
+}
+
+function mapApiResultToRoiResult(
+  form: RoiForm,
+  apiData: RoiApiData,
+): RoiResult | null {
+  const bestScenario = getRecommendedScenario(apiData)
+
+  if (!bestScenario) {
+    return null
+  }
+
+  const localResult = calculateRoi(form)
+
+  const investmentManwon = safeNumber(
+    bestScenario.investment_manwon,
+    form.totalInvestment * 10000,
+  )
+
+  const subsidyManwon = safeNumber(
+    bestScenario.subsidy_manwon,
+    form.expectedSupport * 10000,
+  )
+
+  const netInvestmentManwon = safeNumber(
+    bestScenario.net_investment_manwon,
+    Math.max(investmentManwon - subsidyManwon, 1000),
+  )
+
+  const apiRoi = safeNumber(bestScenario.roi_pct, localResult.roi)
+  const roi = normalizeDisplayRoi(apiRoi, localResult.roi)
+
+  const paybackYears = safeNumber(bestScenario.payback_years, 0)
+  const paybackMonths = normalizePaybackMonths(
+    paybackYears,
+    localResult.paybackMonths,
+  )
+
+  const actualCost = Math.max(netInvestmentManwon / 10000, 0.1)
+
+  const supportFitScore = Math.min(
+    Math.round((subsidyManwon / Math.max(investmentManwon, 1)) * 100),
+    98,
+  )
+
+  const savingEffectScore = Math.min(Math.round(Math.max(roi, 0)), 96)
+
+  const agingScore = Math.min(Math.round(form.equipmentAge * 7), 95)
+
+  const safetyRiskScore = Math.min(
+    Math.round(form.equipmentAge * 5.5 + form.defectRate * 3),
+    92,
+  )
+
+  let statusLabel = "API 분석 완료"
+  let description = "백엔드 ROI API 응답값을 바탕으로 투자 판단 결과를 갱신했습니다."
+
+  if (roi >= 45 && paybackMonths <= 18) {
+    statusLabel = "투자 적합"
+    description = `${
+      bestScenario.label || "선택된 투자안"
+    } 기준으로 ROI가 높고 회수기간이 짧아 지원사업과 함께 검토하기 좋은 상태입니다.`
+  } else if (roi >= 25) {
+    statusLabel = "조건부 적합"
+    description = `${
+      bestScenario.label || "선택된 투자안"
+    } 기준으로 ROI는 양호하지만 지원금 확정 여부와 실제 절감액을 추가 확인하는 것이 좋습니다.`
+  } else {
+    statusLabel = "재검토 필요"
+    description = `${
+      bestScenario.label || "선택된 투자안"
+    } 기준으로는 회수기간이 길 수 있어 투자금, 지원금, 절감액을 다시 검토해야 합니다.`
+  }
+
+  return {
+    roi,
+    paybackMonths,
+    actualCost,
+    supportFitScore,
+    savingEffectScore,
+    agingScore,
+    safetyRiskScore,
+    statusLabel,
+    description,
+  }
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    if (error.message.includes("Failed to fetch")) {
+      return "백엔드 서버에 연결할 수 없습니다. FastAPI 서버가 켜져 있는지 확인해주세요."
+    }
+
+    if (error.message.includes("400")) {
+      return "입력값을 확인해주세요. 현재 설비 카테고리가 백엔드에서 지원되지 않을 수 있습니다."
+    }
+
+    if (error.message.includes("500")) {
+      return "백엔드 내부 오류가 발생했습니다. 터미널 로그를 확인해주세요."
+    }
+
+    return error.message
+  }
+
+  return "알 수 없는 오류가 발생했습니다."
+}
+
 export default function RoiPage() {
   const navigate = useNavigate()
 
@@ -103,6 +386,8 @@ export default function RoiPage() {
     calculateRoi(initialForm),
   )
   const [nextActionOpen, setNextActionOpen] = useState(false)
+  const [apiStatus, setApiStatus] = useState<ApiStatus>("idle")
+  const [errorMessage, setErrorMessage] = useState("")
 
   const updateForm = (key: keyof RoiForm, value: string) => {
     setForm((prev) => ({
@@ -112,15 +397,44 @@ export default function RoiPage() {
     }))
   }
 
-  const handleCalculate = () => {
-    const nextResult = calculateRoi(form)
-    setResult(nextResult)
+  const handleCalculate = async () => {
+    setApiStatus("loading")
+    setErrorMessage("")
+
+    try {
+      const payload = buildRoiPayload(form)
+      const apiResponse = await simulateRoi(payload)
+      const apiData = normalizeRoiApiData(apiResponse)
+
+      if (!apiData) {
+        setApiStatus("empty")
+        setResult(calculateRoi(form))
+        return
+      }
+
+      const nextResult = mapApiResultToRoiResult(form, apiData)
+
+      if (!nextResult) {
+        setApiStatus("empty")
+        setResult(calculateRoi(form))
+        return
+      }
+
+      setResult(nextResult)
+      setApiStatus("success")
+    } catch (error) {
+      setResult(calculateRoi(form))
+      setApiStatus("error")
+      setErrorMessage(getErrorMessage(error))
+    }
   }
 
   const handleReset = () => {
     setForm(initialForm)
     setResult(calculateRoi(initialForm))
     setNextActionOpen(false)
+    setApiStatus("idle")
+    setErrorMessage("")
   }
 
   const maxOldCost = 100
@@ -303,8 +617,9 @@ export default function RoiPage() {
                     <h3>입력값 기준으로 ROI를 다시 계산합니다.</h3>
 
                     <p>
-                      지금은 프론트엔드 내부 계산식으로 결과를 갱신하고, 이후
-                      `/api/roi/simulate` 응답값과 연결하면 됩니다.
+                      ROI 계산하기를 누르면 백엔드{" "}
+                      <b>/api/roi/simulate</b> API를 호출하고, 응답값이 있으면
+                      결과 카드에 반영합니다.
                     </p>
                   </div>
 
@@ -312,10 +627,74 @@ export default function RoiPage() {
                     className="btn blue"
                     type="button"
                     onClick={handleCalculate}
+                    disabled={apiStatus === "loading"}
+                    style={{
+                      opacity: apiStatus === "loading" ? 0.7 : 1,
+                      cursor: apiStatus === "loading" ? "not-allowed" : "pointer",
+                    }}
                   >
-                    ROI 계산하기
+                    {apiStatus === "loading" ? "API 분석 중..." : "ROI 계산하기"}
                   </button>
                 </div>
+
+                {apiStatus !== "idle" && (
+                  <div
+                    style={{
+                      marginTop: "16px",
+                      padding: "16px 18px",
+                      borderRadius: "18px",
+                      border:
+                        apiStatus === "error"
+                          ? "1px solid #FCA5A5"
+                          : apiStatus === "empty"
+                            ? "1px solid #FDBA74"
+                            : "1px solid #BFDBFE",
+                      background:
+                        apiStatus === "error"
+                          ? "#FEF2F2"
+                          : apiStatus === "empty"
+                            ? "#FFF7ED"
+                            : "#EFF6FF",
+                      color:
+                        apiStatus === "error"
+                          ? "#991B1B"
+                          : apiStatus === "empty"
+                            ? "#9A3412"
+                            : "#1E3A8A",
+                      fontSize: "14px",
+                      lineHeight: 1.7,
+                      fontWeight: 800,
+                    }}
+                  >
+                    {apiStatus === "loading" && (
+                      <span>
+                        백엔드 ROI API를 호출하는 중입니다. Network 탭에서{" "}
+                        <b>simulate</b> 요청이 표시되어야 합니다.
+                      </span>
+                    )}
+
+                    {apiStatus === "success" && (
+                      <span>
+                        백엔드 ROI API 응답을 결과 카드에 반영했습니다. Network
+                        탭에서 <b>POST /api/roi/simulate 200</b>을 확인하세요.
+                      </span>
+                    )}
+
+                    {apiStatus === "empty" && (
+                      <span>
+                        API 응답은 도착했지만 결과 데이터가 비어 있습니다. 화면은
+                        깨지지 않도록 프론트 기본 계산값을 표시합니다.
+                      </span>
+                    )}
+
+                    {apiStatus === "error" && (
+                      <span>
+                        API 호출에 실패했습니다. {errorMessage} 현재 화면은
+                        깨지지 않도록 프론트 기본 계산값을 표시합니다.
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>

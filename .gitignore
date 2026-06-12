@@ -34,3 +34,5 @@ dist/
 .DS_Store
 .vscode/
 >>>>>>> fafa4caecf0771298d20ad5019cb0ef0ac8c8653
+
+chroma_db/

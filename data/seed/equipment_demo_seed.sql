@@ -13,7 +13,7 @@ INSERT INTO equipment (
     new_energy_cost_annual,
     new_investment_manwon,
     maintenance_cost_annual,
-    capacity_value,
+    current_capacity_value,
     production_qty,
     contribution_margin_won
 ) VALUES
@@ -72,6 +72,6 @@ ON CONFLICT (equipment_id) DO UPDATE SET
     new_energy_cost_annual = EXCLUDED.new_energy_cost_annual,
     new_investment_manwon = EXCLUDED.new_investment_manwon,
     maintenance_cost_annual = EXCLUDED.maintenance_cost_annual,
-    capacity_value = EXCLUDED.capacity_value,
+    current_capacity_value = EXCLUDED.current_capacity_value,
     production_qty = EXCLUDED.production_qty,
     contribution_margin_won = EXCLUDED.contribution_margin_won;

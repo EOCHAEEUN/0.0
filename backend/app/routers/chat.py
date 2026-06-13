@@ -87,7 +87,7 @@ async def chat(req: ChatRequest):
                     age_years=eq.get("age_years", 0),
                     energy_cost_annual=eq.get("energy_cost_annual", 0),
                     defect_rate=eq.get("defect_rate"),
-                    capacity_value=eq.get("capacity_value"),
+                    current_capacity_value=eq.get("current_capacity_value"),
                 )
             )
 

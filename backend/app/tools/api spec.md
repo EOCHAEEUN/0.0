@@ -124,7 +124,7 @@ POST /api/roi/simulate
     "energy_cost_annual": 4800,
     "defect_rate": 3.2,
     "maintenance_cost_annual": null,
-    "capacity_value": null,
+    "current_capacity_value": null,
     "production_qty": null,
     "contribution_margin_won": null
   },
@@ -203,7 +203,7 @@ POST /api/roi/simulate
   "data_quality": {
     "score": 0.5,
     "level": "medium",
-    "missing_fields": ["maintenance_cost_annual", "capacity_value", "production_qty"],
+    "missing_fields": ["maintenance_cost_annual", "current_capacity_value", "production_qty"],
     "message": "일부 핵심 데이터가 부족합니다."
   },
   "benchmark": {

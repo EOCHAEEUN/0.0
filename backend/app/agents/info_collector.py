@@ -76,7 +76,7 @@ def info_collector_node(state: FactofitState) -> FactofitState:
                 data["age_years"] = eq.age_years
                 data["energy_cost_annual"] = eq.energy_cost_annual
                 data["defect_rate"] = eq.defect_rate
-                data["capacity_value"] = eq.capacity_value
+                data["current_capacity_value"] = eq.current_capacity_value
 
             name = data.get("equipment_name", "").lower()
             if "프레스" in name or "press" in name:

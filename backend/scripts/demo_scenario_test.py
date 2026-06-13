@@ -39,7 +39,7 @@ def build_park_test_input() -> RoiInput:
         energy_cost_annual=4800,
         defect_rate=3.2,
         maintenance_cost_annual=None,
-        capacity_value=None,
+        current_capacity_value=None,
         production_qty=None,
         contribution_margin_won=None,
     )

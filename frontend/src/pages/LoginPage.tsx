@@ -2,6 +2,8 @@ import { useState } from "react"
 import type { CSSProperties, ReactNode } from "react"
 import { useNavigate } from "react-router-dom"
 
+import SignupModal from "../components/auth/SignupModal"
+
 type ModalType = "preview" | "signup" | "sso" | null
 
 export default function LoginPage() {
@@ -432,9 +434,9 @@ export default function LoginPage() {
       )}
 
       {modalType === "signup" && (
-        <SignupDialog
+        <SignupModal
           onClose={() => setModalType(null)}
-          onComplete={() => setModalType("preview")}
+          onLoginClick={() => setModalType(null)}
         />
       )}
 
@@ -509,17 +511,6 @@ const textButtonStyle: CSSProperties = {
   fontSize: "13px",
   fontWeight: 900,
   cursor: "pointer",
-}
-
-const fieldWrapStyle: CSSProperties = {
-  display: "grid",
-  gap: "8px",
-}
-
-const fieldLabelStyle: CSSProperties = {
-  color: "#475467",
-  fontSize: "13px",
-  fontWeight: 900,
 }
 
 function ModalShell({
@@ -679,7 +670,11 @@ function LoginPreviewDialog({
 }) {
   return (
     <ModalShell onClose={onClose} width={560}>
-      <ModalHeader title="FactoFit AI" subtitle="예비 진단 리포트" onClose={onClose} />
+      <ModalHeader
+        title="FactoFit AI"
+        subtitle="예비 진단 리포트"
+        onClose={onClose}
+      />
 
       <div style={{ marginBottom: "24px" }}>
         <h2
@@ -742,8 +737,18 @@ function LoginPreviewDialog({
           </strong>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
-          <PreviewMetric label="예상 확보 가능 지원금" value="8,200만원" color="#3B7A57" />
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "14px",
+          }}
+        >
+          <PreviewMetric
+            label="예상 확보 가능 지원금"
+            value="8,200만원"
+            color="#3B7A57"
+          />
           <PreviewMetric label="예상 ROI" value="98%" color="#D36A21" />
         </div>
       </div>
@@ -884,104 +889,6 @@ function PreviewList({ title, items }: { title: string; items: string[] }) {
   )
 }
 
-function SignupDialog({
-  onClose,
-  onComplete,
-}: {
-  onClose: () => void
-  onComplete: () => void
-}) {
-  const [agree, setAgree] = useState(false)
-
-  return (
-    <ModalShell onClose={onClose} width={620}>
-      <ModalHeader title="회원가입" subtitle="FactoFit 계정 생성" onClose={onClose} />
-
-      <div style={{ display: "grid", gap: "16px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
-          <label style={fieldWrapStyle}>
-            <span style={fieldLabelStyle}>이름</span>
-            <input placeholder="이름을 입력하세요" style={inputStyle} />
-          </label>
-
-          <label style={fieldWrapStyle}>
-            <span style={fieldLabelStyle}>휴대폰 번호</span>
-            <input placeholder="010-0000-0000" style={inputStyle} />
-          </label>
-        </div>
-
-        <label style={fieldWrapStyle}>
-          <span style={fieldLabelStyle}>이메일</span>
-          <input placeholder="company@example.com" style={inputStyle} />
-        </label>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
-          <label style={fieldWrapStyle}>
-            <span style={fieldLabelStyle}>비밀번호</span>
-            <input type="password" placeholder="비밀번호 입력" style={inputStyle} />
-          </label>
-
-          <label style={fieldWrapStyle}>
-            <span style={fieldLabelStyle}>비밀번호 확인</span>
-            <input type="password" placeholder="비밀번호 재입력" style={inputStyle} />
-          </label>
-        </div>
-
-        <label style={fieldWrapStyle}>
-          <span style={fieldLabelStyle}>기업명</span>
-          <input placeholder="기업명을 입력하세요" style={inputStyle} />
-        </label>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
-          <label style={fieldWrapStyle}>
-            <span style={fieldLabelStyle}>업종</span>
-            <input placeholder="예: 자동차 부품 제조" style={inputStyle} />
-          </label>
-
-          <label style={fieldWrapStyle}>
-            <span style={fieldLabelStyle}>지역</span>
-            <input placeholder="예: 경기 수원" style={inputStyle} />
-          </label>
-        </div>
-
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-            color: "#475467",
-            fontSize: "14px",
-            fontWeight: 900,
-            marginTop: "4px",
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={agree}
-            onChange={(event) => setAgree(event.target.checked)}
-            style={{ width: "16px", height: "16px", accentColor: "#344BA0" }}
-          />
-          이용약관 및 개인정보 처리방침에 동의합니다.
-        </label>
-
-        <button
-          type="button"
-          onClick={onComplete}
-          disabled={!agree}
-          style={{
-            ...modalNextButtonStyle,
-            marginTop: "10px",
-            opacity: agree ? 1 : 0.48,
-            cursor: agree ? "pointer" : "not-allowed",
-          }}
-        >
-          다음으로
-        </button>
-      </div>
-    </ModalShell>
-  )
-}
-
 function SsoDialog({
   onClose,
   onContinue,
@@ -991,7 +898,11 @@ function SsoDialog({
 }) {
   return (
     <ModalShell onClose={onClose} width={560}>
-      <ModalHeader title="기업 SSO" subtitle="조직 계정으로 로그인" onClose={onClose} />
+      <ModalHeader
+        title="기업 SSO"
+        subtitle="조직 계정으로 로그인"
+        onClose={onClose}
+      />
 
       <div style={{ marginBottom: "26px" }}>
         <h2
@@ -1056,4 +967,15 @@ function SsoDialog({
       </button>
     </ModalShell>
   )
+}
+
+const fieldWrapStyle: CSSProperties = {
+  display: "grid",
+  gap: "8px",
+}
+
+const fieldLabelStyle: CSSProperties = {
+  color: "#475467",
+  fontSize: "13px",
+  fontWeight: 900,
 }

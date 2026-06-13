@@ -797,7 +797,10 @@ export default function RoiPage() {
               onSelect={setSelectedScenarioId}
             />
 
-            <InvestmentEstimateSection scenarios={scenarios} />
+            <InvestmentEstimateSection
+              scenarios={scenarios}
+              selectedScenarioId={selectedScenarioId}
+            />
 
             <EvidenceSection
               costOpen={costOpen}
@@ -1263,144 +1266,156 @@ function ResultAndAiSection({
   onNavigateDraft: () => void
   onNavigateSupport: () => void
 }) {
+  const resultMetrics = [
+    {
+      label: "총 투자금",
+      value: formatMoneyFromManwon(selectedScenario.investmentManwon),
+    },
+    {
+      label: "예상 지원금",
+      value: formatMoneyFromManwon(selectedScenario.subsidyManwon),
+    },
+    {
+      label: "실부담금",
+      value: formatMoneyFromManwon(selectedScenario.netInvestmentManwon),
+    },
+    {
+      label: "회수기간",
+      value: formatPaybackYears(selectedScenario.paybackYears),
+    },
+  ]
+
   return (
     <div
       style={{
-        display: "grid",
-        gridTemplateColumns: "minmax(0, 1fr) 420px",
-        gap: "22px",
-        alignItems: "stretch",
+        borderRadius: "34px",
+        border: `1px solid ${colors.lineSoft}`,
+        background: colors.card,
+        boxShadow: "0 22px 48px rgba(15,23,42,.06)",
+        overflow: "hidden",
         marginBottom: "34px",
       }}
     >
       <div
         style={{
-          borderRadius: "30px",
-          border: `2px solid ${summaryAccent}`,
-          background: colors.card,
-          padding: "32px",
-          boxShadow: "0 18px 40px rgba(15,23,42,.05)",
-          minHeight: "420px",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-        }}
-      >
-        <span
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            width: "fit-content",
-            height: "42px",
-            padding: "0 18px",
-            borderRadius: "999px",
-            background: summarySoft,
-            color: summaryAccent,
-            fontSize: "14px",
-            fontWeight: 900,
-            marginBottom: "20px",
-          }}
-        >
-          {selectedStatusLabel}
-        </span>
-
-        <h2
-          style={{
-            color: colors.navy,
-            fontSize: "clamp(36px, 4vw, 62px)",
-            lineHeight: 1.1,
-            letterSpacing: "-0.052em",
-            fontWeight: 900,
-            margin: 0,
-            marginBottom: "20px",
-          }}
-        >
-          {form.equipmentName} 투자 시 추천{" "}
-          <span style={{ color: colors.blue2 }}>ROI</span>는{" "}
-          <span style={{ color: summaryAccent }}>{selectedScenario.roiPct}%</span>,{" "}
-          <span style={{ color: summaryAccent }}>
-             {selectedScenario.id} 시나리오
-          </span>
-          입니다.
-        </h2>
-
-        <p
-          style={{
-            color: colors.muted,
-            fontSize: "16px",
-            lineHeight: 1.75,
-            fontWeight: 800,
-            margin: 0,
-            marginBottom: "24px",
-          }}
-        >
-          {selectedDescription}
-        </p>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: "14px",
-            marginBottom: "24px",
-          }}
-        >
-          <SummaryNumberCard
-            label="총 투자금"
-            value={formatMoneyFromManwon(selectedScenario.investmentManwon)}
-          />
-          <SummaryNumberCard
-            label="예상 지원금"
-            value={formatMoneyFromManwon(selectedScenario.subsidyManwon)}
-          />
-          <SummaryNumberCard
-            label="실부담금"
-            value={formatMoneyFromManwon(selectedScenario.netInvestmentManwon)}
-          />
-          <SummaryNumberCard
-            label="회수기간"
-            value={formatPaybackYears(selectedScenario.paybackYears)}
-          />
-        </div>
-
-        <div
-          style={{
-            display: "flex",
-            gap: "14px",
-            flexWrap: "wrap",
-          }}
-        >
-          <button
-            type="button"
-            onClick={onNavigateDraft}
-            style={primaryButtonStyle}
-          >
-            신청서 초안 생성하기
-          </button>
-
-          <button
-            type="button"
-            onClick={onReset}
-            style={secondaryButtonStyle}
-          >
-            다시 계산하기
-          </button>
-        </div>
-      </div>
-
-      <div
-        style={{
           display: "grid",
-          gridTemplateRows: "1fr auto",
-          gap: "22px",
+          gridTemplateColumns: "minmax(0, 1fr) 410px",
+          alignItems: "stretch",
         }}
       >
-        <div
+        <section
+          style={{
+            padding: "42px 42px 36px",
+            minHeight: "430px",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            background:
+              "linear-gradient(135deg, #FFFFFF 0%, #FFFFFF 58%, #F8FAFD 100%)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              flexWrap: "wrap",
+              marginBottom: "24px",
+            }}
+          >
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                width: "fit-content",
+                height: "42px",
+                padding: "0 18px",
+                borderRadius: "999px",
+                background: summarySoft,
+                color: summaryAccent,
+                fontSize: "14px",
+                fontWeight: 900,
+              }}
+            >
+              {selectedStatusLabel}
+            </span>
+
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                height: "42px",
+                padding: "0 16px",
+                borderRadius: "999px",
+                background: "#F7F8FC",
+                color: colors.muted,
+                fontSize: "13px",
+                fontWeight: 900,
+                border: `1px solid ${colors.lineSoft}`,
+              }}
+            >
+              현재 선택 시나리오 {selectedScenario.id}
+            </span>
+          </div>
+
+          <h2
+            style={{
+              color: colors.navy,
+              fontSize: "clamp(38px, 4.2vw, 64px)",
+              lineHeight: 1.08,
+              letterSpacing: "-0.055em",
+              fontWeight: 900,
+              margin: 0,
+              marginBottom: "22px",
+              maxWidth: "820px",
+            }}
+          >
+            {form.equipmentName} 투자 시 추천{" "}
+            <span style={{ color: colors.blue2 }}>ROI</span>는{" "}
+            <span style={{ color: summaryAccent }}>{selectedScenario.roiPct}%</span>,{" "}
+            <span style={{ color: summaryAccent }}>{selectedScenario.id} 시나리오</span>
+            입니다.
+          </h2>
+
+          <p
+            style={{
+              color: colors.muted,
+              fontSize: "16px",
+              lineHeight: 1.75,
+              fontWeight: 800,
+              margin: 0,
+              marginBottom: "30px",
+              maxWidth: "900px",
+            }}
+          >
+            {selectedDescription}
+          </p>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(4, 1fr)",
+              borderTop: `1px solid ${colors.lineSoft}`,
+              borderBottom: `1px solid ${colors.lineSoft}`,
+              background: "#FBFCFF",
+            }}
+          >
+            {resultMetrics.map((metric) => (
+              <SummaryNumberCard
+                key={metric.label}
+                label={metric.label}
+                value={metric.value}
+              />
+            ))}
+          </div>
+        </section>
+
+        <aside
           style={{
             background: colors.navy,
+            borderLeft: "1px solid rgba(255,255,255,.08)",
             borderTop: `4px solid ${colors.gold}`,
-            borderRadius: "30px",
-            padding: "30px 28px",
+            padding: "36px 32px",
             display: "flex",
             flexDirection: "column",
             justifyContent: "center",
@@ -1408,25 +1423,52 @@ function ResultAndAiSection({
         >
           <div
             style={{
-              color: "#FFFFFF",
-              fontSize: "28px",
-              lineHeight: 1.2,
-              letterSpacing: "-0.03em",
-              fontWeight: 900,
-              marginBottom: "14px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "16px",
+              marginBottom: "18px",
             }}
           >
-            AI 판단 근거
+            <div
+              style={{
+                color: "#FFFFFF",
+                fontSize: "30px",
+                lineHeight: 1.15,
+                letterSpacing: "-0.035em",
+                fontWeight: 900,
+              }}
+            >
+              AI 판단 근거
+            </div>
+
+            <div
+              style={{
+                width: "58px",
+                height: "58px",
+                borderRadius: "50%",
+                display: "grid",
+                placeItems: "center",
+                background: "rgba(255,255,255,.1)",
+                border: "1px solid rgba(255,255,255,.18)",
+                color: "#FFFFFF",
+                fontSize: "20px",
+                fontWeight: 900,
+                flexShrink: 0,
+              }}
+            >
+              {selectedScores.total}
+            </div>
           </div>
 
           <p
             style={{
               color: "#DDE7F7",
               fontSize: "14px",
-              lineHeight: 1.7,
+              lineHeight: 1.75,
               fontWeight: 800,
               margin: 0,
-              marginBottom: "22px",
+              marginBottom: "26px",
             }}
           >
             AI는 현재 <b>{recommendedScenarioId} 시나리오</b>를 추천합니다. 추천 기준은
@@ -1440,29 +1482,34 @@ function ResultAndAiSection({
           <ReasonRow label="비용 절감 효과" value={selectedScores.savingEffect} />
           <ReasonRow label="설비 노후도" value={selectedScores.aging} />
           <ReasonRow label="안전 리스크" value={selectedScores.safetyRisk} />
-        </div>
+        </aside>
+      </div>
 
-        <div
-          style={{
-            background: colors.card,
-            border: `1px solid ${colors.lineSoft}`,
-            borderRadius: "26px",
-            padding: "24px",
-            boxShadow: "0 10px 24px rgba(15,23,42,.04)",
-          }}
-        >
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1fr) auto",
+          gap: "22px",
+          alignItems: "center",
+          padding: "26px 32px",
+          borderTop: `1px solid ${colors.lineSoft}`,
+          background: "#F8FAFD",
+        }}
+      >
+        <div>
           <span
             style={{
               display: "inline-flex",
               alignItems: "center",
-              height: "40px",
-              padding: "0 18px",
+              height: "34px",
+              padding: "0 14px",
               borderRadius: "999px",
               background: "#EEF0FF",
               color: colors.blue2,
-              fontSize: "14px",
+              fontSize: "12px",
+              letterSpacing: "0.04em",
               fontWeight: 900,
-              marginBottom: "16px",
+              marginBottom: "12px",
             }}
           >
             NEXT ACTION
@@ -1474,8 +1521,8 @@ function ResultAndAiSection({
               fontSize: "24px",
               lineHeight: 1.25,
               fontWeight: 900,
-              letterSpacing: "-0.03em",
-              marginBottom: "10px",
+              letterSpacing: "-0.035em",
+              marginBottom: "8px",
             }}
           >
             다음 추천 액션
@@ -1485,32 +1532,43 @@ function ResultAndAiSection({
             style={{
               color: colors.muted,
               fontSize: "15px",
-              lineHeight: 1.75,
+              lineHeight: 1.7,
               fontWeight: 800,
               margin: 0,
-              marginBottom: "18px",
             }}
           >
             추천된 {recommendedScenario.id} 시나리오 기준으로 신청서 초안과 지원사업 상세
             검토를 이어서 진행하세요.
           </p>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            gap: "12px",
+            flexWrap: "wrap",
+            justifyContent: "flex-end",
+          }}
+        >
+          <button type="button" onClick={onNavigateDraft} style={primaryButtonStyle}>
+            신청서 초안 생성하기
+          </button>
 
           <button
             type="button"
             onClick={onNavigateSupport}
             style={{
-              width: "72px",
-              height: "72px",
-              borderRadius: "20px",
-              border: "0",
-              background: "#F3F5FC",
+              ...secondaryButtonStyle,
+              background: "#FFFFFF",
               color: colors.blue2,
-              fontSize: "36px",
-              fontWeight: 900,
-              cursor: "pointer",
+              border: `1px solid ${colors.lineSoft}`,
             }}
           >
-            →
+            지원사업 상세보기
+          </button>
+
+          <button type="button" onClick={onReset} style={secondaryButtonStyle}>
+            다시 계산하기
           </button>
         </div>
       </div>
@@ -1683,8 +1741,10 @@ function ScenarioCompareSection({
 
 function InvestmentEstimateSection({
   scenarios,
+  selectedScenarioId,
 }: {
   scenarios: ScenarioCard[]
+  selectedScenarioId: "A" | "B"
 }) {
   return (
     <div
@@ -1697,16 +1757,26 @@ function InvestmentEstimateSection({
     >
       {scenarios.map((scenario) => {
         const isA = scenario.id === "A"
+        const isSelected = selectedScenarioId === scenario.id
         const accent = isA ? colors.green : colors.blue2
+        const softBackground = isA ? colors.greenSoft : "#EEF0FF"
 
         return (
           <div
             key={`estimate-${scenario.id}`}
             style={{
               borderRadius: "26px",
-              border: `1px solid ${colors.lineSoft}`,
-              background: colors.card,
-              padding: "24px",
+              border: isSelected
+                ? `2px solid ${accent}`
+                : `1px solid ${colors.lineSoft}`,
+              background: isSelected
+                ? "linear-gradient(135deg, #FFFFFF 0%, #FFFFFF 62%, #F8FAFD 100%)"
+                : colors.card,
+              padding: isSelected ? "23px" : "24px",
+              boxShadow: isSelected
+                ? "0 18px 38px rgba(15,23,42,.07)"
+                : "none",
+              transition: "border .18s ease, box-shadow .18s ease, background .18s ease",
             }}
           >
             <div
@@ -1732,9 +1802,16 @@ function InvestmentEstimateSection({
 
               <span
                 style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  height: "34px",
+                  padding: "0 14px",
+                  borderRadius: "999px",
+                  background: isSelected ? softBackground : "transparent",
                   color: accent,
                   fontSize: "13px",
                   fontWeight: 900,
+                  whiteSpace: "nowrap",
                 }}
               >
                 {scenario.id === "A" ? "시나리오 A - 전체 교체" : "시나리오 B - 부분 교체"}
@@ -2168,10 +2245,9 @@ function SummaryNumberCard({
   return (
     <div
       style={{
-        border: `1px solid ${colors.lineSoft}`,
-        borderRadius: "20px",
-        padding: "16px 16px 18px",
-        background: colors.card,
+        padding: "20px 22px",
+        background: "transparent",
+        boxShadow: `inset -1px 0 0 ${colors.lineSoft}`,
       }}
     >
       <div
@@ -2180,7 +2256,7 @@ function SummaryNumberCard({
           fontSize: "13px",
           lineHeight: 1.2,
           fontWeight: 900,
-          marginBottom: "14px",
+          marginBottom: "12px",
         }}
       >
         {label}
@@ -2189,9 +2265,9 @@ function SummaryNumberCard({
       <div
         style={{
           color: colors.navy,
-          fontSize: "22px",
-          lineHeight: 1.2,
-          letterSpacing: "-0.03em",
+          fontSize: "24px",
+          lineHeight: 1.15,
+          letterSpacing: "-0.035em",
           fontWeight: 900,
         }}
       >

@@ -45,23 +45,19 @@ def capex_advisor_node(state: FactofitState) -> FactofitState:
             else:
                 category = "unsupported"
 
-            from app.models.roi_input import RoiInput
             from app.models.equipment import EquipmentInput
             from app.models.company import CompanyContext
 
-            state["equipment"] = RoiInput(
-                equipment=EquipmentInput(
-                    name=data.get("equipment_name", ""),
-                    category=category,
-                    age_years=int(data.get("age_years", 0)),
-                    energy_cost_annual=int(data.get("energy_cost_annual", 0))
-                )
+            state["equipment"] = EquipmentInput(
+                name=data.get("equipment_name", ""),
+                category=category,
+                age_years=int(data.get("age_years", 0)),
+                energy_cost_annual=int(data.get("energy_cost_annual", 0))
             )
             if not company:
                 state["company_info"] = CompanyContext(
                     company_name="",
-                    industry_code=data.get("industry_code", ""),
-                    employee_count=0,
+                    industry_code=[data.get("industry_code", "")] if data.get("industry_code") else [],
                     region=data.get("region", "")
                 )
             equipment = state["equipment"]

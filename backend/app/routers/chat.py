@@ -75,20 +75,19 @@ async def chat(req: ChatRequest):
         )
 
         if equipment_data.data:
-            from app.models.roi_input import RoiInput
             from app.models.equipment import EquipmentInput
 
             eq = equipment_data.data[0]
 
-            equipment_info = RoiInput(
-                equipment=EquipmentInput(
-                    name=eq.get("name", ""),
-                    category=eq.get("category", ""),
-                    age_years=eq.get("age_years", 0),
-                    energy_cost_annual=eq.get("energy_cost_annual", 0),
-                    defect_rate=eq.get("defect_rate"),
-                    current_capacity_value=eq.get("current_capacity_value"),
-                )
+            equipment_info = EquipmentInput(
+                name=eq.get("name", ""),
+                category=eq.get("category", ""),
+                age_years=eq.get("age_years", 0),
+                energy_cost_annual=eq.get("energy_cost_annual", 0),
+                defect_rate=eq.get("defect_rate"),
+                current_capacity_value=eq.get("current_capacity_value"),
+                scenario_a_investment_manwon=eq.get("scenario_a_investment_manwon"),
+                scenario_b_investment_manwon=eq.get("scenario_b_investment_manwon"),
             )
 
     initial_state: FactofitState = {
@@ -102,6 +101,8 @@ async def chat(req: ChatRequest):
         "draft_result": None,
         "chat_history": req.chat_history[-10:],
         "final_response": "",
+        "unsupported_equipment": False,
+        "chat_id": None,
     }
 
     result = await factofit_graph.ainvoke(initial_state)

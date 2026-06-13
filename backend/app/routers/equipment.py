@@ -13,7 +13,7 @@ class EquipmentCreateRequest(BaseModel):
     age_years: int
     energy_cost_annual: int
     defect_rate: float
-    capacity_value: int
+    current_capacity_value: int
 
 
 @router.post("/equipment")
@@ -27,7 +27,7 @@ async def create_equipment(body: EquipmentCreateRequest):
         "age_years": body.age_years,
         "energy_cost_annual": body.energy_cost_annual,
         "defect_rate": body.defect_rate,
-        "capacity_value": body.capacity_value,
+        "current_capacity_value": body.current_capacity_value,
     }
 
     try:

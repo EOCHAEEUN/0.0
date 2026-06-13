@@ -1,151 +1,742 @@
-import { useState } from "react"
+import {
+  type CSSProperties,
+  type ReactNode,
+  type RefObject,
+  useRef,
+  useState,
+} from "react"
 import { useNavigate } from "react-router-dom"
+import { simulateRoi } from "../services/api"
 
-type RoiForm = {
+type ApiStatus = "idle" | "loading" | "success" | "empty" | "error"
+
+type RoiFormState = {
+  equipmentType: string
+  industryCode: string
+  industryName: string
+  region: string
   equipmentName: string
-  industry: string
-  equipmentAge: number
-  defectRate: number
-  totalInvestment: number
-  expectedSupport: number
-  annualSaving: number
-  maintenanceCost: number
+  equipmentAge: string
+  annualEnergyCostManwon: string
+  employees: string
+  annualRevenueManwon: string
+  newEquipmentEnergyCostManwon: string
+  newEquipmentInvestmentManwon: string
+  defectRate: string
+  annualMaintenanceCostManwon: string
 }
 
-type RoiResult = {
-  roi: number
-  paybackMonths: number
-  actualCost: number
-  supportFitScore: number
-  savingEffectScore: number
-  agingScore: number
-  safetyRiskScore: number
-  statusLabel: string
-  description: string
+type RoiApiScenario = {
+  label?: string
+  investment_manwon?: number
+  subsidy_manwon?: number
+  net_investment_manwon?: number
+  annual_net_benefit_manwon?: number
+  payback_years?: number
+  roi_pct?: number
 }
 
-const initialForm: RoiForm = {
-  equipmentName: "프레스 설비",
-  industry: "금속가공 제조업",
-  equipmentAge: 11,
-  defectRate: 5.8,
-  totalInvestment: 3.2,
-  expectedSupport: 1.2,
-  annualSaving: 1.7,
-  maintenanceCost: 0.4,
+type RoiApiData = {
+  scenario_a?: RoiApiScenario
+  scenario_b?: RoiApiScenario
+  recommended?: string
 }
 
-function calculateRoi(form: RoiForm): RoiResult {
-  const actualCost = Math.max(form.totalInvestment - form.expectedSupport, 0.1)
-  const roi = Math.round((form.annualSaving / actualCost) * 1000) / 10
-  const paybackMonths = Math.max(
-    Math.round((actualCost / form.annualSaving) * 12),
-    1,
+type RoiApiResponse = {
+  success?: boolean
+  data?: RoiApiData | null
+  scenario_a?: RoiApiScenario
+  scenario_b?: RoiApiScenario
+  recommended?: string
+}
+
+type ScenarioCard = {
+  id: "A" | "B"
+  badge: string
+  title: string
+  subtitle: string
+  investmentManwon: number
+  subsidyManwon: number
+  netInvestmentManwon: number
+  energySavingManwon: number
+  maintenanceSavingManwon: number
+  defectSavingManwon: number
+  annualNetBenefitManwon: number
+  paybackYears: number | null
+  roiPct: number
+  estimateRangeText: string
+  estimateBasisText: string
+}
+
+type ScoreSummary = {
+  supportFit: number
+  savingEffect: number
+  aging: number
+  safetyRisk: number
+  total: number
+}
+
+const INDUSTRY_CODE_TO_NAME: Record<string, string> = {
+  C24: "1차 금속 제조업",
+  C25: "금속가공제품 제조업",
+  C26: "전자부품 · 컴퓨터 · 영상 · 음향 및 통신장비 제조업",
+  C27: "전기장비 제조업",
+  C28: "기타 기계 및 장비 제조업",
+  C29: "자동차 및 트레일러 제조업",
+  C30: "기타 운송장비 제조업",
+}
+
+const initialForm: RoiFormState = {
+  equipmentType: "press / 프레스",
+  industryCode: "C25",
+  industryName: "금속가공제품 제조업",
+  region: "경기도 안산시",
+  equipmentName: "1600톤 프레스 #1",
+  equipmentAge: "15",
+  annualEnergyCostManwon: "4500",
+  employees: "45",
+  annualRevenueManwon: "320000",
+  newEquipmentEnergyCostManwon: "",
+  newEquipmentInvestmentManwon: "",
+  defectRate: "5.8",
+  annualMaintenanceCostManwon: "1200",
+}
+
+const colors = {
+  navy: "#061B34",
+  blue: "#344BA0",
+  blue2: "#5860D3",
+  green: "#5A8D5E",
+  greenSoft: "#EEF5ED",
+  text: "#061B34",
+  muted: "#667085",
+  line: "#D8DEEA",
+  lineSoft: "#E4EAF3",
+  bg: "#F8FAFC",
+  card: "#FFFFFF",
+  soft: "#F7F9FC",
+  grayButton: "#AAB2C4",
+  gold: "#B08B4B",
+}
+
+const inputStyle: CSSProperties = {
+  width: "100%",
+  height: "68px",
+  borderRadius: "22px",
+  border: `1px solid ${colors.line}`,
+  background: "#FFFFFF",
+  color: colors.text,
+  fontSize: "18px",
+  lineHeight: 1,
+  fontWeight: 900,
+  padding: "0 20px",
+  outline: "none",
+  boxSizing: "border-box",
+}
+
+const selectStyle: CSSProperties = {
+  ...inputStyle,
+  appearance: "auto",
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max)
+}
+
+function roundTo(value: number, digits = 1) {
+  const unit = 10 ** digits
+  return Math.round(value * unit) / unit
+}
+
+function toNumber(value: string | number | undefined | null, fallback = 0) {
+  const num = Number(value)
+  return Number.isFinite(num) ? num : fallback
+}
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat("ko-KR").format(Math.round(value))
+}
+
+function formatMoneyFromManwon(value: number) {
+  const normalized = Number.isFinite(value) ? value : 0
+
+  if (Math.abs(normalized) >= 10000) {
+    const eok = normalized / 10000
+    return `${roundTo(eok, 1)}억`
+  }
+
+  return `${formatNumber(normalized)}만원`
+}
+
+function formatAnnualMoneyFromManwon(value: number) {
+  return `${formatMoneyFromManwon(value)}/년`
+}
+
+function formatPaybackYears(value: number | null) {
+  if (!value || !Number.isFinite(value) || value <= 0) {
+    return "-"
+  }
+
+  if (value < 1) {
+    return `${Math.max(Math.round(value * 12), 1)}개월`
+  }
+
+  const rounded = roundTo(value, 1)
+
+  if (Number.isInteger(rounded)) {
+    return `${rounded}년`
+  }
+
+  return `${rounded}년`
+}
+
+function normalizeIndustryCode(code: string) {
+  return code.trim().toUpperCase()
+}
+
+function findIndustryNameByCode(code: string) {
+  return INDUSTRY_CODE_TO_NAME[normalizeIndustryCode(code)] ?? ""
+}
+
+function findIndustryCodeByName(name: string) {
+  const normalized = name.trim()
+
+  if (!normalized) return ""
+
+  const exact = Object.entries(INDUSTRY_CODE_TO_NAME).find(
+    ([, industryName]) => industryName === normalized,
   )
 
-  const supportFitScore = Math.min(
-    Math.round((form.expectedSupport / form.totalInvestment) * 220),
-    98,
+  if (exact) return exact[0]
+
+  const partial = Object.entries(INDUSTRY_CODE_TO_NAME).find(
+    ([, industryName]) =>
+      industryName.includes(normalized) || normalized.includes(industryName),
   )
 
-  const savingEffectScore = Math.min(
-    Math.round((form.annualSaving / actualCost) * 100),
+  if (partial) return partial[0]
+
+  if (normalized.includes("1차") || normalized.includes("금속 제조")) return "C24"
+  if (normalized.includes("금속가공") || normalized.includes("금속 가공")) return "C25"
+  if (normalized.includes("전자") || normalized.includes("반도체")) return "C26"
+  if (normalized.includes("전기")) return "C27"
+  if (normalized.includes("기계") || normalized.includes("장비")) return "C28"
+  if (normalized.includes("자동차")) return "C29"
+  if (normalized.includes("운송")) return "C30"
+
+  return ""
+}
+
+function getEquipmentCategoryKey(equipmentType: string) {
+  const normalized = equipmentType.toLowerCase()
+
+  if (normalized.includes("press") || normalized.includes("프레스")) return "press"
+  if (normalized.includes("cnc")) return "cnc"
+  if (normalized.includes("injection") || normalized.includes("사출")) return "injection"
+
+  return "press"
+}
+
+function getDefaultInvestmentManwon(equipmentType: string) {
+  const key = getEquipmentCategoryKey(equipmentType)
+
+  if (key === "cnc") return 18000
+  if (key === "injection") return 15000
+
+  return 22000
+}
+
+function getDefaultEstimateRangeTextA(equipmentType: string) {
+  const key = getEquipmentCategoryKey(equipmentType)
+
+  if (key === "cnc") return "1.5억 ~ 2.0억"
+  if (key === "injection") return "1.2억 ~ 1.8억"
+
+  return "1.8억 ~ 2.5억"
+}
+
+function getDefaultEstimateRangeTextB(equipmentType: string) {
+  const key = getEquipmentCategoryKey(equipmentType)
+
+  if (key === "cnc") return "3,000만원 ~ 5,000만원"
+  if (key === "injection") return "3,000만원 ~ 4,500만원"
+
+  return "4,000만원 ~ 6,000만원"
+}
+
+function buildLocalScenarios(form: RoiFormState): ScenarioCard[] {
+  const annualEnergyCost = toNumber(form.annualEnergyCostManwon, 4500)
+  const annualMaintenanceCost = toNumber(form.annualMaintenanceCostManwon, 1200)
+  const annualRevenue = toNumber(form.annualRevenueManwon, 320000)
+  const defectRate = toNumber(form.defectRate, 5.8)
+
+  const baseInvestment =
+    toNumber(form.newEquipmentInvestmentManwon, 0) ||
+    getDefaultInvestmentManwon(form.equipmentType)
+
+  const scenarioAInvestment = baseInvestment
+  const scenarioASubsidy = Math.min(Math.round(scenarioAInvestment * 0.545), 12000)
+  const scenarioANetInvestment = Math.max(scenarioAInvestment - scenarioASubsidy, 0)
+
+  const scenarioBInvestment = Math.round(scenarioAInvestment * 0.227)
+  const scenarioBSubsidy = Math.round(scenarioBInvestment * 0.3)
+  const scenarioBNetInvestment = Math.max(scenarioBInvestment - scenarioBSubsidy, 0)
+
+  const inputNewEnergy = toNumber(form.newEquipmentEnergyCostManwon, 0)
+
+  const scenarioAEnergySaving =
+    inputNewEnergy > 0
+      ? Math.max(annualEnergyCost - inputNewEnergy, 0)
+      : Math.round(annualEnergyCost * 0.3)
+
+  const scenarioBEnergySaving =
+    inputNewEnergy > 0
+      ? Math.max(Math.round((annualEnergyCost - inputNewEnergy) * 0.33), 0)
+      : Math.round(annualEnergyCost * 0.1)
+
+  const scenarioAMaintenanceSaving = Math.round(annualMaintenanceCost * 0.55)
+  const scenarioBMaintenanceSaving = Math.round(annualMaintenanceCost * 0.25)
+
+  const scenarioADefectSaving = Math.round(annualRevenue * (defectRate / 100) * 0.071)
+  const scenarioBDefectSaving = Math.round(annualRevenue * (defectRate / 100) * 0.032)
+
+  const scenarioABenefit =
+    scenarioAEnergySaving + scenarioAMaintenanceSaving + scenarioADefectSaving
+
+  const scenarioBBenefit =
+    scenarioBEnergySaving + scenarioBMaintenanceSaving + scenarioBDefectSaving
+
+  const scenarioAPayback =
+    scenarioABenefit > 0 ? roundTo(scenarioANetInvestment / scenarioABenefit, 1) : null
+
+  const scenarioBPayback =
+    scenarioBBenefit > 0 ? roundTo(scenarioBNetInvestment / scenarioBBenefit, 1) : null
+
+  const scenarioARoi =
+    scenarioANetInvestment > 0
+      ? roundTo((scenarioABenefit / scenarioANetInvestment) * 100, 1)
+      : 0
+
+  const scenarioBRoi =
+    scenarioBNetInvestment > 0
+      ? roundTo((scenarioBBenefit / scenarioBNetInvestment) * 100, 1)
+      : 0
+
+  return [
+    {
+      id: "A",
+      badge: "시나리오 A",
+      title:
+        getEquipmentCategoryKey(form.equipmentType) === "injection"
+          ? "고효율 사출 전체 교체"
+          : getEquipmentCategoryKey(form.equipmentType) === "cnc"
+            ? "고효율 CNC 전체 교체"
+            : "고효율 프레스 전체 교체",
+      subtitle: "노후 설비를 고효율 신규 설비로 전면 교체",
+      investmentManwon: scenarioAInvestment,
+      subsidyManwon: scenarioASubsidy,
+      netInvestmentManwon: scenarioANetInvestment,
+      energySavingManwon: scenarioAEnergySaving,
+      maintenanceSavingManwon: scenarioAMaintenanceSaving,
+      defectSavingManwon: scenarioADefectSaving,
+      annualNetBenefitManwon: scenarioABenefit,
+      paybackYears: scenarioAPayback,
+      roiPct: scenarioARoi,
+      estimateRangeText: getDefaultEstimateRangeTextA(form.equipmentType),
+      estimateBasisText: "설비 용량 기준",
+    },
+    {
+      id: "B",
+      badge: "시나리오 B",
+      title: "핵심 부품 교체 + 스마트 모니터링",
+      subtitle: "필수 부품 교체와 모니터링 중심의 점진 투자",
+      investmentManwon: scenarioBInvestment,
+      subsidyManwon: scenarioBSubsidy,
+      netInvestmentManwon: scenarioBNetInvestment,
+      energySavingManwon: scenarioBEnergySaving,
+      maintenanceSavingManwon: scenarioBMaintenanceSaving,
+      defectSavingManwon: scenarioBDefectSaving,
+      annualNetBenefitManwon: scenarioBBenefit,
+      paybackYears: scenarioBPayback,
+      roiPct: scenarioBRoi,
+      estimateRangeText: getDefaultEstimateRangeTextB(form.equipmentType),
+      estimateBasisText: "핵심 부품 기준",
+    },
+  ]
+}
+
+function normalizeApiData(response: unknown): RoiApiData | null {
+  if (!response || typeof response !== "object") return null
+
+  const target = response as RoiApiResponse
+
+  if (
+    target.data &&
+    typeof target.data === "object" &&
+    (target.data.scenario_a || target.data.scenario_b)
+  ) {
+    return target.data
+  }
+
+  if (target.scenario_a || target.scenario_b) {
+    return {
+      scenario_a: target.scenario_a,
+      scenario_b: target.scenario_b,
+      recommended: target.recommended,
+    }
+  }
+
+  return null
+}
+
+function mergeApiScenarios(localScenarios: ScenarioCard[], apiData: RoiApiData | null) {
+  if (!apiData) {
+    return {
+      scenarios: localScenarios,
+      apiRecommended: "",
+    }
+  }
+
+  const mapApiScenario = (local: ScenarioCard, api?: RoiApiScenario) => {
+    if (!api) return local
+
+    const investment = toNumber(api.investment_manwon, local.investmentManwon)
+    const subsidy = toNumber(api.subsidy_manwon, local.subsidyManwon)
+    const netInvestment = toNumber(api.net_investment_manwon, investment - subsidy)
+    const annualNetBenefit = toNumber(
+      api.annual_net_benefit_manwon,
+      local.annualNetBenefitManwon,
+    )
+    const paybackYears = toNumber(api.payback_years, 0)
+    const roiPct = toNumber(api.roi_pct, local.roiPct)
+
+    return {
+      ...local,
+      investmentManwon: investment,
+      subsidyManwon: subsidy,
+      netInvestmentManwon: Math.max(netInvestment, 0),
+      annualNetBenefitManwon: annualNetBenefit,
+      paybackYears: paybackYears > 0 ? roundTo(paybackYears, 1) : local.paybackYears,
+      roiPct: roiPct > 0 && roiPct < 10000 ? roundTo(roiPct, 1) : local.roiPct,
+    }
+  }
+
+  const merged = localScenarios.map((scenario) => {
+    if (scenario.id === "A") {
+      return mapApiScenario(scenario, apiData.scenario_a)
+    }
+
+    return mapApiScenario(scenario, apiData.scenario_b)
+  })
+
+  return {
+    scenarios: merged,
+    apiRecommended: String(apiData.recommended || "").toUpperCase(),
+  }
+}
+
+function buildPayload(form: RoiFormState) {
+  const localScenarios = buildLocalScenarios(form)
+  const scenarioA = localScenarios.find((item) => item.id === "A")!
+  const scenarioB = localScenarios.find((item) => item.id === "B")!
+
+  return {
+    equipment: {
+      name: form.equipmentName,
+      category: getEquipmentCategoryKey(form.equipmentType),
+      age_years: toNumber(form.equipmentAge, 0),
+      energy_cost_annual: Math.round(toNumber(form.annualEnergyCostManwon, 4500) * 10000),
+      new_energy_cost_annual: Math.round(
+        (toNumber(form.newEquipmentEnergyCostManwon, 0) ||
+          Math.round(toNumber(form.annualEnergyCostManwon, 4500) * 0.7)) * 10000,
+      ),
+      new_investment_manwon: scenarioA.investmentManwon,
+      maintenance_cost_annual: Math.round(
+        toNumber(form.annualMaintenanceCostManwon, 1200) * 10000,
+      ),
+      defect_rate: toNumber(form.defectRate, 0),
+      employee_count: toNumber(form.employees, 0),
+      annual_revenue_manwon: toNumber(form.annualRevenueManwon, 0),
+    },
+    company_context: {
+      industry_code: form.industryCode,
+      industry_name: form.industryName,
+      region: form.region,
+    },
+    scenario_a_investment_manwon: scenarioA.investmentManwon,
+    scenario_a_subsidy_manwon: scenarioA.subsidyManwon,
+    scenario_b_investment_manwon: scenarioB.investmentManwon,
+    scenario_b_subsidy_manwon: scenarioB.subsidyManwon,
+  }
+}
+
+function buildScores(form: RoiFormState, scenario: ScenarioCard): ScoreSummary {
+  const age = toNumber(form.equipmentAge, 15)
+
+  const supportFit = clamp(
+    Math.round((scenario.subsidyManwon / Math.max(scenario.investmentManwon, 1)) * 150),
+    35,
     96,
   )
 
-  const agingScore = Math.min(Math.round(form.equipmentAge * 7), 95)
-
-  const safetyRiskScore = Math.min(
-    Math.round(form.equipmentAge * 5.5 + form.defectRate * 3),
-    92,
+  const savingEffect = clamp(
+    Math.round((scenario.annualNetBenefitManwon / Math.max(scenario.netInvestmentManwon, 1)) * 190),
+    25,
+    96,
   )
 
-  let statusLabel = "투자 검토"
-  let description =
-    "지원금과 절감 효과를 함께 고려해 설비 교체 여부를 검토할 수 있습니다."
+  const aging = clamp(Math.round((age / 16) * 100), 45, 96)
 
-  if (roi >= 45 && paybackMonths <= 18) {
-    statusLabel = "투자 적합"
-    description =
-      "정부지원금 적용 후 실부담금이 낮아지고, 에너지 비용과 불량률 개선 효과를 고려할 때 투자 적합도가 높습니다."
-  } else if (roi >= 25) {
-    statusLabel = "조건부 적합"
-    description =
-      "ROI는 양호하지만 지원금 확보 여부와 유지보수비 절감 가능성을 추가로 확인하는 것이 좋습니다."
-  } else {
-    statusLabel = "재검토 필요"
-    description =
-      "현재 입력값 기준으로는 투자 회수기간이 길 수 있어 지원금, 절감액, 설비 규모를 다시 검토해야 합니다."
-  }
+  const safetyRisk = clamp(
+    Math.round(age * 4.8 + toNumber(form.defectRate, 5.8) * 3.5),
+    35,
+    96,
+  )
+
+  const total = Math.round(
+    supportFit * 0.35 + savingEffect * 0.25 + aging * 0.2 + safetyRisk * 0.2,
+  )
 
   return {
-    roi,
-    paybackMonths,
-    actualCost,
-    supportFitScore,
-    savingEffectScore,
-    agingScore,
-    safetyRiskScore,
-    statusLabel,
-    description,
+    supportFit,
+    savingEffect,
+    aging,
+    safetyRisk,
+    total,
   }
 }
 
-function formatEok(value: number) {
-  return `${value.toFixed(1)}억`
+function getRecommendedScenarioId(
+  form: RoiFormState,
+  scenarios: ScenarioCard[],
+  apiRecommended: string,
+): "A" | "B" {
+  if (apiRecommended === "A" || apiRecommended === "B") {
+    return apiRecommended
+  }
+
+  const scenarioA = scenarios.find((item) => item.id === "A")!
+  const scenarioB = scenarios.find((item) => item.id === "B")!
+
+  const scoreA = buildScores(form, scenarioA).total
+  const scoreB = buildScores(form, scenarioB).total
+
+  return scoreA >= scoreB ? "A" : "B"
+}
+
+function getStatusLabel(scores: ScoreSummary) {
+  if (scores.total >= 80) return "투자 적합"
+  if (scores.total >= 65) return "조건부 적합"
+  return "재검토 필요"
+}
+
+function getDescription(form: RoiFormState, scenario: ScenarioCard, scores: ScoreSummary) {
+  const equipmentName = form.equipmentName || "현재 설비"
+
+  if (scenario.id === "A") {
+    return `${equipmentName} 기준 전체 교체 시나리오는 지원금과 절감 효과를 함께 고려할 때 중장기 투자안으로 검토할 수 있습니다. 현재 추정 회수기간은 약 ${formatPaybackYears(
+      scenario.paybackYears,
+    )}입니다.`
+  }
+
+  if (scores.total >= 75) {
+    return `${equipmentName} 기준 부분 교체 시나리오는 초기 실부담금을 낮추는 장점이 있습니다. 다만 전체 교체 대비 절감 효과 규모는 작을 수 있으며, 현재 추정 회수기간은 약 ${formatPaybackYears(
+      scenario.paybackYears,
+    )}입니다.`
+  }
+
+  return `${equipmentName} 기준 부분 교체 시나리오는 예산 부담은 낮지만 절감 효과와 지원금 규모를 함께 확인하면서 신중하게 검토하는 것이 좋습니다.`
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    if (error.message.includes("Failed to fetch")) {
+      return "백엔드 서버에 연결할 수 없습니다. FastAPI 서버가 켜져 있는지 확인해주세요."
+    }
+
+    if (error.message.includes("400")) {
+      return "입력값을 확인해주세요. 현재 설비 카테고리 또는 투자금 형식이 백엔드 조건과 다를 수 있습니다."
+    }
+
+    if (error.message.includes("500")) {
+      return "백엔드 내부 오류가 발생했습니다. 서버 로그를 확인해주세요."
+    }
+
+    return error.message
+  }
+
+  return "알 수 없는 오류가 발생했습니다."
 }
 
 export default function RoiPage() {
   const navigate = useNavigate()
 
-  const [form, setForm] = useState<RoiForm>(initialForm)
-  const [result, setResult] = useState<RoiResult>(() =>
-    calculateRoi(initialForm),
-  )
-  const [nextActionOpen, setNextActionOpen] = useState(false)
+  const inputSectionRef = useRef<HTMLDivElement | null>(null)
+  const resultSectionRef = useRef<HTMLDivElement | null>(null)
 
-  const updateForm = (key: keyof RoiForm, value: string) => {
-    setForm((prev) => ({
-      ...prev,
-      [key]:
-        key === "equipmentName" || key === "industry" ? value : Number(value),
-    }))
+  const [form, setForm] = useState<RoiFormState>(initialForm)
+  const [scenarios, setScenarios] = useState<ScenarioCard[]>(() => buildLocalScenarios(initialForm))
+  const [selectedScenarioId, setSelectedScenarioId] = useState<"A" | "B">("A")
+  const [recommendedScenarioId, setRecommendedScenarioId] = useState<"A" | "B">("A")
+  const [apiStatus, setApiStatus] = useState<ApiStatus>("idle")
+  const [errorMessage, setErrorMessage] = useState("")
+  const [costOpen, setCostOpen] = useState(false)
+  const [benchmarkOpen, setBenchmarkOpen] = useState(false)
+
+  const handleFieldChange = (key: keyof RoiFormState, value: string) => {
+    setForm((prev) => {
+      const next = {
+        ...prev,
+        [key]: value,
+      }
+
+      if (key === "industryCode") {
+        const matchedIndustryName = findIndustryNameByCode(value)
+
+        if (matchedIndustryName) {
+          next.industryName = matchedIndustryName
+        }
+      }
+
+      if (key === "industryName") {
+        const matchedIndustryCode = findIndustryCodeByName(value)
+
+        if (matchedIndustryCode) {
+          next.industryCode = matchedIndustryCode
+        }
+      }
+
+      return next
+    })
   }
 
-  const handleCalculate = () => {
-    const nextResult = calculateRoi(form)
-    setResult(nextResult)
+  const selectedScenario =
+    scenarios.find((scenario) => scenario.id === selectedScenarioId) ?? scenarios[0]
+
+  const recommendedScenario =
+    scenarios.find((scenario) => scenario.id === recommendedScenarioId) ?? scenarios[0]
+
+  const selectedScores = buildScores(form, selectedScenario)
+  const selectedStatusLabel = getStatusLabel(selectedScores)
+  const selectedDescription = getDescription(form, selectedScenario, selectedScores)
+
+  const summaryAccent = selectedScenario.id === "A" ? colors.green : colors.blue2
+  const summarySoft = selectedScenario.id === "A" ? colors.greenSoft : "#EEF0FF"
+
+  const currentEnergyCost = toNumber(form.annualEnergyCostManwon, 4500)
+  const currentMaintenanceCost = toNumber(form.annualMaintenanceCostManwon, 1200)
+  const currentDefectLoss = Math.round(
+    toNumber(form.annualRevenueManwon, 320000) * (toNumber(form.defectRate, 5.8) / 100) * 0.12,
+  )
+
+  const selectedEnergyAfter = Math.max(
+    currentEnergyCost - selectedScenario.energySavingManwon,
+    0,
+  )
+
+  const selectedMaintenanceAfter = Math.max(
+    currentMaintenanceCost - selectedScenario.maintenanceSavingManwon,
+    0,
+  )
+
+  const selectedDefectAfter = Math.max(
+    currentDefectLoss - selectedScenario.defectSavingManwon,
+    0,
+  )
+
+  const costMax = Math.max(
+    currentEnergyCost,
+    currentMaintenanceCost,
+    currentDefectLoss,
+    selectedEnergyAfter,
+    selectedMaintenanceAfter,
+    selectedDefectAfter,
+    1,
+  )
+
+  const toBarWidth = (value: number) => `${Math.max((value / costMax) * 100, 4)}%`
+
+  const benchmarkIndustryName =
+    form.industryName || findIndustryNameByCode(form.industryCode) || "업종명 미확인"
+
+  const handleCalculate = async () => {
+    setApiStatus("loading")
+    setErrorMessage("")
+
+    const localScenarios = buildLocalScenarios(form)
+
+    try {
+      const payload = buildPayload(form)
+      const apiResponse = await simulateRoi(payload)
+      const apiData = normalizeApiData(apiResponse)
+      const merged = mergeApiScenarios(localScenarios, apiData)
+
+      const nextRecommendedId = getRecommendedScenarioId(
+        form,
+        merged.scenarios,
+        merged.apiRecommended,
+      )
+
+      setScenarios(merged.scenarios)
+      setRecommendedScenarioId(nextRecommendedId)
+      setSelectedScenarioId(nextRecommendedId)
+      setApiStatus(apiData ? "success" : "empty")
+
+      window.requestAnimationFrame(() => {
+        resultSectionRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        })
+      })
+    } catch (error) {
+      const nextRecommendedId = getRecommendedScenarioId(form, localScenarios, "")
+
+      setScenarios(localScenarios)
+      setRecommendedScenarioId(nextRecommendedId)
+      setSelectedScenarioId(nextRecommendedId)
+      setApiStatus("error")
+      setErrorMessage(getErrorMessage(error))
+
+      window.requestAnimationFrame(() => {
+        resultSectionRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        })
+      })
+    }
   }
 
   const handleReset = () => {
+    const initialScenarios = buildLocalScenarios(initialForm)
+
     setForm(initialForm)
-    setResult(calculateRoi(initialForm))
-    setNextActionOpen(false)
+    setScenarios(initialScenarios)
+    setRecommendedScenarioId("A")
+    setSelectedScenarioId("A")
+    setApiStatus("idle")
+    setErrorMessage("")
+    setCostOpen(false)
+    setBenchmarkOpen(false)
+
+    window.requestAnimationFrame(() => {
+      inputSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      })
+    })
   }
-
-  const maxOldCost = 100
-
-  const electricityOld = 82
-
-  const electricityNew = Math.max(
-    32,
-    Math.round(82 - result.savingEffectScore * 0.32),
-  )
-
-  const defectOld = Math.min(90, Math.round(form.defectRate * 12))
-  const defectNew = Math.max(18, Math.round(defectOld * 0.48))
-
-  const maintenanceOld = Math.min(
-    95,
-    Math.round(form.maintenanceCost * 150 + form.equipmentAge * 2),
-  )
-
-  const maintenanceNew = Math.max(24, Math.round(maintenanceOld * 0.52))
 
   return (
     <main className="page">
       <section className="section white">
-        <div className="container">
+        <div
+          className="container"
+          style={{
+            width: "min(1280px, calc(100% - 40px))",
+            margin: "0 auto",
+            paddingBottom: "56px",
+          }}
+        >
           <button
             type="button"
             onClick={() => navigate("/")}
@@ -154,659 +745,1885 @@ export default function RoiPage() {
               height: "44px",
               padding: "0 18px",
               borderRadius: "999px",
-              border: "1px solid #CBD5E1",
-              background: "#FFFFFF",
-              color: "#061B34",
+              border: `1px solid ${colors.line}`,
+              background: colors.card,
+              color: colors.navy,
+              fontSize: "14px",
               fontWeight: 900,
               cursor: "pointer",
-              boxShadow: "0 8px 20px rgba(6,27,52,.06)",
+              boxShadow: "0 8px 22px rgba(6,27,52,.06)",
             }}
           >
             ← 대시보드로 돌아가기
           </button>
 
-          <div className="section-head">
-            <div>
-              <div className="screen-tag">FACTOFIT ROI SIMULATION</div>
+          <PageHero />
 
-              <div className="label">ROI ANALYSIS</div>
+          <InputPanel
+            inputSectionRef={inputSectionRef}
+            form={form}
+            apiStatus={apiStatus}
+            errorMessage={errorMessage}
+            onChange={handleFieldChange}
+            onCalculate={handleCalculate}
+          />
 
-              <h2>
-                설비투자 전, <br />
-                회수기간과 실부담금을 먼저 계산합니다.
-              </h2>
-            </div>
+          <section
+            ref={resultSectionRef}
+            style={{
+              marginTop: "34px",
+            }}
+          >
+            <ResultAndAiSection
+              form={form}
+              selectedScenario={selectedScenario}
+              recommendedScenario={recommendedScenario}
+              recommendedScenarioId={recommendedScenarioId}
+              selectedScenarioId={selectedScenarioId}
+              selectedScores={selectedScores}
+              selectedStatusLabel={selectedStatusLabel}
+              selectedDescription={selectedDescription}
+              summaryAccent={summaryAccent}
+              summarySoft={summarySoft}
+              onReset={handleReset}
+              onNavigateDraft={() => navigate("/application-draft")}
+              onNavigateSupport={() => navigate("/support-projects")}
+            />
 
-            <p className="section-desc">
-              투자금, 예상 지원금, 절감액, 불량률 개선 효과를 바탕으로 AI가
-              설비 교체 의사결정을 도와줍니다.
-            </p>
+            <ScenarioCompareSection
+              scenarios={scenarios}
+              recommendedScenarioId={recommendedScenarioId}
+              selectedScenarioId={selectedScenarioId}
+              onSelect={setSelectedScenarioId}
+            />
+
+            <InvestmentEstimateSection scenarios={scenarios} />
+
+            <EvidenceSection
+              costOpen={costOpen}
+              benchmarkOpen={benchmarkOpen}
+              onToggleCost={() => setCostOpen((prev) => !prev)}
+              onToggleBenchmark={() => setBenchmarkOpen((prev) => !prev)}
+              currentEnergyCost={currentEnergyCost}
+              currentMaintenanceCost={currentMaintenanceCost}
+              currentDefectLoss={currentDefectLoss}
+              selectedEnergyAfter={selectedEnergyAfter}
+              selectedMaintenanceAfter={selectedMaintenanceAfter}
+              selectedDefectAfter={selectedDefectAfter}
+              costMax={costMax}
+              toBarWidth={toBarWidth}
+              benchmarkIndustryName={benchmarkIndustryName}
+              form={form}
+              selectedScores={selectedScores}
+            />
+          </section>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function PageHero() {
+  return (
+    <div
+      style={{
+        marginBottom: "28px",
+      }}
+    >
+      <div
+        style={{
+          width: "60px",
+          height: "4px",
+          borderRadius: "999px",
+          background:
+            "linear-gradient(90deg, #4B5CB0 0%, #C8A15B 55%, rgba(200,161,91,0) 100%)",
+          marginBottom: "14px",
+        }}
+      />
+
+      <div
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          height: "40px",
+          padding: "0 22px",
+          borderRadius: "999px",
+          background: colors.blue,
+          color: "#FFFFFF",
+          fontSize: "14px",
+          fontWeight: 900,
+          letterSpacing: "0.04em",
+          marginBottom: "18px",
+        }}
+      >
+        FACTOFIT SIMULATION
+      </div>
+
+      <div
+        style={{
+          color: colors.blue,
+          fontSize: "15px",
+          fontWeight: 900,
+          letterSpacing: "0.22em",
+          marginBottom: "18px",
+        }}
+      >
+        ANALYSIS
+      </div>
+
+      <h1
+        style={{
+          color: colors.navy,
+          fontSize: "clamp(40px, 4.8vw, 70px)",
+          lineHeight: 1.08,
+          letterSpacing: "-0.045em",
+          fontWeight: 900,
+          margin: 0,
+          marginBottom: "18px",
+        }}
+      >
+        설비투자 전, 회수기간과 실부담금보다 먼저{" "}
+        <span style={{ color: colors.blue2 }}>ROI</span>를 계산합니다.
+      </h1>
+
+      <p
+        style={{
+          color: colors.muted,
+          fontSize: "16px",
+          lineHeight: 1.8,
+          fontWeight: 800,
+          margin: 0,
+          maxWidth: "1080px",
+        }}
+      >
+        필수 정보는 지원사업 매칭 기준으로 사용되고, 선택 정보는 계산 정확도를 높이는 데
+        활용됩니다. 입력값이 비어 있으면 일부 항목은 fallback 평균값으로 계산됩니다.
+      </p>
+    </div>
+  )
+}
+
+function InputPanel({
+  inputSectionRef,
+  form,
+  apiStatus,
+  errorMessage,
+  onChange,
+  onCalculate,
+}: {
+  inputSectionRef: RefObject<HTMLDivElement | null>
+  form: RoiFormState
+  apiStatus: ApiStatus
+  errorMessage: string
+  onChange: (key: keyof RoiFormState, value: string) => void
+  onCalculate: () => void
+}) {
+  return (
+    <div
+      ref={inputSectionRef}
+      style={{
+        background: colors.card,
+        border: `1px solid ${colors.line}`,
+        borderRadius: "30px",
+        overflow: "hidden",
+        boxShadow: "0 18px 40px rgba(15,23,42,.04)",
+        marginBottom: "34px",
+      }}
+    >
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "280px minmax(0, 1fr)",
+        }}
+      >
+        <aside
+          style={{
+            padding: "32px 24px 28px",
+            background: colors.soft,
+            borderRight: `1px solid ${colors.lineSoft}`,
+          }}
+        >
+          <div
+            style={{
+              color: colors.blue2,
+              fontSize: "14px",
+              letterSpacing: "0.18em",
+              fontWeight: 900,
+              marginBottom: "18px",
+            }}
+          >
+            STEP 01
           </div>
 
-          <div className="diagnosis-card-v2" style={{ marginBottom: "28px" }}>
-            <div className="diagnosis-step">
-              <div className="diagnosis-step-aside">
-                <small>STEP 01</small>
+          <h2
+            style={{
+              color: colors.navy,
+              fontSize: "28px",
+              lineHeight: 1.2,
+              letterSpacing: "-0.03em",
+              fontWeight: 900,
+              margin: 0,
+              marginBottom: "14px",
+            }}
+          >
+            입력 정보
+          </h2>
 
-                <h3>ROI 입력값</h3>
+          <p
+            style={{
+              color: colors.muted,
+              fontSize: "15px",
+              lineHeight: 1.7,
+              fontWeight: 800,
+              margin: 0,
+              marginBottom: "28px",
+            }}
+          >
+            필수값은 지원사업 매칭 기준으로 사용되고, 선택값은 계산 정확도를 높이는 데
+            활용됩니다.
+          </p>
 
-                <p>
-                  설비 정보와 투자금, 예상 지원금, 연간 절감액을 입력하면 투자
-                  회수기간과 ROI를 즉시 계산합니다.
+          <div
+            style={{
+              background: colors.card,
+              border: `1px solid ${colors.lineSoft}`,
+              borderRadius: "24px",
+              padding: "22px 18px",
+            }}
+          >
+            <div
+              style={{
+                color: colors.navy,
+                fontSize: "18px",
+                lineHeight: 1.3,
+                fontWeight: 900,
+                marginBottom: "14px",
+              }}
+            >
+              필수 수집 항목
+            </div>
+
+            <p
+              style={{
+                color: colors.muted,
+                fontSize: "14px",
+                lineHeight: 1.7,
+                fontWeight: 800,
+                margin: 0,
+              }}
+            >
+              설비 종류, 업종 코드, 업종명, 지역은 반드시 필요합니다.
+            </p>
+          </div>
+        </aside>
+
+        <div
+          style={{
+            padding: "32px 28px 28px",
+          }}
+        >
+          <SectionTitle>공통 필수 정보</SectionTitle>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "18px 20px",
+              marginBottom: "30px",
+            }}
+          >
+            <FieldBox label="설비 종류 *">
+              <select
+                value={form.equipmentType}
+                onChange={(event) => onChange("equipmentType", event.target.value)}
+                style={selectStyle}
+              >
+                <option value="press / 프레스">press / 프레스</option>
+                <option value="cnc / CNC">cnc / CNC</option>
+                <option value="injection / 사출">injection / 사출</option>
+              </select>
+            </FieldBox>
+
+            <FieldBox label="지역 *">
+              <input
+                value={form.region}
+                onChange={(event) => onChange("region", event.target.value)}
+                placeholder="예: 경기도 안산시"
+                style={inputStyle}
+              />
+            </FieldBox>
+
+            <FieldBox label="업종명 *">
+              <input
+                value={form.industryName}
+                onChange={(event) => onChange("industryName", event.target.value)}
+                placeholder="예: 금속가공"
+                style={inputStyle}
+              />
+            </FieldBox>
+
+            <FieldBox label="업종 코드 *">
+              <input
+                value={form.industryCode}
+                onChange={(event) => onChange("industryCode", event.target.value)}
+                placeholder="예: C25"
+                style={inputStyle}
+              />
+            </FieldBox>
+          </div>
+
+          <SectionTitle>계산 선택 정보</SectionTitle>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "18px 20px",
+            }}
+          >
+            <FieldBox label="설비명">
+              <input
+                value={form.equipmentName}
+                onChange={(event) => onChange("equipmentName", event.target.value)}
+                placeholder="예: 1600톤 프레스 #1"
+                style={inputStyle}
+              />
+            </FieldBox>
+
+            <FieldBox label="설비 연식">
+              <input
+                value={form.equipmentAge}
+                onChange={(event) => onChange("equipmentAge", event.target.value)}
+                placeholder="예: 15"
+                style={inputStyle}
+              />
+            </FieldBox>
+
+            <FieldBox label="연간 에너지 비용 (만원/년)">
+              <input
+                value={form.annualEnergyCostManwon}
+                onChange={(event) => onChange("annualEnergyCostManwon", event.target.value)}
+                placeholder="예: 4500"
+                style={inputStyle}
+              />
+            </FieldBox>
+
+            <FieldBox label="직원 수 (명)">
+              <input
+                value={form.employees}
+                onChange={(event) => onChange("employees", event.target.value)}
+                placeholder="예: 45"
+                style={inputStyle}
+              />
+            </FieldBox>
+
+            <FieldBox label="연매출 (만원/년)">
+              <input
+                value={form.annualRevenueManwon}
+                onChange={(event) => onChange("annualRevenueManwon", event.target.value)}
+                placeholder="예: 320000"
+                style={inputStyle}
+              />
+            </FieldBox>
+
+            <FieldBox label="새 설비 예상 에너지 비용">
+              <input
+                value={form.newEquipmentEnergyCostManwon}
+                onChange={(event) =>
+                  onChange("newEquipmentEnergyCostManwon", event.target.value)
+                }
+                placeholder="비워두면 평균값 사용"
+                style={inputStyle}
+              />
+            </FieldBox>
+
+            <FieldBox label="새 설비 예상 투자 비용">
+              <input
+                value={form.newEquipmentInvestmentManwon}
+                onChange={(event) =>
+                  onChange("newEquipmentInvestmentManwon", event.target.value)
+                }
+                placeholder="비워두면 평균값 사용"
+                style={inputStyle}
+              />
+            </FieldBox>
+
+            <FieldBox label="불량률 (%)">
+              <input
+                value={form.defectRate}
+                onChange={(event) => onChange("defectRate", event.target.value)}
+                placeholder="예: 5.8"
+                style={inputStyle}
+              />
+            </FieldBox>
+
+            <FieldBox label="연간 유지보수 비용 (만원/년)">
+              <input
+                value={form.annualMaintenanceCostManwon}
+                onChange={(event) =>
+                  onChange("annualMaintenanceCostManwon", event.target.value)
+                }
+                placeholder="예: 1200"
+                style={inputStyle}
+              />
+            </FieldBox>
+          </div>
+
+          <div
+            style={{
+              marginTop: "26px",
+              background: "#F8FAFD",
+              border: `1px solid ${colors.lineSoft}`,
+              borderRadius: "24px",
+              padding: "24px",
+            }}
+          >
+            <div
+              style={{
+                color: colors.navy,
+                fontSize: "18px",
+                lineHeight: 1.35,
+                fontWeight: 900,
+                marginBottom: "10px",
+              }}
+            >
+              입력값 기준으로 시뮬레이션을 실행합니다.
+            </div>
+
+            <p
+              style={{
+                color: colors.muted,
+                fontSize: "14px",
+                lineHeight: 1.7,
+                fontWeight: 800,
+                margin: 0,
+                marginBottom: "18px",
+              }}
+            >
+              실행 시 백엔드 <b>/api/roi/simulate</b> API를 호출하고, 응답이 있으면
+              추천 결과와 시나리오 카드에 반영합니다.
+            </p>
+
+            <button
+              type="button"
+              onClick={onCalculate}
+              disabled={apiStatus === "loading"}
+              style={{
+                height: "52px",
+                padding: "0 28px",
+                borderRadius: "16px",
+                border: "0",
+                background: colors.blue2,
+                color: "#FFFFFF",
+                fontSize: "15px",
+                fontWeight: 900,
+                cursor: apiStatus === "loading" ? "not-allowed" : "pointer",
+                opacity: apiStatus === "loading" ? 0.7 : 1,
+              }}
+            >
+              {apiStatus === "loading" ? "시뮬레이션 실행 중..." : "시뮬레이션 실행"}
+            </button>
+          </div>
+
+          {apiStatus !== "idle" && (
+            <StatusMessage apiStatus={apiStatus} errorMessage={errorMessage} />
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ResultAndAiSection({
+  form,
+  selectedScenario,
+  recommendedScenario,
+  recommendedScenarioId,
+  selectedScenarioId,
+  selectedScores,
+  selectedStatusLabel,
+  selectedDescription,
+  summaryAccent,
+  summarySoft,
+  onReset,
+  onNavigateDraft,
+  onNavigateSupport,
+}: {
+  form: RoiFormState
+  selectedScenario: ScenarioCard
+  recommendedScenario: ScenarioCard
+  recommendedScenarioId: "A" | "B"
+  selectedScenarioId: "A" | "B"
+  selectedScores: ScoreSummary
+  selectedStatusLabel: string
+  selectedDescription: string
+  summaryAccent: string
+  summarySoft: string
+  onReset: () => void
+  onNavigateDraft: () => void
+  onNavigateSupport: () => void
+}) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 1fr) 420px",
+        gap: "22px",
+        alignItems: "stretch",
+        marginBottom: "34px",
+      }}
+    >
+      <div
+        style={{
+          borderRadius: "30px",
+          border: `2px solid ${summaryAccent}`,
+          background: colors.card,
+          padding: "32px",
+          boxShadow: "0 18px 40px rgba(15,23,42,.05)",
+          minHeight: "420px",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+        }}
+      >
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            width: "fit-content",
+            height: "42px",
+            padding: "0 18px",
+            borderRadius: "999px",
+            background: summarySoft,
+            color: summaryAccent,
+            fontSize: "14px",
+            fontWeight: 900,
+            marginBottom: "20px",
+          }}
+        >
+          {selectedStatusLabel}
+        </span>
+
+        <h2
+          style={{
+            color: colors.navy,
+            fontSize: "clamp(36px, 4vw, 62px)",
+            lineHeight: 1.1,
+            letterSpacing: "-0.052em",
+            fontWeight: 900,
+            margin: 0,
+            marginBottom: "20px",
+          }}
+        >
+          {form.equipmentName} 투자 시 추천{" "}
+          <span style={{ color: colors.blue2 }}>ROI</span>는{" "}
+          <span style={{ color: summaryAccent }}>{selectedScenario.roiPct}%</span>,{" "}
+          <span style={{ color: summaryAccent }}>
+             {selectedScenario.id} 시나리오
+          </span>
+          입니다.
+        </h2>
+
+        <p
+          style={{
+            color: colors.muted,
+            fontSize: "16px",
+            lineHeight: 1.75,
+            fontWeight: 800,
+            margin: 0,
+            marginBottom: "24px",
+          }}
+        >
+          {selectedDescription}
+        </p>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: "14px",
+            marginBottom: "24px",
+          }}
+        >
+          <SummaryNumberCard
+            label="총 투자금"
+            value={formatMoneyFromManwon(selectedScenario.investmentManwon)}
+          />
+          <SummaryNumberCard
+            label="예상 지원금"
+            value={formatMoneyFromManwon(selectedScenario.subsidyManwon)}
+          />
+          <SummaryNumberCard
+            label="실부담금"
+            value={formatMoneyFromManwon(selectedScenario.netInvestmentManwon)}
+          />
+          <SummaryNumberCard
+            label="회수기간"
+            value={formatPaybackYears(selectedScenario.paybackYears)}
+          />
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            gap: "14px",
+            flexWrap: "wrap",
+          }}
+        >
+          <button
+            type="button"
+            onClick={onNavigateDraft}
+            style={primaryButtonStyle}
+          >
+            신청서 초안 생성하기
+          </button>
+
+          <button
+            type="button"
+            onClick={onReset}
+            style={secondaryButtonStyle}
+          >
+            다시 계산하기
+          </button>
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateRows: "1fr auto",
+          gap: "22px",
+        }}
+      >
+        <div
+          style={{
+            background: colors.navy,
+            borderTop: `4px solid ${colors.gold}`,
+            borderRadius: "30px",
+            padding: "30px 28px",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            style={{
+              color: "#FFFFFF",
+              fontSize: "28px",
+              lineHeight: 1.2,
+              letterSpacing: "-0.03em",
+              fontWeight: 900,
+              marginBottom: "14px",
+            }}
+          >
+            AI 판단 근거
+          </div>
+
+          <p
+            style={{
+              color: "#DDE7F7",
+              fontSize: "14px",
+              lineHeight: 1.7,
+              fontWeight: 800,
+              margin: 0,
+              marginBottom: "22px",
+            }}
+          >
+            AI는 현재 <b>{recommendedScenarioId} 시나리오</b>를 추천합니다. 추천 기준은
+            지원금 적합도, 비용 절감 효과, 설비 노후도, 안전 리스크를 종합한 점수입니다.
+            {selectedScenarioId !== recommendedScenarioId
+              ? ` 현재 화면에서는 ${selectedScenarioId} 시나리오를 확인 중입니다.`
+              : ""}
+          </p>
+
+          <ReasonRow label="지원금 적합도" value={selectedScores.supportFit} />
+          <ReasonRow label="비용 절감 효과" value={selectedScores.savingEffect} />
+          <ReasonRow label="설비 노후도" value={selectedScores.aging} />
+          <ReasonRow label="안전 리스크" value={selectedScores.safetyRisk} />
+        </div>
+
+        <div
+          style={{
+            background: colors.card,
+            border: `1px solid ${colors.lineSoft}`,
+            borderRadius: "26px",
+            padding: "24px",
+            boxShadow: "0 10px 24px rgba(15,23,42,.04)",
+          }}
+        >
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              height: "40px",
+              padding: "0 18px",
+              borderRadius: "999px",
+              background: "#EEF0FF",
+              color: colors.blue2,
+              fontSize: "14px",
+              fontWeight: 900,
+              marginBottom: "16px",
+            }}
+          >
+            NEXT ACTION
+          </span>
+
+          <div
+            style={{
+              color: colors.navy,
+              fontSize: "24px",
+              lineHeight: 1.25,
+              fontWeight: 900,
+              letterSpacing: "-0.03em",
+              marginBottom: "10px",
+            }}
+          >
+            다음 추천 액션
+          </div>
+
+          <p
+            style={{
+              color: colors.muted,
+              fontSize: "15px",
+              lineHeight: 1.75,
+              fontWeight: 800,
+              margin: 0,
+              marginBottom: "18px",
+            }}
+          >
+            추천된 {recommendedScenario.id} 시나리오 기준으로 신청서 초안과 지원사업 상세
+            검토를 이어서 진행하세요.
+          </p>
+
+          <button
+            type="button"
+            onClick={onNavigateSupport}
+            style={{
+              width: "72px",
+              height: "72px",
+              borderRadius: "20px",
+              border: "0",
+              background: "#F3F5FC",
+              color: colors.blue2,
+              fontSize: "36px",
+              fontWeight: 900,
+              cursor: "pointer",
+            }}
+          >
+            →
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ScenarioCompareSection({
+  scenarios,
+  recommendedScenarioId,
+  selectedScenarioId,
+  onSelect,
+}: {
+  scenarios: ScenarioCard[]
+  recommendedScenarioId: "A" | "B"
+  selectedScenarioId: "A" | "B"
+  onSelect: (id: "A" | "B") => void
+}) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: "22px",
+        marginBottom: "34px",
+      }}
+    >
+      {scenarios.map((scenario) => {
+        const isSelected = selectedScenarioId === scenario.id
+        const isRecommended = recommendedScenarioId === scenario.id
+        const isA = scenario.id === "A"
+        const accent = isA ? colors.green : colors.blue2
+
+        return (
+          <button
+            key={scenario.id}
+            type="button"
+            onClick={() => onSelect(scenario.id)}
+            style={{
+              textAlign: "left",
+              borderRadius: "28px",
+              border: isSelected ? `2px solid ${accent}` : `1px solid ${colors.lineSoft}`,
+              background: colors.card,
+              padding: "26px",
+              cursor: "pointer",
+              boxShadow: isSelected ? "0 16px 34px rgba(15,23,42,.08)" : "none",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: "16px",
+                marginBottom: "18px",
+              }}
+            >
+              <div>
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    height: "40px",
+                    padding: "0 16px",
+                    borderRadius: "999px",
+                    background: isRecommended ? colors.greenSoft : "#EEF0FF",
+                    color: isRecommended ? colors.green : colors.blue2,
+                    fontSize: "14px",
+                    fontWeight: 900,
+                    marginBottom: "18px",
+                  }}
+                >
+                  {isRecommended ? `${scenario.badge} 추천` : scenario.badge}
+                </span>
+
+                <div
+                  style={{
+                    color: colors.navy,
+                    fontSize: "24px",
+                    lineHeight: 1.25,
+                    letterSpacing: "-0.03em",
+                    fontWeight: 900,
+                    marginBottom: "10px",
+                  }}
+                >
+                  {scenario.title}
+                </div>
+
+                <p
+                  style={{
+                    color: colors.muted,
+                    fontSize: "14px",
+                    lineHeight: 1.65,
+                    fontWeight: 800,
+                    margin: 0,
+                  }}
+                >
+                  {scenario.subtitle}
                 </p>
               </div>
 
-              <div className="diagnosis-step-body">
-                <div className="diagnosis-form-grid">
-                  <div className="diagnosis-field">
-                    <label>설비명</label>
-
-                    <input
-                      value={form.equipmentName}
-                      onChange={(event) =>
-                        updateForm("equipmentName", event.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div className="diagnosis-field">
-                    <label>업종</label>
-
-                    <input
-                      value={form.industry}
-                      onChange={(event) =>
-                        updateForm("industry", event.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div className="diagnosis-field">
-                    <label>설비 사용연수</label>
-
-                    <input
-                      type="number"
-                      value={form.equipmentAge}
-                      onChange={(event) =>
-                        updateForm("equipmentAge", event.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div className="diagnosis-field">
-                    <label>현재 불량률 (%)</label>
-
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={form.defectRate}
-                      onChange={(event) =>
-                        updateForm("defectRate", event.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div className="diagnosis-field">
-                    <label>총 투자금 (억원)</label>
-
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={form.totalInvestment}
-                      onChange={(event) =>
-                        updateForm("totalInvestment", event.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div className="diagnosis-field">
-                    <label>예상 지원금 (억원)</label>
-
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={form.expectedSupport}
-                      onChange={(event) =>
-                        updateForm("expectedSupport", event.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div className="diagnosis-field">
-                    <label>연간 절감액 (억원)</label>
-
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={form.annualSaving}
-                      onChange={(event) =>
-                        updateForm("annualSaving", event.target.value)
-                      }
-                    />
-                  </div>
-
-                  <div className="diagnosis-field">
-                    <label>연간 유지보수비 (억원)</label>
-
-                    <input
-                      type="number"
-                      step="0.1"
-                      value={form.maintenanceCost}
-                      onChange={(event) =>
-                        updateForm("maintenanceCost", event.target.value)
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="diagnosis-ready" style={{ marginTop: "24px" }}>
-                  <div>
-                    <h3>입력값 기준으로 ROI를 다시 계산합니다.</h3>
-
-                    <p>
-                      지금은 프론트엔드 내부 계산식으로 결과를 갱신하고, 이후
-                      `/api/roi/simulate` 응답값과 연결하면 됩니다.
-                    </p>
-                  </div>
-
-                  <button
-                    className="btn blue"
-                    type="button"
-                    onClick={handleCalculate}
-                  >
-                    ROI 계산하기
-                  </button>
-                </div>
+              <div
+                style={{
+                  flexShrink: 0,
+                  width: "68px",
+                  height: "68px",
+                  borderRadius: "50%",
+                  background: accent,
+                  color: "#FFFFFF",
+                  display: "grid",
+                  placeItems: "center",
+                  fontSize: "28px",
+                  fontWeight: 900,
+                }}
+              >
+                {scenario.id}
               </div>
             </div>
-          </div>
 
-          <div className="roi-main-layout">
-            <div className="roi-result-card">
-              <span className="badge green">{result.statusLabel}</span>
+            <MetricGrid>
+              <MetricCell label="투자금액" value={formatMoneyFromManwon(scenario.investmentManwon)} />
+              <MetricCell label="보조금" value={formatMoneyFromManwon(scenario.subsidyManwon)} />
+              <MetricCell
+                label="실투자금액"
+                value={formatMoneyFromManwon(scenario.netInvestmentManwon)}
+                valueColor={accent}
+              />
+            </MetricGrid>
 
-              <h3>
-                {form.equipmentName} 교체 시 <br />
-                예상 ROI는 {result.roi}%입니다.
-              </h3>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gap: "14px",
+                margin: "16px 0",
+              }}
+            >
+              <SmallSavingCard
+                icon="⚡"
+                label="에너지 절감액"
+                value={formatAnnualMoneyFromManwon(scenario.energySavingManwon)}
+              />
+              <SmallSavingCard
+                icon="🔧"
+                label="유지보수 절감액"
+                value={formatAnnualMoneyFromManwon(scenario.maintenanceSavingManwon)}
+              />
+              <SmallSavingCard
+                icon="◎"
+                label="불량비용 절감액"
+                value={formatAnnualMoneyFromManwon(scenario.defectSavingManwon)}
+              />
+            </div>
 
-              <p>
-                {result.description} 현재 입력값 기준 투자 회수기간은 약{" "}
-                {result.paybackMonths}개월입니다.
-              </p>
+            <MetricGrid>
+              <MetricCell
+                label="연간 순편익"
+                value={formatAnnualMoneyFromManwon(scenario.annualNetBenefitManwon)}
+                valueColor={accent}
+              />
+              <MetricCell label="회수기간" value={formatPaybackYears(scenario.paybackYears)} />
+              <MetricCell label="ROI" value={`${scenario.roiPct}%`} valueColor={accent} />
+            </MetricGrid>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
 
-              <div className="roi-number-grid">
-                <div className="roi-number">
-                  <span>총 투자금</span>
-                  <b>{formatEok(form.totalInvestment)}</b>
-                </div>
+function InvestmentEstimateSection({
+  scenarios,
+}: {
+  scenarios: ScenarioCard[]
+}) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: "22px",
+        marginBottom: "34px",
+      }}
+    >
+      {scenarios.map((scenario) => {
+        const isA = scenario.id === "A"
+        const accent = isA ? colors.green : colors.blue2
 
-                <div className="roi-number">
-                  <span>예상 지원금</span>
-                  <b>{formatEok(form.expectedSupport)}</b>
-                </div>
-
-                <div className="roi-number">
-                  <span>실부담금</span>
-                  <b>{formatEok(result.actualCost)}</b>
-                </div>
-
-                <div className="roi-number">
-                  <span>회수기간</span>
-                  <b>{result.paybackMonths}개월</b>
-                </div>
+        return (
+          <div
+            key={`estimate-${scenario.id}`}
+            style={{
+              borderRadius: "26px",
+              border: `1px solid ${colors.lineSoft}`,
+              background: colors.card,
+              padding: "24px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "12px",
+                marginBottom: "20px",
+              }}
+            >
+              <div
+                style={{
+                  color: colors.navy,
+                  fontSize: "24px",
+                  lineHeight: 1.2,
+                  fontWeight: 900,
+                  letterSpacing: "-0.03em",
+                }}
+              >
+                투자금 추정 정보
               </div>
 
-              <div className="hero-actions">
-                <button
-                  className="btn blue"
-                  type="button"
-                  onClick={() => navigate("/application-draft")}
-                >
-                  신청서 초안 생성하기
-                </button>
-
-                <button className="btn dark" type="button" onClick={handleReset}>
-                  다시 계산하기
-                </button>
-              </div>
+              <span
+                style={{
+                  color: accent,
+                  fontSize: "13px",
+                  fontWeight: 900,
+                }}
+              >
+                {scenario.id === "A" ? "시나리오 A - 전체 교체" : "시나리오 B - 부분 교체"}
+              </span>
             </div>
 
             <div
               style={{
                 display: "grid",
-                gap: "22px",
-                alignContent: "start",
+                gridTemplateColumns: "1fr 1fr 1fr",
+                gap: "14px",
               }}
             >
-              <div className="ai-reason-card">
-                <h3>AI 판단 근거</h3>
-
-                <div className="reason-row">
-                  <span>지원금 적합도</span>
-
-                  <div className="reason-track">
-                    <i style={{ width: `${result.supportFitScore}%` }} />
-                  </div>
-
-                  <b>{result.supportFitScore}</b>
-                </div>
-
-                <div className="reason-row">
-                  <span>비용 절감 효과</span>
-
-                  <div className="reason-track">
-                    <i style={{ width: `${result.savingEffectScore}%` }} />
-                  </div>
-
-                  <b>{result.savingEffectScore}</b>
-                </div>
-
-                <div className="reason-row">
-                  <span>설비 노후도</span>
-
-                  <div className="reason-track">
-                    <i style={{ width: `${result.agingScore}%` }} />
-                  </div>
-
-                  <b>{result.agingScore}</b>
-                </div>
-
-                <div className="reason-row">
-                  <span>안전 리스크</span>
-
-                  <div className="reason-track">
-                    <i style={{ width: `${result.safetyRiskScore}%` }} />
-                  </div>
-
-                  <b>{result.safetyRiskScore}</b>
-                </div>
-              </div>
-
-              <div
-                className="card"
-                style={{
-                  borderRadius: "28px",
-                  padding: nextActionOpen ? "28px" : "22px 26px",
-                  borderTop: "4px solid #344BA0",
-                  boxShadow: "0 18px 44px rgba(6,27,52,.08)",
-                  transition: "all .2s ease",
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setNextActionOpen((prev) => !prev)}
-                  style={{
-                    width: "100%",
-                    border: "0",
-                    background: "transparent",
-                    padding: 0,
-                    cursor: "pointer",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: "18px",
-                    textAlign: "left",
-                  }}
-                >
-                  <div>
-                    <span className="badge blue">NEXT ACTION</span>
-
-                    <h3
-                      style={{
-                        color: "#061B34",
-                        fontSize: nextActionOpen ? "28px" : "24px",
-                        lineHeight: 1.25,
-                        fontWeight: 900,
-                        letterSpacing: "-0.7px",
-                        marginTop: "12px",
-                      }}
-                    >
-                      다음 추천 액션
-                    </h3>
-
-                    {!nextActionOpen && (
-                      <p
-                        style={{
-                          color: "#667085",
-                          fontSize: "14px",
-                          lineHeight: 1.7,
-                          fontWeight: 800,
-                          marginTop: "10px",
-                        }}
-                      >
-                        신청서 초안과 지원사업 상세 검토를 이어서 진행하세요.
-                      </p>
-                    )}
-                  </div>
-
-                  <span
-                    style={{
-                      minWidth: "50px",
-                      height: "50px",
-                      borderRadius: "16px",
-                      background: "#EEF6FF",
-                      color: "#344BA0",
-                      display: "grid",
-                      placeItems: "center",
-                      fontSize: "24px",
-                      fontWeight: 900,
-                      transform: nextActionOpen ? "rotate(90deg)" : "none",
-                      transition: "transform .18s ease",
-                    }}
-                  >
-                    →
-                  </span>
-                </button>
-
-                {nextActionOpen && (
-                  <>
-                    <p
-                      style={{
-                        color: "#667085",
-                        fontSize: "15px",
-                        lineHeight: 1.8,
-                        fontWeight: 800,
-                        marginTop: "22px",
-                        marginBottom: "22px",
-                      }}
-                    >
-                      ROI 결과가 양호하므로 신청서 초안과 지원사업 상세 검토를
-                      이어서 진행하는 것이 좋습니다.
-                    </p>
-
-                    <div
-                      style={{
-                        display: "grid",
-                        gap: "12px",
-                        marginBottom: "24px",
-                      }}
-                    >
-                      {[
-                        [
-                          "01",
-                          "신청서 초안 생성",
-                          "ROI 결과를 신청서 문장으로 정리",
-                        ],
-                        [
-                          "02",
-                          "지원사업 상세 확인",
-                          "스마트공장·에너지 효율 사업 검토",
-                        ],
-                        [
-                          "03",
-                          "안전 리스크 함께 점검",
-                          "노후도와 불량률 근거 보강",
-                        ],
-                      ].map(([step, title, desc]) => (
-                        <div
-                          key={step}
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "42px 1fr",
-                            gap: "12px",
-                            alignItems: "center",
-                            padding: "14px",
-                            border: "1px solid #E2E8F0",
-                            borderRadius: "18px",
-                            background: "#F8FAFC",
-                          }}
-                        >
-                          <span
-                            style={{
-                              width: "36px",
-                              height: "36px",
-                              borderRadius: "50%",
-                              background: "#FFFFFF",
-                              color: "#344BA0",
-                              border: "1px solid #BFDBFE",
-                              display: "grid",
-                              placeItems: "center",
-                              fontSize: "12px",
-                              fontWeight: 900,
-                            }}
-                          >
-                            {step}
-                          </span>
-
-                          <div>
-                            <strong
-                              style={{
-                                display: "block",
-                                color: "#061B34",
-                                fontSize: "15px",
-                                fontWeight: 900,
-                                marginBottom: "4px",
-                              }}
-                            >
-                              {title}
-                            </strong>
-
-                            <span
-                              style={{
-                                color: "#667085",
-                                fontSize: "12px",
-                                lineHeight: 1.5,
-                                fontWeight: 800,
-                              }}
-                            >
-                              {desc}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr 1fr",
-                        gap: "10px",
-                      }}
-                    >
-                      <button
-                        className="btn blue"
-                        type="button"
-                        onClick={() => navigate("/application-draft")}
-                        style={{
-                          width: "100%",
-                        }}
-                      >
-                        신청서 생성
-                      </button>
-
-                      <button
-                        className="btn dark"
-                        type="button"
-                        onClick={() => navigate("/support-projects")}
-                        style={{
-                          width: "100%",
-                        }}
-                      >
-                        지원사업 보기
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
+              <EstimateCard label="투자 범위" value={scenario.estimateRangeText} />
+              <EstimateCard
+                label="권장 투자액"
+                value={formatMoneyFromManwon(scenario.investmentManwon)}
+                valueColor={accent}
+              />
+              <EstimateCard label="산정 기준" value={scenario.estimateBasisText} />
             </div>
+
+            <p
+              style={{
+                color: colors.muted,
+                fontSize: "13px",
+                lineHeight: 1.7,
+                fontWeight: 800,
+                margin: 0,
+                marginTop: "16px",
+              }}
+            >
+              실제 서비스에서는 설비 카테고리, 업종 코드, 지역, 설비 용량을 기준으로 DB
+              평균 단가를 조회해 이 값을 대체하는 구조가 적합합니다.
+            </p>
           </div>
-
-          <div className="roi-evidence-grid">
-            <div className="evidence-card">
-              <div className="evidence-head">
-                <h3>비용 비교</h3>
-                <span>단위: 백만원</span>
-              </div>
-
-              <div className="legend-row">
-                <span>
-                  <i className="legend-dot a" />
-                  기존 설비 유지
-                </span>
-
-                <span>
-                  <i className="legend-dot b" />
-                  신규 설비 교체
-                </span>
-              </div>
-
-              <div className="evidence-chart">
-                <div className="evidence-chart-row">
-                  <strong>연간 전기요금</strong>
-
-                  <div className="evidence-bars">
-                    <div className="evidence-bar">
-                      <i className="a" style={{ width: `${electricityOld}%` }}>
-                        {electricityOld}
-                      </i>
-                    </div>
-
-                    <div className="evidence-bar">
-                      <i className="b" style={{ width: `${electricityNew}%` }}>
-                        {electricityNew}
-                      </i>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="evidence-chart-row">
-                  <strong>불량 손실</strong>
-
-                  <div className="evidence-bars">
-                    <div className="evidence-bar">
-                      <i className="a" style={{ width: `${defectOld}%` }}>
-                        {defectOld}
-                      </i>
-                    </div>
-
-                    <div className="evidence-bar">
-                      <i className="b" style={{ width: `${defectNew}%` }}>
-                        {defectNew}
-                      </i>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="evidence-chart-row">
-                  <strong>유지보수비</strong>
-
-                  <div className="evidence-bars">
-                    <div className="evidence-bar">
-                      <i className="a" style={{ width: `${maintenanceOld}%` }}>
-                        {maintenanceOld}
-                      </i>
-                    </div>
-
-                    <div className="evidence-bar">
-                      <i className="b" style={{ width: `${maintenanceNew}%` }}>
-                        {maintenanceNew}
-                      </i>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="evidence-axis">
-                <span>0</span>
-                <span>{Math.round(maxOldCost * 0.33)}</span>
-                <span>{Math.round(maxOldCost * 0.66)}</span>
-                <span>{maxOldCost}</span>
-              </div>
-            </div>
-
-            <div className="evidence-card">
-              <div className="evidence-head">
-                <h3>벤치마크 근거</h3>
-                <span>AI 분석 요약</span>
-              </div>
-
-              <div className="benchmark-table">
-                <div className="benchmark-row">
-                  <div>업종</div>
-                  <div>{form.industry}</div>
-                </div>
-
-                <div className="benchmark-row">
-                  <div>설비 유형</div>
-                  <div>{form.equipmentName}</div>
-                </div>
-
-                <div className="benchmark-row">
-                  <div>노후도</div>
-                  <div>
-                    <b>{form.equipmentAge}년</b>
-                    <span className="status-chip orange">주의</span>
-                  </div>
-                </div>
-
-                <div className="benchmark-row">
-                  <div>불량률</div>
-                  <div>
-                    <b>{form.defectRate}%</b>
-                    <span className="status-chip red">개선 필요</span>
-                  </div>
-                </div>
-
-                <div className="benchmark-row">
-                  <div>지원사업 적합도</div>
-                  <div>
-                    <b>{result.supportFitScore}%</b>
-                    <span className="status-chip green">높음</span>
-                  </div>
-                </div>
-              </div>
-
-              <p className="section-desc">
-                현재 설비는 에너지 비용, 유지보수비, 불량 손실 측면에서 교체
-                검토 우선순위가 높습니다.
-              </p>
-            </div>
-          </div>
-
-          <details className="application-accordion">
-            <summary>지원사업 신청서 초안 미리보기</summary>
-
-            <div className="application-accordion-body">
-              <div className="draft-preview-card">
-                <div className="draft-preview-top">
-                  <h4>AI 신청서 초안</h4>
-
-                  <button
-                    type="button"
-                    onClick={() => navigate("/application-draft")}
-                  >
-                    수정하기
-                  </button>
-                </div>
-
-                <div className="draft-message">
-                  본 기업은 {form.equipmentName} 교체를 통해 에너지 사용량
-                  절감, 불량률 개선, 생산 안정성 향상을 목표로 합니다. FactoFit
-                  ROI 분석 결과, 지원금 적용 시 투자 회수기간은 약{" "}
-                  {result.paybackMonths}개월로 예상됩니다.
-                </div>
-
-                <div className="draft-table">
-                  <div className="draft-row">
-                    <div>신청 목적</div>
-                    <div>노후 설비 교체 및 에너지 효율 개선</div>
-                  </div>
-
-                  <div className="draft-row">
-                    <div>주요 기대효과</div>
-                    <div>전기요금 절감, 불량률 감소, 생산성 향상</div>
-                  </div>
-
-                  <div className="draft-row">
-                    <div>추천 지원사업</div>
-                    <div>스마트공장 고도화 / 에너지 효율 개선 지원사업</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </details>
-        </div>
-      </section>
-    </main>
+        )
+      })}
+    </div>
   )
+}
+
+function EvidenceSection({
+  costOpen,
+  benchmarkOpen,
+  onToggleCost,
+  onToggleBenchmark,
+  currentEnergyCost,
+  currentMaintenanceCost,
+  currentDefectLoss,
+  selectedEnergyAfter,
+  selectedMaintenanceAfter,
+  selectedDefectAfter,
+  costMax,
+  toBarWidth,
+  benchmarkIndustryName,
+  form,
+  selectedScores,
+}: {
+  costOpen: boolean
+  benchmarkOpen: boolean
+  onToggleCost: () => void
+  onToggleBenchmark: () => void
+  currentEnergyCost: number
+  currentMaintenanceCost: number
+  currentDefectLoss: number
+  selectedEnergyAfter: number
+  selectedMaintenanceAfter: number
+  selectedDefectAfter: number
+  costMax: number
+  toBarWidth: (value: number) => string
+  benchmarkIndustryName: string
+  form: RoiFormState
+  selectedScores: ScoreSummary
+}) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: "22px",
+      }}
+    >
+      <AccordionCard
+        title="비용 비교"
+        subtitle="기본 닫힘 · 클릭 시 상세 표시"
+        open={costOpen}
+        onToggle={onToggleCost}
+      >
+        <div
+          style={{
+            display: "flex",
+            gap: "18px",
+            flexWrap: "wrap",
+            marginBottom: "18px",
+          }}
+        >
+          <LegendChip color={colors.blue} label="기존 설비 유지" />
+          <LegendChip color={colors.blue2} label="선택 시나리오 기준" />
+        </div>
+
+        <CostCompareRow
+          label="연간 전기요금"
+          oldValue={currentEnergyCost}
+          newValue={selectedEnergyAfter}
+          oldBarWidth={toBarWidth(currentEnergyCost)}
+          newBarWidth={toBarWidth(selectedEnergyAfter)}
+        />
+
+        <CostCompareRow
+          label="불량 손실"
+          oldValue={currentDefectLoss}
+          newValue={selectedDefectAfter}
+          oldBarWidth={toBarWidth(currentDefectLoss)}
+          newBarWidth={toBarWidth(selectedDefectAfter)}
+        />
+
+        <CostCompareRow
+          label="유지보수비"
+          oldValue={currentMaintenanceCost}
+          newValue={selectedMaintenanceAfter}
+          oldBarWidth={toBarWidth(currentMaintenanceCost)}
+          newBarWidth={toBarWidth(selectedMaintenanceAfter)}
+        />
+
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            color: "#98A2B3",
+            fontSize: "12px",
+            fontWeight: 900,
+            marginTop: "12px",
+            paddingLeft: "150px",
+          }}
+        >
+          <span>0</span>
+          <span>{formatNumber(Math.round(costMax * 0.33))}</span>
+          <span>{formatNumber(Math.round(costMax * 0.66))}</span>
+          <span>{formatNumber(costMax)}</span>
+        </div>
+      </AccordionCard>
+
+      <AccordionCard
+        title="벤치마크 근거"
+        subtitle="AI 분석 요약 · 기본 닫힘"
+        open={benchmarkOpen}
+        onToggle={onToggleBenchmark}
+      >
+        <div
+          style={{
+            border: `1px solid ${colors.lineSoft}`,
+            borderRadius: "22px",
+            overflow: "hidden",
+            marginBottom: "16px",
+          }}
+        >
+          <BenchmarkRow label="업종" value={benchmarkIndustryName} />
+          <BenchmarkRow label="설비 유형" value={form.equipmentType} bordered />
+          <BenchmarkRow
+            label="노후도"
+            value={`${form.equipmentAge || "-"}년`}
+            chip={{ label: "주의", color: "#A35B16", background: "#FFF5E8" }}
+            bordered
+          />
+          <BenchmarkRow
+            label="불량률"
+            value={`${form.defectRate || "-"}%`}
+            chip={{
+              label: "개선 필요",
+              color: "#B84646",
+              background: "#FFF1F1",
+            }}
+            bordered
+          />
+          <BenchmarkRow
+            label="지원사업 적합도"
+            value={`${selectedScores.supportFit}%`}
+            chip={{
+              label: "높음",
+              color: colors.green,
+              background: colors.greenSoft,
+            }}
+            bordered
+          />
+        </div>
+
+        <p
+          style={{
+            color: colors.muted,
+            fontSize: "14px",
+            lineHeight: 1.75,
+            fontWeight: 800,
+            margin: 0,
+          }}
+        >
+          현재 설비는 에너지 비용, 유지보수비, 불량 손실, 노후도 측면에서 교체 또는
+          부분 개선 검토 우선순위가 높습니다.
+        </p>
+      </AccordionCard>
+    </div>
+  )
+}
+
+function SectionTitle({ children }: { children: ReactNode }) {
+  return (
+    <div
+      style={{
+        color: colors.navy,
+        fontSize: "26px",
+        lineHeight: 1.2,
+        letterSpacing: "-0.03em",
+        fontWeight: 900,
+        marginBottom: "18px",
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
+function FieldBox({
+  label,
+  children,
+}: {
+  label: string
+  children: ReactNode
+}) {
+  return (
+    <div>
+      <label
+        style={{
+          display: "block",
+          color: colors.muted,
+          fontSize: "14px",
+          lineHeight: 1.2,
+          fontWeight: 900,
+          marginBottom: "10px",
+        }}
+      >
+        {label}
+      </label>
+      {children}
+    </div>
+  )
+}
+
+function StatusMessage({
+  apiStatus,
+  errorMessage,
+}: {
+  apiStatus: ApiStatus
+  errorMessage: string
+}) {
+  const styleMap: Record<ApiStatus, { border: string; background: string; color: string; text: string }> = {
+    idle: {
+      border: `1px solid ${colors.line}`,
+      background: colors.card,
+      color: colors.muted,
+      text: "",
+    },
+    loading: {
+      border: "1px solid #C2D7FF",
+      background: "#F3F7FF",
+      color: "#2E4AA7",
+      text: "API 응답을 기다리는 중입니다.",
+    },
+    success: {
+      border: "1px solid #C2D7FF",
+      background: "#F3F7FF",
+      color: "#2E4AA7",
+      text: "백엔드 응답을 화면에 반영했습니다. 추천 결과와 시나리오 카드를 확인하세요.",
+    },
+    empty: {
+      border: "1px solid #F3C58C",
+      background: "#FFF9F0",
+      color: "#A35B16",
+      text: "API 응답은 왔지만 결과 데이터가 비어 있어 프론트 기본 계산값으로 표시합니다.",
+    },
+    error: {
+      border: "1px solid #F5B1B1",
+      background: "#FFF6F6",
+      color: "#A03434",
+      text: `API 호출에 실패했습니다. ${errorMessage} 프론트 기본 계산값으로 계속 표시합니다.`,
+    },
+  }
+
+  const current = styleMap[apiStatus]
+
+  return (
+    <div
+      style={{
+        marginTop: "14px",
+        padding: "14px 16px",
+        borderRadius: "16px",
+        border: current.border,
+        background: current.background,
+        color: current.color,
+        fontSize: "13px",
+        lineHeight: 1.7,
+        fontWeight: 900,
+      }}
+    >
+      {current.text}
+    </div>
+  )
+}
+
+function MetricGrid({ children }: { children: ReactNode }) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(3, 1fr)",
+        border: `1px solid ${colors.lineSoft}`,
+        borderRadius: "22px",
+        overflow: "hidden",
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
+function MetricCell({
+  label,
+  value,
+  valueColor,
+}: {
+  label: string
+  value: string
+  valueColor?: string
+}) {
+  return (
+    <div
+      style={{
+        padding: "18px",
+        borderRight: `1px solid ${colors.lineSoft}`,
+      }}
+    >
+      <div
+        style={{
+          color: colors.muted,
+          fontSize: "13px",
+          lineHeight: 1.2,
+          fontWeight: 900,
+          marginBottom: "12px",
+        }}
+      >
+        {label}
+      </div>
+
+      <div
+        style={{
+          color: valueColor || colors.navy,
+          fontSize: "22px",
+          lineHeight: 1.2,
+          letterSpacing: "-0.03em",
+          fontWeight: 900,
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  )
+}
+
+function SmallSavingCard({
+  icon,
+  label,
+  value,
+}: {
+  icon: string
+  label: string
+  value: string
+}) {
+  return (
+    <div
+      style={{
+        border: `1px solid ${colors.lineSoft}`,
+        background: colors.card,
+        borderRadius: "20px",
+        padding: "18px 14px",
+        textAlign: "center",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "22px",
+          lineHeight: 1,
+          marginBottom: "12px",
+        }}
+      >
+        {icon}
+      </div>
+
+      <div
+        style={{
+          color: colors.muted,
+          fontSize: "13px",
+          lineHeight: 1.35,
+          fontWeight: 900,
+          marginBottom: "10px",
+        }}
+      >
+        {label}
+      </div>
+
+      <div
+        style={{
+          color: colors.navy,
+          fontSize: "17px",
+          lineHeight: 1.35,
+          fontWeight: 900,
+          letterSpacing: "-0.03em",
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  )
+}
+
+function SummaryNumberCard({
+  label,
+  value,
+}: {
+  label: string
+  value: string
+}) {
+  return (
+    <div
+      style={{
+        border: `1px solid ${colors.lineSoft}`,
+        borderRadius: "20px",
+        padding: "16px 16px 18px",
+        background: colors.card,
+      }}
+    >
+      <div
+        style={{
+          color: colors.muted,
+          fontSize: "13px",
+          lineHeight: 1.2,
+          fontWeight: 900,
+          marginBottom: "14px",
+        }}
+      >
+        {label}
+      </div>
+
+      <div
+        style={{
+          color: colors.navy,
+          fontSize: "22px",
+          lineHeight: 1.2,
+          letterSpacing: "-0.03em",
+          fontWeight: 900,
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  )
+}
+
+function EstimateCard({
+  label,
+  value,
+  valueColor,
+}: {
+  label: string
+  value: string
+  valueColor?: string
+}) {
+  return (
+    <div
+      style={{
+        border: `1px solid ${colors.lineSoft}`,
+        borderRadius: "20px",
+        padding: "18px 16px",
+        background: "#FDFEFF",
+      }}
+    >
+      <div
+        style={{
+          color: colors.muted,
+          fontSize: "13px",
+          lineHeight: 1.2,
+          fontWeight: 900,
+          marginBottom: "12px",
+        }}
+      >
+        {label}
+      </div>
+
+      <div
+        style={{
+          color: valueColor || colors.navy,
+          fontSize: "20px",
+          lineHeight: 1.3,
+          fontWeight: 900,
+          letterSpacing: "-0.03em",
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  )
+}
+
+function ReasonRow({
+  label,
+  value,
+}: {
+  label: string
+  value: number
+}) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "120px 1fr 34px",
+        alignItems: "center",
+        gap: "12px",
+        marginBottom: "16px",
+      }}
+    >
+      <div
+        style={{
+          color: "#FFFFFF",
+          fontSize: "15px",
+          lineHeight: 1.2,
+          fontWeight: 900,
+          whiteSpace: "nowrap",
+        }}
+      >
+        {label}
+      </div>
+
+      <div
+        style={{
+          width: "100%",
+          height: "15px",
+          borderRadius: "999px",
+          background: "rgba(255,255,255,.18)",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            width: `${value}%`,
+            maxWidth: "100%",
+            height: "100%",
+            borderRadius: "999px",
+            background: "#B7D8B9",
+          }}
+        />
+      </div>
+
+      <div
+        style={{
+          color: "#FFFFFF",
+          fontSize: "15px",
+          lineHeight: 1,
+          fontWeight: 900,
+          textAlign: "right",
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  )
+}
+
+function AccordionCard({
+  title,
+  subtitle,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string
+  subtitle: string
+  open: boolean
+  onToggle: () => void
+  children: ReactNode
+}) {
+  return (
+    <div
+      style={{
+        borderRadius: "28px",
+        border: `1px solid ${colors.lineSoft}`,
+        background: colors.card,
+        overflow: "hidden",
+      }}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        style={{
+          width: "100%",
+          border: "0",
+          background: "transparent",
+          padding: "22px 24px",
+          cursor: "pointer",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          textAlign: "left",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "baseline",
+            gap: "14px",
+            flexWrap: "wrap",
+          }}
+        >
+          <span
+            style={{
+              color: colors.navy,
+              fontSize: "24px",
+              lineHeight: 1.2,
+              fontWeight: 900,
+              letterSpacing: "-0.03em",
+            }}
+          >
+            {title}
+          </span>
+
+          <span
+            style={{
+              color: colors.muted,
+              fontSize: "13px",
+              fontWeight: 900,
+            }}
+          >
+            {subtitle}
+          </span>
+        </div>
+
+        <span
+          style={{
+            color: colors.blue2,
+            fontSize: "42px",
+            lineHeight: 1,
+            fontWeight: 300,
+          }}
+        >
+          {open ? "−" : "+"}
+        </span>
+      </button>
+
+      {open && (
+        <div
+          style={{
+            padding: "0 24px 24px",
+          }}
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function LegendChip({
+  color,
+  label,
+}: {
+  color: string
+  label: string
+}) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "8px",
+        color: colors.muted,
+        fontSize: "14px",
+        fontWeight: 900,
+      }}
+    >
+      <i
+        style={{
+          width: "22px",
+          height: "10px",
+          borderRadius: "999px",
+          background: color,
+          display: "inline-block",
+        }}
+      />
+      {label}
+    </span>
+  )
+}
+
+function CostCompareRow({
+  label,
+  oldValue,
+  newValue,
+  oldBarWidth,
+  newBarWidth,
+}: {
+  label: string
+  oldValue: number
+  newValue: number
+  oldBarWidth: string
+  newBarWidth: string
+}) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "150px 1fr",
+        gap: "16px",
+        alignItems: "center",
+        marginBottom: "24px",
+      }}
+    >
+      <div
+        style={{
+          color: colors.navy,
+          fontSize: "16px",
+          lineHeight: 1.3,
+          fontWeight: 900,
+        }}
+      >
+        {label}
+      </div>
+
+      <div>
+        <div
+          style={{
+            width: "100%",
+            height: "24px",
+            borderRadius: "999px",
+            background: "#E9EDF5",
+            overflow: "hidden",
+            marginBottom: "12px",
+          }}
+        >
+          <div
+            style={{
+              width: oldBarWidth,
+              height: "100%",
+              background: colors.blue,
+              color: "#FFFFFF",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-end",
+              paddingRight: "10px",
+              fontSize: "13px",
+              fontWeight: 900,
+              borderRadius: "999px",
+            }}
+          >
+            {formatNumber(oldValue)}
+          </div>
+        </div>
+
+        <div
+          style={{
+            width: "100%",
+            height: "24px",
+            borderRadius: "999px",
+            background: "#E9EDF5",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              width: newBarWidth,
+              height: "100%",
+              background: colors.blue2,
+              color: "#FFFFFF",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-end",
+              paddingRight: "10px",
+              fontSize: "13px",
+              fontWeight: 900,
+              borderRadius: "999px",
+            }}
+          >
+            {formatNumber(newValue)}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function BenchmarkRow({
+  label,
+  value,
+  chip,
+  bordered,
+}: {
+  label: string
+  value: string
+  chip?: {
+    label: string
+    color: string
+    background: string
+  }
+  bordered?: boolean
+}) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "160px 1fr",
+        gap: "18px",
+        alignItems: "center",
+        padding: "16px 18px",
+        borderTop: bordered ? `1px solid ${colors.lineSoft}` : "0",
+      }}
+    >
+      <div
+        style={{
+          color: colors.muted,
+          fontSize: "14px",
+          lineHeight: 1.2,
+          fontWeight: 900,
+        }}
+      >
+        {label}
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          flexWrap: "wrap",
+          color: colors.navy,
+          fontSize: "16px",
+          lineHeight: 1.4,
+          fontWeight: 900,
+        }}
+      >
+        <span>{value}</span>
+
+        {chip && (
+          <span
+            style={{
+              height: "28px",
+              padding: "0 12px",
+              borderRadius: "999px",
+              background: chip.background,
+              color: chip.color,
+              fontSize: "12px",
+              fontWeight: 900,
+              display: "inline-flex",
+              alignItems: "center",
+            }}
+          >
+            {chip.label}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const primaryButtonStyle: CSSProperties = {
+  height: "58px",
+  padding: "0 34px",
+  borderRadius: "18px",
+  border: "0",
+  background: colors.blue2,
+  color: "#FFFFFF",
+  fontSize: "16px",
+  fontWeight: 900,
+  cursor: "pointer",
+}
+
+const secondaryButtonStyle: CSSProperties = {
+  height: "58px",
+  padding: "0 34px",
+  borderRadius: "18px",
+  border: "0",
+  background: colors.grayButton,
+  color: "#FFFFFF",
+  fontSize: "16px",
+  fontWeight: 900,
+  cursor: "pointer",
 }

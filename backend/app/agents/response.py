@@ -77,7 +77,7 @@ def response_node(state: FactofitState) -> FactofitState:
                 "defect_rate": eq.defect_rate,
                 "new_energy_cost_annual": eq.new_energy_cost_annual,
                 "maintenance_cost_annual": eq.maintenance_cost_annual,
-                "capacity_value": eq.capacity_value,
+                "current_capacity_value": eq.current_capacity_value,
                 "production_qty": eq.production_qty,
                 "contribution_margin_won": eq.contribution_margin_won,
                 "scenario_a_investment_manwon": roi.scenario_a_investment_manwon,

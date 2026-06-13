@@ -30,7 +30,7 @@ class EquipmentInput(BaseModel):
     energy_cost_annual: int
     defect_rate: Optional[float] = None
     maintenance_cost_annual: Optional[int] = None
-    capacity_value: Optional[float] = None
+    current_capacity_value: Optional[float] = None
     annual_operating_hours: Optional[int] = None
     load_factor: Optional[float] = None
     electricity_price_won: Optional[int] = None
@@ -213,7 +213,7 @@ def _build_scenario(
     if investment_override is not None:
         investment = investment_override
     else:
-        est = estimate_investment(category, equipment.capacity_value)
+        est = estimate_investment(category, equipment.current_capacity_value)
         if est:
             investment = est[scenario_key]["mid"]
             inv_estimation = est
@@ -266,7 +266,7 @@ def _calc_data_quality(equipment: EquipmentInput) -> dict:
     optional_fields = [
         "defect_rate",
         "maintenance_cost_annual",
-        "capacity_value",
+        "current_capacity_value",
         "production_qty",
         "contribution_margin_won",
     ]
@@ -386,7 +386,7 @@ def _calc_ai_recommendation(
         next_questions.append("연간 유지보수비를 입력하면 절감 효과 계산이 더 정확해집니다.")
     if "production_qty" in missing or "contribution_margin_won" in missing:
         next_questions.append("연간 생산량과 제품당 기여이익을 입력하면 불량비용 계산이 더 정확해집니다.")
-    if "capacity_value" in missing:
+    if "current_capacity_value" in missing:
         next_questions.append("설비 용량을 입력하면 투자금 추정이 더 정확해집니다.")
 
     return {

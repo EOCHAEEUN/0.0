@@ -19,7 +19,6 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.append(str(ROOT))
 
 from app.models.equipment import EquipmentInput
-from app.models.roi_input import RoiInput
 from app.tools.roi_calc import calculate_roi
 
 try:
@@ -31,8 +30,8 @@ else:
     SEARCH_IMPORT_ERROR = None
 
 
-def build_park_test_input() -> RoiInput:
-    equipment = EquipmentInput(
+def build_park_test_input() -> EquipmentInput:
+    return EquipmentInput(
         name="유압 프레스 라인 A",
         category="press",
         age_years=15,
@@ -43,9 +42,6 @@ def build_park_test_input() -> RoiInput:
         production_qty=None,
         contribution_margin_won=None,
     )
-
-    return RoiInput(equipment=equipment)
-
 
 def run_roi_test() -> dict:
     roi_input = build_park_test_input()

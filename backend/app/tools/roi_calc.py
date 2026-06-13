@@ -19,7 +19,6 @@ LangChain, Tool, Agent와는 완전히 독립적이며,
 from __future__ import annotations
 from typing import Optional
 from app.models.equipment import EquipmentInput
-from app.models.roi_input import RoiInput
 # ==================== 2. 투자금 추정 테이블 ====================
 INVESTMENT_TABLE = {
     "press": [
@@ -374,8 +373,7 @@ def _calc_ai_recommendation(
 
 
 # ==================== 5. 메인 계산 ====================
-def calculate_roi(roi_input: RoiInput) -> dict:
-    equipment = roi_input.equipment
+def calculate_roi(equipment: EquipmentInput) -> dict:
 
     # category 정규화
     category = equipment.category.lower()
@@ -393,11 +391,11 @@ def calculate_roi(roi_input: RoiInput) -> dict:
 
     scenario_a = _build_scenario(
         equipment, bench, "scenario_a",
-        roi_input.scenario_a_investment_manwon,
+        equipment.scenario_a_investment_manwon,
     )
     scenario_b = _build_scenario(
         equipment, bench, "scenario_b",
-        roi_input.scenario_b_investment_manwon,
+        equipment.scenario_b_investment_manwon,
     )
 
     equipment_status = {

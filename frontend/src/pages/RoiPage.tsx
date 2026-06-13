@@ -181,7 +181,7 @@ function buildRoiPayload(form: RoiForm) {
       new_energy_cost_annual: newEnergyCostAnnual,
       new_investment_manwon: investmentManwon,
       maintenance_cost_annual: maintenanceCostAnnual,
-      capacity_value: 0,
+      current_capacity_value: 0,
       production_qty: 100000,
       contribution_margin_won: 1500,
     },

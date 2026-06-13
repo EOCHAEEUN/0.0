@@ -9,8 +9,8 @@ class EquipmentInput(BaseModel):
     defect_rate: Optional[float] = None
     new_energy_cost_annual: Optional[int] = None
     new_investment_manwon: Optional[int] = None
-    maintenance_cost_annual: Optional[int] = None   
-    capacity_value: Optional[float] = None          
-    production_qty: Optional[int] = None            
-    contribution_margin_won: Optional[int] = None   
+    maintenance_cost_annual: Optional[int] = None
+    current_capacity_value: Optional[float] = None
+    production_qty: Optional[int] = None
+    contribution_margin_won: Optional[int] = None
 

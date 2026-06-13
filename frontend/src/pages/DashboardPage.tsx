@@ -1,9 +1,10 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import AppHeader from "../components/AppHeader"
-import ParkManagerSummaryCards from "../components/dashboard/ParkManagerSummaryCards"
 
 type Tone = "green" | "blue" | "orange" | "red"
+
+type OpenPanel = "company" | "equipment" | null
 
 type KpiCard = {
   label: string
@@ -48,8 +49,6 @@ type DdayItem = {
   dday: string
 }
 
-const PARK_MANAGER_CUSTOMER_ID = "d7b57d58-f54b-4f6e-a35a-9a5ac095015e"
-
 const kpiCards: KpiCard[] = [
   {
     label: "예상 지원금",
@@ -79,20 +78,20 @@ const kpiCards: KpiCard[] = [
 
 const serviceCards: ServiceCard[] = [
   {
-    title: "ROI 시뮬레이션",
-    description:
-      "총 투자금, 지원금, 절감액을 기준으로 실부담금과 회수기간을 계산합니다.",
-    badge: "ROI",
-    path: "/roi",
-    tone: "blue",
-  },
-  {
     title: "지원사업 추천",
     description:
       "기업 조건과 설비투자 목적에 맞는 정부지원사업을 우선순위로 정리합니다.",
     badge: "POLICY",
     path: "/support-projects",
     tone: "green",
+  },
+  {
+    title: "ROI 시뮬레이션",
+    description:
+      "총 투자금, 지원금, 절감액을 기준으로 실부담금과 회수기간을 계산합니다.",
+    badge: "ROI",
+    path: "/roi",
+    tone: "blue",
   },
   {
     title: "안전 진단",
@@ -282,8 +281,7 @@ function getProcessTooltipLeft(step: string) {
 export default function DashboardPage() {
   const navigate = useNavigate()
 
-  const [companyOpen, setCompanyOpen] = useState(false)
-  const [equipmentOpen, setEquipmentOpen] = useState(false)
+  const [openPanel, setOpenPanel] = useState<OpenPanel>(null)
   const [showGradeGuide, setShowGradeGuide] = useState(false)
   const [hoveredProcessStep, setHoveredProcessStep] = useState<string | null>(
     null,
@@ -300,6 +298,10 @@ export default function DashboardPage() {
 
   const visibleReasons = showAllReasons ? reasonItems : reasonItems.slice(0, 1)
   const visibleDdays = showAllDdays ? ddayItems : ddayItems.slice(0, 1)
+
+  const togglePanel = (panel: Exclude<OpenPanel, null>) => {
+    setOpenPanel((prev) => (prev === panel ? null : panel))
+  }
 
   return (
     <main className="page">
@@ -366,175 +368,179 @@ export default function DashboardPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr",
+              gridTemplateColumns: openPanel === null ? "1fr 1fr" : "1fr",
               gap: "22px",
               marginTop: "42px",
             }}
           >
-            <div
-              style={{
-                background: "rgba(255,255,255,.08)",
-                border: "1px solid rgba(255,255,255,.16)",
-                borderRadius: "26px",
-                padding: "28px",
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => setCompanyOpen((prev) => !prev)}
+            {(openPanel === null || openPanel === "company") && (
+              <div
                 style={{
-                  width: "100%",
-                  background: "transparent",
-                  border: "0",
-                  color: "#FFFFFF",
-                  padding: 0,
-                  cursor: "pointer",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: "12px",
-                  alignItems: "center",
+                  background: "rgba(255,255,255,.08)",
+                  border: "1px solid rgba(255,255,255,.16)",
+                  borderRadius: "26px",
+                  padding: "28px",
                 }}
               >
-                <h3
+                <button
+                  type="button"
+                  onClick={() => togglePanel("company")}
                   style={{
+                    width: "100%",
+                    background: "transparent",
+                    border: "0",
                     color: "#FFFFFF",
-                    fontSize: "20px",
-                    fontWeight: 900,
+                    padding: 0,
+                    cursor: "pointer",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: "12px",
+                    alignItems: "center",
                   }}
                 >
-                  🏢 기업정보 보기
-                </h3>
+                  <h3
+                    style={{
+                      color: "#FFFFFF",
+                      fontSize: "20px",
+                      fontWeight: 900,
+                    }}
+                  >
+                    🏢 기업정보 보기
+                  </h3>
 
-                <span style={{ color: "#FFFFFF", fontWeight: 900 }}>
-                  {companyOpen ? "−" : "+"}
-                </span>
-              </button>
+                  <span style={{ color: "#FFFFFF", fontWeight: 900 }}>
+                    {openPanel === "company" ? "−" : "+"}
+                  </span>
+                </button>
 
-              {companyOpen && (
-                <div style={{ marginTop: "22px" }}>
-                  {[
-                    ["업종", "금속 가공업"],
-                    ["지역", "경기 안산시"],
-                    ["종업원", "45명"],
-                    ["기업규모", "중소기업"],
-                    ["주요목적", "설비 교체 / 에너지 절감"],
-                  ].map(([label, value]) => (
-                    <div
-                      key={label}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        padding: "13px 0",
-                        borderTop: "1px solid rgba(255,255,255,.12)",
-                        color: "#E5EEF8",
-                        fontSize: "15px",
-                        fontWeight: 900,
-                      }}
-                    >
-                      <span>{label}</span>
-                      <strong>{value}</strong>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div
-              style={{
-                background: "rgba(255,255,255,.08)",
-                border: "1px solid rgba(255,255,255,.16)",
-                borderRadius: "26px",
-                padding: "28px",
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => setEquipmentOpen((prev) => !prev)}
-                style={{
-                  width: "100%",
-                  background: "transparent",
-                  border: "0",
-                  color: "#FFFFFF",
-                  padding: 0,
-                  cursor: "pointer",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: "12px",
-                  alignItems: "center",
-                }}
-              >
-                <h3
-                  style={{
-                    color: "#FFFFFF",
-                    fontSize: "20px",
-                    fontWeight: 900,
-                  }}
-                >
-                  ⚙ 설비현황 보기
-                </h3>
-
-                <span style={{ color: "#FFFFFF", fontWeight: 900 }}>
-                  {equipmentOpen ? "−" : "+"}
-                </span>
-              </button>
-
-              {equipmentOpen && (
-                <div style={{ marginTop: "22px" }}>
-                  {[
-                    ["유압 프레스 라인 A", "15년 · 교체 권고"],
-                    ["CNC 선반 B-3호기", "11년 · 점검 필요"],
-                    ["자동 용접기 W-2", "4년 · 정상"],
-                  ].map(([title, status]) => (
-                    <div
-                      key={title}
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr auto",
-                        gap: "16px",
-                        padding: "15px 0",
-                        borderTop: "1px solid rgba(255,255,255,.12)",
-                        alignItems: "center",
-                      }}
-                    >
-                      <div>
-                        <strong
-                          style={{
-                            display: "block",
-                            color: "#FFFFFF",
-                            fontSize: "16px",
-                            fontWeight: 900,
-                          }}
-                        >
-                          {title}
-                        </strong>
-
-                        <span
-                          style={{
-                            display: "block",
-                            color: "#BFD0E3",
-                            marginTop: "4px",
-                            fontSize: "12px",
-                            fontWeight: 800,
-                          }}
-                        >
-                          주요 공정 설비
-                        </span>
-                      </div>
-
-                      <span
+                {openPanel === "company" && (
+                  <div style={{ marginTop: "22px" }}>
+                    {[
+                      ["업종", "금속 가공업"],
+                      ["지역", "경기 안산시"],
+                      ["종업원", "45명"],
+                      ["기업규모", "중소기업"],
+                      ["주요목적", "설비 교체 / 에너지 절감"],
+                    ].map(([label, value]) => (
+                      <div
+                        key={label}
                         style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          padding: "13px 0",
+                          borderTop: "1px solid rgba(255,255,255,.12)",
                           color: "#E5EEF8",
-                          fontSize: "13px",
+                          fontSize: "15px",
                           fontWeight: 900,
                         }}
                       >
-                        {status}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                        <span>{label}</span>
+                        <strong>{value}</strong>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {(openPanel === null || openPanel === "equipment") && (
+              <div
+                style={{
+                  background: "rgba(255,255,255,.08)",
+                  border: "1px solid rgba(255,255,255,.16)",
+                  borderRadius: "26px",
+                  padding: "28px",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => togglePanel("equipment")}
+                  style={{
+                    width: "100%",
+                    background: "transparent",
+                    border: "0",
+                    color: "#FFFFFF",
+                    padding: 0,
+                    cursor: "pointer",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: "12px",
+                    alignItems: "center",
+                  }}
+                >
+                  <h3
+                    style={{
+                      color: "#FFFFFF",
+                      fontSize: "20px",
+                      fontWeight: 900,
+                    }}
+                  >
+                    ⚙ 설비현황 보기
+                  </h3>
+
+                  <span style={{ color: "#FFFFFF", fontWeight: 900 }}>
+                    {openPanel === "equipment" ? "−" : "+"}
+                  </span>
+                </button>
+
+                {openPanel === "equipment" && (
+                  <div style={{ marginTop: "22px" }}>
+                    {[
+                      ["유압 프레스 라인 A", "15년 · 교체 권고"],
+                      ["CNC 선반 B-3호기", "11년 · 점검 필요"],
+                      ["자동 용접기 W-2", "4년 · 정상"],
+                    ].map(([title, status]) => (
+                      <div
+                        key={title}
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "1fr auto",
+                          gap: "16px",
+                          padding: "15px 0",
+                          borderTop: "1px solid rgba(255,255,255,.12)",
+                          alignItems: "center",
+                        }}
+                      >
+                        <div>
+                          <strong
+                            style={{
+                              display: "block",
+                              color: "#FFFFFF",
+                              fontSize: "16px",
+                              fontWeight: 900,
+                            }}
+                          >
+                            {title}
+                          </strong>
+
+                          <span
+                            style={{
+                              display: "block",
+                              color: "#BFD0E3",
+                              marginTop: "4px",
+                              fontSize: "12px",
+                              fontWeight: 800,
+                            }}
+                          >
+                            주요 공정 설비
+                          </span>
+                        </div>
+
+                        <span
+                          style={{
+                            color: "#E5EEF8",
+                            fontSize: "13px",
+                            fontWeight: 900,
+                          }}
+                        >
+                          {status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -594,14 +600,6 @@ export default function DashboardPage() {
               </p>
             </div>
           ))}
-        </div>
-        <div
-          style={{
-            width: "min(1180px, 100%)",
-            margin: "28px auto 0",
-          }}
-        >
-          <ParkManagerSummaryCards companyId={PARK_MANAGER_CUSTOMER_ID} />
         </div>
       </section>
 

@@ -16,36 +16,10 @@ LangChain, Tool, Agent와는 완전히 독립적이며,
 
 # TODO: Policy Matching 에이전트 연동 후 실제 매칭 지원금으로 대체
 # 현재는 BENCHMARKS default_subsidy 기반 추정치 사용
-
 from __future__ import annotations
 from typing import Optional
-from pydantic import BaseModel
-
-
-# ==================== 1. 입력 모델 ====================
-class EquipmentInput(BaseModel):
-    name: str
-    category: str
-    age_years: int
-    energy_cost_annual: int
-    defect_rate: Optional[float] = None
-    maintenance_cost_annual: Optional[int] = None
-    current_capacity_value: Optional[float] = None
-    annual_operating_hours: Optional[int] = None
-    load_factor: Optional[float] = None
-    electricity_price_won: Optional[int] = None
-    production_qty: Optional[int] = None
-    contribution_margin_won: Optional[int] = None
-
-
-class RoiInput(BaseModel):
-    equipment: EquipmentInput
-    scenario_a_investment_manwon: Optional[int] = None
-    scenario_a_subsidy_manwon: Optional[int] = None
-    scenario_b_investment_manwon: Optional[int] = None
-    scenario_b_subsidy_manwon: Optional[int] = None
-
-
+from app.models.equipment import EquipmentInput
+from app.models.roi_input import RoiInput
 # ==================== 2. 투자금 추정 테이블 ====================
 INVESTMENT_TABLE = {
     "press": [
@@ -165,7 +139,6 @@ def _build_scenario(
     bench: dict,
     scenario_key: str,
     investment_override: Optional[int],
-    subsidy_override: Optional[int],
 ) -> dict:
     # category 정규화 추가
     category = equipment.category.lower()
@@ -229,7 +202,7 @@ def _build_scenario(
             else:
                 investment = None
     # 지원금
-    subsidy = subsidy_override if subsidy_override is not None else s["default_subsidy"]
+    subsidy = s["default_subsidy"]
 
     # 실부담, 회수기간, ROI
     if investment is not None:
@@ -421,12 +394,10 @@ def calculate_roi(roi_input: RoiInput) -> dict:
     scenario_a = _build_scenario(
         equipment, bench, "scenario_a",
         roi_input.scenario_a_investment_manwon,
-        roi_input.scenario_a_subsidy_manwon,
     )
     scenario_b = _build_scenario(
         equipment, bench, "scenario_b",
         roi_input.scenario_b_investment_manwon,
-        roi_input.scenario_b_subsidy_manwon,
     )
 
     equipment_status = {

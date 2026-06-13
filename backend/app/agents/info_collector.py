@@ -2,7 +2,6 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from app.state import FactofitState
 from app.prompts.info_collector import INFO_COLLECTOR_SYSTEM_PROMPT
 from app.models.equipment import EquipmentInput
-from app.models.roi_input import RoiInput
 from app.models.company import CompanyContext
 from app.core.llm import llm
 import json
@@ -125,17 +124,15 @@ def info_collector_node(state: FactofitState) -> FactofitState:
             else:
                 defect_rate = None
 
-            state["equipment"] = RoiInput(
-                equipment=EquipmentInput(
-                    name=data.get("equipment_name", ""),
-                    category=category,
-                    age_years=int(data.get("age_years", 0)),
-                    energy_cost_annual=int(data.get("energy_cost_annual", 0)),
-                    new_energy_cost_annual=int(data["new_energy_cost_annual"]) if data.get("new_energy_cost_annual") else None,
-                    new_investment_manwon=int(data["new_investment_manwon"]) if data.get("new_investment_manwon") else None,
-                    defect_rate=defect_rate,
-                    maintenance_cost_annual=int(data["maintenance_cost_annual"]) if data.get("maintenance_cost_annual") else None
-                )
+            state["equipment"] = EquipmentInput(
+                name=data.get("equipment_name", ""),
+                category=category,
+                age_years=int(data.get("age_years", 0)),
+                energy_cost_annual=int(data.get("energy_cost_annual", 0)),
+                new_energy_cost_annual=int(data["new_energy_cost_annual"]) if data.get("new_energy_cost_annual") else None,
+                new_investment_manwon=int(data["new_investment_manwon"]) if data.get("new_investment_manwon") else None,
+                defect_rate=defect_rate,
+                maintenance_cost_annual=int(data["maintenance_cost_annual"]) if data.get("maintenance_cost_annual") else None
             )
 
             state["company_info"] = CompanyContext(

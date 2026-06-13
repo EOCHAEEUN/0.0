@@ -2378,3 +2378,323 @@
     letter-spacing: -1.4px;
   }
 }
+/* =========================================================
+   FactoFit MainPage - Hero background video 밝기 개선 버전
+   ========================================================= */
+
+.ff-hero-video-placeholder {
+  position: absolute;
+  inset: 76px 0 0;
+  z-index: 0;
+  opacity: 1;
+  overflow: hidden;
+  background: #061b34;
+}
+
+.ff-hero-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.02);
+  filter: brightness(1.02) contrast(1.08) saturate(0.92);
+}
+
+.ff-hero-video-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      circle at 50% 45%,
+      rgba(91, 111, 165, 0.1) 0%,
+      rgba(91, 111, 165, 0) 38%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(6, 27, 52, 0.18) 0%,
+      rgba(6, 27, 52, 0.28) 48%,
+      rgba(6, 27, 52, 0.52) 100%
+    ),
+    linear-gradient(
+      90deg,
+      rgba(6, 27, 52, 0.38) 0%,
+      rgba(6, 27, 52, 0.22) 48%,
+      rgba(6, 27, 52, 0.36) 100%
+    );
+}
+
+.ff-hero-content {
+  position: relative;
+  z-index: 2;
+  text-shadow: 0 14px 38px rgba(0, 0, 0, 0.34);
+}
+
+.ff-scroll-arrow {
+  z-index: 2;
+}
+
+@media (max-width: 900px) {
+  .ff-hero-video {
+    transform: scale(1.08);
+    filter: brightness(0.96) contrast(1.08) saturate(0.9);
+  }
+}
+
+@media (max-width: 560px) {
+  .ff-hero-video-placeholder {
+    inset: 76px 0 0;
+  }
+
+  .ff-hero-video {
+    transform: scale(1.14);
+    filter: brightness(0.92) contrast(1.08) saturate(0.88);
+  }
+}
+/* =========================================================
+   FactoFit MainPage - Hero text readability upgrade
+   목적:
+   - 영상 밝기는 유지
+   - 글씨 뒤쪽만 살짝 어둡게 해서 가독성 개선
+   - 기존 UX/UI/레이아웃 변경 없음
+   ========================================================= */
+
+.ff-hero-content {
+  position: relative;
+  z-index: 2;
+  isolation: isolate;
+  text-shadow:
+    0 4px 18px rgba(0, 0, 0, 0.38),
+    0 18px 48px rgba(0, 0, 0, 0.28);
+}
+
+.ff-hero-content::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  top: 50%;
+  width: min(980px, 88vw);
+  height: min(520px, 58vh);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  border-radius: 999px;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(6, 27, 52, 0.58) 0%,
+      rgba(6, 27, 52, 0.42) 34%,
+      rgba(6, 27, 52, 0.2) 62%,
+      rgba(6, 27, 52, 0) 100%
+    );
+  filter: blur(2px);
+}
+
+.ff-hero-video-overlay {
+  background:
+    radial-gradient(
+      circle at 50% 45%,
+      rgba(91, 111, 165, 0.08) 0%,
+      rgba(91, 111, 165, 0) 38%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(6, 27, 52, 0.14) 0%,
+      rgba(6, 27, 52, 0.22) 48%,
+      rgba(6, 27, 52, 0.46) 100%
+    ),
+    linear-gradient(
+      90deg,
+      rgba(6, 27, 52, 0.3) 0%,
+      rgba(6, 27, 52, 0.16) 48%,
+      rgba(6, 27, 52, 0.3) 100%
+    );
+}
+
+.ff-hero-video {
+  filter: brightness(1.02) contrast(1.08) saturate(0.92);
+}
+
+@media (max-width: 900px) {
+  .ff-hero-content::before {
+    width: 92vw;
+    height: 560px;
+  }
+}
+
+@media (max-width: 560px) {
+  .ff-hero-content::before {
+    width: 96vw;
+    height: 520px;
+    background:
+      radial-gradient(
+        ellipse at center,
+        rgba(6, 27, 52, 0.66) 0%,
+        rgba(6, 27, 52, 0.46) 38%,
+        rgba(6, 27, 52, 0.22) 66%,
+        rgba(6, 27, 52, 0) 100%
+      );
+  }
+}
+/* Hero text readability reset */
+.ff-hero-content::before {
+  display: none !important;
+  content: none !important;
+}
+
+.ff-hero-content h1 {
+  color: #ffffff !important;
+  text-shadow:
+    0 3px 14px rgba(0, 0, 0, 0.58),
+    0 16px 42px rgba(0, 0, 0, 0.42);
+}
+
+.ff-hero-content h1 span {
+  color: #ffffff !important;
+}
+
+.ff-hero-description {
+  text-shadow:
+    0 3px 12px rgba(0, 0, 0, 0.52),
+    0 14px 34px rgba(0, 0, 0, 0.34);
+}
+
+.ff-hero-kicker {
+  text-shadow:
+    0 3px 12px rgba(0, 0, 0, 0.52),
+    0 12px 30px rgba(0, 0, 0, 0.32);
+}
+.ff-hero-video-overlay {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(6, 27, 52, 0.2) 0%,
+      rgba(6, 27, 52, 0.3) 48%,
+      rgba(6, 27, 52, 0.52) 100%
+    ),
+    linear-gradient(
+      90deg,
+      rgba(6, 27, 52, 0.38) 0%,
+      rgba(6, 27, 52, 0.22) 48%,
+      rgba(6, 27, 52, 0.38) 100%
+    );
+}
+/* =========================================================
+   FactoFit MainPage - WHY FACTOFIT background video
+   목적:
+   - WHY FACTOFIT 섹션 오른쪽/배경 영역에 영상 적용
+   - 기존 문구, 버튼, 레이아웃 변경 없음
+   - 오디오 없는 배경 영상 전용
+   ========================================================= */
+
+.ff-why-teaser-media {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.ff-why-teaser-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.02);
+  filter: brightness(1.03) contrast(1.04) saturate(0.88);
+}
+
+.ff-why-teaser-video-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.96) 0%,
+      rgba(255, 255, 255, 0.9) 34%,
+      rgba(255, 255, 255, 0.58) 58%,
+      rgba(255, 255, 255, 0.22) 100%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.24) 0%,
+      rgba(255, 255, 255, 0.08) 100%
+    );
+}
+/* =========================================================
+   WHY FACTOFIT video background - full width fix
+   목적:
+   - 영상이 섹션 전체 너비를 덮게 수정
+   - 오른쪽 흰 여백 제거
+   - 왼쪽 텍스트 가독성은 흰색 그라데이션으로 유지
+   - 기존 문구/버튼/레이아웃은 최대한 유지
+   ========================================================= */
+
+.ff-why-teaser-section {
+  position: relative !important;
+  min-height: 760px;
+  overflow: hidden !important;
+  background: #ffffff;
+}
+
+.ff-why-teaser-media {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  overflow: hidden !important;
+  background: #f8fafc !important;
+  z-index: 0;
+}
+
+.ff-why-teaser-video {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 100% !important;
+  min-height: 100% !important;
+  object-fit: cover !important;
+  object-position: center center !important;
+  transform: scale(1.02);
+  filter: brightness(1.03) contrast(1.05) saturate(0.9);
+}
+
+.ff-why-teaser-video-overlay {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.98) 0%,
+      rgba(255, 255, 255, 0.94) 26%,
+      rgba(255, 255, 255, 0.7) 44%,
+      rgba(255, 255, 255, 0.26) 66%,
+      rgba(255, 255, 255, 0.04) 100%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.18) 0%,
+      rgba(255, 255, 255, 0.02) 100%
+    );
+}
+
+.ff-why-teaser-section .ff-section-container {
+  position: relative;
+  z-index: 2;
+  min-height: 760px;
+  display: flex;
+  align-items: center;
+}
+
+.ff-why-teaser-copy {
+  position: relative;
+  z-index: 2;
+}

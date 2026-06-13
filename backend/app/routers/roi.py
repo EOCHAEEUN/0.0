@@ -1,12 +1,12 @@
 ﻿from fastapi import APIRouter, HTTPException
-from app.models.roi_input import RoiInput
+from app.models.equipment import EquipmentInput
 from app.tools.roi_calc import calculate_roi
 
 router = APIRouter()
 
 
 @router.post("/roi/simulate")
-async def simulate_roi(body: RoiInput):
+async def simulate_roi(body: EquipmentInput):
     """ROI simulation REST endpoint."""
     try:
         return {

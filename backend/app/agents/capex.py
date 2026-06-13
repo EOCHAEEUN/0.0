@@ -69,7 +69,7 @@ def capex_advisor_node(state: FactofitState) -> FactofitState:
 
     # 지원하지 않는 카테고리 체크
     supported = ["press", "cnc", "injection"]
-    if not equipment or equipment.equipment.category not in supported:
+    if not equipment or equipment.category not in supported:
         state["final_response"] = "죄송해요, 현재 ROI 계산은 프레스(press), CNC, 사출성형기(injection) 설비만 지원하고 있어요. 추후 더 많은 설비 유형을 지원할 예정입니다!"
         return state
     
@@ -83,7 +83,7 @@ def capex_advisor_node(state: FactofitState) -> FactofitState:
         }
 
         industry_code_str = ", ".join(company.industry_code) if company and company.industry_code else ""
-        equipment_name = equipment.equipment.name if equipment else ""
+        equipment_name = equipment.name if equipment else ""
         policy_query = f"{equipment_name} 지원사업" if equipment_name else "제조설비 지원사업"
         matched_policies = match_policies(company_context, policy_query)
         state["matched_policies"] = matched_policies
@@ -101,10 +101,10 @@ def capex_advisor_node(state: FactofitState) -> FactofitState:
     prompt = CAPEX_SYSTEM_PROMPT.format(
         industry_code=", ".join(company.industry_code) if company and company.industry_code else "정보 없음",
         region=company.region if company else "정보 없음",
-        equipment_name=equipment.equipment.name if equipment else "정보 없음",
-        age_years=equipment.equipment.age_years if equipment else 0,
-        energy_cost=equipment.equipment.energy_cost_annual if equipment else 0,
-        defect_rate=equipment.equipment.defect_rate if equipment and equipment.equipment.defect_rate else "정보 없음",
+        equipment_name=equipment.name if equipment else "정보 없음",
+        age_years=equipment.age_years if equipment else 0,
+        energy_cost=equipment.energy_cost_annual if equipment else 0,
+        defect_rate=equipment.defect_rate if equipment and equipment.defect_rate else "정보 없음",
         roi_result="Tool을 호출해서 계산하세요.",
         matched_policies=matched_policies_text
     )

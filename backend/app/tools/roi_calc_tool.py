@@ -40,5 +40,4 @@ def calculate_equipment_roi(equipment: EquipmentInput) -> dict:
     설비 교체 ROI 계산 Tool.
     내부적으로 roi_calc.py의 calculate_roi를 호출하여 결과를 반환합니다.
     """
-    roi_input = RoiInput(equipment=equipment)
-    return _calculate_roi(roi_input)
+    return _calculate_roi(equipment)  # EquipmentInput 직접 넘기기

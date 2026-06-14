@@ -5,6 +5,8 @@ from app.models.equipment import EquipmentInput
 
 
 class CompanyOnboarding(BaseModel):
+    # DB 및 인증 연결정보
+    user_id: Optional[str] = None              # Auth에서 발급된 사용자 ID
     # 기업 기본정보
     company_name: str
     business_registration_no: Optional[str] = None

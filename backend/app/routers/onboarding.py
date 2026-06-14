@@ -2,80 +2,39 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from app.models.company import CompanyOnboarding
 from app.core.database import get_db
-
+from app.models.equipment import EquipmentInput
+from app.models.user import UserCreate
 router = APIRouter()
 
-
-@router.post("/onboarding")
-async def register_company(body: CompanyOnboarding):
+@router.post("/onboarding/user")
+async def register_user(body: UserCreate):
     db = get_db()
 
-    company_payload = {
-        "company_name": body.company_name,
-        "industry_code": body.industry_code,
-        "company_type": body.company_type,
-        "employee_count": body.employee_count,
-        "region": body.region,
-        "annual_revenue": body.annual_revenue,
-        "energy_cost_annual": body.energy_cost_annual,
+    user_payload = {
+        "user_id": body.user_id,
+        "name": body.name,
+        "phone": body.phone,
     }
 
     try:
-        # 1. company 저장
-        company_result = db.table("company").insert(company_payload).execute()
+        result = db.table("user").insert(user_payload).execute()
 
-        if not company_result.data:
+        if not result.data:
             return JSONResponse(
                 status_code=500,
                 content={
                     "success": False,
-                    "message": "company 저장 결과가 비어 있습니다.",
-                    "error": "company_result.data is empty"
+                    "message": "user 저장 결과가 비어 있습니다.",
                 }
             )
 
-        company = company_result.data[0]
-        company_id = company.get("company_id")
+        user = result.data[0]
 
-        # 2. equipment 저장
-        equipment_payload = {
-            "company_id": company_id,
-            "name": body.equipment.name,
-            "category": body.equipment.category,
-            "age_years": body.equipment.age_years,
-            "energy_cost_annual": body.equipment.energy_cost_annual,
-            "defect_rate": body.equipment.defect_rate,
-            "capacity_value": body.equipment.capacity_value,
-            "new_energy_cost_annual": body.equipment.new_energy_cost_annual,
-            "new_investment_manwon": body.equipment.new_investment_manwon,
-            "maintenance_cost_annual": body.equipment.maintenance_cost_annual,
-            "production_qty": body.equipment.production_qty,
-            "contribution_margin_won": body.equipment.contribution_margin_won,
-        }
-
-        equipment_result = db.table("equipment").insert(equipment_payload).execute()
-
-        if not equipment_result.data:
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "success": False,
-                    "message": "equipment 저장 결과가 비어 있습니다.",
-                    "error": "equipment_result.data is empty"
-                }
-            )
-
-        equipment = equipment_result.data[0]
-        equipment_id = equipment.get("equipment_id")
-
-        # 3. company_id + equipment_id 같이 반환
         return {
             "success": True,
             "data": {
-                "company_id": company_id,
-                "equipment_id": equipment_id,
-                "company": company,
-                "equipment": equipment
+                "user_id": user.get("user_id"),
+                "user": user
             }
         }
 
@@ -84,7 +43,55 @@ async def register_company(body: CompanyOnboarding):
             status_code=500,
             content={
                 "success": False,
-                "message": "온보딩 정보를 Supabase에 저장하지 못했습니다.",
+                "message": "user 정보를 저장하지 못했습니다.",
+                "error": str(e)
+            }
+        )
+    
+@router.post("/onboarding")
+async def register_company(body: CompanyOnboarding):
+    db = get_db()
+
+    company_payload = {
+        "user_id": body.user_id,
+        "company_name": body.company_name,
+        "industry_name": body.industry_name,
+        "industry_code": body.industry_code,
+        "region": body.region,
+        "business_registration_no": body.business_registration_no,
+        "company_size": body.company_size,
+        "primary_purpose": body.primary_purpose,
+        "employee_count": body.employee_count,
+    }
+
+    try:
+        result = db.table("company").insert(company_payload).execute()
+
+        if not result.data:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "success": False,
+                    "message": "company 저장 결과가 비어 있습니다.",
+                }
+            )
+
+        company = result.data[0]
+
+        return {
+            "success": True,
+            "data": {
+                "company_id": company.get("company_id"),
+                "company": company
+            }
+        }
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "message": "온보딩 정보를 저장하지 못했습니다.",
                 "error": str(e)
             }
         )
@@ -124,6 +131,112 @@ async def get_company(company_id: str):
             content={
                 "success": False,
                 "message": "회사를 찾을 수 없습니다.",
+                "error": str(e)
+            }
+        )
+
+@router.patch("/onboarding/company/{company_id}")
+async def update_company(company_id: str, body: CompanyOnboarding):
+    db = get_db()
+
+    # None이 아닌 값만 업데이트
+    update_payload = {}
+    
+    if body.company_name: update_payload["company_name"] = body.company_name
+    if body.industry_name: update_payload["industry_name"] = body.industry_name
+    if body.industry_code: update_payload["industry_code"] = body.industry_code
+    if body.region: update_payload["region"] = body.region
+    if body.business_registration_no: update_payload["business_registration_no"] = body.business_registration_no
+    if body.company_type: update_payload["company_type"] = body.company_type
+    if body.company_size: update_payload["company_size"] = body.company_size
+    if body.primary_purpose: update_payload["primary_purpose"] = body.primary_purpose
+    if body.employee_count: update_payload["employee_count"] = body.employee_count
+    if body.annual_revenue: update_payload["annual_revenue"] = body.annual_revenue
+    if body.avg_revenue_3y_manwon: update_payload["avg_revenue_3y_manwon"] = body.avg_revenue_3y_manwon
+    if body.total_assets_manwon: update_payload["total_assets_manwon"] = body.total_assets_manwon
+    if body.is_disclosure_group_member is not None: update_payload["is_disclosure_group_member"] = body.is_disclosure_group_member
+    if body.independence_check_passed is not None: update_payload["independence_check_passed"] = body.independence_check_passed
+    if body.energy_cost_annual: update_payload["energy_cost_annual"] = body.energy_cost_annual
+
+    try:
+        result = db.table("company").update(update_payload).eq("company_id", company_id).execute()
+
+        if not result.data:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "success": False,
+                    "message": "company 업데이트 결과가 비어 있습니다.",
+                }
+            )
+
+        return {
+            "success": True,
+            "data": {
+                "company_id": company_id,
+                "company": result.data[0]
+            }
+        }
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "message": "company 업데이트에 실패했습니다.",
+                "error": str(e)
+            }
+        )
+    
+@router.post("/onboarding/{company_id}/equipment")
+async def register_equipment(company_id: str, body: EquipmentInput):
+    db = get_db()
+
+    equipment_payload = {
+        "company_id": company_id,
+        "name": body.name,
+        "category": body.category,
+        "age_years": body.age_years,
+        "energy_cost_annual": body.energy_cost_annual,
+        "defect_rate": body.defect_rate,
+        "maintenance_cost_annual": body.maintenance_cost_annual,
+        "current_capacity_value": body.current_capacity_value,
+        "production_qty": body.production_qty,
+        "contribution_margin_won": body.contribution_margin_won,
+        "new_energy_cost_annual": body.new_energy_cost_annual,
+        "new_investment_manwon": body.new_investment_manwon,
+        "scenario_a_investment_manwon": body.scenario_a_investment_manwon,
+        "scenario_b_investment_manwon": body.scenario_b_investment_manwon,
+    }
+
+    try:
+        result = db.table("equipment").insert(equipment_payload).execute()
+
+        if not result.data:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "success": False,
+                    "message": "equipment 저장 결과가 비어 있습니다.",
+                }
+            )
+
+        equipment = result.data[0]
+
+        return {
+            "success": True,
+            "data": {
+                "equipment_id": equipment.get("equipment_id"),
+                "equipment": equipment
+            }
+        }
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "message": "설비 정보를 저장하지 못했습니다.",
                 "error": str(e)
             }
         )

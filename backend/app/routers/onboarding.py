@@ -45,7 +45,7 @@ async def register_company(body: CompanyOnboarding):
             "age_years": body.equipment.age_years,
             "energy_cost_annual": body.equipment.energy_cost_annual,
             "defect_rate": body.equipment.defect_rate,
-            "capacity_value": body.equipment.capacity_value,
+            "current_capacity_value": body.equipment.current_capacity_value,
             "new_energy_cost_annual": body.equipment.new_energy_cost_annual,
             "new_investment_manwon": body.equipment.new_investment_manwon,
             "maintenance_cost_annual": body.equipment.maintenance_cost_annual,

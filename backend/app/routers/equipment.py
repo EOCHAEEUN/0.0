@@ -1,19 +1,10 @@
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+
 from app.core.database import get_db
+from app.models.equipment import EquipmentCreateRequest
 
 router = APIRouter()
-
-
-class EquipmentCreateRequest(BaseModel):
-    company_id: str
-    name: str
-    category: str
-    age_years: int
-    energy_cost_annual: int
-    defect_rate: float
-    current_capacity_value: int
 
 
 @router.post("/equipment")
@@ -21,13 +12,18 @@ async def create_equipment(body: EquipmentCreateRequest):
     db = get_db()
 
     payload = {
-        "company_id": body.company_id,
+        "company_id": str(body.company_id),
         "name": body.name,
         "category": body.category,
         "age_years": body.age_years,
         "energy_cost_annual": body.energy_cost_annual,
         "defect_rate": body.defect_rate,
+        "maintenance_cost_annual": body.maintenance_cost_annual,
         "current_capacity_value": body.current_capacity_value,
+        "production_qty": body.production_qty,
+        "contribution_margin_won": body.contribution_margin_won,
+        "scenario_a_investment_manwon": body.scenario_a_investment_manwon,
+        "scenario_b_investment_manwon": body.scenario_b_investment_manwon,
     }
 
     try:

@@ -1,14 +1,16 @@
-from pydantic import BaseModel
-from typing import Optional
 from datetime import datetime
+from typing import Optional
+from uuid import UUID
+
+from pydantic import BaseModel
 
 
-class UserCreate(BaseModel):
-    user_id: str                           # Auth에서 발급된 사용자 ID
-    name: str                              # 이름 (필수)
-    phone: str                             # 연락처 (필수)
+class UserProfileCreate(BaseModel):
+    user_id: UUID
+    name: str
+    phone: str
 
 
-class UserContext(UserCreate):
-    created_at: Optional[datetime] = None  # 서버에서 관리하는 시간
-    updated_at: Optional[datetime] = None  # 서버에서 관리하는 시간
+class UserProfileContext(UserProfileCreate):
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None

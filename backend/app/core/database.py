@@ -3,11 +3,16 @@ from app.core.config import settings
 
 _client: Client | None = None
 
+
+def create_service_client() -> Client:
+    return create_client(
+        settings.supabase_url,
+        settings.supabase_service_key
+    )
+
+
 def get_db() -> Client:
     global _client
     if _client is None:
-        _client = create_client(
-            settings.supabase_url,
-            settings.supabase_service_key
-        )
+        _client = create_service_client()
     return _client

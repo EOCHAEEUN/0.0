@@ -1,4 +1,11 @@
 import { useMemo, useState } from "react"
+import {
+  createCompanyOnboarding,
+  saveAuthSession,
+  sendSignupEmailCode,
+  signupWithProfile,
+  verifySignupEmailCode,
+} from "../../services/auth"
 import "./SignupModal.css"
 
 type IndustryOption = {
@@ -98,6 +105,9 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
 
   const [agreeService, setAgreeService] = useState(true)
   const [agreePrivacy, setAgreePrivacy] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSendingCode, setIsSendingCode] = useState(false)
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false)
 
   const passwordChecks = useMemo(() => {
     return [
@@ -163,18 +173,30 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
     }).slice(0, 8)
   }
 
-  const handleSendEmailCode = () => {
+  const handleSendEmailCode = async () => {
+    if (isSendingCode) return
+
     if (!email.includes("@")) {
       alert("이메일 형식을 확인해주세요.")
       return
     }
 
-    setIsCodeSent(true)
-    setIsEmailVerified(false)
-    alert("인증번호를 발송했습니다. 지금은 시연용으로 아무 숫자 4자리 이상 입력하면 됩니다.")
+    try {
+      setIsSendingCode(true)
+      await sendSignupEmailCode(email)
+      setIsCodeSent(true)
+      setIsEmailVerified(false)
+      alert("인증번호를 이메일로 발송했습니다.")
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "인증번호 발송에 실패했습니다.")
+    } finally {
+      setIsSendingCode(false)
+    }
   }
 
-  const handleVerifyEmail = () => {
+  const handleVerifyEmail = async () => {
+    if (isVerifyingCode) return
+
     if (!isCodeSent) {
       alert("먼저 인증번호를 받아주세요.")
       return
@@ -185,8 +207,17 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
       return
     }
 
-    setIsEmailVerified(true)
-    alert("이메일 인증이 완료되었습니다.")
+    try {
+      setIsVerifyingCode(true)
+      const session = await verifySignupEmailCode(email, emailCode.trim())
+      saveAuthSession(session)
+      setIsEmailVerified(true)
+      alert("이메일 인증이 완료되었습니다.")
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "이메일 인증에 실패했습니다.")
+    } finally {
+      setIsVerifyingCode(false)
+    }
   }
 
   const handleAddIndustryRow = () => {
@@ -304,7 +335,9 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
       .filter((item) => item.industry_name || item.industry_code.length > 0)
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (isSubmitting) return
+
     if (!email || !password || !passwordCheck || !userName || !phone) {
       alert("필수 계정 정보와 사용자 정보를 입력해주세요.")
       return
@@ -396,8 +429,43 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
       },
     }
 
-    localStorage.setItem("factofit_signup_profile", JSON.stringify(payload))
-    console.log("signup payload", payload)
+    const signupPayload = {
+      email,
+      password,
+      name: userName,
+      phone,
+      business_registration_no: businessNumber || null,
+      company: payload.company,
+      agreements: payload.agreements,
+    }
+
+    const onboardingPayload = {
+      company_name: companyName,
+      business_registration_no: businessNumber || null,
+      industry_name: payload.company.industry_name,
+      industry_code: payload.company.industry_code,
+      region,
+      company_type: companySize,
+      company_size: companySize,
+      primary_purpose: mainPurpose ? [mainPurpose] : [],
+      employee_count: toNullableNumber(maxEmployeeCount) ?? 0,
+      annual_revenue: toNullableNumber(maxRevenueManwon) ?? 0,
+    }
+
+    try {
+      setIsSubmitting(true)
+      const session = await signupWithProfile(signupPayload)
+      saveAuthSession(session)
+      const onboarding = await createCompanyOnboarding(onboardingPayload)
+      localStorage.setItem("factofit_company_id", onboarding.company_id)
+      alert("회원가입이 완료되었습니다.")
+      onClose()
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "회원가입에 실패했습니다.")
+    } finally {
+      setIsSubmitting(false)
+      return
+    }
 
     alert("회원가입 정보가 저장되었습니다. 이후 DB API와 연결하면 마이페이지에서 불러올 수 있습니다.")
   }
@@ -439,8 +507,12 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
                   setIsEmailVerified(false)
                 }}
               />
-              <button type="button" onClick={handleSendEmailCode}>
-                인증번호 받기
+              <button
+                type="button"
+                onClick={handleSendEmailCode}
+                disabled={isSendingCode}
+              >
+                {isSendingCode ? "발송 중..." : "인증번호 받기"}
               </button>
             </div>
 
@@ -459,8 +531,12 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
                 value={emailCode}
                 onChange={(event) => setEmailCode(event.target.value)}
               />
-              <button type="button" onClick={handleVerifyEmail}>
-                인증 확인
+              <button
+                type="button"
+                onClick={handleVerifyEmail}
+                disabled={isVerifyingCode}
+              >
+                {isVerifyingCode ? "확인 중..." : "인증 확인"}
               </button>
             </div>
 
@@ -769,8 +845,13 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
           </label>
         </div>
 
-        <button type="button" className="ff-signup-submit" onClick={handleSubmit}>
-          회원가입 완료
+        <button
+          type="button"
+          className="ff-signup-submit"
+          onClick={handleSubmit}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? "저장 중..." : "회원가입 완료"}
         </button>
 
         <button

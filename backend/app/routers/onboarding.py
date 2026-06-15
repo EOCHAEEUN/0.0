@@ -28,6 +28,7 @@ async def register_company(
         "company_size": body.company_size,
         "primary_purpose": body.primary_purpose,
         "employee_count": body.employee_count,
+        "annual_revenue": body.annual_revenue,
         "established_year": body.established_year,
         "workplace_type": body.workplace_type,
     }

@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import sys
 import time
 import zlib
 import struct
@@ -24,11 +25,22 @@ except Exception:
     pdfplumber = None
 
 
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
+
 # =========================================================
 # 환경변수 / Supabase 연결
 # =========================================================
 
-load_dotenv()
+ROOT_DIR = Path(__file__).resolve().parents[2]
+BACKEND_DIR = ROOT_DIR / "backend"
+
+load_dotenv(ROOT_DIR / ".env")
+load_dotenv(BACKEND_DIR / ".env")
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip()
 SUPABASE_SERVICE_ROLE_KEY = (
@@ -1373,6 +1385,8 @@ def extract_text_from_attachment(file_bytes: bytes, content_type: str, filename:
 # =========================================================
 
 REVENUE_LIMIT = int(os.getenv("REVENUE_ENRICH_LIMIT", str(LIMIT)))
+REVENUE_REPROCESS_EMPTY = os.getenv("REVENUE_REPROCESS_EMPTY", "0").strip() == "1"
+REVENUE_REPROCESS_HINT_ONLY = os.getenv("REVENUE_REPROCESS_HINT_ONLY", "0").strip() == "1"
 
 REVENUE_OPERATOR_MAP = {
     "이상": "이상",
@@ -1387,10 +1401,74 @@ REVENUE_OPERATOR_MAP = {
 
 REVENUE_AMOUNT_PATTERN = re.compile(
     r"(?P<number>\d[\d,]*(?:\.\d+)?)\s*"
-    r"(?P<unit>억\s*원|억원|억|천만\s*원|천만원|천만|"
+    r"(?P<unit>조\s*원|조원|천억\s*원|천억원|천억|억\s*원|억원|억|천만\s*원|천만원|천만|"
     r"백만\s*원|백만원|백만|만\s*원|만원|만|원)\s*"
     r"(?P<operator>이상|초과|이하|미만)"
 )
+
+REVENUE_SECTION_KEYWORDS = [
+    "매출",
+    "매출액",
+    "평균매출",
+    "평균 매출",
+    "연매출",
+    "수출실적",
+    "수출 실적",
+    "수출액",
+    "중견기업",
+    "소상공인",
+    "소기업",
+    "중기업",
+    "지원대상",
+    "신청대상",
+    "신청자격",
+    "지원자격",
+    "자격요건",
+    "제외대상",
+    "지원 제외",
+    "신청 제외",
+]
+
+REVENUE_CONTEXT_QUALIFIERS = [
+    "이상",
+    "초과",
+    "이하",
+    "미만",
+    "제외",
+    "대상",
+    "자격",
+    "요건",
+    "한정",
+    "해당",
+]
+
+REVENUE_EXCLUDED_CONTEXT_KEYWORDS = [
+    "지원금",
+    "사업비",
+    "총사업비",
+    "기업부담금",
+    "민간부담금",
+    "부담금",
+    "자부담",
+    "VAT",
+    "부가세",
+    "예산",
+    "보조금",
+    "수수료",
+    "사용료",
+]
+
+REVENUE_REPROCESS_HINT_KEYWORDS = [
+    "매출",
+    "평균매출",
+    "수출실적",
+    "수출액",
+    "중견기업",
+    "소상공인",
+    "3천억원",
+    "3000억원",
+    "3,000억원",
+]
 
 
 def parse_revenue_to_manwon(value) -> int | None:
@@ -1415,7 +1493,11 @@ def parse_revenue_to_manwon(value) -> int | None:
 
     number = float(match.group(1))
 
-    if "억원" in text or "억" in text:
+    if "조원" in text or "조" in text:
+        amount = int(number * 100_000_000)
+    elif "천억원" in text or "천억" in text:
+        amount = int(number * 10_000_000)
+    elif "억원" in text or "억" in text:
         amount = int(number * 10000)
     elif "천만원" in text or "천만" in text:
         amount = int(number * 1000)
@@ -1563,17 +1645,37 @@ def split_revenue_segments(text: str) -> list[str]:
     return segments
 
 
+def is_revenue_candidate_segment(segment: str) -> bool:
+    if not segment:
+        return False
+
+    if not re.search(r"\d", segment):
+        return False
+
+    has_section_keyword = any(keyword in segment for keyword in REVENUE_SECTION_KEYWORDS)
+    if not has_section_keyword:
+        return False
+
+    has_qualifier = any(keyword in segment for keyword in REVENUE_CONTEXT_QUALIFIERS)
+    has_money_unit = bool(
+        re.search(
+            r"\d[\d,]*(?:\.\d+)?\s*(?:조\s*원|천억\s*원|억\s*원|억원|억|천만\s*원|만원|원|달러|불|USD)",
+            segment,
+            flags=re.IGNORECASE,
+        )
+    )
+    has_export = any(keyword in segment for keyword in ["수출실적", "수출 실적", "수출액"])
+
+    return has_qualifier or has_money_unit or has_export
+
+
 def extract_revenue_candidate_windows(text: str, window_size: int = 2) -> list[str]:
     segments = split_revenue_segments(text)
     windows = []
     seen = set()
 
     for index, segment in enumerate(segments):
-        if "매출" not in segment:
-            continue
-        if not any(operator in segment for operator in ["이상", "초과", "이하", "미만"]):
-            continue
-        if not re.search(r"\d", segment):
+        if not is_revenue_candidate_segment(segment):
             continue
 
         start = max(0, index - window_size)
@@ -1589,13 +1691,25 @@ def extract_revenue_candidate_windows(text: str, window_size: int = 2) -> list[s
     return windows[:20]
 
 
+def normalize_operator_for_exclusion(operator: str, context: str) -> str:
+    if not any(keyword in context for keyword in ["제외", "지원 제외", "신청 제외", "대상 제외"]):
+        return operator
+
+    return {
+        "이상": "미만",
+        "초과": "이하",
+        "이하": "초과",
+        "미만": "이상",
+    }.get(operator, operator)
+
+
 def extract_revenue_rules_regex(text: str) -> list[dict]:
     """단순 매출 조건을 정규식으로 추출한다."""
     rules = []
     seen = set()
 
     for window in extract_revenue_candidate_windows(text):
-        if "매출" not in window:
+        if not any(keyword in window for keyword in ["매출", "중견기업", "소상공인", "수출실적", "수출 실적", "수출액"]):
             continue
 
         for match in REVENUE_AMOUNT_PATTERN.finditer(window):
@@ -1610,13 +1724,16 @@ def extract_revenue_rules_regex(text: str) -> list[dict]:
             start = max(0, match.start() - 140)
             end = min(len(window), match.end() + 140)
             nearby = window[start:end]
-            if "매출" not in nearby:
+            if not any(keyword in nearby for keyword in ["매출", "중견기업", "소상공인", "수출실적", "수출 실적", "수출액"]):
                 continue
+            if any(keyword in nearby for keyword in REVENUE_EXCLUDED_CONTEXT_KEYWORDS):
+                if not any(keyword in nearby for keyword in ["평균매출", "평균 매출", "연매출", "매출액", "수출실적", "수출 실적", "수출액"]):
+                    continue
 
             rule = {
                 "track": infer_track_name(window),
                 "revenue_type": infer_revenue_type(nearby),
-                "operator": match.group("operator"),
+                "operator": normalize_operator_for_exclusion(match.group("operator"), nearby),
                 "value_manwon": value_manwon,
                 "export_min_usd": extract_export_min_usd(window),
                 "evidence": window[:700],
@@ -1665,8 +1782,9 @@ def build_revenue_rules_prompt(title: str, text: str) -> str:
 7. 같은 트랙에서 매출과 수출실적을 모두 요구하면 export_min_usd도 정수로 저장하세요.
 8. "평균매출액 또는 연간매출액"처럼 OR 조건이면 두 항목으로 나누어 반환하세요.
 9. evidence에는 실제 후보 문장을 짧게 보존하세요.
-10. 매출 자격조건이 없으면 빈 배열 []만 반환하세요.
-11. 설명이나 마크다운 없이 JSON 배열만 반환하세요.
+10. "매출액 3,000억원 이상인 기업 제외"처럼 제외 조건이면 신청 가능한 조건으로 뒤집어 반환하세요. 예: "3,000억원 이상 제외" = operator "미만".
+11. 매출 자격조건이 없으면 빈 배열 []만 반환하세요.
+12. 설명이나 마크다운 없이 JSON 배열만 반환하세요.
 
 반환 형식:
 [
@@ -1861,20 +1979,52 @@ def build_revenue_update_payload(rules: list[dict]) -> dict:
 
 
 def fetch_policies_without_revenue_rules(limit: int = REVENUE_LIMIT):
+    columns = (
+        "policy_id,title,url,summary,raw_text,raw_json,"
+        "revenue_min_manwon,revenue_max_manwon,revenue_rules"
+    )
+
     result = (
         supabase
         .table("policy")
-        .select(
-            "policy_id,title,url,summary,raw_text,raw_json,"
-            "revenue_min_manwon,revenue_max_manwon,revenue_rules"
-        )
+        .select(columns)
         .like("policy_id", "PBLN_%")
         .is_("revenue_rules", "null")
         .limit(limit)
         .execute()
     )
 
-    return result.data or []
+    rows = result.data or []
+    if not REVENUE_REPROCESS_EMPTY or len(rows) >= limit:
+        return rows
+
+    empty_limit = limit
+    if REVENUE_REPROCESS_HINT_ONLY:
+        empty_limit = max(limit * 5, 300)
+
+    empty_result = (
+        supabase
+        .table("policy")
+        .select(columns)
+        .like("policy_id", "PBLN_%")
+        .eq("revenue_rules", "[]")
+        .limit(empty_limit - len(rows))
+        .execute()
+    )
+
+    empty_rows = empty_result.data or []
+    if REVENUE_REPROCESS_HINT_ONLY:
+        filtered_empty_rows = []
+        for row in empty_rows:
+            haystack = " ".join(
+                str(row.get(key) or "")
+                for key in ["title", "summary", "raw_text"]
+            )
+            if any(keyword in haystack for keyword in REVENUE_REPROCESS_HINT_KEYWORDS):
+                filtered_empty_rows.append(row)
+        empty_rows = filtered_empty_rows[: limit - len(rows)]
+
+    return rows + empty_rows[: limit - len(rows)]
 
 
 def update_revenue_rules(policy_id: str, rules: list[dict]) -> bool:
@@ -2347,6 +2497,39 @@ def run_revenue_enrichment():
 
 
 def main():
+    target = os.getenv("ENRICH_TARGET", "").strip().lower()
+    if len(sys.argv) >= 2:
+        target = sys.argv[1].strip().lower()
+
+    if target in ("amount", "max_amount"):
+        print("=" * 80)
+        print("정책 최대 지원금액 보강 시작")
+        run_amount_enrichment()
+        print("\n" + "=" * 80)
+        print("정책 최대 지원금액 보강 완료")
+        return
+
+    if target in ("revenue", "revenue_rules", "rules"):
+        print("=" * 80)
+        print("정책 매출 조건 revenue_rules 보강 시작")
+        run_revenue_enrichment()
+        print("\n" + "=" * 80)
+        print("정책 매출 조건 revenue_rules 보강 완료")
+        return
+
+    if target == "":
+        print("=" * 80)
+        print("정책 상세정보 보강 실행 파일이 분리되었습니다.")
+        print("최대 지원금액만: python data/scripts/enrich_policy_amount_details.py")
+        print("매출 조건만: python data/scripts/enrich_policy_revenue_rules.py")
+        print("전체 실행이 필요하면: python data/scripts/enrich_policy_details.py all")
+        return
+
+    if target != "all":
+        raise ValueError(
+            "ENRICH_TARGET or CLI argument must be one of: amount, revenue, all"
+        )
+
     print("=" * 80)
     print("정책 상세정보 보강 시작")
     print("1단계: 최대 지원금액")

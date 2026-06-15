@@ -1,55 +1,73 @@
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
+
 from pydantic import BaseModel, Field
+
 from app.models.equipment import EquipmentInput
 
 
 class CompanyOnboarding(BaseModel):
-    # DB 및 인증 연결정보
-    user_id: Optional[str] = None              # Auth에서 발급된 사용자 ID
-    # 기업 기본정보
+    user_id: Optional[UUID] = None
     company_name: str
     business_registration_no: Optional[str] = None
-
-    # 업종정보
     industry_name: Optional[str] = None
-    industry_code: list[str]  # 예: ["C25"]
-
-    # 소재지 및 기업 형태
-    region: str  # 예: 경기도 안산시
+    industry_code: list[str]
+    region: str
     company_type: Optional[str] = None
-    # 예: individual_business, corporation
-
-    company_size: Optional[str] = None
-
-    # 서비스 주요 이용 목적
+    company_size: str
     primary_purpose: list[str] = Field(default_factory=list)
-    # 예:
-    # ["지원사업 추천", "설비 ROI 분석", "안전점검"]
-
-    # 기업규모 판단용 정보
-    employee_count: Optional[int] = Field(default=None, ge=0)
-    annual_revenue: Optional[int] = Field(default=None, ge=0)  # 만원 단위
-    avg_revenue_3y_manwon: Optional[int] = Field(default=None, ge=0)
+    employee_count: int = Field(ge=0)
+    annual_revenue: int = Field(ge=0)
+    revenue_2y_ago_manwon: Optional[int] = Field(default=None, ge=0)
+    revenue_3y_ago_manwon: Optional[int] = Field(default=None, ge=0)
     total_assets_manwon: Optional[int] = Field(default=None, ge=0)
-
-    # 독립성 판단 정보
     is_disclosure_group_member: Optional[bool] = None
     independence_check_passed: Optional[bool] = None
-
-    # ROI 관련 기업정보
     energy_cost_annual: Optional[int] = Field(default=None, ge=0)
-
-
-    # 최초 등록 설비
+    established_year: Optional[int] = Field(default=None, ge=1800)
+    workplace_type: Optional[str] = None
     equipment: Optional[EquipmentInput] = None
 
 
-class CompanyContext(CompanyOnboarding):
-    # DB 및 인증 연결정보
-    company_id: Optional[str] = None
-    user_id: Optional[str] = None
+class CompanyUpdate(BaseModel):
+    user_id: Optional[UUID] = None
+    company_name: Optional[str] = None
+    business_registration_no: Optional[str] = None
+    industry_name: Optional[str] = None
+    industry_code: Optional[list[str]] = None
+    region: Optional[str] = None
+    company_type: Optional[str] = None
+    company_size: Optional[str] = None
+    primary_purpose: Optional[list[str]] = None
+    employee_count: Optional[int] = Field(default=None, ge=0)
+    annual_revenue: Optional[int] = Field(default=None, ge=0)
+    revenue_2y_ago_manwon: Optional[int] = Field(default=None, ge=0)
+    revenue_3y_ago_manwon: Optional[int] = Field(default=None, ge=0)
+    total_assets_manwon: Optional[int] = Field(default=None, ge=0)
+    is_disclosure_group_member: Optional[bool] = None
+    independence_check_passed: Optional[bool] = None
+    energy_cost_annual: Optional[int] = Field(default=None, ge=0)
+    established_year: Optional[int] = Field(default=None, ge=1800)
+    workplace_type: Optional[str] = None
 
-    # 서버에서 관리하는 시간
+
+class CompanyContext(CompanyUpdate):
+    company_id: Optional[UUID | str] = None
+    company_name: str = ""
+    industry_code: list[str] = Field(default_factory=list)
+    region: str = ""
+    primary_purpose: list[str] = Field(default_factory=list)
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+    def estimated_avg_revenue_3y_manwon(self) -> Optional[int]:
+        if self.annual_revenue is None:
+            return None
+
+        revenues = [
+            self.annual_revenue,
+            self.revenue_2y_ago_manwon or self.annual_revenue,
+            self.revenue_3y_ago_manwon or self.annual_revenue,
+        ]
+        return round(sum(revenues) / len(revenues))

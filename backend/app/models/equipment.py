@@ -17,6 +17,6 @@ class EquipmentInput(BaseModel):
     scenario_a_investment_manwon: Optional[int] = Field(default=None, ge=0)
     scenario_b_investment_manwon: Optional[int] = Field(default=None, ge=0)
 
-
 class EquipmentCreateRequest(EquipmentInput):
     company_id: UUID
+

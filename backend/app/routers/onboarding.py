@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from app.core.database import get_db
 from app.models.company import CompanyOnboarding, CompanyUpdate
 from app.models.equipment import EquipmentInput
-from app.models.user import UserProfileCreate
+from app.models.user_profile import UserProfileCreate
 
 
 router = APIRouter()
@@ -68,13 +68,6 @@ async def register_company(body: CompanyOnboarding):
         "company_size": body.company_size,
         "primary_purpose": body.primary_purpose,
         "employee_count": body.employee_count,
-        "annual_revenue": body.annual_revenue,
-        "revenue_2y_ago_manwon": body.revenue_2y_ago_manwon,
-        "revenue_3y_ago_manwon": body.revenue_3y_ago_manwon,
-        "total_assets_manwon": body.total_assets_manwon,
-        "is_disclosure_group_member": body.is_disclosure_group_member,
-        "independence_check_passed": body.independence_check_passed,
-        "energy_cost_annual": body.energy_cost_annual,
         "established_year": body.established_year,
         "workplace_type": body.workplace_type,
     }

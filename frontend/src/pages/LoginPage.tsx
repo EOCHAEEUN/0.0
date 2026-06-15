@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from "react"
 import { useNavigate } from "react-router-dom"
 
 import SignupModal from "../components/auth/SignupModal"
+import { loginWithPassword, saveAuthSession } from "../services/auth"
 
 type ModalType = "preview" | "signup" | "sso" | null
 
@@ -13,9 +14,21 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [remember, setRemember] = useState(false)
   const [modalType, setModalType] = useState<ModalType>(null)
+  const [isLoggingIn, setIsLoggingIn] = useState(false)
 
-  const handleLogin = () => {
-    setModalType("preview")
+  const handleLogin = async () => {
+    if (isLoggingIn) return
+
+    try {
+      setIsLoggingIn(true)
+      const session = await loginWithPassword(email, password)
+      saveAuthSession(session)
+      setModalType("preview")
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "로그인에 실패했습니다.")
+    } finally {
+      setIsLoggingIn(false)
+    }
   }
 
   const handleContinue = () => {
@@ -381,8 +394,13 @@ export default function LoginPage() {
               </button>
             </div>
 
-            <button type="button" onClick={handleLogin} style={primaryButtonStyle}>
-              로그인
+            <button
+              type="button"
+              onClick={handleLogin}
+              style={primaryButtonStyle}
+              disabled={isLoggingIn}
+            >
+              {isLoggingIn ? "로그인 중..." : "로그인"}
             </button>
 
             <div
@@ -538,7 +556,6 @@ function ModalShell({
 }) {
   return (
     <div
-      onClick={onClose}
       style={{
         position: "fixed",
         inset: 0,

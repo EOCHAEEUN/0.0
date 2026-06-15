@@ -58,7 +58,15 @@ const INDUSTRY_OPTIONS: IndustryOption[] = [
   { name: "뿌리", codes: ["C24", "C25", "C28", "C29"] },
 ]
 
-const COMPANY_SIZE_OPTIONS = ["소상공인", "소기업", "중소기업", "중견기업"]
+const COMPANY_SIZE_OPTIONS = [
+  "선택 필요",
+  "소상공인",
+  "소기업",
+  "중소기업",
+  "중견기업",
+  "대기업",
+  "확인 필요",
+]
 
 const PURPOSE_OPTIONS = [
   "지원사업 추천",
@@ -74,6 +82,40 @@ const createIndustryInputRow = (): IndustryInputRow => ({
   industryCode: "",
   selectedIndustry: null,
 })
+
+function onlyDigits(value: string) {
+  return value.replace(/\D/g, "")
+}
+
+function formatPhoneNumber(value: string) {
+  const digits = onlyDigits(value).slice(0, 11)
+
+  if (digits.length <= 3) return digits
+  if (digits.length <= 7) {
+    return `${digits.slice(0, 3)}-${digits.slice(3)}`
+  }
+
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`
+}
+
+function formatBusinessNumber(value: string) {
+  const digits = onlyDigits(value).slice(0, 10)
+
+  if (digits.length <= 3) return digits
+  if (digits.length <= 5) {
+    return `${digits.slice(0, 3)}-${digits.slice(3)}`
+  }
+
+  return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`
+}
+
+function normalizePhoneNumber(value: string) {
+  return onlyDigits(value)
+}
+
+function normalizeBusinessNumber(value: string) {
+  return onlyDigits(value)
+}
 
 export default function SignupModal({ onClose, onLoginClick }: SignupModalProps) {
   const [email, setEmail] = useState("")
@@ -93,15 +135,10 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
     createIndustryInputRow(),
   ])
   const [openIndustryRowId, setOpenIndustryRowId] = useState<string | null>(null)
-  const [isOptionalOpen, setIsOptionalOpen] = useState(false)
-
   const [region, setRegion] = useState("")
-  const [companySize, setCompanySize] = useState("중소기업")
+  const [companySize, setCompanySize] = useState("선택 필요")
   const [mainPurpose, setMainPurpose] = useState("지원사업 추천")
 
-  const [maxEmployeeCount, setMaxEmployeeCount] = useState("")
-  const [minRevenueManwon, setMinRevenueManwon] = useState("")
-  const [maxRevenueManwon, setMaxRevenueManwon] = useState("")
 
   const [agreeService, setAgreeService] = useState(true)
   const [agreePrivacy, setAgreePrivacy] = useState(true)
@@ -311,11 +348,6 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
     setOpenIndustryRowId(rowId)
   }
 
-  const toNullableNumber = (value: string) => {
-    if (!value.trim()) return null
-    return Number(value)
-  }
-
   const getNormalizedIndustries = () => {
     return industryRows
       .map((row) => {
@@ -395,8 +427,8 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
       },
       user: {
         name: userName,
-        phone,
-        business_number: businessNumber || null,
+        phone: normalizePhoneNumber(phone),
+        business_number: normalizeBusinessNumber(businessNumber) || null,
       },
       company: {
         company_name: companyName,
@@ -419,9 +451,9 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
         region,
         company_size: companySize,
         main_purpose: mainPurpose,
-        max_employee_count: toNullableNumber(maxEmployeeCount),
-        min_revenue_manwon: toNullableNumber(minRevenueManwon),
-        max_revenue_manwon: toNullableNumber(maxRevenueManwon),
+        max_employee_count: null,
+        min_revenue_manwon: null,
+        max_revenue_manwon: null,
       },
       agreements: {
         service_terms: agreeService,
@@ -433,23 +465,23 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
       email,
       password,
       name: userName,
-      phone,
-      business_registration_no: businessNumber || null,
+      phone: normalizePhoneNumber(phone),
+      business_registration_no: normalizeBusinessNumber(businessNumber) || null,
       company: payload.company,
       agreements: payload.agreements,
     }
 
     const onboardingPayload = {
       company_name: companyName,
-      business_registration_no: businessNumber || null,
+      business_registration_no: normalizeBusinessNumber(businessNumber) || null,
       industry_name: payload.company.industry_name,
       industry_code: payload.company.industry_code,
       region,
       company_type: companySize,
       company_size: companySize,
       primary_purpose: mainPurpose ? [mainPurpose] : [],
-      employee_count: toNullableNumber(maxEmployeeCount) ?? 0,
-      annual_revenue: toNullableNumber(maxRevenueManwon) ?? 0,
+      employee_count: 0,
+      annual_revenue: 0,
     }
 
     try {
@@ -471,7 +503,7 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
   }
 
   return (
-    <div className="ff-signup-overlay" onClick={onClose}>
+    <div className="ff-signup-overlay">
       <section
         className="ff-signup-panel"
         onClick={(event) => event.stopPropagation()}
@@ -626,19 +658,11 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
               <input
                 placeholder="010-0000-0000"
                 value={phone}
-                onChange={(event) => setPhone(event.target.value)}
+                onChange={(event) => setPhone(formatPhoneNumber(event.target.value))}
               />
             </div>
           </div>
 
-          <div className="ff-signup-field">
-            <FieldLabel text="사업자등록번호" optional />
-            <input
-              placeholder="예: 123-45-67890"
-              value={businessNumber}
-              onChange={(event) => setBusinessNumber(event.target.value)}
-            />
-          </div>
         </div>
 
         <div className="ff-signup-section">
@@ -732,6 +756,17 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
           </button>
 
           <div className="ff-signup-field">
+            <FieldLabel text="사업자등록번호" optional />
+            <input
+              placeholder="예: 123-45-67890"
+              value={businessNumber}
+              onChange={(event) =>
+                setBusinessNumber(formatBusinessNumber(event.target.value))
+              }
+            />
+          </div>
+
+          <div className="ff-signup-field">
             <FieldLabel text="지역" required />
             <input
               placeholder="예: 경기 안산시"
@@ -766,60 +801,6 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
             </div>
           </div>
         </div>
-
-        <section
-          className={
-            isOptionalOpen
-              ? "ff-signup-optional is-open"
-              : "ff-signup-optional"
-          }
-        >
-          <button
-            type="button"
-            className="ff-signup-optional-summary"
-            onClick={() => setIsOptionalOpen((prev) => !prev)}
-          >
-            <span>4. 선택 정보</span>
-            <em>종업원 수·매출액 기준이 있는 지원사업 매칭에 활용됩니다.</em>
-            <b>{isOptionalOpen ? "닫기" : "열기"}</b>
-          </button>
-
-          {isOptionalOpen && (
-            <div className="ff-signup-optional-body">
-              <div className="ff-signup-field">
-                <FieldLabel text="최대 종업원 수" optional />
-                <input
-                  type="number"
-                  placeholder="예: 50"
-                  value={maxEmployeeCount}
-                  onChange={(event) => setMaxEmployeeCount(event.target.value)}
-                />
-              </div>
-
-              <div className="ff-signup-two-col">
-                <div className="ff-signup-field">
-                  <FieldLabel text="최소 매출액, 만원 단위" optional />
-                  <input
-                    type="number"
-                    placeholder="예: 10000"
-                    value={minRevenueManwon}
-                    onChange={(event) => setMinRevenueManwon(event.target.value)}
-                  />
-                </div>
-
-                <div className="ff-signup-field">
-                  <FieldLabel text="최대 매출액, 만원 단위" optional />
-                  <input
-                    type="number"
-                    placeholder="예: 500000"
-                    value={maxRevenueManwon}
-                    onChange={(event) => setMaxRevenueManwon(event.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-        </section>
 
         <div className="ff-signup-agree-box">
           <label>

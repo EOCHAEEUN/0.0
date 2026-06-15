@@ -17,10 +17,11 @@ class CompanyOnboarding(BaseModel):
     company_type: Optional[str] = None
     company_size: str
     primary_purpose: list[str] = Field(default_factory=list)
-    employee_count: int = Field(ge=0)
-    annual_revenue: int = Field(ge=0)
-    revenue_2y_ago_manwon: Optional[int] = Field(default=None, ge=0)
-    revenue_3y_ago_manwon: Optional[int] = Field(default=None, ge=0)
+
+    # 기업규모 판단용 정보
+    employee_count: Optional[int] = Field(default=None, ge=0)
+    annual_revenue: int = Field(default=None, ge=0)  # 직전 연도 매출액
+    avg_revenue_3y_manwon: Optional[int] = Field(default=None, ge=0)
     total_assets_manwon: Optional[int] = Field(default=None, ge=0)
     is_disclosure_group_member: Optional[bool] = None
     independence_check_passed: Optional[bool] = None

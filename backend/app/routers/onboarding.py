@@ -29,6 +29,12 @@ async def register_company(
         "primary_purpose": body.primary_purpose,
         "employee_count": body.employee_count,
         "annual_revenue": body.annual_revenue,
+        "revenue_2y_ago_manwon": body.revenue_2y_ago_manwon,
+        "revenue_3y_ago_manwon": body.revenue_3y_ago_manwon,
+        "total_assets_manwon": body.total_assets_manwon,
+        "is_disclosure_group_member": body.is_disclosure_group_member,
+        "independence_check_passed": body.independence_check_passed,
+        "energy_cost_annual": body.energy_cost_annual,
         "established_year": body.established_year,
         "workplace_type": body.workplace_type,
     }

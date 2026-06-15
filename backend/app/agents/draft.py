@@ -15,10 +15,10 @@ def application_draft_node(state: FactofitState) -> FactofitState:
 
     # 프롬프트 구성
     prompt = APPLICATION_DRAFT_SYSTEM_PROMPT.format(
-        industry_code=company.industry_code if company else "정보 없음",
+        industry_code=", ".join(company.industry_code) if company and company.industry_code else "정보 없음",
         region=company.region if company else "정보 없음",
-        equipment_name=equipment.equipment.name if equipment else "정보 없음",
-        age_years=equipment.equipment.age_years if equipment else 0,
+        equipment_name=equipment.name if equipment else "정보 없음",
+        age_years=equipment.age_years if equipment else 0,
         selected_policy=selected_policy,
         roi_result=roi_result if roi_result else "ROI 계산 결과 없음"
     )

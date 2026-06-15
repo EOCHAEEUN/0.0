@@ -38,10 +38,11 @@ export default function LoginPage() {
         style={{
           position: "absolute",
           inset: 0,
-          backgroundImage: "url('/factory-bg.jpg')",
+          backgroundImage: "url('/images/login-factory-bg.jpg')",
           backgroundSize: "cover",
-          backgroundPosition: "center",
+          backgroundPosition: "52% center",
           backgroundRepeat: "no-repeat",
+          filter: "saturate(1.03) contrast(1.05) brightness(1.12)",
           zIndex: 0,
         }}
       />
@@ -51,8 +52,19 @@ export default function LoginPage() {
           position: "absolute",
           inset: 0,
           background:
-            "linear-gradient(90deg, rgba(6,27,52,.88) 0%, rgba(6,27,52,.70) 44%, rgba(6,27,52,.46) 100%)",
+            "linear-gradient(90deg, rgba(6,27,52,.68) 0%, rgba(6,27,52,.42) 44%, rgba(6,27,52,.12) 100%)",
           zIndex: 1,
+        }}
+      />
+
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background:
+            "radial-gradient(circle at 62% 50%, rgba(255,255,255,.08) 0%, rgba(6,27,52,.06) 40%, rgba(6,27,52,.20) 100%)",
+          zIndex: 2,
+          pointerEvents: "none",
         }}
       />
 
@@ -83,21 +95,23 @@ export default function LoginPage() {
       <section
         style={{
           position: "relative",
-          zIndex: 2,
-          width: "min(1900px, 100%)",
+          zIndex: 3,
+          width: "100%",
           minHeight: "100vh",
           margin: "0 auto",
           display: "grid",
-          gridTemplateColumns: "minmax(620px, 1fr) 520px",
+          gridTemplateColumns: "minmax(540px, 760px) minmax(420px, 470px)",
           alignItems: "center",
-          gap: "clamp(120px, 13vw, 260px)",
-          padding: "clamp(84px, 8vh, 130px) clamp(64px, 7vw, 120px)",
+          justifyContent: "space-between",
+          gap: "clamp(56px, 7vw, 150px)",
+          padding: "clamp(72px, 8vh, 110px) clamp(64px, 5vw, 86px)",
         }}
       >
         <div
           style={{
-            maxWidth: "760px",
+            maxWidth: "720px",
             justifySelf: "start",
+            transform: "translateY(10px)",
           }}
         >
           <div
@@ -105,7 +119,7 @@ export default function LoginPage() {
               display: "flex",
               alignItems: "center",
               gap: "14px",
-              marginBottom: "58px",
+              marginBottom: "48px",
             }}
           >
             <div
@@ -156,9 +170,9 @@ export default function LoginPage() {
             style={{
               margin: "0 0 34px",
               color: "#FFFFFF",
-              fontSize: "clamp(56px, 5.2vw, 82px)",
+              fontSize: "clamp(52px, 5vw, 78px)",
               lineHeight: 1.12,
-              letterSpacing: "-3.4px",
+              letterSpacing: "-3.2px",
               fontWeight: 900,
               textShadow: "0 18px 48px rgba(0,0,0,.24)",
             }}
@@ -170,9 +184,9 @@ export default function LoginPage() {
 
           <p
             style={{
-              margin: "0 0 54px",
+              margin: "0 0 48px",
               color: "#E9F0FA",
-              fontSize: "20px",
+              fontSize: "19px",
               lineHeight: 1.85,
               fontWeight: 800,
               textShadow: "0 10px 32px rgba(0,0,0,.22)",
@@ -189,8 +203,8 @@ export default function LoginPage() {
             style={{
               display: "grid",
               gridTemplateColumns: "repeat(4, 1fr)",
-              gap: "16px",
-              maxWidth: "720px",
+              gap: "14px",
+              maxWidth: "640px",
             }}
           >
             {[
@@ -202,10 +216,10 @@ export default function LoginPage() {
               <div
                 key={`${line1}-${line2}`}
                 style={{
-                  minHeight: "118px",
+                  minHeight: "108px",
                   borderRadius: "18px",
                   border: "1px solid rgba(255,255,255,.16)",
-                  background: "rgba(10,24,46,.54)",
+                  background: "rgba(10,24,46,.46)",
                   backdropFilter: "blur(10px)",
                   display: "grid",
                   placeItems: "center",
@@ -252,23 +266,23 @@ export default function LoginPage() {
         <section
           style={{
             width: "100%",
-            minHeight: "610px",
+            minHeight: "585px",
             borderRadius: "30px",
             background: "rgba(255,255,255,.96)",
             color: "#061B34",
-            padding: "52px 50px",
-            boxShadow: "0 34px 100px rgba(6,27,52,.28)",
+            padding: "46px 46px",
+            boxShadow: "0 34px 100px rgba(6,27,52,.26)",
             display: "grid",
             alignContent: "center",
             justifySelf: "end",
           }}
         >
-          <div style={{ textAlign: "center", marginBottom: "38px" }}>
+          <div style={{ textAlign: "center", marginBottom: "32px" }}>
             <h2
               style={{
                 margin: "0 0 12px",
                 color: "#061B34",
-                fontSize: "38px",
+                fontSize: "36px",
                 fontWeight: 900,
                 letterSpacing: "-1.5px",
               }}
@@ -288,7 +302,7 @@ export default function LoginPage() {
             </p>
           </div>
 
-          <div style={{ display: "grid", gap: "20px" }}>
+          <div style={{ display: "grid", gap: "18px" }}>
             <label style={{ display: "grid", gap: "9px" }}>
               <span
                 style={{

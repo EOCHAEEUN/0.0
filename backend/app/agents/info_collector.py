@@ -129,10 +129,10 @@ def info_collector_node(state: FactofitState) -> FactofitState:
                 category=category,
                 age_years=int(data.get("age_years", 0)),
                 energy_cost_annual=int(data.get("energy_cost_annual", 0)),
-                new_energy_cost_annual=int(data["new_energy_cost_annual"]) if data.get("new_energy_cost_annual") else None,
-                new_investment_manwon=int(data["new_investment_manwon"]) if data.get("new_investment_manwon") else None,
                 defect_rate=defect_rate,
-                maintenance_cost_annual=int(data["maintenance_cost_annual"]) if data.get("maintenance_cost_annual") else None
+                maintenance_cost_annual=int(data["maintenance_cost_annual"]) if data.get("maintenance_cost_annual") else None,
+                scenario_a_investment_manwon=int(data["scenario_a_investment_manwon"]) if data.get("scenario_a_investment_manwon") else None,
+                scenario_b_investment_manwon=int(data["scenario_b_investment_manwon"]) if data.get("scenario_b_investment_manwon") else None
             )
 
             state["company_info"] = CompanyContext(

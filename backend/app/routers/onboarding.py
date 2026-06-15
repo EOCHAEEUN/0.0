@@ -1,41 +1,45 @@
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
-from app.models.company import CompanyOnboarding
+
 from app.core.database import get_db
+from app.models.company import CompanyOnboarding, CompanyUpdate
 from app.models.equipment import EquipmentInput
-from app.models.user import UserCreate
+from app.models.user_profile import UserProfileCreate
+
+
 router = APIRouter()
 
+
 @router.post("/onboarding/user")
-async def register_user(body: UserCreate):
+async def register_user_profile(body: UserProfileCreate):
     db = get_db()
 
-    user_payload = {
-        "user_id": body.user_id,
+    profile_payload = {
+        "user_id": str(body.user_id),
         "name": body.name,
         "phone": body.phone,
     }
 
     try:
-        result = db.table("user").insert(user_payload).execute()
+        result = db.table("user_profile").upsert(profile_payload).execute()
 
         if not result.data:
             return JSONResponse(
                 status_code=500,
                 content={
                     "success": False,
-                    "message": "user 저장 결과가 비어 있습니다.",
-                }
+                    "message": "user_profile save returned no data.",
+                },
             )
 
-        user = result.data[0]
+        profile = result.data[0]
 
         return {
             "success": True,
             "data": {
-                "user_id": user.get("user_id"),
-                "user": user
-            }
+                "user_id": profile.get("user_id"),
+                "user_profile": profile,
+            },
         }
 
     except Exception as e:
@@ -43,25 +47,29 @@ async def register_user(body: UserCreate):
             status_code=500,
             content={
                 "success": False,
-                "message": "user 정보를 저장하지 못했습니다.",
-                "error": str(e)
-            }
+                "message": "Failed to save user_profile.",
+                "error": str(e),
+            },
         )
-    
+
+
 @router.post("/onboarding")
 async def register_company(body: CompanyOnboarding):
     db = get_db()
 
     company_payload = {
-        "user_id": body.user_id,
+        "user_id": str(body.user_id) if body.user_id else None,
         "company_name": body.company_name,
         "industry_name": body.industry_name,
         "industry_code": body.industry_code,
         "region": body.region,
         "business_registration_no": body.business_registration_no,
+        "company_type": body.company_type,
         "company_size": body.company_size,
         "primary_purpose": body.primary_purpose,
         "employee_count": body.employee_count,
+        "established_year": body.established_year,
+        "workplace_type": body.workplace_type,
     }
 
     try:
@@ -72,8 +80,8 @@ async def register_company(body: CompanyOnboarding):
                 status_code=500,
                 content={
                     "success": False,
-                    "message": "company 저장 결과가 비어 있습니다.",
-                }
+                    "message": "company save returned no data.",
+                },
             )
 
         company = result.data[0]
@@ -82,8 +90,8 @@ async def register_company(body: CompanyOnboarding):
             "success": True,
             "data": {
                 "company_id": company.get("company_id"),
-                "company": company
-            }
+                "company": company,
+            },
         }
 
     except Exception as e:
@@ -91,9 +99,9 @@ async def register_company(body: CompanyOnboarding):
             status_code=500,
             content={
                 "success": False,
-                "message": "온보딩 정보를 저장하지 못했습니다.",
-                "error": str(e)
-            }
+                "message": "Failed to save onboarding company data.",
+                "error": str(e),
+            },
         )
 
 
@@ -121,8 +129,8 @@ async def get_company(company_id: str):
             "success": True,
             "data": {
                 "company": company_result.data,
-                "equipments": equipment_result.data
-            }
+                "equipments": equipment_result.data,
+            },
         }
 
     except Exception as e:
@@ -130,52 +138,52 @@ async def get_company(company_id: str):
             status_code=404,
             content={
                 "success": False,
-                "message": "회사를 찾을 수 없습니다.",
-                "error": str(e)
-            }
+                "message": "Company not found.",
+                "error": str(e),
+            },
         )
 
+
 @router.patch("/onboarding/company/{company_id}")
-async def update_company(company_id: str, body: CompanyOnboarding):
+async def update_company(company_id: str, body: CompanyUpdate):
     db = get_db()
 
-    # None이 아닌 값만 업데이트
-    update_payload = {}
-    
-    if body.company_name: update_payload["company_name"] = body.company_name
-    if body.industry_name: update_payload["industry_name"] = body.industry_name
-    if body.industry_code: update_payload["industry_code"] = body.industry_code
-    if body.region: update_payload["region"] = body.region
-    if body.business_registration_no: update_payload["business_registration_no"] = body.business_registration_no
-    if body.company_type: update_payload["company_type"] = body.company_type
-    if body.company_size: update_payload["company_size"] = body.company_size
-    if body.primary_purpose: update_payload["primary_purpose"] = body.primary_purpose
-    if body.employee_count: update_payload["employee_count"] = body.employee_count
-    if body.annual_revenue: update_payload["annual_revenue"] = body.annual_revenue
-    if body.avg_revenue_3y_manwon: update_payload["avg_revenue_3y_manwon"] = body.avg_revenue_3y_manwon
-    if body.total_assets_manwon: update_payload["total_assets_manwon"] = body.total_assets_manwon
-    if body.is_disclosure_group_member is not None: update_payload["is_disclosure_group_member"] = body.is_disclosure_group_member
-    if body.independence_check_passed is not None: update_payload["independence_check_passed"] = body.independence_check_passed
-    if body.energy_cost_annual: update_payload["energy_cost_annual"] = body.energy_cost_annual
+    update_payload = body.model_dump(exclude_none=True)
+    if "user_id" in update_payload:
+        update_payload["user_id"] = str(update_payload["user_id"])
+
+    if not update_payload:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "message": "No company fields to update.",
+            },
+        )
 
     try:
-        result = db.table("company").update(update_payload).eq("company_id", company_id).execute()
+        result = (
+            db.table("company")
+            .update(update_payload)
+            .eq("company_id", company_id)
+            .execute()
+        )
 
         if not result.data:
             return JSONResponse(
                 status_code=500,
                 content={
                     "success": False,
-                    "message": "company 업데이트 결과가 비어 있습니다.",
-                }
+                    "message": "company update returned no data.",
+                },
             )
 
         return {
             "success": True,
             "data": {
                 "company_id": company_id,
-                "company": result.data[0]
-            }
+                "company": result.data[0],
+            },
         }
 
     except Exception as e:
@@ -183,11 +191,12 @@ async def update_company(company_id: str, body: CompanyOnboarding):
             status_code=500,
             content={
                 "success": False,
-                "message": "company 업데이트에 실패했습니다.",
-                "error": str(e)
-            }
+                "message": "Failed to update company.",
+                "error": str(e),
+            },
         )
-    
+
+
 @router.post("/onboarding/{company_id}/equipment")
 async def register_equipment(company_id: str, body: EquipmentInput):
     db = get_db()
@@ -203,8 +212,6 @@ async def register_equipment(company_id: str, body: EquipmentInput):
         "current_capacity_value": body.current_capacity_value,
         "production_qty": body.production_qty,
         "contribution_margin_won": body.contribution_margin_won,
-        "new_energy_cost_annual": body.new_energy_cost_annual,
-        "new_investment_manwon": body.new_investment_manwon,
         "scenario_a_investment_manwon": body.scenario_a_investment_manwon,
         "scenario_b_investment_manwon": body.scenario_b_investment_manwon,
     }
@@ -217,8 +224,8 @@ async def register_equipment(company_id: str, body: EquipmentInput):
                 status_code=500,
                 content={
                     "success": False,
-                    "message": "equipment 저장 결과가 비어 있습니다.",
-                }
+                    "message": "equipment save returned no data.",
+                },
             )
 
         equipment = result.data[0]
@@ -227,8 +234,8 @@ async def register_equipment(company_id: str, body: EquipmentInput):
             "success": True,
             "data": {
                 "equipment_id": equipment.get("equipment_id"),
-                "equipment": equipment
-            }
+                "equipment": equipment,
+            },
         }
 
     except Exception as e:
@@ -236,7 +243,7 @@ async def register_equipment(company_id: str, body: EquipmentInput):
             status_code=500,
             content={
                 "success": False,
-                "message": "설비 정보를 저장하지 못했습니다.",
-                "error": str(e)
-            }
+                "message": "Failed to save equipment.",
+                "error": str(e),
+            },
         )

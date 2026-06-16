@@ -18,10 +18,9 @@ async def register_company(
     db = get_db()
 
     company_payload = {
-    "user_id": current_user.id,
-    **body.model_dump(exclude_none=True)
-}
-
+        "user_id": current_user.id,
+        **body.model_dump(exclude_none=True)
+    }
 
     try:
         result = db.table("company").upsert(
@@ -99,8 +98,6 @@ async def get_my_company(
                 "error": str(exc),
             },
         )
-
-from app.models.user_profile import UserProfileUpdate
 
 @router.patch("/user-profile/me")
 async def update_user_profile(
@@ -203,9 +200,9 @@ async def register_equipment(
     db = get_db()
 
     equipment_payload = {
-    "company_id": company_id,
-    **body.model_dump(exclude_none=True)
-}
+        "company_id": company_id,
+        **body.model_dump(exclude_none=True)
+    }
 
     try:
         result = db.table("equipment").insert(equipment_payload).execute()

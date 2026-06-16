@@ -74,7 +74,6 @@ async def verify_email_code(body: VerifyEmailCodeRequest):
                 "type": "email",
             }
         )
-
         return {
             "success": True,
             "data": _session_payload(auth_response),
@@ -89,7 +88,6 @@ async def verify_email_code(body: VerifyEmailCodeRequest):
                 "error": str(exc),
             },
         )
-
 
 @router.post("/auth/signup")
 async def signup(

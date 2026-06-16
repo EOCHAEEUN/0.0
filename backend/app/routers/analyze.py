@@ -2,6 +2,7 @@ from fastapi import APIRouter
 from app.core.database import get_db
 from app.models.company import CompanyContext
 from app.models.equipment import EquipmentInput
+from app.agents.draft import application_draft_node
 from app.agents.capex import capex_advisor_node
 from app.state import FactofitState
 from datetime import datetime
@@ -38,6 +39,8 @@ async def analyze(company_id: str):
         return {"success": False, "message": "설비 정보를 찾을 수 없습니다."}
 
     eq = equipment_data.data[0]
+    equipment_id = eq.get("equipment_id") 
+    
     equipment = EquipmentInput(
         name=eq.get("name", ""),
         category=eq.get("category", ""),
@@ -67,14 +70,23 @@ async def analyze(company_id: str):
         "unsupported_equipment": False,
         "chat_id": None
     }
+    
+    try:
+        db.table("roi_output").delete().eq("company_id", company_id).eq("equipment_id", equipment_id).execute()
+        db.table("matched_policy").delete().eq("company_id", company_id).eq("equipment_id", equipment_id).execute()
+        db.table("draft_result").delete().eq("company_id", company_id).eq("equipment_id", equipment_id).execute()
+    except Exception as e:
+        print(f"기존 데이터 삭제 실패: {e}")
 
     result_state = capex_advisor_node(state)
+    result_state = application_draft_node(result_state)
 
     # 4. roi_output 저장
     if result_state.get("roi_result"):
         try:
             db.table("roi_output").insert({
                 "company_id": company_id,
+                "equipment_id": equipment_id,
                 "roi_data": result_state["roi_result"],
                 "created_at": datetime.now().isoformat()
             }).execute()
@@ -87,6 +99,7 @@ async def analyze(company_id: str):
             for policy in result_state.get("matched_policies", []):
                 db.table("matched_policy").insert({
                     "company_id": company_id,
+                    "equipment_id": equipment_id,
                     "policy_id": policy.get("id", ""),
                     "title": policy.get("metadata", {}).get("title", ""),
                     "match_score": round(1 - policy.get("distance", 1), 3),
@@ -98,11 +111,28 @@ async def analyze(company_id: str):
         except Exception as e:
             print(f"matched_policy 저장 실패: {e}")
 
+    # 6. draft_result 저장
+    if result_state.get("draft_result"):
+        try:
+            matched_policies = result_state.get("matched_policies", [])
+            policy_id = matched_policies[0].get("id", "") if matched_policies else ""
+            
+            db.table("draft_result").insert({
+                "company_id": company_id,
+                "equipment_id": equipment_id,
+                "policy_id": policy_id,
+                "draft_content": result_state["draft_result"],
+                "created_at": datetime.now().isoformat()
+            }).execute()
+        except Exception as e:
+            print(f"draft_result 저장 실패: {e}")
+
     return {
         "success": True,
         "data": {
             "roi_result": result_state.get("roi_result"),
             "matched_policies": result_state.get("matched_policies", []),
+            "draft_result": result_state.get("draft_result"),
             "response": result_state.get("final_response", "")
         }
     }

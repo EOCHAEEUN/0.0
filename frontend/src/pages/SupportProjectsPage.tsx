@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
 type SupportProject = {
@@ -23,81 +24,143 @@ type ReadinessItem = {
 
 type PolicyState = "loading" | "error" | "empty" | "success"
 
-/**
- * 테스트용 상태값
- *
- * success: 추천사업 카드 표시
- * empty: policy_card = [] 상황 테스트
- * loading: 로딩 UI 테스트
- * error: 에러 UI 테스트
- *
- * 실사용 기본값은 success로 둡니다.
- */
-const TEST_POLICY_STATE: PolicyState = "success"
+type PolicyApiItem = {
+  id?: string | number
+  content?: string
+  reason?: string
+  llm_score?: string
+  metadata?: {
+    title?: string
+    organization?: string
+    deadline?: string | null
+    deadline_display?: string | null
+    max_amount?: number | string | null
+    policy_category?: string
+    service_category?: string
+    urgency_label?: string
+  }
+}
 
-const selectedEquipmentContext = {
+const DEFAULT_EQUIPMENT_CONTEXT = {
   equipmentName: "프레스 설비",
   industryName: "자동차 부품 제조업",
   equipmentAge: 11,
   defectRate: 5.8,
   roiPaybackMonths: 14,
-  maxSupportAmount: "1억",
 }
 
-const supportProjects: SupportProject[] = [
-  {
-    id: 1,
-    title: "스마트공장 구축 및 고도화 지원사업",
-    agency: "중소벤처기업부",
-    deadline: "2026.06.20",
-    amount: "최대 1억원",
-    fitScore: 92,
-    category: "스마트공장",
+const API_BASE = "http://127.0.0.1:8000"
+const COMPANY_ID_STORAGE_KEY = "factofit_company_id"
+const MY_PAGE_STORAGE_KEY = "factofit_mypage_profile"
+
+function getStoredCompanyId() {
+  return window.localStorage.getItem(COMPANY_ID_STORAGE_KEY) || ""
+}
+
+function readSelectedEquipmentContext() {
+  try {
+    const raw = window.localStorage.getItem(MY_PAGE_STORAGE_KEY)
+    if (!raw) return DEFAULT_EQUIPMENT_CONTEXT
+
+    const parsed = JSON.parse(raw)
+    const company = parsed.companyInfo ?? parsed.company ?? {}
+    const equipments = parsed.equipments ?? parsed.equipmentList ?? []
+    const firstEquipment = Array.isArray(equipments) ? equipments[0] : null
+
+    return {
+      ...DEFAULT_EQUIPMENT_CONTEXT,
+      equipmentName:
+        firstEquipment?.name ||
+        firstEquipment?.equipmentName ||
+        DEFAULT_EQUIPMENT_CONTEXT.equipmentName,
+      industryName:
+        company.industryName ||
+        company.industry_name ||
+        DEFAULT_EQUIPMENT_CONTEXT.industryName,
+      equipmentAge:
+        Number(firstEquipment?.ageYears ?? firstEquipment?.age_years) ||
+        DEFAULT_EQUIPMENT_CONTEXT.equipmentAge,
+      defectRate:
+        Number(firstEquipment?.defectRate ?? firstEquipment?.defect_rate) ||
+        DEFAULT_EQUIPMENT_CONTEXT.defectRate,
+    }
+  } catch {
+    return DEFAULT_EQUIPMENT_CONTEXT
+  }
+}
+
+function scoreToPercent(score?: string) {
+  if (!score) return 70
+  const filled = (score.match(/●/g) ?? []).length
+  return Math.min(100, Math.max(0, filled * 20))
+}
+
+function formatSupportAmount(value?: number | string | null) {
+  if (value === null || value === undefined || value === "" || value === "None") {
+    return "정보 없음"
+  }
+
+  const amount = Number(value)
+  if (Number.isNaN(amount)) return String(value)
+  if (amount >= 10000) {
+    return `최대 ${(amount / 10000).toFixed(amount % 10000 === 0 ? 0 : 1)}억원`
+  }
+  return `최대 ${amount.toLocaleString()}만원`
+}
+
+function normalizeDeadline(value?: string | null) {
+  if (!value || value === "None" || value === "마감일 미정") return "마감일 미정"
+  return value.slice(0, 10).replace(/-/g, ".")
+}
+
+function getProjectTone(score: number): SupportProject["tone"] {
+  if (score >= 85) return "green"
+  if (score >= 75) return "blue"
+  if (score >= 65) return "orange"
+  return "red"
+}
+
+function mapPolicyToProject(policy: PolicyApiItem, index: number): SupportProject {
+  const metadata = policy.metadata ?? {}
+  const fitScore = scoreToPercent(policy.llm_score)
+
+  return {
+    id: Number(policy.id) || index + 1,
+    title: metadata.title || `추천 지원사업 ${index + 1}`,
+    agency: metadata.organization || "주관기관 정보 없음",
+    deadline: normalizeDeadline(metadata.deadline_display || metadata.deadline),
+    amount: formatSupportAmount(metadata.max_amount),
+    fitScore,
+    category: metadata.service_category || metadata.policy_category || "지원사업",
     description:
-      "노후 프레스 설비 교체와 스마트 모니터링 시스템 도입 목적에 가장 적합한 지원사업입니다.",
-    tags: ["프레스 설비", "스마트 모니터링", "생산성 향상"],
-    tone: "green",
-  },
-  {
-    id: 2,
-    title: "고효율 설비 교체 지원사업",
-    agency: "한국에너지공단",
-    deadline: "2026.06.28",
-    amount: "최대 8,400만원",
-    fitScore: 88,
-    category: "에너지 효율",
-    description:
-      "전기요금 절감과 에너지 사용량 개선을 목표로 하는 설비 교체에 적합합니다.",
-    tags: ["전기요금 절감", "에너지 효율", "고효율 설비"],
-    tone: "blue",
-  },
-  {
-    id: 3,
-    title: "중소기업 혁신바우처",
-    agency: "중소벤처기업진흥공단",
-    deadline: "2026.07.05",
-    amount: "최대 5,000만원",
-    fitScore: 74,
-    category: "컨설팅/기술개선",
-    description:
-      "설비 투자 전 컨설팅, 공정 개선, 기술 진단 비용 일부를 지원받을 수 있습니다.",
-    tags: ["컨설팅", "공정 개선", "기술 진단"],
-    tone: "orange",
-  },
-  {
-    id: 4,
-    title: "제조 안전환경 개선 지원사업",
-    agency: "지자체/산업안전기관",
-    deadline: "2026.07.12",
-    amount: "최대 3,000만원",
-    fitScore: 69,
-    category: "안전 개선",
-    description:
-      "노후 설비로 인한 안전 리스크를 줄이기 위한 점검, 보호장치, 안전 설비 개선에 활용할 수 있습니다.",
-    tags: ["안전 리스크", "노후 설비", "보호장치"],
-    tone: "red",
-  },
-]
+      policy.reason ||
+      policy.content ||
+      "기업 조건과 설비 정보를 기준으로 추천된 지원사업입니다.",
+    tags: [
+      metadata.urgency_label,
+      metadata.service_category || metadata.policy_category,
+      metadata.organization,
+    ].filter(Boolean) as string[],
+    tone: getProjectTone(fitScore),
+  }
+}
+
+async function fetchPolicyCards(companyId: string): Promise<SupportProject[]> {
+  const response = await fetch(
+    `${API_BASE}/api/policies?company_id=${encodeURIComponent(companyId)}&limit=10`,
+  )
+
+  if (!response.ok) {
+    throw new Error(`Policy API failed: ${response.status}`)
+  }
+
+  const json = await response.json()
+  const policies = json?.data?.policies ?? []
+
+  return policies.map((policy: PolicyApiItem, index: number) =>
+    mapPolicyToProject(policy, index),
+  )
+}
 
 const readinessItems: ReadinessItem[] = [
   {
@@ -156,14 +219,8 @@ function getProjectScoreColor(score: number) {
 }
 
 function formatDeadline(deadline: string) {
+  if (deadline === "마감일 미정") return "-"
   return deadline.slice(5).replace(".", "/")
-}
-
-function getPolicyCardsByState(state: PolicyState) {
-  if (state === "empty") return []
-  if (state === "loading") return []
-  if (state === "error") return []
-  return supportProjects
 }
 
 function getBestScore(projects: SupportProject[]) {
@@ -351,7 +408,46 @@ function ErrorPolicyState({ onBackToRoi }: { onBackToRoi: () => void }) {
 export default function SupportProjectsPage() {
   const navigate = useNavigate()
 
-  const policyCards = getPolicyCardsByState(TEST_POLICY_STATE)
+  const [policyState, setPolicyState] = useState<PolicyState>("loading")
+  const [policyCards, setPolicyCards] = useState<SupportProject[]>([])
+  const selectedEquipmentContext = useMemo(() => readSelectedEquipmentContext(), [])
+
+  useEffect(() => {
+    const companyId = getStoredCompanyId()
+
+    if (!companyId) {
+      setPolicyCards([])
+      setPolicyState("empty")
+      return
+    }
+
+    let ignore = false
+
+    async function loadPolicies() {
+      try {
+        setPolicyState("loading")
+        const cards = await fetchPolicyCards(companyId)
+
+        if (ignore) return
+
+        setPolicyCards(cards)
+        setPolicyState(cards.length > 0 ? "success" : "empty")
+      } catch (error) {
+        console.error("정책 추천 API 호출 실패:", error)
+        if (!ignore) {
+          setPolicyCards([])
+          setPolicyState("error")
+        }
+      }
+    }
+
+    loadPolicies()
+
+    return () => {
+      ignore = true
+    }
+  }, [])
+
   const topProject = policyCards[0]
   const hasPolicyCards = policyCards.length > 0
 
@@ -411,7 +507,7 @@ export default function SupportProjectsPage() {
 
             <div className="mini-stat">
               <span>예상 최대 지원금</span>
-              <b>{hasPolicyCards ? selectedEquipmentContext.maxSupportAmount : "-"}</b>
+              <b>{bestScore}</b>
             </div>
 
             <div className="mini-stat">
@@ -420,17 +516,17 @@ export default function SupportProjectsPage() {
             </div>
           </div>
 
-          {TEST_POLICY_STATE === "loading" && <LoadingPolicyState />}
+          {policyState === "loading" && <LoadingPolicyState />}
 
-          {TEST_POLICY_STATE === "error" && (
+          {policyState === "error" && (
             <ErrorPolicyState onBackToRoi={() => navigate("/roi")} />
           )}
 
-          {TEST_POLICY_STATE === "empty" && (
+          {policyState === "empty" && (
             <EmptyPolicyState onBackToRoi={() => navigate("/roi")} />
           )}
 
-          {TEST_POLICY_STATE === "success" && hasPolicyCards && topProject && (
+          {policyState === "success" && hasPolicyCards && topProject && (
             <>
               <div
                 className="summary-hero-card"

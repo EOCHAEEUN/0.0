@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import MainHeader from "../components/main/MainHeader"
 import MainDialog from "../components/main/MainDialog"
@@ -16,6 +16,16 @@ export default function MainPage() {
   const navigate = useNavigate()
   const [dialogType, setDialogType] = useState<DialogType>(null)
   const [newsletterEmail, setNewsletterEmail] = useState("")
+  const whyTeaserRef = useRef<HTMLElement | null>(null)
+
+  const handleHeroScroll = () => {
+    if (!whyTeaserRef.current) return
+
+    window.scrollTo({
+      top: whyTeaserRef.current.offsetTop,
+      behavior: "smooth",
+    })
+  }
 
   const handleNewsletterSubmit = () => {
     setDialogType("newsletter")
@@ -83,10 +93,17 @@ export default function MainPage() {
           </div>
         </div>
 
-        <div className="ff-scroll-arrow">↓</div>
+        <button
+          type="button"
+          className="ff-scroll-arrow"
+          onClick={handleHeroScroll}
+          aria-label="Why FactoFit 섹션으로 이동"
+        >
+          ↓
+        </button>
       </section>
 
-      <section className="ff-why-teaser-section">
+      <section ref={whyTeaserRef} className="ff-why-teaser-section">
         <div className="ff-why-teaser-media" aria-hidden="true">
           <video
             className="ff-why-teaser-video"

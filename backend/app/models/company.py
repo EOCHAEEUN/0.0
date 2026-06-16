@@ -6,39 +6,21 @@ from pydantic import BaseModel, Field
 
 from app.models.equipment import EquipmentInput
 
-
-class CompanyOnboarding(BaseModel):
-    user_id: Optional[UUID] = None
+class CompanyOnboarding(BaseModel): # 회원가입에서 받는 정보
     company_name: str
     business_registration_no: Optional[str] = None
     industry_name: Optional[str] = None
     industry_code: list[str]
     region: str
-    company_type: Optional[str] = None
     company_size: str
     primary_purpose: list[str] = Field(default_factory=list)
 
-    # 기업규모 판단용 정보
-    employee_count: Optional[int] = Field(default=None, ge=0)
-    annual_revenue: int = Field(default=None, ge=0)  # 직전 연도 매출액
-    avg_revenue_3y_manwon: Optional[int] = Field(default=None, ge=0)
-    total_assets_manwon: Optional[int] = Field(default=None, ge=0)
-    is_disclosure_group_member: Optional[bool] = None
-    independence_check_passed: Optional[bool] = None
-    energy_cost_annual: Optional[int] = Field(default=None, ge=0)
-    established_year: Optional[int] = Field(default=None, ge=1800)
-    workplace_type: Optional[str] = None
-    equipment: Optional[EquipmentInput] = None
-
-
-class CompanyUpdate(BaseModel):
-    user_id: Optional[UUID] = None
+class CompanyUpdate(BaseModel): #마이페이지에서 받는 정보
     company_name: Optional[str] = None
     business_registration_no: Optional[str] = None
     industry_name: Optional[str] = None
     industry_code: Optional[list[str]] = None
     region: Optional[str] = None
-    company_type: Optional[str] = None
     company_size: Optional[str] = None
     primary_purpose: Optional[list[str]] = None
     employee_count: Optional[int] = Field(default=None, ge=0)
@@ -47,8 +29,6 @@ class CompanyUpdate(BaseModel):
     revenue_3y_ago_manwon: Optional[int] = Field(default=None, ge=0)
     total_assets_manwon: Optional[int] = Field(default=None, ge=0)
     is_disclosure_group_member: Optional[bool] = None
-    independence_check_passed: Optional[bool] = None
-    energy_cost_annual: Optional[int] = Field(default=None, ge=0)
     established_year: Optional[int] = Field(default=None, ge=1800)
     workplace_type: Optional[str] = None
 

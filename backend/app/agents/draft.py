@@ -2,6 +2,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from app.state import FactofitState
 from app.prompts.draft import APPLICATION_DRAFT_SYSTEM_PROMPT
 from app.core.llm import llm
+import json
 
 
 def application_draft_node(state: FactofitState) -> FactofitState:
@@ -28,7 +29,18 @@ def application_draft_node(state: FactofitState) -> FactofitState:
         HumanMessage(content=state["user_query"])
     ])
 
-    # State에 draft_result 저장
-    state["draft_result"] = response.content
-    state["final_response"] = response.content
+    # JSON 파싱
+    try:
+        content = response.content.strip()
+        if content.startswith("```"):
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+        result = json.loads(content.strip())
+        state["draft_result"] = result
+        state["final_response"] = json.dumps(result, ensure_ascii=False)
+    except:
+        state["draft_result"] = response.content
+        state["final_response"] = response.content
+
     return state

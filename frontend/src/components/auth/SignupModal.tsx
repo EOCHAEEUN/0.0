@@ -1,4 +1,11 @@
 import { useMemo, useState } from "react"
+import {
+  createCompanyOnboarding,
+  saveAuthSession,
+  sendSignupEmailCode,
+  signupWithProfile,
+  verifySignupEmailCode,
+} from "../../services/auth"
 import "./SignupModal.css"
 
 type IndustryOption = {
@@ -51,7 +58,15 @@ const INDUSTRY_OPTIONS: IndustryOption[] = [
   { name: "뿌리", codes: ["C24", "C25", "C28", "C29"] },
 ]
 
-const COMPANY_SIZE_OPTIONS = ["소상공인", "소기업", "중소기업", "중견기업"]
+const COMPANY_SIZE_OPTIONS = [
+  "선택 필요",
+  "소상공인",
+  "소기업",
+  "중소기업",
+  "중견기업",
+  "대기업",
+  "확인 필요",
+]
 
 const PURPOSE_OPTIONS = [
   "지원사업 추천",
@@ -67,6 +82,40 @@ const createIndustryInputRow = (): IndustryInputRow => ({
   industryCode: "",
   selectedIndustry: null,
 })
+
+function onlyDigits(value: string) {
+  return value.replace(/\D/g, "")
+}
+
+function formatPhoneNumber(value: string) {
+  const digits = onlyDigits(value).slice(0, 11)
+
+  if (digits.length <= 3) return digits
+  if (digits.length <= 7) {
+    return `${digits.slice(0, 3)}-${digits.slice(3)}`
+  }
+
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`
+}
+
+function formatBusinessNumber(value: string) {
+  const digits = onlyDigits(value).slice(0, 10)
+
+  if (digits.length <= 3) return digits
+  if (digits.length <= 5) {
+    return `${digits.slice(0, 3)}-${digits.slice(3)}`
+  }
+
+  return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`
+}
+
+function normalizePhoneNumber(value: string) {
+  return onlyDigits(value)
+}
+
+function normalizeBusinessNumber(value: string) {
+  return onlyDigits(value)
+}
 
 export default function SignupModal({ onClose, onLoginClick }: SignupModalProps) {
   const [email, setEmail] = useState("")
@@ -86,18 +135,16 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
     createIndustryInputRow(),
   ])
   const [openIndustryRowId, setOpenIndustryRowId] = useState<string | null>(null)
-  const [isOptionalOpen, setIsOptionalOpen] = useState(false)
-
   const [region, setRegion] = useState("")
-  const [companySize, setCompanySize] = useState("중소기업")
+  const [companySize, setCompanySize] = useState("선택 필요")
   const [mainPurpose, setMainPurpose] = useState("지원사업 추천")
 
-  const [maxEmployeeCount, setMaxEmployeeCount] = useState("")
-  const [minRevenueManwon, setMinRevenueManwon] = useState("")
-  const [maxRevenueManwon, setMaxRevenueManwon] = useState("")
 
   const [agreeService, setAgreeService] = useState(true)
   const [agreePrivacy, setAgreePrivacy] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSendingCode, setIsSendingCode] = useState(false)
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false)
 
   const passwordChecks = useMemo(() => {
     return [
@@ -163,18 +210,30 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
     }).slice(0, 8)
   }
 
-  const handleSendEmailCode = () => {
+  const handleSendEmailCode = async () => {
+    if (isSendingCode) return
+
     if (!email.includes("@")) {
       alert("이메일 형식을 확인해주세요.")
       return
     }
 
-    setIsCodeSent(true)
-    setIsEmailVerified(false)
-    alert("인증번호를 발송했습니다. 지금은 시연용으로 아무 숫자 4자리 이상 입력하면 됩니다.")
+    try {
+      setIsSendingCode(true)
+      await sendSignupEmailCode(email)
+      setIsCodeSent(true)
+      setIsEmailVerified(false)
+      alert("인증번호를 이메일로 발송했습니다.")
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "인증번호 발송에 실패했습니다.")
+    } finally {
+      setIsSendingCode(false)
+    }
   }
 
-  const handleVerifyEmail = () => {
+  const handleVerifyEmail = async () => {
+    if (isVerifyingCode) return
+
     if (!isCodeSent) {
       alert("먼저 인증번호를 받아주세요.")
       return
@@ -185,8 +244,17 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
       return
     }
 
-    setIsEmailVerified(true)
-    alert("이메일 인증이 완료되었습니다.")
+    try {
+      setIsVerifyingCode(true)
+      const session = await verifySignupEmailCode(email, emailCode.trim())
+      saveAuthSession(session)
+      setIsEmailVerified(true)
+      alert("이메일 인증이 완료되었습니다.")
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "이메일 인증에 실패했습니다.")
+    } finally {
+      setIsVerifyingCode(false)
+    }
   }
 
   const handleAddIndustryRow = () => {
@@ -280,11 +348,6 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
     setOpenIndustryRowId(rowId)
   }
 
-  const toNullableNumber = (value: string) => {
-    if (!value.trim()) return null
-    return Number(value)
-  }
-
   const getNormalizedIndustries = () => {
     return industryRows
       .map((row) => {
@@ -304,7 +367,9 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
       .filter((item) => item.industry_name || item.industry_code.length > 0)
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (isSubmitting) return
+
     if (!email || !password || !passwordCheck || !userName || !phone) {
       alert("필수 계정 정보와 사용자 정보를 입력해주세요.")
       return
@@ -362,8 +427,8 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
       },
       user: {
         name: userName,
-        phone,
-        business_number: businessNumber || null,
+        phone: normalizePhoneNumber(phone),
+        business_number: normalizeBusinessNumber(businessNumber) || null,
       },
       company: {
         company_name: companyName,
@@ -386,9 +451,9 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
         region,
         company_size: companySize,
         main_purpose: mainPurpose,
-        max_employee_count: toNullableNumber(maxEmployeeCount),
-        min_revenue_manwon: toNullableNumber(minRevenueManwon),
-        max_revenue_manwon: toNullableNumber(maxRevenueManwon),
+        max_employee_count: null,
+        min_revenue_manwon: null,
+        max_revenue_manwon: null,
       },
       agreements: {
         service_terms: agreeService,
@@ -396,14 +461,49 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
       },
     }
 
-    localStorage.setItem("factofit_signup_profile", JSON.stringify(payload))
-    console.log("signup payload", payload)
+    const signupPayload = {
+      email,
+      password,
+      name: userName,
+      phone: normalizePhoneNumber(phone),
+      business_registration_no: normalizeBusinessNumber(businessNumber) || null,
+      company: payload.company,
+      agreements: payload.agreements,
+    }
+
+    const onboardingPayload = {
+      company_name: companyName,
+      business_registration_no: normalizeBusinessNumber(businessNumber) || null,
+      industry_name: payload.company.industry_name,
+      industry_code: payload.company.industry_code,
+      region,
+      company_type: companySize,
+      company_size: companySize,
+      primary_purpose: mainPurpose ? [mainPurpose] : [],
+      employee_count: 0,
+      annual_revenue: 0,
+    }
+
+    try {
+      setIsSubmitting(true)
+      const session = await signupWithProfile(signupPayload)
+      saveAuthSession(session)
+      const onboarding = await createCompanyOnboarding(onboardingPayload)
+      localStorage.setItem("factofit_company_id", onboarding.company_id)
+      alert("회원가입이 완료되었습니다.")
+      onClose()
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "회원가입에 실패했습니다.")
+    } finally {
+      setIsSubmitting(false)
+      return
+    }
 
     alert("회원가입 정보가 저장되었습니다. 이후 DB API와 연결하면 마이페이지에서 불러올 수 있습니다.")
   }
 
   return (
-    <div className="ff-signup-overlay" onClick={onClose}>
+    <div className="ff-signup-overlay">
       <section
         className="ff-signup-panel"
         onClick={(event) => event.stopPropagation()}
@@ -439,8 +539,12 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
                   setIsEmailVerified(false)
                 }}
               />
-              <button type="button" onClick={handleSendEmailCode}>
-                인증번호 받기
+              <button
+                type="button"
+                onClick={handleSendEmailCode}
+                disabled={isSendingCode}
+              >
+                {isSendingCode ? "발송 중..." : "인증번호 받기"}
               </button>
             </div>
 
@@ -459,8 +563,12 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
                 value={emailCode}
                 onChange={(event) => setEmailCode(event.target.value)}
               />
-              <button type="button" onClick={handleVerifyEmail}>
-                인증 확인
+              <button
+                type="button"
+                onClick={handleVerifyEmail}
+                disabled={isVerifyingCode}
+              >
+                {isVerifyingCode ? "확인 중..." : "인증 확인"}
               </button>
             </div>
 
@@ -550,19 +658,11 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
               <input
                 placeholder="010-0000-0000"
                 value={phone}
-                onChange={(event) => setPhone(event.target.value)}
+                onChange={(event) => setPhone(formatPhoneNumber(event.target.value))}
               />
             </div>
           </div>
 
-          <div className="ff-signup-field">
-            <FieldLabel text="사업자등록번호" optional />
-            <input
-              placeholder="예: 123-45-67890"
-              value={businessNumber}
-              onChange={(event) => setBusinessNumber(event.target.value)}
-            />
-          </div>
         </div>
 
         <div className="ff-signup-section">
@@ -656,6 +756,17 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
           </button>
 
           <div className="ff-signup-field">
+            <FieldLabel text="사업자등록번호" optional />
+            <input
+              placeholder="예: 123-45-67890"
+              value={businessNumber}
+              onChange={(event) =>
+                setBusinessNumber(formatBusinessNumber(event.target.value))
+              }
+            />
+          </div>
+
+          <div className="ff-signup-field">
             <FieldLabel text="지역" required />
             <input
               placeholder="예: 경기 안산시"
@@ -691,60 +802,6 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
           </div>
         </div>
 
-        <section
-          className={
-            isOptionalOpen
-              ? "ff-signup-optional is-open"
-              : "ff-signup-optional"
-          }
-        >
-          <button
-            type="button"
-            className="ff-signup-optional-summary"
-            onClick={() => setIsOptionalOpen((prev) => !prev)}
-          >
-            <span>4. 선택 정보</span>
-            <em>종업원 수·매출액 기준이 있는 지원사업 매칭에 활용됩니다.</em>
-            <b>{isOptionalOpen ? "닫기" : "열기"}</b>
-          </button>
-
-          {isOptionalOpen && (
-            <div className="ff-signup-optional-body">
-              <div className="ff-signup-field">
-                <FieldLabel text="최대 종업원 수" optional />
-                <input
-                  type="number"
-                  placeholder="예: 50"
-                  value={maxEmployeeCount}
-                  onChange={(event) => setMaxEmployeeCount(event.target.value)}
-                />
-              </div>
-
-              <div className="ff-signup-two-col">
-                <div className="ff-signup-field">
-                  <FieldLabel text="최소 매출액, 만원 단위" optional />
-                  <input
-                    type="number"
-                    placeholder="예: 10000"
-                    value={minRevenueManwon}
-                    onChange={(event) => setMinRevenueManwon(event.target.value)}
-                  />
-                </div>
-
-                <div className="ff-signup-field">
-                  <FieldLabel text="최대 매출액, 만원 단위" optional />
-                  <input
-                    type="number"
-                    placeholder="예: 500000"
-                    value={maxRevenueManwon}
-                    onChange={(event) => setMaxRevenueManwon(event.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-        </section>
-
         <div className="ff-signup-agree-box">
           <label>
             <input
@@ -769,8 +826,13 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
           </label>
         </div>
 
-        <button type="button" className="ff-signup-submit" onClick={handleSubmit}>
-          회원가입 완료
+        <button
+          type="button"
+          className="ff-signup-submit"
+          onClick={handleSubmit}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? "저장 중..." : "회원가입 완료"}
         </button>
 
         <button

@@ -2,6 +2,8 @@ from typing import Optional
 from pydantic import BaseModel
 
 class MatchedPolicy(BaseModel):
+    company_id: str
+    equipment_id: str
     policy_id: str
     title: str
     match_score: float   # RAG 유사도 점수 (0.0 ~ 1.0)

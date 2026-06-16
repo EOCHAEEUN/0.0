@@ -39,6 +39,8 @@ async def analyze(company_id: str):
         return {"success": False, "message": "설비 정보를 찾을 수 없습니다."}
 
     eq = equipment_data.data[0]
+    equipment_id = eq.get("equipment_id") 
+    
     equipment = EquipmentInput(
         name=eq.get("name", ""),
         category=eq.get("category", ""),
@@ -68,6 +70,13 @@ async def analyze(company_id: str):
         "unsupported_equipment": False,
         "chat_id": None
     }
+    
+    try:
+        db.table("roi_output").delete().eq("company_id", company_id).eq("equipment_id", equipment_id).execute()
+        db.table("matched_policy").delete().eq("company_id", company_id).eq("equipment_id", equipment_id).execute()
+        db.table("draft_result").delete().eq("company_id", company_id).eq("equipment_id", equipment_id).execute()
+    except Exception as e:
+        print(f"기존 데이터 삭제 실패: {e}")
 
     result_state = capex_advisor_node(state)
     result_state = application_draft_node(result_state)
@@ -77,6 +86,7 @@ async def analyze(company_id: str):
         try:
             db.table("roi_output").insert({
                 "company_id": company_id,
+                "equipment_id": equipment_id,
                 "roi_data": result_state["roi_result"],
                 "created_at": datetime.now().isoformat()
             }).execute()
@@ -89,6 +99,7 @@ async def analyze(company_id: str):
             for policy in result_state.get("matched_policies", []):
                 db.table("matched_policy").insert({
                     "company_id": company_id,
+                    "equipment_id": equipment_id,
                     "policy_id": policy.get("id", ""),
                     "title": policy.get("metadata", {}).get("title", ""),
                     "match_score": round(1 - policy.get("distance", 1), 3),
@@ -108,6 +119,7 @@ async def analyze(company_id: str):
             
             db.table("draft_result").insert({
                 "company_id": company_id,
+                "equipment_id": equipment_id,
                 "policy_id": policy_id,
                 "draft_content": result_state["draft_result"],
                 "created_at": datetime.now().isoformat()

@@ -180,7 +180,6 @@ async def login(body: LoginRequest):
             db.table("company")
             .select("*")
             .eq("user_id", user_id)
-            .order("created_at", desc=True)
             .execute()
         )
 
@@ -220,7 +219,6 @@ async def me(current_user: CurrentUser = Depends(get_current_user)):
         db.table("company")
         .select("*")
         .eq("user_id", current_user.id)
-        .order("created_at", desc=True)
         .execute()
     )
 

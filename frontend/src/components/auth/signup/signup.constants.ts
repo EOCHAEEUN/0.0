@@ -31,8 +31,10 @@ export const INDUSTRY_OPTIONS: IndustryOption[] = [
   { name: "뿌리", codes: ["C24", "C25", "C28", "C29"] },
 ]
 
-export const COMPANY_SIZE_OPTIONS = [
-  "선택 필요",
+export const COMPANY_TYPE_PLACEHOLDER = "선택 필요"
+
+export const COMPANY_TYPE_OPTIONS = [
+  COMPANY_TYPE_PLACEHOLDER,
   "소상공인",
   "소기업",
   "중소기업",

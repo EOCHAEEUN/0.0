@@ -2,13 +2,12 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from app.state import FactofitState
 from app.prompts.info_collector import INFO_COLLECTOR_SYSTEM_PROMPT
 from app.models.equipment import EquipmentInput
-from app.models.roi_input import RoiInput
 from app.models.company import CompanyContext
 from app.core.llm import llm
 import json
 
 
-def info_collector_node(state: FactofitState) -> FactofitState:
+def info_collector_node(state: FactofitState) -> FactofitState:    
     # chat_history를 텍스트로 변환
     history_text = ""
     for msg in state.get("chat_history", []):
@@ -37,6 +36,8 @@ def info_collector_node(state: FactofitState) -> FactofitState:
                 lines.append(f"설비연식: {eq.age_years}년")
             if eq.energy_cost_annual:
                 lines.append(f"에너지비용: {eq.energy_cost_annual}만원")
+            if eq.defect_rate:
+                lines.append(f"불량률: {eq.defect_rate}%")
         company_context = "\n".join(lines)
 
     # 프롬프트 구성
@@ -47,8 +48,6 @@ def info_collector_node(state: FactofitState) -> FactofitState:
     )
 
     response = llm.invoke([SystemMessage(content=prompt)])
-    print("=== LLM 응답 ===")
-    print(response.content)
 
     try:
         content = response.content.strip()
@@ -76,7 +75,7 @@ def info_collector_node(state: FactofitState) -> FactofitState:
                 data["age_years"] = eq.age_years
                 data["energy_cost_annual"] = eq.energy_cost_annual
                 data["defect_rate"] = eq.defect_rate
-                data["capacity_value"] = eq.capacity_value
+                data["current_capacity_value"] = eq.current_capacity_value
 
             name = data.get("equipment_name", "").lower()
             if "프레스" in name or "press" in name:
@@ -114,7 +113,7 @@ def info_collector_node(state: FactofitState) -> FactofitState:
                 state["final_response"] = ""
                 state["user_query"] = f"{data.get('industry_code', '')} {data.get('region', '')} 제조기업 지원사업"
                 # 안내 메시지는 matched_policies 결과랑 같이 보여줌
-                # prompts/policy.py에서 처리
+                # prompts/policy.py에서 처리  
                 return state
             # defect_rate에서 % 제거
             defect_rate = data.get("defect_rate")
@@ -125,17 +124,15 @@ def info_collector_node(state: FactofitState) -> FactofitState:
             else:
                 defect_rate = None
 
-            state["equipment"] = RoiInput(
-                equipment=EquipmentInput(
-                    name=data.get("equipment_name", ""),
-                    category=category,
-                    age_years=int(data.get("age_years", 0)),
-                    energy_cost_annual=int(data.get("energy_cost_annual", 0)),
-                    new_energy_cost_annual=int(data["new_energy_cost_annual"]) if data.get("new_energy_cost_annual") else None,
-                    new_investment_manwon=int(data["new_investment_manwon"]) if data.get("new_investment_manwon") else None,
-                    defect_rate=defect_rate,
-                    maintenance_cost_annual=int(data["maintenance_cost_annual"]) if data.get("maintenance_cost_annual") else None
-                )
+            state["equipment"] = EquipmentInput(
+                name=data.get("equipment_name", ""),
+                category=category,
+                age_years=int(data.get("age_years", 0)),
+                energy_cost_annual=int(data.get("energy_cost_annual", 0)),
+                defect_rate=defect_rate,
+                maintenance_cost_annual=int(data["maintenance_cost_annual"]) if data.get("maintenance_cost_annual") else None,
+                scenario_a_investment_manwon=int(data["scenario_a_investment_manwon"]) if data.get("scenario_a_investment_manwon") else None,
+                scenario_b_investment_manwon=int(data["scenario_b_investment_manwon"]) if data.get("scenario_b_investment_manwon") else None
             )
 
             state["company_info"] = CompanyContext(
@@ -143,11 +140,11 @@ def info_collector_node(state: FactofitState) -> FactofitState:
                 industry_code=data.get("industry_code", ""),
                 employee_count=int(data.get("employee_count", 0)),
                 region=data.get("region", ""),
-                annual_revenue=data.get("annual_revenue")
+                annual_revenue=data.get("annual_revenue"),
+                company_id=state["company_info"].company_id if state.get("company_info") else None
             )
 
-            # router로 돌아가도록 intent 비우고 final_response 비움
-            state["intent"] = ""
+            state["intent"] = "roi"
             state["final_response"] = ""
 
         else:

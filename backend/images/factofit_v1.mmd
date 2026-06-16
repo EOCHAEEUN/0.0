@@ -11,18 +11,22 @@ graph TD;
 	capex_advisor_node(capex_advisor_node)
 	policy_matching_node(policy_matching_node)
 	application_draft_node(application_draft_node)
+	equipment_safety_node(equipment_safety_node)
 	response_node(response_node)
 	__end__([<p>__end__</p>]):::last
 	__start__ --> guard_node;
 	application_draft_node --> response_node;
 	capex_advisor_node --> response_node;
+	equipment_safety_node --> response_node;
 	guard_node -.-> __end__;
 	guard_node -.-> router_node;
 	info_collector_node -.-> __end__;
-	info_collector_node -.-> router_node;
+	info_collector_node -. &nbsp;roi&nbsp; .-> capex_advisor_node;
+	info_collector_node -. &nbsp;policy&nbsp; .-> policy_matching_node;
 	policy_matching_node --> response_node;
 	router_node -. &nbsp;draft&nbsp; .-> application_draft_node;
 	router_node -. &nbsp;roi&nbsp; .-> capex_advisor_node;
+	router_node -. &nbsp;safety&nbsp; .-> equipment_safety_node;
 	router_node -. &nbsp;info_missing&nbsp; .-> info_collector_node;
 	router_node -. &nbsp;calendar&nbsp; .-> policy_matching_node;
 	router_node -. &nbsp;general&nbsp; .-> response_node;

@@ -18,11 +18,15 @@ type RoiFormState = {
   equipmentName: string
   equipmentAge: string
   annualEnergyCostManwon: string
-  employees: string
   annualRevenueManwon: string
+  employees: string
+  process: string
+  currentCapacityValue: string
+  defectRate: string
+  productionQty: string
+  contributionMarginWon: string
   scenarioAInvestmentManwon: string
   scenarioBInvestmentManwon: string
-  defectRate: string
   annualMaintenanceCostManwon: string
 }
 
@@ -120,11 +124,15 @@ const initialForm: RoiFormState = {
   equipmentName: "",
   equipmentAge: "",
   annualEnergyCostManwon: "",
-  employees: "",
   annualRevenueManwon: "",
+  employees: "",
+  process: "",
+  currentCapacityValue: "",
+  defectRate: "",
+  productionQty: "",
+  contributionMarginWon: "",
   scenarioAInvestmentManwon: "",
   scenarioBInvestmentManwon: "",
-  defectRate: "",
   annualMaintenanceCostManwon: "",
 }
 
@@ -344,11 +352,26 @@ function getInitialFormFromMyPage(): RoiFormState {
       annualEnergyCostManwon: formatCommaNumber(
         getFirstNumberString(equipment.annualEnergyCost, equipment.energy_cost_annual),
       ),
+      annualRevenueManwon: formatCommaNumber(
+        getFirstNumberString(companyInfo.annualRevenue, companyInfo.annual_revenue),
+      ),
       employees: formatCommaNumber(
         getFirstNumberString(companyInfo.employees, companyInfo.employee_count),
       ),
-      annualRevenueManwon: formatCommaNumber(
-        getFirstNumberString(companyInfo.annualRevenue, companyInfo.annual_revenue),
+      process: getFirstString(equipment.process),
+      currentCapacityValue: getFirstNumberString(
+        equipment.currentCapacityValue,
+        equipment.current_capacity_value,
+      ),
+      defectRate: getFirstNumberString(equipment.defectRate, equipment.defect_rate),
+      productionQty: formatCommaNumber(
+        getFirstNumberString(equipment.productionQty, equipment.production_qty),
+      ),
+      contributionMarginWon: formatCommaNumber(
+        getFirstNumberString(
+          equipment.contributionMarginWon,
+          equipment.contribution_margin_won,
+        ),
       ),
       scenarioAInvestmentManwon: formatCommaNumber(
         getFirstNumberString(
@@ -362,15 +385,13 @@ function getInitialFormFromMyPage(): RoiFormState {
           equipment.scenario_b_investment_manwon,
         ),
       ),
-      defectRate: getFirstNumberString(equipment.defectRate, equipment.defect_rate),
       annualMaintenanceCostManwon: formatCommaNumber(
         getFirstNumberString(
           equipment.maintenanceCostAnnual,
           equipment.maintenance_cost_annual,
         ),
       ),
-    }
-  } catch (error) {
+    }  } catch (error) {
     console.warn("마이페이지 저장 정보를 ROI 입력값으로 불러오지 못했습니다.", error)
     return initialForm
   }
@@ -636,6 +657,10 @@ function buildPayload(form: RoiFormState) {
       defect_rate: toNumber(form.defectRate, 0),
       employee_count: toNumber(form.employees, 0),
       annual_revenue_manwon: toNumber(form.annualRevenueManwon, 0),
+      process: form.process.trim(),
+      current_capacity_value: toNumber(form.currentCapacityValue, 0),
+      production_qty: toNumber(form.productionQty, 0),
+      contribution_margin_won: toNumber(form.contributionMarginWon, 0),
       scenario_a_investment_manwon: scenarioA.investmentManwon,
       scenario_b_investment_manwon: scenarioB.investmentManwon,
     },
@@ -649,6 +674,23 @@ function buildPayload(form: RoiFormState) {
     scenario_b_investment_manwon: scenarioB.investmentManwon,
     scenario_b_subsidy_manwon: scenarioB.subsidyManwon,
   }
+}
+
+function getMissingRequiredInputLabels(form: RoiFormState) {
+  const requiredChecks: Array<[string, boolean]> = [
+    ["설비 종류", Boolean(form.equipmentType.trim())],
+    ["설비명", Boolean(form.equipmentName.trim())],
+    ["업종명", Boolean(form.industryName.trim())],
+    ["업종코드", Boolean(form.industryCode.trim())],
+    ["설비 사용연수", Boolean(form.equipmentAge.trim())],
+    ["연간 에너지 비용", Boolean(form.annualEnergyCostManwon.trim())],
+    ["연 매출액", Boolean(form.annualRevenueManwon.trim())],
+    ["지역", Boolean(form.region.trim())],
+  ]
+
+  return requiredChecks
+    .filter(([, passed]) => !passed)
+    .map(([label]) => label)
 }
 
 function buildScores(form: RoiFormState, scenario: ScenarioCard): ScoreSummary {
@@ -764,6 +806,8 @@ export default function RoiPage() {
   const [recommendedScenarioId, setRecommendedScenarioId] = useState<"A" | "B">("A")
   const [apiStatus, setApiStatus] = useState<ApiStatus>("idle")
   const [errorMessage, setErrorMessage] = useState("")
+  const [requiredNoticeOpen, setRequiredNoticeOpen] = useState(false)
+  const [missingRequiredLabels, setMissingRequiredLabels] = useState<string[]>([])
   const [costOpen, setCostOpen] = useState(false)
   const [benchmarkOpen, setBenchmarkOpen] = useState(false)
 
@@ -868,6 +912,14 @@ export default function RoiPage() {
     form.industryName || findIndustryNameByCode(form.industryCode) || "업종명 미확인"
 
   const handleCalculate = async () => {
+    const missingLabels = getMissingRequiredInputLabels(form)
+
+    if (missingLabels.length > 0) {
+      setMissingRequiredLabels(missingLabels)
+      setRequiredNoticeOpen(true)
+      return
+    }
+
     setApiStatus("loading")
     setErrorMessage("")
 
@@ -937,6 +989,18 @@ export default function RoiPage() {
 
   return (
     <main className="page">
+      <FloatingModalNotice
+        open={requiredNoticeOpen}
+        title="필수 정보를 먼저 입력해주세요."
+        description="ROI 시뮬레이션을 실행하려면 공통 필수 정보가 모두 필요합니다."
+        description2={
+          missingRequiredLabels.length > 0
+            ? `누락된 항목: ${missingRequiredLabels.join(", ")}`
+            : "입력값을 확인한 뒤 다시 분석을 시작해주세요."
+        }
+        onClose={() => setRequiredNoticeOpen(false)}
+      />
+
       <section className="section white">
         <div
           className="container"
@@ -1212,7 +1276,7 @@ function InputPanel({
                 marginBottom: "14px",
               }}
             >
-              필수 수집 항목
+              공통 필수 정보
             </div>
 
             <p
@@ -1224,7 +1288,8 @@ function InputPanel({
                 margin: 0,
               }}
             >
-              설비 종류, 업종 코드, 업종명, 지역은 반드시 필요합니다.
+              설비 종류, 설비명, 업종명, 업종코드, 사용연수, 에너지 비용, 연 매출액,
+              지역은 시뮬레이션 실행 전에 반드시 필요합니다.
             </p>
           </div>
         </aside>
@@ -1234,7 +1299,10 @@ function InputPanel({
             padding: "32px 28px 28px",
           }}
         >
-          <SectionTitle tooltip="마이페이지에 저장된 입력값이 기본으로 채워지며, 이 화면에서 자유롭게 수정할 수 있습니다. 수정한 값은 ROI 계산에만 사용됩니다.">
+          <SectionTitle
+            required
+            tooltip="ROI 시뮬레이션을 실행하기 위해 반드시 필요한 입력값입니다. 마이페이지에 저장된 값이 있으면 자동으로 채워지고, 이 화면에서 수정한 값은 ROI 계산에만 사용됩니다."
+          >
             공통 필수 정보
           </SectionTitle>
 
@@ -1246,7 +1314,7 @@ function InputPanel({
               marginBottom: "30px",
             }}
           >
-            <FieldBox label="설비 종류 *">
+            <FieldBox label="설비 종류">
               <select
                 value={form.equipmentType}
                 onChange={(event) => onChange("equipmentType", event.target.value)}
@@ -1260,44 +1328,6 @@ function InputPanel({
               </select>
             </FieldBox>
 
-            <FieldBox label="지역 *">
-              <input
-                value={form.region}
-                onChange={(event) => onChange("region", event.target.value)}
-                placeholder="예: 경기도 안산시"
-                style={inputStyle}
-              />
-            </FieldBox>
-
-            <FieldBox label="업종명 *">
-              <input
-                value={form.industryName}
-                onChange={(event) => onChange("industryName", event.target.value)}
-                placeholder="예: 금속가공"
-                style={inputStyle}
-              />
-            </FieldBox>
-
-            <FieldBox label="업종 코드 *">
-              <input
-                value={form.industryCode}
-                onChange={(event) => onChange("industryCode", event.target.value)}
-                placeholder="예: C25"
-                style={inputStyle}
-              />
-            </FieldBox>
-          </div>
-
-          <SectionTitle>계산 선택 정보</SectionTitle>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "28px 26px",
-              alignItems: "start",
-            }}
-          >
             <FieldBox label="설비명">
               <input
                 value={form.equipmentName}
@@ -1307,7 +1337,25 @@ function InputPanel({
               />
             </FieldBox>
 
-            <FieldBox label="설비 연식">
+            <FieldBox label="업종명">
+              <input
+                value={form.industryName}
+                onChange={(event) => onChange("industryName", event.target.value)}
+                placeholder="예: 금속가공"
+                style={inputStyle}
+              />
+            </FieldBox>
+
+            <FieldBox label="업종코드">
+              <input
+                value={form.industryCode}
+                onChange={(event) => onChange("industryCode", event.target.value)}
+                placeholder="예: C25"
+                style={inputStyle}
+              />
+            </FieldBox>
+
+            <FieldBox label="설비 사용연수">
               <input
                 value={form.equipmentAge}
                 onChange={(event) => onChange("equipmentAge", event.target.value)}
@@ -1316,7 +1364,7 @@ function InputPanel({
               />
             </FieldBox>
 
-            <FieldBox label="연간 에너지 비용 (만원/년)">
+            <FieldBox label="연간 에너지 비용">
               <input
                 value={form.annualEnergyCostManwon}
                 onChange={(event) =>
@@ -1325,18 +1373,10 @@ function InputPanel({
                 placeholder="예: 4,500"
                 style={inputStyle}
               />
+              <HelperText>단위: 만원/년</HelperText>
             </FieldBox>
 
-            <FieldBox label="직원 수 (명)">
-              <input
-                value={form.employees}
-                onChange={(event) => onChange("employees", formatCommaNumber(event.target.value))}
-                placeholder="예: 45"
-                style={inputStyle}
-              />
-            </FieldBox>
-
-            <FieldBox label="연매출 (만원/년)">
+            <FieldBox label="연 매출액">
               <input
                 value={form.annualRevenueManwon}
                 onChange={(event) =>
@@ -1345,9 +1385,124 @@ function InputPanel({
                 placeholder="예: 320,000"
                 style={inputStyle}
               />
+              <HelperText>단위: 만원/년</HelperText>
             </FieldBox>
 
-            <FieldBox label="연간 유지보수 비용 (만원/년)">
+            <FieldBox label="지역">
+              <input
+                value={form.region}
+                onChange={(event) => onChange("region", event.target.value)}
+                placeholder="예: 경기도 안산시"
+                style={inputStyle}
+              />
+            </FieldBox>
+          </div>
+
+          <SectionTitle
+            optional
+            tooltip="선택 정보를 입력하면 투자비, 절감액, 회수기간을 더 현실적인 기준으로 계산할 수 있습니다."
+          >
+            선택 정보
+          </SectionTitle>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "28px 26px",
+              alignItems: "start",
+            }}
+          >
+            <FieldBox label="직원수">
+              <input
+                value={form.employees}
+                onChange={(event) => onChange("employees", formatCommaNumber(event.target.value))}
+                placeholder="예: 45"
+                style={inputStyle}
+              />
+            </FieldBox>
+
+            <FieldBox label="공정">
+              <input
+                value={form.process}
+                onChange={(event) => onChange("process", event.target.value)}
+                placeholder="예: 프레스 공정"
+                style={inputStyle}
+              />
+            </FieldBox>
+
+            <FieldBox label="설비용량 규격값">
+              <input
+                value={form.currentCapacityValue}
+                onChange={(event) => onChange("currentCapacityValue", event.target.value)}
+                placeholder="예: 1600"
+                style={inputStyle}
+              />
+              <HelperText>보조 단위: 프레스/사출기 톤, CNC kW</HelperText>
+            </FieldBox>
+
+            <FieldBox label="불량률">
+              <input
+                value={form.defectRate}
+                onChange={(event) => onChange("defectRate", event.target.value)}
+                placeholder="예: 5.8"
+                style={inputStyle}
+              />
+              <HelperText>% 단위</HelperText>
+            </FieldBox>
+
+            <FieldBox label="연간 생산량">
+              <input
+                value={form.productionQty}
+                onChange={(event) => onChange("productionQty", formatCommaNumber(event.target.value))}
+                placeholder="예: 50,000"
+                style={inputStyle}
+              />
+            </FieldBox>
+
+            <FieldBox label="제품 개당 예상이익">
+              <input
+                value={form.contributionMarginWon}
+                onChange={(event) =>
+                  onChange("contributionMarginWon", formatCommaNumber(event.target.value))
+                }
+                placeholder="예: 12,000"
+                style={inputStyle}
+              />
+              <HelperText>원 단위</HelperText>
+            </FieldBox>
+
+            <FieldBox label="전체교체 예상 투자금">
+              <input
+                value={form.scenarioAInvestmentManwon}
+                onChange={(event) =>
+                  onChange(
+                    "scenarioAInvestmentManwon",
+                    formatCommaNumber(event.target.value),
+                  )
+                }
+                placeholder="예: 22,000"
+                style={inputStyle}
+              />
+              <HelperText>단위: 만원 · scenario_a_investment_manwon</HelperText>
+            </FieldBox>
+
+            <FieldBox label="부분교체 예상 투자금">
+              <input
+                value={form.scenarioBInvestmentManwon}
+                onChange={(event) =>
+                  onChange(
+                    "scenarioBInvestmentManwon",
+                    formatCommaNumber(event.target.value),
+                  )
+                }
+                placeholder="예: 4,994"
+                style={inputStyle}
+              />
+              <HelperText>단위: 만원 · scenario_b_investment_manwon</HelperText>
+            </FieldBox>
+
+            <FieldBox label="연간 유지보수 비용">
               <input
                 value={form.annualMaintenanceCostManwon}
                 onChange={(event) =>
@@ -1359,109 +1514,9 @@ function InputPanel({
                 placeholder="예: 1,200"
                 style={inputStyle}
               />
+              <HelperText>단위: 만원/년</HelperText>
             </FieldBox>
-
-            <FieldBox label="불량률 (%)">
-              <input
-                value={form.defectRate}
-                onChange={(event) => onChange("defectRate", event.target.value)}
-                placeholder="예: 5.8"
-                style={inputStyle}
-              />
-            </FieldBox>
-
-            <div />
           </div>
-
-          <details
-            style={{
-              marginTop: "18px",
-              marginBottom: "18px",
-              border: `1px solid ${colors.lineSoft}`,
-              borderRadius: "24px",
-              background: "#FFFFFF",
-              padding: "22px 24px",
-            }}
-          >
-            <summary
-              style={{
-                color: colors.navy,
-                fontSize: "18px",
-                fontWeight: 950,
-                cursor: "pointer",
-                listStyle: "none",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                gap: "14px",
-              }}
-            >
-              <span>예상 투자비용 입력하기</span>
-              <span
-                style={{
-                  color: "#94A3B8",
-                  fontSize: "13px",
-                  fontWeight: 900,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                선택 · ROI 정확도 향상
-              </span>
-            </summary>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "18px 20px",
-                marginTop: "20px",
-              }}
-            >
-              <FieldBox label="전체교체 예상 투자금">
-                <input
-                  value={form.scenarioAInvestmentManwon}
-                  onChange={(event) =>
-                    onChange(
-                      "scenarioAInvestmentManwon",
-                      formatCommaNumber(event.target.value),
-                    )
-                  }
-                  placeholder="예: 22,000"
-                  style={inputStyle}
-                />
-                <HelperText>단위: 만원 · scenario_a_investment_manwon</HelperText>
-              </FieldBox>
-
-              <FieldBox label="부분교체 예상 투자금">
-                <input
-                  value={form.scenarioBInvestmentManwon}
-                  onChange={(event) =>
-                    onChange(
-                      "scenarioBInvestmentManwon",
-                      formatCommaNumber(event.target.value),
-                    )
-                  }
-                  placeholder="예: 4,994"
-                  style={inputStyle}
-                />
-                <HelperText>단위: 만원 · scenario_b_investment_manwon</HelperText>
-              </FieldBox>
-            </div>
-
-            <p
-              style={{
-                color: colors.muted,
-                fontSize: "13px",
-                lineHeight: 1.7,
-                fontWeight: 800,
-                margin: 0,
-                marginTop: "18px",
-              }}
-            >
-              마이페이지에 입력한 값이 있으면 자동으로 채워집니다. 이 페이지에서 수정한
-              값은 ROI 계산에만 사용되며 마이페이지 정보로 저장되지는 않습니다.
-            </p>
-          </details>
 
           <div
             style={{
@@ -1515,7 +1570,7 @@ function InputPanel({
                 opacity: apiStatus === "loading" ? 0.7 : 1,
               }}
             >
-              {apiStatus === "loading" ? "시뮬레이션 실행 중..." : "시뮬레이션 실행"}
+              {apiStatus === "loading" ? "시뮬레이션 분석 중..." : "시뮬레이션 분석하기"}
             </button>
           </div>
 
@@ -2307,12 +2362,169 @@ function EvidenceSection({
   )
 }
 
+function RequiredMark() {
+  return (
+    <span
+      style={{
+        color: "#D94E41",
+        marginLeft: "2px",
+      }}
+    >
+      *
+    </span>
+  )
+}
+
+function SelectChip() {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        minHeight: "26px",
+        padding: "0 10px",
+        borderRadius: "999px",
+        background: "#F4F6FA",
+        color: "#98A2B3",
+        fontSize: "11px",
+        fontWeight: 900,
+        lineHeight: 1,
+        whiteSpace: "nowrap",
+        flexShrink: 0,
+      }}
+    >
+      선택
+    </span>
+  )
+}
+
+function FloatingModalNotice({
+  open,
+  title,
+  description,
+  description2,
+  onClose,
+}: {
+  open: boolean
+  title: string
+  description: string
+  description2: string
+  onClose: () => void
+}) {
+  if (!open) return null
+
+  return (
+    <>
+      <div
+        onClick={onClose}
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 120,
+          background: "rgba(15, 23, 42, 0.38)",
+          backdropFilter: "blur(2px)",
+        }}
+      />
+
+      <div
+        style={{
+          position: "fixed",
+          left: "50%",
+          top: "50%",
+          transform: "translate(-50%, -50%)",
+          zIndex: 121,
+          width: "min(560px, calc(100vw - 32px))",
+          borderRadius: "28px",
+          padding: "28px 28px 24px",
+          background: "linear-gradient(180deg, #FFF7ED 0%, #FFFFFF 100%)",
+          border: "1px solid #FDBA74",
+          boxShadow: "0 28px 60px rgba(15, 23, 42, 0.18)",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: "18px",
+          }}
+        >
+          <div>
+            <strong
+              style={{
+                display: "block",
+                color: "#9A3412",
+                fontSize: "24px",
+                lineHeight: 1.35,
+                fontWeight: 900,
+                letterSpacing: "-0.5px",
+              }}
+            >
+              {title}
+            </strong>
+
+            <p
+              style={{
+                margin: "12px 0 0",
+                color: "#9A3412",
+                fontSize: "14px",
+                lineHeight: 1.8,
+                fontWeight: 800,
+              }}
+            >
+              {description}
+            </p>
+
+            <p
+              style={{
+                margin: "6px 0 0",
+                color: "#9A3412",
+                fontSize: "14px",
+                lineHeight: 1.8,
+                fontWeight: 800,
+              }}
+            >
+              {description2}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              width: "42px",
+              height: "42px",
+              flexShrink: 0,
+              borderRadius: "999px",
+              border: "1px solid rgba(15, 23, 42, 0.12)",
+              background: "#FFFFFF",
+              color: "#475569",
+              fontSize: "28px",
+              lineHeight: 1,
+              fontWeight: 900,
+              cursor: "pointer",
+              boxShadow: "0 8px 18px rgba(6, 27, 52, 0.08)",
+            }}
+          >
+            ×
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
+
 function SectionTitle({
   children,
   tooltip,
+  required = false,
+  optional = false,
 }: {
   children: ReactNode
   tooltip?: string
+  required?: boolean
+  optional?: boolean
 }) {
   const [tooltipOpen, setTooltipOpen] = useState(false)
 
@@ -2332,7 +2544,12 @@ function SectionTitle({
         width: "fit-content",
       }}
     >
-      <span>{children}</span>
+      <span>
+        {children}
+        {required && <RequiredMark />}
+      </span>
+
+      {optional && <SelectChip />}
 
       {tooltip && (
         <span
@@ -2363,7 +2580,7 @@ function SectionTitle({
             position: "absolute",
             left: "calc(100% + 10px)",
             top: "-4px",
-            width: "320px",
+            width: "360px",
             padding: "14px 16px",
             borderRadius: "16px",
             border: `1px solid ${colors.lineSoft}`,

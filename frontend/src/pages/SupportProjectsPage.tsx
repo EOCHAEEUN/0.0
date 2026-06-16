@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
 type SupportProject = {
@@ -7,6 +7,7 @@ type SupportProject = {
   agency: string
   deadline: string
   amount: string
+  amountValueManwon: number | null
   fitScore: number
   category: string
   description: string
@@ -26,9 +27,12 @@ type PolicyState = "loading" | "error" | "empty" | "success"
 
 type PolicyApiItem = {
   id?: string | number
+  policy_id?: string | number
+  title?: string
   content?: string
   reason?: string
   llm_score?: string
+  match_score?: number | string
   metadata?: {
     title?: string
     organization?: string
@@ -41,71 +45,246 @@ type PolicyApiItem = {
   }
 }
 
-const DEFAULT_EQUIPMENT_CONTEXT = {
-  equipmentName: "프레스 설비",
-  industryName: "자동차 부품 제조업",
-  equipmentAge: 11,
-  defectRate: 5.8,
-  roiPaybackMonths: 14,
+type PolicyApiResponse = {
+  success?: boolean
+  data?: {
+    policies?: PolicyApiItem[]
+    total?: number
+    source?: string
+    message?: string
+  }
+  message?: string
+  error?: string
+}
+
+type DraftResult = {
+  company_name?: string | null
+  equipment_name?: string | null
+  selected_policy?: string | null
+  application_purpose?: string | null
+  investment_manwon?: number | null
+  subsidy_manwon?: number | null
+  payback_months?: number | null
+  expected_benefits?: string[] | null
+  readiness_score?: number | null
+  ai_reasons?: string[] | null
+  business_necessity?: string | null
+  expected_effects?: string | null
+  required_documents?: string[] | null
+}
+
+type CompanyInfo = {
+  company_id?: string
+  company_name?: string | null
+  industry_name?: string | null
+  industry_code?: string[] | string | null
+  employee_count?: number | null
+  region?: string | null
+  annual_revenue?: number | null
+  company_type?: string | null
+  primary_purpose?: string[] | null
+  updated_at?: string | null
+}
+
+type EquipmentInfo = {
+  equipment_id?: string
+  company_id?: string
+  name?: string | null
+  category?: string | null
+  process?: string | null
+  age_years?: number | null
+  energy_cost_annual?: number | null
+  defect_rate?: number | null
+  maintenance_cost_annual?: number | null
+  current_capacity_value?: number | null
+  production_qty?: number | null
+  contribution_margin_won?: number | null
+  created_at?: string | null
+}
+
+type RoiScenario = {
+  label?: string
+  investment_manwon?: number
+  subsidy_manwon?: number
+  net_investment_manwon?: number
+  annual_net_benefit_manwon?: number
+  payback_years?: number
+  roi_pct?: number
+  breakdown?: {
+    energy_saving_manwon?: number
+    energy_saving_method?: string
+    maintenance_saving_manwon?: number
+    defect_saving_manwon?: number
+    defect_saving_method?: string
+  }
+}
+
+type RoiResult = {
+  scenario_a?: RoiScenario
+  scenario_b?: RoiScenario
+  recommended?: "A" | "B" | string
+  ai_recommendation?: {
+    decision?: string
+    confidence_score?: number
+    summary?: string
+    top_reasons?: {
+      factor?: string
+      impact?: string
+      message?: string
+      source?: string
+    }[]
+    risks?: {
+      type?: string
+      level?: string
+      message?: string
+    }[]
+    next_questions?: string[]
+  }
+  data_quality?: {
+    score?: number
+    level?: string
+    missing_fields?: string[]
+    message?: string
+  }
+  benchmark?: {
+    avg_energy_cost_manwon?: number
+    avg_defect_rate_pct?: number
+    avg_replacement_cycle_yr?: number
+    energy_vs_avg?: number
+  }
+  equipment_status?: {
+    age_vs_cycle?: number
+    is_overdue?: boolean
+  }
+}
+
+type AnalysisData = {
+  company?: CompanyInfo | null
+  equipment?: EquipmentInfo | null
+  equipment_id?: string | null
+  roi_result?: RoiResult | null
+  matched_policies?: any[]
+  draft_result?: DraftResult | null
+  response?: string
+}
+
+type EquipmentContext = {
+  equipmentName: string
+  industryName: string
+  equipmentAge: number | null
+  defectRate: number | null
+  roiPaybackMonths: number | null
+  investmentManwon: number | null
+  subsidyManwon: number | null
+  recommendedScenario: string
 }
 
 const API_BASE = "http://127.0.0.1:8000"
 const COMPANY_ID_STORAGE_KEY = "factofit_company_id"
-const MY_PAGE_STORAGE_KEY = "factofit_mypage_profile"
+const AUTH_TOKEN_STORAGE_KEY = "factofit_access_token"
+const ANALYSIS_RESULT_STORAGE_KEY = "factofit_analysis_result"
+
+const policyCardsMemoryCache = new Map<string, SupportProject[]>()
+const policyCardsInFlightCache = new Map<string, Promise<SupportProject[]>>()
 
 function getStoredCompanyId() {
   return window.localStorage.getItem(COMPANY_ID_STORAGE_KEY) || ""
 }
 
-function readSelectedEquipmentContext() {
+function getStoredAccessToken() {
+  return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || ""
+}
+
+function parseResponseDraft(response?: string): DraftResult | null {
+  if (!response) return null
+
   try {
-    const raw = window.localStorage.getItem(MY_PAGE_STORAGE_KEY)
-    if (!raw) return DEFAULT_EQUIPMENT_CONTEXT
-
-    const parsed = JSON.parse(raw)
-    const company = parsed.companyInfo ?? parsed.company ?? {}
-    const equipments = parsed.equipments ?? parsed.equipmentList ?? []
-    const firstEquipment = Array.isArray(equipments) ? equipments[0] : null
-
-    return {
-      ...DEFAULT_EQUIPMENT_CONTEXT,
-      equipmentName:
-        firstEquipment?.name ||
-        firstEquipment?.equipmentName ||
-        DEFAULT_EQUIPMENT_CONTEXT.equipmentName,
-      industryName:
-        company.industryName ||
-        company.industry_name ||
-        DEFAULT_EQUIPMENT_CONTEXT.industryName,
-      equipmentAge:
-        Number(firstEquipment?.ageYears ?? firstEquipment?.age_years) ||
-        DEFAULT_EQUIPMENT_CONTEXT.equipmentAge,
-      defectRate:
-        Number(firstEquipment?.defectRate ?? firstEquipment?.defect_rate) ||
-        DEFAULT_EQUIPMENT_CONTEXT.defectRate,
-    }
+    const parsed = JSON.parse(response)
+    return parsed && typeof parsed === "object" ? parsed : null
   } catch {
-    return DEFAULT_EQUIPMENT_CONTEXT
+    return null
   }
 }
 
-function scoreToPercent(score?: string) {
-  if (!score) return 70
-  const filled = (score.match(/●/g) ?? []).length
-  return Math.min(100, Math.max(0, filled * 20))
+function readAnalysisData(): AnalysisData {
+  try {
+    const raw = window.localStorage.getItem(ANALYSIS_RESULT_STORAGE_KEY)
+    if (!raw) return {}
+
+    const parsed = JSON.parse(raw)
+    const data = parsed?.data ?? {}
+    const responseDraft = parseResponseDraft(data?.response)
+
+    return {
+      ...data,
+      draft_result: data?.draft_result ?? responseDraft ?? null,
+    }
+  } catch {
+    return {}
+  }
+}
+
+function getAnalysisFingerprint(analysisData: AnalysisData) {
+  return [
+    analysisData.company?.updated_at,
+    analysisData.equipment?.equipment_id,
+    analysisData.equipment?.created_at,
+    analysisData.draft_result?.readiness_score,
+  ]
+    .filter(Boolean)
+    .join(":")
+}
+
+function toNumberOrNull(value?: number | string | null) {
+  if (value === null || value === undefined || value === "" || value === "None") {
+    return null
+  }
+
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null
+  }
+
+  const cleaned = String(value).replace(/[^\d.-]/g, "")
+  if (!cleaned) return null
+
+  const amount = Number(cleaned)
+  return Number.isNaN(amount) ? null : amount
+}
+
+function safeNumber(value: unknown, fallback = 0) {
+  const numberValue = Number(value)
+  return Number.isFinite(numberValue) ? numberValue : fallback
+}
+
+function clampScore(value: number) {
+  return Math.min(100, Math.max(0, Math.round(value)))
 }
 
 function formatSupportAmount(value?: number | string | null) {
-  if (value === null || value === undefined || value === "" || value === "None") {
-    return "정보 없음"
-  }
+  const amount = toNumberOrNull(value)
 
-  const amount = Number(value)
-  if (Number.isNaN(amount)) return String(value)
+  if (amount === null) return "정보 없음"
+
   if (amount >= 10000) {
     return `최대 ${(amount / 10000).toFixed(amount % 10000 === 0 ? 0 : 1)}억원`
   }
+
   return `최대 ${amount.toLocaleString()}만원`
+}
+
+function formatManwon(value?: number | null) {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) {
+    return "-"
+  }
+
+  const amount = Number(value)
+
+  if (amount >= 10000) {
+    const eok = amount / 10000
+    return `${eok.toFixed(amount % 10000 === 0 ? 0 : 1)}억원`
+  }
+
+  return `${Math.round(amount).toLocaleString()}만원`
 }
 
 function normalizeDeadline(value?: string | null) {
@@ -120,16 +299,32 @@ function getProjectTone(score: number): SupportProject["tone"] {
   return "red"
 }
 
+function scoreToPercent(score?: string, matchScore?: number | string) {
+  const numericMatchScore = toNumberOrNull(matchScore)
+
+  if (numericMatchScore !== null) {
+    if (numericMatchScore <= 1) return clampScore(numericMatchScore * 100)
+    return clampScore(numericMatchScore)
+  }
+
+  if (!score) return 70
+
+  const filled = (score.match(/●/g) ?? []).length
+  return clampScore(filled * 20)
+}
+
 function mapPolicyToProject(policy: PolicyApiItem, index: number): SupportProject {
   const metadata = policy.metadata ?? {}
-  const fitScore = scoreToPercent(policy.llm_score)
+  const fitScore = scoreToPercent(policy.llm_score, policy.match_score)
+  const amountValueManwon = toNumberOrNull(metadata.max_amount)
 
   return {
-    id: Number(policy.id) || index + 1,
-    title: metadata.title || `추천 지원사업 ${index + 1}`,
+    id: Number(policy.id ?? policy.policy_id) || index + 1,
+    title: policy.title || metadata.title || `추천 지원사업 ${index + 1}`,
     agency: metadata.organization || "주관기관 정보 없음",
     deadline: normalizeDeadline(metadata.deadline_display || metadata.deadline),
     amount: formatSupportAmount(metadata.max_amount),
+    amountValueManwon,
     fitScore,
     category: metadata.service_category || metadata.policy_category || "지원사업",
     description:
@@ -145,53 +340,133 @@ function mapPolicyToProject(policy: PolicyApiItem, index: number): SupportProjec
   }
 }
 
-async function fetchPolicyCards(companyId: string): Promise<SupportProject[]> {
-  const response = await fetch(
+async function fetchPolicyCards(
+  companyId: string,
+  analysisFingerprint: string,
+): Promise<SupportProject[]> {
+  const cacheKey = `policies:${companyId}:${analysisFingerprint || "latest"}:10`
+
+  const cached = policyCardsMemoryCache.get(cacheKey)
+  if (cached) return cached
+
+  const inFlight = policyCardsInFlightCache.get(cacheKey)
+  if (inFlight) return inFlight
+
+  const token = getStoredAccessToken()
+
+  const requestPromise = fetch(
     `${API_BASE}/api/policies?company_id=${encodeURIComponent(companyId)}&limit=10`,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    },
   )
+    .then(async (response) => {
+      const json = (await response.json().catch(() => ({}))) as PolicyApiResponse
 
-  if (!response.ok) {
-    throw new Error(`Policy API failed: ${response.status}`)
-  }
+      if (!response.ok) {
+        if (response.status === 504) {
+          console.warn("정책 추천 timeout fallback:", json)
+          return []
+        }
 
-  const json = await response.json()
-  const policies = json?.data?.policies ?? []
+        throw new Error(
+          json?.message ||
+            json?.error ||
+            `Policy API failed: ${response.status}`,
+        )
+      }
 
-  return policies.map((policy: PolicyApiItem, index: number) =>
-    mapPolicyToProject(policy, index),
-  )
+      const policies = Array.isArray(json?.data?.policies)
+        ? json.data.policies
+        : []
+
+      console.log("지원사업 API 응답:", {
+        source: json?.data?.source,
+        total: json?.data?.total,
+        count: policies.length,
+        message: json?.data?.message,
+      })
+
+      return policies.map((policy: PolicyApiItem, index: number) =>
+        mapPolicyToProject(policy, index),
+      )
+    })
+    .then((cards) => {
+      policyCardsMemoryCache.set(cacheKey, cards)
+      return cards
+    })
+    .finally(() => {
+      policyCardsInFlightCache.delete(cacheKey)
+    })
+
+  policyCardsInFlightCache.set(cacheKey, requestPromise)
+
+  return requestPromise
 }
 
-const readinessItems: ReadinessItem[] = [
-  {
-    label: "ROI 분석 결과",
-    status: "완료",
-    score: 100,
-    tone: "green",
-    description: "투자금, 예상 지원금, 실부담금, 회수기간 계산이 완료되었습니다.",
-  },
-  {
-    label: "설비 교체 필요성",
-    status: "완료",
-    score: 92,
-    tone: "green",
-    description: "노후도와 불량률 기준으로 교체 필요성이 충분합니다.",
-  },
-  {
-    label: "견적서 첨부",
-    status: "확인 필요",
-    score: 58,
-    tone: "orange",
-    description: "도입 예정 설비의 견적서와 사양서가 필요합니다.",
-  },
-  {
-    label: "사업계획서 문장",
-    status: "작성 필요",
-    score: 42,
-    tone: "red",
-    description: "도입 목적과 기대효과를 신청서 문장으로 정리해야 합니다.",
-  },
-]
+function getSelectedScenario(roiResult?: RoiResult | null): RoiScenario | undefined {
+  if (!roiResult) return undefined
+
+  if (roiResult.recommended === "B") {
+    return roiResult.scenario_b ?? roiResult.scenario_a
+  }
+
+  return roiResult.scenario_a ?? roiResult.scenario_b
+}
+
+function getIndustryText(company?: CompanyInfo | null) {
+  if (!company) return "업종 정보 없음"
+
+  if (company.industry_name) return company.industry_name
+
+  if (Array.isArray(company.industry_code)) {
+    return company.industry_code.join(", ")
+  }
+
+  return company.industry_code || "업종 정보 없음"
+}
+
+function getEquipmentContext(analysisData: AnalysisData): EquipmentContext {
+  const company = analysisData.company
+  const equipment = analysisData.equipment
+  const draft = analysisData.draft_result
+  const roiResult = analysisData.roi_result
+  const selectedScenario = getSelectedScenario(roiResult)
+
+  const paybackMonths =
+    draft?.payback_months ??
+    (selectedScenario?.payback_years
+      ? Number(selectedScenario.payback_years) * 12
+      : null)
+
+  return {
+    equipmentName:
+      draft?.equipment_name ||
+      equipment?.name ||
+      equipment?.process ||
+      "설비 정보 없음",
+    industryName: getIndustryText(company),
+    equipmentAge:
+      typeof equipment?.age_years === "number" ? equipment.age_years : null,
+    defectRate:
+      typeof equipment?.defect_rate === "number" ? equipment.defect_rate : null,
+    roiPaybackMonths:
+      typeof paybackMonths === "number" ? paybackMonths : null,
+    investmentManwon:
+      draft?.investment_manwon ??
+      selectedScenario?.investment_manwon ??
+      null,
+    subsidyManwon:
+      draft?.subsidy_manwon ??
+      selectedScenario?.subsidy_manwon ??
+      null,
+    recommendedScenario: roiResult?.recommended || "A",
+  }
+}
 
 function getFitLabel(score: number) {
   if (score >= 85) return "매우 적합"
@@ -228,11 +503,161 @@ function getBestScore(projects: SupportProject[]) {
   return `${Math.max(...projects.map((project) => project.fitScore))}%`
 }
 
+function getMaxSupportAmount(projects: SupportProject[]) {
+  const amounts = projects
+    .map((project) => project.amountValueManwon)
+    .filter((amount): amount is number => typeof amount === "number")
+
+  if (amounts.length === 0) return "-"
+
+  return formatSupportAmount(Math.max(...amounts))
+}
+
 function getPriorityCount(projects: SupportProject[]) {
   return projects.filter((project) => project.fitScore >= 85).length
 }
 
-function EmptyPolicyState({ onBackToRoi }: { onBackToRoi: () => void }) {
+function getReadinessScore(analysisData: AnalysisData, policyCards: SupportProject[]) {
+  const draftScore = analysisData.draft_result?.readiness_score
+
+  if (typeof draftScore === "number") {
+    const policyBonus = policyCards.length > 0 ? 8 : 0
+    return clampScore(draftScore + policyBonus)
+  }
+
+  let score = 0
+
+  if (analysisData.roi_result) score += 35
+  if (analysisData.equipment) score += 20
+  if (analysisData.company) score += 15
+  if (analysisData.draft_result) score += 20
+  if (policyCards.length > 0) score += 10
+
+  return clampScore(score)
+}
+
+function getReadinessComment(
+  analysisData: AnalysisData,
+  policyCards: SupportProject[],
+) {
+  const draft = analysisData.draft_result
+  const roi = analysisData.roi_result
+  const equipment = analysisData.equipment
+
+  if (!roi && !draft) {
+    return "아직 ROI 분석 결과가 없어 신청 준비도를 계산할 수 없습니다. 먼저 마이페이지에서 설비 정보를 저장한 뒤 분석을 진행해주세요."
+  }
+
+  if (policyCards.length === 0) {
+    return `${equipment?.name || draft?.equipment_name || "선택 설비"} 기준 ROI와 신청서 초안은 생성되었습니다. 다만 현재 조건에 맞는 지원사업 결과가 없어 지원사업 적합도 검토가 추가로 필요합니다.`
+  }
+
+  return `${equipment?.name || draft?.equipment_name || "선택 설비"} 기준 ROI 분석과 지원사업 추천 결과가 반영되었습니다. 견적서와 증빙자료를 보완하면 신청 완성도를 더 높일 수 있습니다.`
+}
+
+function getEquipmentNeedScore(analysisData: AnalysisData) {
+  const equipment = analysisData.equipment
+  const roi = analysisData.roi_result
+  const benchmarkCycle = roi?.benchmark?.avg_replacement_cycle_yr ?? 10
+  const avgDefectRate = roi?.benchmark?.avg_defect_rate_pct ?? 2
+
+  const age = equipment?.age_years ?? 0
+  const defectRate = equipment?.defect_rate ?? 0
+
+  let score = 45
+
+  if (age >= benchmarkCycle) score += 25
+  else if (age >= benchmarkCycle * 0.7) score += 15
+
+  if (defectRate >= avgDefectRate * 2) score += 25
+  else if (defectRate > avgDefectRate) score += 15
+
+  if (roi?.equipment_status?.is_overdue) score += 5
+
+  return clampScore(score)
+}
+
+function buildReadinessItems(
+  analysisData: AnalysisData,
+  policyCards: SupportProject[],
+): ReadinessItem[] {
+  const hasRoi = Boolean(analysisData.roi_result)
+  const hasPolicies = policyCards.length > 0
+  const hasDraft = Boolean(analysisData.draft_result)
+  const requiredDocs = analysisData.draft_result?.required_documents ?? []
+
+  const equipmentNeedScore = getEquipmentNeedScore(analysisData)
+  const documentScore = requiredDocs.length > 0 ? 58 : 35
+  const draftScore = hasDraft
+    ? clampScore(analysisData.draft_result?.readiness_score ?? 65)
+    : 30
+
+  return [
+    {
+      label: "ROI 분석 결과",
+      status: hasRoi ? "완료" : "확인 필요",
+      score: hasRoi ? 100 : 0,
+      tone: hasRoi ? "green" : "red",
+      description: hasRoi
+        ? "투자금, 예상 지원금, 실부담금, 회수기간 계산이 완료되었습니다."
+        : "ROI 분석 결과가 아직 없습니다.",
+    },
+    {
+      label: "설비 교체 필요성",
+      status: equipmentNeedScore >= 70 ? "완료" : "확인 필요",
+      score: equipmentNeedScore,
+      tone: equipmentNeedScore >= 70 ? "green" : "orange",
+      description:
+        "설비 노후도, 불량률, 업종 벤치마크를 기준으로 교체 필요성을 계산했습니다.",
+    },
+    {
+      label: "지원사업 적합도",
+      status: hasPolicies ? "완료" : "확인 필요",
+      score: hasPolicies ? Math.max(...policyCards.map((card) => card.fitScore)) : 0,
+      tone: hasPolicies ? "green" : "orange",
+      description: hasPolicies
+        ? "현재 조건에 맞는 지원사업 추천 결과가 반영되었습니다."
+        : "현재 조건에 맞는 지원사업 결과가 없어 추가 검토가 필요합니다.",
+    },
+    {
+      label: "견적서 및 증빙자료",
+      status: "확인 필요",
+      score: documentScore,
+      tone: "orange",
+      description:
+        requiredDocs.length > 0
+          ? `${requiredDocs.join(", ")} 제출 전 확인이 필요합니다.`
+          : "견적서, 사업자등록증, 설비 사진 등 증빙자료 확인이 필요합니다.",
+    },
+    {
+      label: "사업계획서 문장",
+      status: hasDraft ? "완료" : "확인 필요",
+      score: draftScore,
+      tone: hasDraft ? "green" : "red",
+      description: hasDraft
+        ? "AI 신청서 초안 문장이 생성되었습니다."
+        : "신청서 초안 문장 생성이 필요합니다.",
+    },
+  ]
+}
+
+function getRequiredDocuments(analysisData: AnalysisData) {
+  const docs = analysisData.draft_result?.required_documents?.filter(Boolean)
+
+  if (docs && docs.length > 0) {
+    return docs
+  }
+
+  return ["사업자등록증", "설비 견적서", "현 설비 사진"]
+}
+
+function EmptyPolicyState({
+  onBackToRoi,
+  equipmentName,
+}: {
+  onBackToRoi: () => void
+  equipmentName: string
+}) {
   return (
     <div
       style={{
@@ -270,9 +695,9 @@ function EmptyPolicyState({ onBackToRoi }: { onBackToRoi: () => void }) {
           maxWidth: "760px",
         }}
       >
-        policy_card가 빈 배열로 내려와도 화면이 깨지지 않도록 빈 상태 UI를
-        표시합니다. ROI 분석 결과, 설비명, 업종, 투자 목적, 예상 지원금 정보를
-        보완하면 추천 정확도를 높일 수 있습니다.
+        {equipmentName} 기준 정책 추천 결과가 비어 있습니다. ROI 분석 결과,
+        설비명, 업종, 투자 목적, 예상 지원금 정보를 보완하면 추천 정확도를
+        높일 수 있습니다.
       </p>
 
       <div
@@ -291,9 +716,7 @@ function EmptyPolicyState({ onBackToRoi }: { onBackToRoi: () => void }) {
           className="btn dark"
           type="button"
           onClick={() =>
-            window.alert(
-              "테스트 완료: policy_card 빈 배열에서도 화면이 깨지지 않습니다.",
-            )
+            window.alert("지원사업 결과가 없어도 화면이 정상 표시됩니다.")
           }
         >
           빈 상태 테스트 확인
@@ -407,13 +830,29 @@ function ErrorPolicyState({ onBackToRoi }: { onBackToRoi: () => void }) {
 
 export default function SupportProjectsPage() {
   const navigate = useNavigate()
+  const hasStartedFetchRef = useRef(false)
 
   const [policyState, setPolicyState] = useState<PolicyState>("loading")
   const [policyCards, setPolicyCards] = useState<SupportProject[]>([])
-  const selectedEquipmentContext = useMemo(() => readSelectedEquipmentContext(), [])
+
+  const analysisData = useMemo(() => readAnalysisData(), [])
+  const analysisFingerprint = useMemo(
+    () => getAnalysisFingerprint(analysisData),
+    [analysisData],
+  )
+  const selectedEquipmentContext = useMemo(
+    () => getEquipmentContext(analysisData),
+    [analysisData],
+  )
 
   useEffect(() => {
-    const companyId = getStoredCompanyId()
+    if (hasStartedFetchRef.current) return
+    hasStartedFetchRef.current = true
+
+    const companyId =
+      analysisData.company?.company_id ||
+      analysisData.equipment?.company_id ||
+      getStoredCompanyId()
 
     if (!companyId) {
       setPolicyCards([])
@@ -426,7 +865,7 @@ export default function SupportProjectsPage() {
     async function loadPolicies() {
       try {
         setPolicyState("loading")
-        const cards = await fetchPolicyCards(companyId)
+        const cards = await fetchPolicyCards(companyId, analysisFingerprint)
 
         if (ignore) return
 
@@ -434,6 +873,7 @@ export default function SupportProjectsPage() {
         setPolicyState(cards.length > 0 ? "success" : "empty")
       } catch (error) {
         console.error("정책 추천 API 호출 실패:", error)
+
         if (!ignore) {
           setPolicyCards([])
           setPolicyState("error")
@@ -446,13 +886,19 @@ export default function SupportProjectsPage() {
     return () => {
       ignore = true
     }
-  }, [])
+  }, [analysisData, analysisFingerprint])
 
   const topProject = policyCards[0]
   const hasPolicyCards = policyCards.length > 0
 
   const bestScore = getBestScore(policyCards)
+  const maxSupportAmount = getMaxSupportAmount(policyCards)
   const priorityCount = getPriorityCount(policyCards)
+
+  const readinessScore = getReadinessScore(analysisData, policyCards)
+  const readinessItems = buildReadinessItems(analysisData, policyCards)
+  const readinessComment = getReadinessComment(analysisData, policyCards)
+  const requiredDocuments = getRequiredDocuments(analysisData)
 
   return (
     <main className="page">
@@ -507,7 +953,7 @@ export default function SupportProjectsPage() {
 
             <div className="mini-stat">
               <span>예상 최대 지원금</span>
-              <b>{bestScore}</b>
+              <b>{maxSupportAmount}</b>
             </div>
 
             <div className="mini-stat">
@@ -523,7 +969,10 @@ export default function SupportProjectsPage() {
           )}
 
           {policyState === "empty" && (
-            <EmptyPolicyState onBackToRoi={() => navigate("/roi")} />
+            <EmptyPolicyState
+              equipmentName={selectedEquipmentContext.equipmentName}
+              onBackToRoi={() => navigate("/roi")}
+            />
           )}
 
           {policyState === "success" && hasPolicyCards && topProject && (
@@ -553,10 +1002,10 @@ export default function SupportProjectsPage() {
                     </h3>
 
                     <p>
-                      {selectedEquipmentContext.equipmentName} 교체와 스마트
-                      모니터링 도입 목적이 명확하고, ROI 분석 결과 투자
-                      회수기간도 짧기 때문에 신청서 작성 근거를 구성하기 좋은
-                      상태입니다.
+                      {selectedEquipmentContext.equipmentName} 설비 투자 조건과
+                      ROI 분석 결과를 기준으로 우선 검토할 수 있는 지원사업입니다.
+                      신청서 작성 시 투자금, 기대효과, 회수기간을 함께 제시하면
+                      근거를 더 명확히 구성할 수 있습니다.
                     </p>
 
                     <div
@@ -588,16 +1037,23 @@ export default function SupportProjectsPage() {
                     <h4>AI 추천 근거</h4>
 
                     <ul>
-                      <li>설비 노후도와 불량률 개선 필요성이 명확합니다.</li>
-                      <li>스마트 모니터링 도입 목적이 지원사업 방향과 맞습니다.</li>
+                      <li>{topProject.description}</li>
                       <li>
-                        투자 회수기간이 약{" "}
-                        {selectedEquipmentContext.roiPaybackMonths}개월로
-                        사업성이 양호합니다.
+                        추천 적합도는 {topProject.fitScore}%이며, 현재 설비투자
+                        조건과의 유사도를 기준으로 산정되었습니다.
                       </li>
                       <li>
-                        전기요금 및 유지보수비 절감 효과를 신청서에 활용할 수
-                        있습니다.
+                        투자금 {formatManwon(selectedEquipmentContext.investmentManwon)}
+                        , 예상 지원금{" "}
+                        {formatManwon(selectedEquipmentContext.subsidyManwon)}을
+                        신청서 근거로 활용할 수 있습니다.
+                      </li>
+                      <li>
+                        회수기간은{" "}
+                        {selectedEquipmentContext.roiPaybackMonths
+                          ? `약 ${selectedEquipmentContext.roiPaybackMonths.toFixed(1)}개월`
+                          : "추가 확인 필요"}
+                        입니다.
                       </li>
                     </ul>
                   </div>
@@ -1136,7 +1592,9 @@ export default function SupportProjectsPage() {
                       boxShadow: "0 10px 25px rgba(0,0,0,0.05)",
                     }}
                   >
-                    <span className="badge green">신청 가능</span>
+                    <span className="badge green">
+                      {readinessScore >= 60 ? "신청 가능" : "보완 필요"}
+                    </span>
 
                     <h3
                       style={{
@@ -1149,7 +1607,7 @@ export default function SupportProjectsPage() {
                       }}
                     >
                       현재 신청 준비도는 <br />
-                      73%입니다.
+                      {readinessScore}%입니다.
                     </h3>
 
                     <p
@@ -1161,9 +1619,7 @@ export default function SupportProjectsPage() {
                         fontWeight: 800,
                       }}
                     >
-                      ROI와 설비 교체 필요성은 충분히 정리되어 있습니다. 다만
-                      견적서와 사업계획서 문장을 보완하면 신청 완성도가 크게
-                      높아집니다.
+                      {readinessComment}
                     </p>
 
                     <div
@@ -1178,7 +1634,7 @@ export default function SupportProjectsPage() {
                       <i
                         style={{
                           display: "block",
-                          width: "73%",
+                          width: `${readinessScore}%`,
                           height: "100%",
                           background: "#0B7A53",
                           borderRadius: "999px",
@@ -1211,6 +1667,7 @@ export default function SupportProjectsPage() {
                     {readinessItems.map((item) => (
                       <div
                         key={item.label}
+                        title={item.description}
                         style={{
                           display: "grid",
                           gridTemplateColumns: "170px 1fr 70px",
@@ -1289,28 +1746,23 @@ export default function SupportProjectsPage() {
 
               <div className="detail-body">
                 <div className="check-grid">
-                  <div className="check-card">
-                    <h4>사업자등록증</h4>
-                    <p>
-                      기업명, 업종, 사업장 주소 등 기본정보 확인에 필요합니다.
-                    </p>
-                  </div>
+                  {requiredDocuments.map((documentName, index) => {
+                    const toneClass =
+                      index === 0 ? "" : index === 1 ? "orange" : "red"
 
-                  <div className="check-card orange">
-                    <h4>설비 견적서</h4>
-                    <p>
-                      도입 예정 설비의 금액, 사양, 납품 조건이 포함된 견적서를
-                      준비해야 합니다.
-                    </p>
-                  </div>
-
-                  <div className="check-card red">
-                    <h4>현 설비 사진</h4>
-                    <p>
-                      노후 설비 상태를 보여주는 사진과 유지보수 이력을 함께
-                      준비하면 신청 필요성이 강화됩니다.
-                    </p>
-                  </div>
+                    return (
+                      <div
+                        className={`check-card ${toneClass}`}
+                        key={`${documentName}-${index}`}
+                      >
+                        <h4>{documentName}</h4>
+                        <p>
+                          제출 전 최신 상태로 준비하고, 신청사업 요구 양식에
+                          맞는지 확인해주세요.
+                        </p>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             </details>

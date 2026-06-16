@@ -16,36 +16,9 @@ LangChain, Tool, Agent와는 완전히 독립적이며,
 
 # TODO: Policy Matching 에이전트 연동 후 실제 매칭 지원금으로 대체
 # 현재는 BENCHMARKS default_subsidy 기반 추정치 사용
-
 from __future__ import annotations
 from typing import Optional
-from pydantic import BaseModel
-
-
-# ==================== 1. 입력 모델 ====================
-class EquipmentInput(BaseModel):
-    name: str
-    category: str
-    age_years: int
-    energy_cost_annual: int
-    defect_rate: Optional[float] = None
-    maintenance_cost_annual: Optional[int] = None
-    capacity_value: Optional[float] = None
-    annual_operating_hours: Optional[int] = None
-    load_factor: Optional[float] = None
-    electricity_price_won: Optional[int] = None
-    production_qty: Optional[int] = None
-    contribution_margin_won: Optional[int] = None
-
-
-class RoiInput(BaseModel):
-    equipment: EquipmentInput
-    scenario_a_investment_manwon: Optional[int] = None
-    scenario_a_subsidy_manwon: Optional[int] = None
-    scenario_b_investment_manwon: Optional[int] = None
-    scenario_b_subsidy_manwon: Optional[int] = None
-
-
+from app.models.equipment import EquipmentInput
 # ==================== 2. 투자금 추정 테이블 ====================
 INVESTMENT_TABLE = {
     "press": [
@@ -165,7 +138,6 @@ def _build_scenario(
     bench: dict,
     scenario_key: str,
     investment_override: Optional[int],
-    subsidy_override: Optional[int],
 ) -> dict:
     # category 정규화 추가
     category = equipment.category.lower()
@@ -213,7 +185,7 @@ def _build_scenario(
     if investment_override is not None:
         investment = investment_override
     else:
-        est = estimate_investment(category, equipment.capacity_value)
+        est = estimate_investment(category, equipment.current_capacity_value)
         if est:
             investment = est[scenario_key]["mid"]
             inv_estimation = est
@@ -229,7 +201,7 @@ def _build_scenario(
             else:
                 investment = None
     # 지원금
-    subsidy = subsidy_override if subsidy_override is not None else s["default_subsidy"]
+    subsidy = s["default_subsidy"]
 
     # 실부담, 회수기간, ROI
     if investment is not None:
@@ -266,7 +238,7 @@ def _calc_data_quality(equipment: EquipmentInput) -> dict:
     optional_fields = [
         "defect_rate",
         "maintenance_cost_annual",
-        "capacity_value",
+        "current_capacity_value",
         "production_qty",
         "contribution_margin_won",
     ]
@@ -386,7 +358,7 @@ def _calc_ai_recommendation(
         next_questions.append("연간 유지보수비를 입력하면 절감 효과 계산이 더 정확해집니다.")
     if "production_qty" in missing or "contribution_margin_won" in missing:
         next_questions.append("연간 생산량과 제품당 기여이익을 입력하면 불량비용 계산이 더 정확해집니다.")
-    if "capacity_value" in missing:
+    if "current_capacity_value" in missing:
         next_questions.append("설비 용량을 입력하면 투자금 추정이 더 정확해집니다.")
 
     return {
@@ -401,8 +373,7 @@ def _calc_ai_recommendation(
 
 
 # ==================== 5. 메인 계산 ====================
-def calculate_roi(roi_input: RoiInput) -> dict:
-    equipment = roi_input.equipment
+def calculate_roi(equipment: EquipmentInput) -> dict:
 
     # category 정규화
     category = equipment.category.lower()
@@ -420,13 +391,11 @@ def calculate_roi(roi_input: RoiInput) -> dict:
 
     scenario_a = _build_scenario(
         equipment, bench, "scenario_a",
-        roi_input.scenario_a_investment_manwon,
-        roi_input.scenario_a_subsidy_manwon,
+        equipment.scenario_a_investment_manwon,
     )
     scenario_b = _build_scenario(
         equipment, bench, "scenario_b",
-        roi_input.scenario_b_investment_manwon,
-        roi_input.scenario_b_subsidy_manwon,
+        equipment.scenario_b_investment_manwon,
     )
 
     equipment_status = {

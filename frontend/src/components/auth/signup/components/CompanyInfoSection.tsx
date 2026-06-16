@@ -1,4 +1,4 @@
-import { COMPANY_SIZE_OPTIONS, PURPOSE_OPTIONS } from "../signup.constants"
+import { COMPANY_TYPE_OPTIONS, PURPOSE_OPTIONS } from "../signup.constants"
 import type { IndustryInputRow, IndustryOption } from "../signup.types"
 import FieldLabel from "./FieldLabel"
 import IndustryInputList from "./IndustryInputList"
@@ -9,7 +9,7 @@ type CompanyInfoSectionProps = {
   openIndustryRowId: string | null
   businessNumber: string
   region: string
-  companySize: string
+  companyType: string
   mainPurpose: string
   getFilteredIndustries: (row: IndustryInputRow) => IndustryOption[]
   onCompanyNameChange: (value: string) => void
@@ -21,7 +21,7 @@ type CompanyInfoSectionProps = {
   onRemoveIndustryRow: (rowId: string) => void
   onBusinessNumberChange: (value: string) => void
   onRegionChange: (value: string) => void
-  onCompanySizeChange: (value: string) => void
+  onCompanyTypeChange: (value: string) => void
   onMainPurposeChange: (value: string) => void
 }
 
@@ -31,7 +31,7 @@ export default function CompanyInfoSection({
   openIndustryRowId,
   businessNumber,
   region,
-  companySize,
+  companyType,
   mainPurpose,
   getFilteredIndustries,
   onCompanyNameChange,
@@ -43,7 +43,7 @@ export default function CompanyInfoSection({
   onRemoveIndustryRow,
   onBusinessNumberChange,
   onRegionChange,
-  onCompanySizeChange,
+  onCompanyTypeChange,
   onMainPurposeChange,
 }: CompanyInfoSectionProps) {
   return (
@@ -91,19 +91,19 @@ export default function CompanyInfoSection({
 
       <div className="ff-signup-two-col">
         <div className="ff-signup-field">
-          <FieldLabel text="기업 규모" optional />
+          <FieldLabel text="기업 규모" required />
           <select
-            value={companySize}
-            onChange={(event) => onCompanySizeChange(event.target.value)}
+            value={companyType}
+            onChange={(event) => onCompanyTypeChange(event.target.value)}
           >
-            {COMPANY_SIZE_OPTIONS.map((option) => (
+            {COMPANY_TYPE_OPTIONS.map((option) => (
               <option key={option}>{option}</option>
             ))}
           </select>
         </div>
 
         <div className="ff-signup-field">
-          <FieldLabel text="주요 목적" optional />
+          <FieldLabel text="주요 목적" required />
           <select
             value={mainPurpose}
             onChange={(event) => onMainPurposeChange(event.target.value)}

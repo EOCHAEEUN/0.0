@@ -24,7 +24,6 @@ class SignupRequest(BaseModel):
     name: str
     phone: Optional[str] = None
     business_registration_no: Optional[str] = None
-
     company: SignupCompanyInput
     agreements: SignupAgreements
 

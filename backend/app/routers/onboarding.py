@@ -22,6 +22,7 @@ async def register_company(
     **body.model_dump(exclude_none=True)
 }
 
+
     try:
         result = db.table("company").upsert(
             company_payload,

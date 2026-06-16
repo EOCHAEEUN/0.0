@@ -34,12 +34,23 @@ async def send_email_code(body: EmailCodeRequest):
     db = create_service_client()
 
     try:
+<<<<<<< HEAD
         db.auth.sign_in_with_otp({
             "email": body.email,
             "options": {
                 "should_create_user": True,
             },
         })
+=======
+        db.auth.sign_in_with_otp(
+            {
+                "email": body.email,
+                "options": {
+                    "should_create_user": True,
+                },
+            }
+        )
+>>>>>>> main
 
         return {
             "success": True,
@@ -65,11 +76,21 @@ async def verify_email_code(body: VerifyEmailCodeRequest):
     db = create_service_client()
 
     try:
+<<<<<<< HEAD
         auth_response = db.auth.verify_otp({
             "email": body.email,
             "token": body.token,
             "type": "email",
         })
+=======
+        auth_response = db.auth.verify_otp(
+            {
+                "email": body.email,
+                "token": body.token,
+                "type": "email",
+            }
+        )
+>>>>>>> main
 
         return {
             "success": True,

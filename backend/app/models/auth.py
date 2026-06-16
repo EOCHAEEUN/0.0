@@ -1,7 +1,5 @@
 from typing import Optional
-
 from pydantic import BaseModel, Field
-
 
 class SignupCompanyInput(BaseModel):
     company_name: str
@@ -14,7 +12,6 @@ class SignupCompanyInput(BaseModel):
     max_employee_count: Optional[int] = Field(default=None, ge=0)
     min_revenue_manwon: Optional[int] = Field(default=None, ge=0)
     max_revenue_manwon: Optional[int] = Field(default=None, ge=0)
-
 
 class SignupAgreements(BaseModel):
     service_terms: bool = False
@@ -35,7 +32,6 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
-
 class EmailCodeRequest(BaseModel):
     email: str
 
@@ -43,7 +39,6 @@ class EmailCodeRequest(BaseModel):
 class VerifyEmailCodeRequest(BaseModel):
     email: str
     token: str = Field(min_length=4)
-
 
 class CurrentUser(BaseModel):
     id: str

@@ -12,19 +12,8 @@ class CompanyOnboarding(BaseModel): # 회원가입에서 받는 정보
     industry_name: Optional[str] = None
     industry_code: list[str]
     region: str
-    company_type: str
+    company_type: Optional[str] = None
     primary_purpose: list[str] = Field(default_factory=list)
-    employee_count: int = Field(ge=0)
-    annual_revenue: int = Field(ge=0)
-    revenue_2y_ago_manwon: Optional[int] = Field(default=None, ge=0)
-    revenue_3y_ago_manwon: Optional[int] = Field(default=None, ge=0)
-    total_assets_manwon: Optional[int] = Field(default=None, ge=0)
-    is_disclosure_group_member: Optional[bool] = None
-    independence_check_passed: Optional[bool] = None
-    energy_cost_annual: Optional[int] = Field(default=None, ge=0)
-    established_year: Optional[int] = Field(default=None, ge=1800)
-    workplace_type: Optional[str] = None
-    equipment: Optional[EquipmentInput] = None
 
 class CompanyUpdate(BaseModel): #마이페이지에서 받는 정보
     company_name: Optional[str] = None
@@ -40,6 +29,7 @@ class CompanyUpdate(BaseModel): #마이페이지에서 받는 정보
     revenue_3y_ago_manwon: Optional[int] = Field(default=None, ge=0)
     total_assets_manwon: Optional[int] = Field(default=None, ge=0)
     is_disclosure_group_member: Optional[bool] = None
+    independence_check_passed: Optional[bool] = None  # 독립성 기준 통과 여부
     established_year: Optional[int] = Field(default=None, ge=1800)
     workplace_type: Optional[str] = None
 

@@ -74,10 +74,12 @@ async def chat(req: ChatRequest):
             .execute()
         )
 
+        equipment_id = None
         if equipment_data.data:
             from app.models.equipment import EquipmentInput
 
             eq = equipment_data.data[0]
+            equipment_id = eq.get("equipment_id")
 
             equipment_info = EquipmentInput(
                 name=eq.get("name", ""),
@@ -96,6 +98,7 @@ async def chat(req: ChatRequest):
         "is_safe": False,
         "company_info": company_info,
         "equipment": equipment_info,
+        "equipment_id": equipment_id,
         "matched_policies": [],
         "roi_result": None,
         "draft_result": None,

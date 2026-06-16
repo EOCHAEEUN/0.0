@@ -77,7 +77,9 @@ def match_policies(company_context: dict, query: str) -> list[dict]:
     company_codes = _normalize_list(company_context.get("industry_code"))
     region = company_context.get("region", "")
     region_short = region.split()[0] if region else ""
-    company_type_values = _normalize_list(company_context.get("company_type"))
+    company_type_values = _normalize_list(
+        company_context.get("company_type")
+    )
 
     policy_query = query
     results = search_policies(policy_query, n_results=20, where=None)

@@ -51,7 +51,6 @@ async def chat(req: ChatRequest):
                 industry_code=data.get("industry_code", []),
                 region=data.get("region", ""),
                 company_type=data.get("company_type"),
-                company_size=data.get("company_size"),
                 primary_purpose=data.get("primary_purpose") or [],
                 employee_count=data.get("employee_count"),
                 annual_revenue=data.get("annual_revenue"),

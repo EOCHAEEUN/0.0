@@ -37,7 +37,7 @@ POLICY_SYSTEM_PROMPT = """
 기업 컨텍스트:
 업종코드: {industry_code}
 지역: {region}
-기업규모: {company_size}
+기업규모: {company_type}
 직원 수: {employee_count}명
 매출액: {annual_revenue}만원
 설비: {equipment_info}

@@ -25,7 +25,6 @@ async def register_company(
         "region": body.region,
         "business_registration_no": body.business_registration_no,
         "company_type": body.company_type,
-        "company_size": body.company_size,
         "primary_purpose": body.primary_purpose,
         "employee_count": body.employee_count,
         "annual_revenue": body.annual_revenue,

@@ -58,7 +58,7 @@ const INDUSTRY_OPTIONS: IndustryOption[] = [
   { name: "뿌리", codes: ["C24", "C25", "C28", "C29"] },
 ]
 
-const COMPANY_SIZE_OPTIONS = [
+const company_type_OPTIONS = [
   "선택 필요",
   "소상공인",
   "소기업",
@@ -449,7 +449,7 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
         industries: normalizedIndustries,
 
         region,
-        company_size: companySize,
+        company_type: companySize,
         main_purpose: mainPurpose,
         max_employee_count: null,
         min_revenue_manwon: null,
@@ -478,7 +478,6 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
       industry_code: payload.company.industry_code,
       region,
       company_type: companySize,
-      company_size: companySize,
       primary_purpose: mainPurpose ? [mainPurpose] : [],
       employee_count: 0,
       annual_revenue: 0,
@@ -782,7 +781,7 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
                 value={companySize}
                 onChange={(event) => setCompanySize(event.target.value)}
               >
-                {COMPANY_SIZE_OPTIONS.map((option) => (
+                {company_type_OPTIONS.map((option) => (
                   <option key={option}>{option}</option>
                 ))}
               </select>

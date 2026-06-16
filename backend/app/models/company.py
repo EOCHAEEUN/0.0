@@ -14,8 +14,7 @@ class CompanyOnboarding(BaseModel):
     industry_name: Optional[str] = None
     industry_code: list[str]
     region: str
-    company_type: Optional[str] = None
-    company_size: str
+    company_type: str
     primary_purpose: list[str] = Field(default_factory=list)
     employee_count: int = Field(ge=0)
     annual_revenue: int = Field(ge=0)
@@ -38,7 +37,6 @@ class CompanyUpdate(BaseModel):
     industry_code: Optional[list[str]] = None
     region: Optional[str] = None
     company_type: Optional[str] = None
-    company_size: Optional[str] = None
     primary_purpose: Optional[list[str]] = None
     employee_count: Optional[int] = Field(default=None, ge=0)
     annual_revenue: Optional[int] = Field(default=None, ge=0)

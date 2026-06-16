@@ -9,6 +9,7 @@ class FactofitState(TypedDict):
     is_safe: bool                             # guard_node 통과 여부
     company_info: Optional[CompanyContext]    # 기업 프로필 (DB에서 로드)
     equipment: Optional[EquipmentInput]       # 설비 + ROI 입력값
+    equipment_id: Optional[str] 
     matched_policies: list[MatchedPolicy]    # policy_matching 결과
     roi_result: Optional[dict]          # capex_advisor 계산 결과
     draft_result: Optional[str]              # application_draft 초안서 결과

@@ -7,7 +7,7 @@ class SignupCompanyInput(BaseModel):
     industry_code: list[str] = Field(default_factory=list)
     industries: list[dict] = Field(default_factory=list)
     region: str
-    company_size: Optional[str] = None
+    company_type: Optional[str] = None
     main_purpose: Optional[str] = None
     max_employee_count: Optional[int] = Field(default=None, ge=0)
     min_revenue_manwon: Optional[int] = Field(default=None, ge=0)

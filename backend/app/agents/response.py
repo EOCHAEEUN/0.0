@@ -54,6 +54,7 @@ def response_node(state: FactofitState) -> FactofitState:
             supabase.table("draft_result").insert(
                 {
                     "company_id": company_id,
+                    "equipment_id": state.get("equipment_id"),
                     "policy_id": policy_id,
                     "draft_content": state.get("draft_result", ""),
                     "created_at": datetime.now().isoformat(),
@@ -67,6 +68,7 @@ def response_node(state: FactofitState) -> FactofitState:
             supabase.table("roi_output").insert(
                 {
                     "company_id": company_id,
+                    "equipment_id": state.get("equipment_id"),
                     "roi_data": state["roi_result"],
                     "created_at": datetime.now().isoformat(),
                 }
@@ -74,35 +76,13 @@ def response_node(state: FactofitState) -> FactofitState:
         except Exception as e:
             print(f"roi_output save failed: {e}")
 
-    if state.get("equipment") and state.get("intent") == "roi":
-        try:
-            eq = state["equipment"]
-            supabase.table("roi_input").insert(
-                {
-                    "company_id": company_id,
-                    "equipment_name": eq.name,
-                    "category": eq.category,
-                    "age_years": eq.age_years,
-                    "energy_cost_annual": eq.energy_cost_annual,
-                    "defect_rate": eq.defect_rate,
-                    "maintenance_cost_annual": eq.maintenance_cost_annual,
-                    "current_capacity_value": eq.current_capacity_value,
-                    "production_qty": eq.production_qty,
-                    "contribution_margin_won": eq.contribution_margin_won,
-                    "scenario_a_investment_manwon": eq.scenario_a_investment_manwon,
-                    "scenario_b_investment_manwon": eq.scenario_b_investment_manwon,
-                    "created_at": datetime.now().isoformat(),
-                }
-            ).execute()
-        except Exception as e:
-            print(f"roi_input save failed: {e}")
-
     if state.get("matched_policies"):
         try:
             for policy in state.get("matched_policies", []):
                 supabase.table("matched_policy").insert(
                     {
                         "company_id": company_id,
+                        "equipment_id": state.get("equipment_id"),
                         "policy_id": policy.get("id", ""),
                         "title": policy.get("metadata", {}).get("title", ""),
                         "match_score": round(1 - policy.get("distance", 1), 3),

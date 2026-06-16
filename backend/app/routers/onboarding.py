@@ -65,6 +65,15 @@ async def get_my_company(
     db = get_db()
 
     try:
+        # user_profile 조회 추가
+        profile_result = (
+            db.table("user_profile")
+            .select("*")
+            .eq("user_id", current_user.id)
+            .maybe_single()
+            .execute()
+        )
+
         company_result = (
             db.table("company")
             .select("*")
@@ -84,7 +93,8 @@ async def get_my_company(
         return {
             "success": True,
             "data": {
-                "company": company_result.data[0] if company_result.data else None,  # 단일 객체
+                "user_profile": profile_result.data,  # 추가
+                "company": company_result.data[0] if company_result.data else None,
                 "equipments": equipment_result.data,
             },
         }
@@ -141,8 +151,10 @@ async def update_company(
     current_user: CurrentUser = Depends(get_current_user),
 ):
     db = get_db()
-
-    update_payload = body.model_dump(exclude_none=True)
+    update_payload = {
+        k: v for k, v in body.model_dump().items()
+        if v is not None and v != ""
+    }
     update_payload.pop("user_id", None)
 
     if not update_payload:
@@ -199,6 +211,24 @@ async def register_equipment(
 ):
     db = get_db()
 
+    # 소유권 검증
+    company_result = (
+        db.table("company")
+        .select("company_id")
+        .eq("company_id", company_id)
+        .eq("user_id", current_user.id)
+        .single()
+        .execute()
+    )
+    if not company_result.data:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "success": False,
+                "message": "Company not found or not owned by user.",
+            },
+        )
+    
     equipment_payload = {
         "company_id": company_id,
         **body.model_dump(exclude_none=True)
@@ -243,8 +273,10 @@ async def update_equipment(
 ):
     db = get_db()
 
-    update_payload = body.model_dump(exclude_none=True)
-
+    update_payload = {
+        k: v for k, v in body.model_dump().items()
+        if v is not None and v != ""
+    }
     try:
         # 소유권 검증
         equipment_result = (

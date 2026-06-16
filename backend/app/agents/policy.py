@@ -78,7 +78,7 @@ def match_policies(company_context: dict, query: str) -> list[dict]:
     region = company_context.get("region", "")
     region_short = region.split()[0] if region else ""
     company_type_values = _normalize_list(
-        company_context.get("company_size") or company_context.get("company_type")
+        company_context.get("company_type")
     )
 
     policy_query = query
@@ -144,7 +144,6 @@ def policy_matching_node(state: FactofitState) -> FactofitState:
     company_context = {
         "industry_code": company.industry_code if company else None,
         "region": company.region if company else None,
-        "company_size": company.company_size if company else None,
         "company_type": company.company_type if company else None,
         "employee_count": company.employee_count if company else None,
         "annual_revenue": company.annual_revenue if company else None,
@@ -163,7 +162,6 @@ def policy_matching_node(state: FactofitState) -> FactofitState:
     prompt = POLICY_SYSTEM_PROMPT.format(
         industry_code=", ".join(company.industry_code) if company else "정보 없음",
         region=company.region if company else "정보 없음",
-        company_size=company.company_size if company else "정보 없음",
         company_type=company.company_type if company else "정보 없음",
         employee_count=company.employee_count if company else "정보 없음",
         annual_revenue=company.annual_revenue or "정보 없음" if company else "정보 없음",

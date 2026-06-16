@@ -18,7 +18,13 @@ function App() {
       <Routes>
         <Route path="/main" element={<MainPage />} />
         <Route path="/login" element={<LoginPage />} />
+
+        {/* 대시보드 기본 경로 */}
         <Route path="/" element={<DashboardPage />} />
+
+        {/* MyPage 분석 완료 후 이동하는 경로 */}
+        <Route path="/dashboard" element={<DashboardPage />} />
+
         <Route path="/roi" element={<RoiPage />} />
         <Route path="/application-draft" element={<ApplicationDraftPage />} />
         <Route path="/support-projects" element={<SupportProjectsPage />} />

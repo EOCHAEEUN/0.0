@@ -6,3 +6,225 @@
 @import "./signup/styles/signup.optional.css";
 @import "./signup/styles/signup.actions.css";
 @import "./signup/styles/signup.responsive.css";
+.ff-signup-top-notice {
+  position: relative;
+  z-index: 2;
+  margin: 18px 0 28px;
+  border-radius: 22px;
+  padding: 18px 20px;
+  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+  border: 1px solid #bfdbfe;
+  box-shadow:
+    0 18px 44px rgba(6, 27, 52, 0.1),
+    0 0 0 1px rgba(255, 255, 255, 0.8) inset;
+}
+
+.ff-signup-top-notice__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ff-signup-top-notice strong {
+  display: block;
+  color: #1e3a8a;
+  font-size: 16px;
+  line-height: 1.35;
+  font-weight: 900;
+  letter-spacing: -0.2px;
+}
+
+.ff-signup-top-notice p {
+  margin: 7px 0 0;
+  color: #1e3a8a;
+  font-size: 13px;
+  line-height: 1.75;
+  font-weight: 800;
+}
+
+.ff-signup-required-popover {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 9999;
+  width: min(680px, calc(100vw - 48px));
+  max-height: min(70vh, 620px);
+  overflow: auto;
+  transform: translate(-50%, -50%);
+  border-radius: 28px;
+  padding: 26px 30px;
+  background: linear-gradient(180deg, #fff7ed 0%, #ffffff 100%);
+  border: 1px solid #fdba74;
+  box-shadow:
+    0 32px 90px rgba(6, 27, 52, 0.26),
+    0 0 0 1px rgba(255, 255, 255, 0.8) inset;
+  animation: ffSignupPopoverIn 0.18s ease-out;
+}
+
+.ff-signup-required-popover__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.ff-signup-required-popover strong {
+  display: block;
+  color: #9a3412;
+  font-size: 20px;
+  line-height: 1.35;
+  font-weight: 900;
+  letter-spacing: -0.3px;
+}
+
+.ff-signup-required-popover p {
+  margin: 9px 0 0;
+  color: #9a3412;
+  font-size: 14px;
+  line-height: 1.75;
+  font-weight: 850;
+}
+
+.ff-signup-required-popover__list {
+  margin: 18px 0 0;
+  padding: 18px 0 0 22px;
+  border-top: 1px solid rgba(154, 52, 18, 0.16);
+  color: #9a3412;
+  font-size: 14px;
+  line-height: 1.9;
+  font-weight: 900;
+}
+
+.ff-signup-notice-close {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #ffffff;
+  color: #475569;
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(6, 27, 52, 0.08);
+}
+
+.ff-signup-notice-close:hover {
+  background: #f8fafc;
+  color: #061b34;
+}
+
+.ff-signup-panel--email-locked input[type="password"] {
+  background: #f8fafc !important;
+  color: #94a3b8 !important;
+  border-color: #e2e8f0 !important;
+  opacity: 0.52;
+  cursor: not-allowed !important;
+  caret-color: transparent;
+  filter: grayscale(1);
+}
+
+.ff-signup-panel--email-locked input[type="password"]::placeholder {
+  color: #aab2c0 !important;
+}
+
+.ff-signup-panel--email-locked input[type="password"]:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.ff-signup-panel--email-locked input[type="password"] ~ *,
+.ff-signup-panel--email-locked [class*="password"],
+.ff-signup-panel--email-locked [class*="Password"] {
+  opacity: 0.56;
+}
+
+.ff-signup-panel--email-locked input[type="email"],
+.ff-signup-panel--email-locked input[type="email"] ~ *,
+.ff-signup-panel--email-locked button {
+  opacity: 1;
+  filter: none;
+}
+
+.ff-signup-locked-group {
+  position: relative;
+}
+
+.ff-signup-locked-fieldset {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  transition:
+    opacity 0.18s ease,
+    filter 0.18s ease;
+}
+
+.ff-signup-locked-fieldset:disabled {
+  opacity: 0.42;
+  filter: grayscale(0.25);
+}
+
+.ff-signup-locked-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 30px;
+  background: transparent;
+  cursor: not-allowed;
+}
+
+.ff-signup-submit--locked {
+  opacity: 0.58;
+  cursor: not-allowed !important;
+  filter: grayscale(0.15);
+}
+
+@keyframes ffSignupPopoverIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -46%) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@media (max-width: 720px) {
+  .ff-signup-top-notice {
+    border-radius: 18px;
+    padding: 16px;
+    margin: 16px 0 24px;
+  }
+
+  .ff-signup-top-notice strong {
+    font-size: 15px;
+  }
+
+  .ff-signup-top-notice p {
+    font-size: 12px;
+  }
+
+  .ff-signup-required-popover {
+    width: calc(100vw - 28px);
+    max-height: 76vh;
+    border-radius: 22px;
+    padding: 22px;
+  }
+
+  .ff-signup-required-popover strong {
+    font-size: 17px;
+  }
+
+  .ff-signup-required-popover p,
+  .ff-signup-required-popover__list {
+    font-size: 13px;
+  }
+}

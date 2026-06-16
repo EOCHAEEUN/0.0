@@ -6,7 +6,7 @@ import {
   signupWithProfile,
   verifySignupEmailCode,
 } from "../../../services/auth"
-import { INDUSTRY_OPTIONS } from "./signup.constants"
+import { COMPANY_TYPE_PLACEHOLDER, INDUSTRY_OPTIONS } from "./signup.constants"
 import type {
   IndustryInputRow,
   IndustryOption,
@@ -21,6 +21,8 @@ import {
   normalizeBusinessNumber,
   normalizePhoneNumber,
 } from "./signup.utils"
+
+const DEFAULT_PURPOSE = "지원사업 추천"
 
 export function useSignupForm({ onClose }: UseSignupFormParams) {
   const [email, setEmail] = useState("")
@@ -42,11 +44,11 @@ export function useSignupForm({ onClose }: UseSignupFormParams) {
   const [openIndustryRowId, setOpenIndustryRowId] = useState<string | null>(null)
 
   const [region, setRegion] = useState("")
-  const [companySize, setCompanySize] = useState("선택 필요")
-  const [mainPurpose, setMainPurpose] = useState("지원사업 추천")
+  const [companyType, setCompanyType] = useState(COMPANY_TYPE_PLACEHOLDER)
+  const [mainPurpose, setMainPurpose] = useState(DEFAULT_PURPOSE)
 
-  const [agreeService, setAgreeService] = useState(true)
-  const [agreePrivacy, setAgreePrivacy] = useState(true)
+  const [agreeService, setAgreeService] = useState(false)
+  const [agreePrivacy, setAgreePrivacy] = useState(false)
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSendingCode, setIsSendingCode] = useState(false)
@@ -101,6 +103,8 @@ export function useSignupForm({ onClose }: UseSignupFormParams) {
 
   const handleEmailChange = (value: string) => {
     setEmail(value)
+    setEmailCode("")
+    setIsCodeSent(false)
     setIsEmailVerified(false)
   }
 
@@ -132,14 +136,16 @@ export function useSignupForm({ onClose }: UseSignupFormParams) {
   const handleSendEmailCode = async () => {
     if (isSendingCode) return
 
-    if (!email.includes("@")) {
+    const trimmedEmail = email.trim()
+
+    if (!trimmedEmail.includes("@")) {
       alert("이메일 형식을 확인해주세요.")
       return
     }
 
     try {
       setIsSendingCode(true)
-      await sendSignupEmailCode(email)
+      await sendSignupEmailCode(trimmedEmail)
       setIsCodeSent(true)
       setIsEmailVerified(false)
       alert("인증번호를 이메일로 발송했습니다.")
@@ -153,19 +159,22 @@ export function useSignupForm({ onClose }: UseSignupFormParams) {
   const handleVerifyEmail = async () => {
     if (isVerifyingCode) return
 
+    const trimmedEmail = email.trim()
+    const trimmedCode = emailCode.trim()
+
     if (!isCodeSent) {
       alert("먼저 인증번호를 받아주세요.")
       return
     }
 
-    if (emailCode.trim().length < 4) {
+    if (trimmedCode.length < 4) {
       alert("인증번호를 입력해주세요.")
       return
     }
 
     try {
       setIsVerifyingCode(true)
-      const session = await verifySignupEmailCode(email, emailCode.trim())
+      const session = await verifySignupEmailCode(trimmedEmail, trimmedCode)
       saveAuthSession(session)
       setIsEmailVerified(true)
       alert("이메일 인증이 완료되었습니다.")
@@ -293,7 +302,20 @@ export function useSignupForm({ onClose }: UseSignupFormParams) {
   const handleSubmit = async () => {
     if (isSubmitting) return
 
-    if (!email || !password || !passwordCheck || !userName || !phone) {
+    const trimmedEmail = email.trim()
+    const trimmedUserName = userName.trim()
+    const trimmedCompanyName = companyName.trim()
+    const trimmedRegion = region.trim()
+    const normalizedPhone = normalizePhoneNumber(phone)
+    const normalizedBusinessNumber = normalizeBusinessNumber(businessNumber)
+
+    if (
+      !trimmedEmail ||
+      !password ||
+      !passwordCheck ||
+      !trimmedUserName ||
+      !normalizedPhone
+    ) {
       alert("필수 계정 정보와 사용자 정보를 입력해주세요.")
       return
     }
@@ -315,8 +337,13 @@ export function useSignupForm({ onClose }: UseSignupFormParams) {
 
     const normalizedIndustries = getNormalizedIndustries()
 
-    if (!companyName || !region) {
+    if (!trimmedCompanyName || !trimmedRegion) {
       alert("기업명, 지역을 입력해주세요.")
+      return
+    }
+
+    if (companyType === COMPANY_TYPE_PLACEHOLDER) {
+      alert("기업 규모를 선택해주세요.")
       return
     }
 
@@ -343,72 +370,58 @@ export function useSignupForm({ onClose }: UseSignupFormParams) {
       new Set(normalizedIndustries.flatMap((item) => item.industry_code)),
     )
 
-    const companyPayload = {
-      company_name: companyName,
-
-      /**
-       * 기존 단일 업종 저장 구조와의 호환을 위해 유지합니다.
-       * 여러 업종을 추가하면 쉼표로 묶어서 저장됩니다.
-       */
-      industry_name: normalizedIndustries
-        .map((item) => item.industry_name)
-        .join(", "),
-      industry_code: uniqueIndustryCodes,
-
-      /**
-       * 신규 다중 업종 저장용 필드입니다.
-       * DB 연결 시 이 배열을 기준으로 별도 테이블에 저장하면 됩니다.
-       */
-      industries: normalizedIndustries,
-
-      region,
-      company_size: companySize,
-      main_purpose: mainPurpose,
-      max_employee_count: null,
-      min_revenue_manwon: null,
-      max_revenue_manwon: null,
-    }
+    const industryName = normalizedIndustries
+      .map((item) => item.industry_name)
+      .join(", ")
 
     const agreementsPayload = {
       service_terms: agreeService,
       privacy_policy: agreePrivacy,
     }
 
+    /**
+     * /auth/signup
+     * 사람 정보만 보냅니다.
+     * company 정보는 여기 넣지 않습니다.
+     */
     const signupPayload = {
-      email,
+      email: trimmedEmail,
       password,
-      name: userName,
-      phone: normalizePhoneNumber(phone),
-      business_registration_no: normalizeBusinessNumber(businessNumber) || null,
-      company: companyPayload,
+      name: trimmedUserName,
+      phone: normalizedPhone,
+      business_registration_no: normalizedBusinessNumber || null,
       agreements: agreementsPayload,
     }
 
     /**
-     * FactoFit 최종 기준:
-     * - /auth/signup은 user_profile 중심
-     * - /onboarding에서 company 기본정보 저장
-     * - employee_count는 optional이므로 회원가입 시점에는 보내지 않음
-     * - annual_revenue는 required이므로 기본값 0 저장
+     * /onboarding
+     * 회사 정보만 보냅니다.
+     *
+     * 팀 전달 기준:
+     * company_type 사용
      */
     const onboardingPayload = {
-      company_name: companyName,
-      business_registration_no: normalizeBusinessNumber(businessNumber) || null,
-      industry_name: companyPayload.industry_name,
-      industry_code: companyPayload.industry_code,
-      region,
-      company_size: companySize,
+      company_name: trimmedCompanyName,
+      business_registration_no: normalizedBusinessNumber || null,
+      industry_name: industryName,
+      industry_code: uniqueIndustryCodes,
+      region: trimmedRegion,
+      company_type: companyType,
       primary_purpose: mainPurpose ? [mainPurpose] : [],
       annual_revenue: 0,
     }
 
     try {
       setIsSubmitting(true)
+
       const session = await signupWithProfile(signupPayload)
       saveAuthSession(session)
 
       const onboarding = await createCompanyOnboarding(onboardingPayload)
-      localStorage.setItem("factofit_company_id", onboarding.company_id)
+
+      if (onboarding?.company_id) {
+        localStorage.setItem("factofit_company_id", onboarding.company_id)
+      }
 
       alert("회원가입이 완료되었습니다.")
       onClose()
@@ -433,7 +446,7 @@ export function useSignupForm({ onClose }: UseSignupFormParams) {
     industryRows,
     openIndustryRowId,
     region,
-    companySize,
+    companyType,
     mainPurpose,
     agreeService,
     agreePrivacy,
@@ -453,7 +466,7 @@ export function useSignupForm({ onClose }: UseSignupFormParams) {
     setUserName,
     setCompanyName,
     setRegion,
-    setCompanySize,
+    setCompanyType,
     setMainPurpose,
     setAgreeService,
     setAgreePrivacy,

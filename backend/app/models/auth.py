@@ -1,6 +1,10 @@
 from typing import Optional
+
 from pydantic import BaseModel, Field
 
+
+# legacy: /auth/signup에서는 더 이상 사용하지 않음.
+# 다른 파일에서 import 중이면 임시로 남겨둔다.
 class SignupCompanyInput(BaseModel):
     company_name: str
     industry_name: Optional[str] = None
@@ -13,6 +17,7 @@ class SignupCompanyInput(BaseModel):
     min_revenue_manwon: Optional[int] = Field(default=None, ge=0)
     max_revenue_manwon: Optional[int] = Field(default=None, ge=0)
 
+
 class SignupAgreements(BaseModel):
     service_terms: bool = False
     privacy_policy: bool = False
@@ -22,15 +27,15 @@ class SignupRequest(BaseModel):
     email: str
     password: str = Field(min_length=8)
     name: str
-    phone: Optional[str] = None
+    phone: str
     business_registration_no: Optional[str] = None
-    company: SignupCompanyInput
     agreements: SignupAgreements
 
 
 class LoginRequest(BaseModel):
     email: str
     password: str
+
 
 class EmailCodeRequest(BaseModel):
     email: str
@@ -39,6 +44,7 @@ class EmailCodeRequest(BaseModel):
 class VerifyEmailCodeRequest(BaseModel):
     email: str
     token: str = Field(min_length=4)
+
 
 class CurrentUser(BaseModel):
     id: str

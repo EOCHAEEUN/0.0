@@ -74,6 +74,7 @@ async def verify_email_code(body: VerifyEmailCodeRequest):
                 "type": "email",
             }
         )
+
         return {
             "success": True,
             "data": _session_payload(auth_response),
@@ -88,6 +89,7 @@ async def verify_email_code(body: VerifyEmailCodeRequest):
                 "error": str(exc),
             },
         )
+
 
 @router.post("/auth/signup")
 async def signup(
@@ -127,6 +129,7 @@ async def signup(
             "service_terms_agreed": body.agreements.service_terms,
             "privacy_policy_agreed": body.agreements.privacy_policy,
         }
+
         profile_result = (
             db.table("user_profile")
             .upsert(profile_payload, on_conflict="user_id")
@@ -134,15 +137,19 @@ async def signup(
         )
 
         auth_response = db.auth.sign_in_with_password(
-            {"email": body.email, "password": body.password}
+            {
+                "email": body.email,
+                "password": body.password,
+            }
         )
 
         return {
             "success": True,
             "data": {
                 **_session_payload(auth_response),
-                "user": current_user.model_dump(),
-                "profile": profile_result.data[0] if profile_result.data else profile_payload,
+                "user_profile": profile_result.data[0]
+                if profile_result.data
+                else profile_payload,
             },
         }
 
@@ -163,8 +170,12 @@ async def login(body: LoginRequest):
 
     try:
         auth_response = db.auth.sign_in_with_password(
-            {"email": body.email, "password": body.password}
+            {
+                "email": body.email,
+                "password": body.password,
+            }
         )
+
         user_id = auth_response.user.id
 
         profile = (
@@ -174,20 +185,24 @@ async def login(body: LoginRequest):
             .maybe_single()
             .execute()
         )
+
         companies = (
             db.table("company")
             .select("*")
             .eq("user_id", user_id)
+            .order("created_at", desc=True)
             .execute()
         )
+
+        company = companies.data[0] if companies.data else None
 
         return {
             "success": True,
             "data": {
                 **_session_payload(auth_response),
-                "profile": profile.data,
-                "companies": companies.data,
-                "company_id": companies.data[0].get("company_id") if companies.data else None,
+                "user_profile": profile.data,
+                "company": company,
+                "company_id": company.get("company_id") if company else None,
             },
         }
 
@@ -213,19 +228,23 @@ async def me(current_user: CurrentUser = Depends(get_current_user)):
         .maybe_single()
         .execute()
     )
+
     companies = (
         db.table("company")
         .select("*")
         .eq("user_id", current_user.id)
+        .order("created_at", desc=True)
         .execute()
     )
+
+    company = companies.data[0] if companies.data else None
 
     return {
         "success": True,
         "data": {
             "user": current_user.model_dump(),
-            "profile": profile.data,
-            "companies": companies.data,
-            "company_id": companies.data[0].get("company_id") if companies.data else None,
+            "user_profile": profile.data,
+            "company": company,
+            "company_id": company.get("company_id") if company else None,
         },
     }

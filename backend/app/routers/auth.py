@@ -1,7 +1,15 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
-from app.core.database import get_db
-from app.models.auth import LoginRequest, SignupRequest
+
+from app.core.auth import get_current_user
+from app.core.database import create_service_client, get_db
+from app.models.auth import (
+    CurrentUser,
+    EmailCodeRequest,
+    LoginRequest,
+    SignupRequest,
+    VerifyEmailCodeRequest,
+)
 
 router = APIRouter()
 
@@ -20,35 +28,102 @@ def _session_payload(auth_response) -> dict:
         },
     }
 
+
+@router.post("/auth/send-email-code")
+async def send_email_code(body: EmailCodeRequest):
+    db = create_service_client()
+
+    try:
+        db.auth.sign_in_with_otp({
+            "email": body.email,
+            "options": {
+                "should_create_user": True,
+            },
+        })
+
+        return {
+            "success": True,
+            "data": {
+                "email": body.email,
+                "message": "Verification email sent.",
+            },
+        }
+
+    except Exception as exc:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "message": "인증 메일을 발송하지 못했습니다.",
+                "error": str(exc),
+            },
+        )
+
+
+@router.post("/auth/verify-email-code")
+async def verify_email_code(body: VerifyEmailCodeRequest):
+    db = create_service_client()
+
+    try:
+        auth_response = db.auth.verify_otp({
+            "email": body.email,
+            "token": body.token,
+            "type": "email",
+        })
+
+        return {
+            "success": True,
+            "data": _session_payload(auth_response),
+        }
+
+    except Exception as exc:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "message": "이메일 인증에 실패했습니다.",
+                "error": str(exc),
+            },
+        )
+
+
 @router.post("/auth/signup")
-async def signup(body: SignupRequest):
+async def signup(
+    body: SignupRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+):
     if not body.agreements.service_terms or not body.agreements.privacy_policy:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Required agreements are missing.",
         )
 
-    db = get_db()
+    db = create_service_client()
 
     try:
-        created = db.auth.admin.create_user(
+        db.auth.admin.update_user_by_id(
+            current_user.id,
             {
-                "email": body.email,
                 "password": body.password,
                 "email_confirm": True,
                 "user_metadata": {
                     "name": body.name,
                     "phone": body.phone,
-                }
-            }
+                    "business_registration_no": body.business_registration_no,
+                    "service_terms_agreed": body.agreements.service_terms,
+                    "privacy_policy_agreed": body.agreements.privacy_policy,
+                },
+            },
         )
-        user = created.user
-        user_id = user.id
 
         profile_payload = {
-            "user_id": user_id,
+            "user_id": current_user.id,
+            "email": current_user.email or body.email,
             "name": body.name,
             "phone": body.phone,
+            "business_registration_no": body.business_registration_no,
+            "service_terms_agreed": body.agreements.service_terms,
+            "privacy_policy_agreed": body.agreements.privacy_policy,
         }
         profile_result = (
             db.table("user_profile")
@@ -64,6 +139,7 @@ async def signup(body: SignupRequest):
             "success": True,
             "data": {
                 **_session_payload(auth_response),
+                "user": current_user.model_dump(),
                 "profile": profile_result.data[0] if profile_result.data else profile_payload,
             },
         }
@@ -81,7 +157,7 @@ async def signup(body: SignupRequest):
 
 @router.post("/auth/login")
 async def login(body: LoginRequest):
-    db = get_db()
+    db = create_service_client()
 
     try:
         auth_response = db.auth.sign_in_with_password(
@@ -123,3 +199,33 @@ async def login(body: LoginRequest):
                 "error": str(exc),
             },
         )
+
+
+@router.get("/me")
+async def me(current_user: CurrentUser = Depends(get_current_user)):
+    db = get_db()
+
+    profile = (
+        db.table("user_profile")
+        .select("*")
+        .eq("user_id", current_user.id)
+        .maybe_single()
+        .execute()
+    )
+    companies = (
+        db.table("company")
+        .select("*")
+        .eq("user_id", current_user.id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+
+    return {
+        "success": True,
+        "data": {
+            "user": current_user.model_dump(),
+            "profile": profile.data,
+            "companies": companies.data,
+            "company_id": companies.data[0].get("company_id") if companies.data else None,
+        },
+    }

@@ -20,8 +20,8 @@ type RoiFormState = {
   annualEnergyCostManwon: string
   employees: string
   annualRevenueManwon: string
-  newEquipmentEnergyCostManwon: string
-  newEquipmentInvestmentManwon: string
+  scenarioAInvestmentManwon: string
+  scenarioBInvestmentManwon: string
   defectRate: string
   annualMaintenanceCostManwon: string
 }
@@ -86,20 +86,46 @@ const INDUSTRY_CODE_TO_NAME: Record<string, string> = {
   C30: "기타 운송장비 제조업",
 }
 
+const MY_PAGE_STORAGE_KEY = "factofit_mypage_profile"
+
+const EQUIPMENT_TYPE_OPTIONS = [
+  {
+    value: "press / 프레스",
+    key: "press",
+    labelKo: "프레스",
+    defaultName: "1600톤 프레스 #1",
+    keywords: ["press", "프레스"],
+  },
+  {
+    value: "cnc / CNC",
+    key: "cnc",
+    labelKo: "CNC",
+    defaultName: "CNC 가공기 #1",
+    keywords: ["cnc"],
+  },
+  {
+    value: "injection / 사출",
+    key: "injection",
+    labelKo: "사출",
+    defaultName: "사출성형기 #1",
+    keywords: ["injection", "사출"],
+  },
+] as const
+
 const initialForm: RoiFormState = {
   equipmentType: "press / 프레스",
-  industryCode: "C25",
-  industryName: "금속가공제품 제조업",
-  region: "경기도 안산시",
-  equipmentName: "1600톤 프레스 #1",
-  equipmentAge: "15",
-  annualEnergyCostManwon: "4500",
-  employees: "45",
-  annualRevenueManwon: "320000",
-  newEquipmentEnergyCostManwon: "",
-  newEquipmentInvestmentManwon: "",
-  defectRate: "5.8",
-  annualMaintenanceCostManwon: "1200",
+  industryCode: "",
+  industryName: "",
+  region: "",
+  equipmentName: "",
+  equipmentAge: "",
+  annualEnergyCostManwon: "",
+  employees: "",
+  annualRevenueManwon: "",
+  scenarioAInvestmentManwon: "",
+  scenarioBInvestmentManwon: "",
+  defectRate: "",
+  annualMaintenanceCostManwon: "",
 }
 
 const colors = {
@@ -148,9 +174,25 @@ function roundTo(value: number, digits = 1) {
   return Math.round(value * unit) / unit
 }
 
+function normalizeNumberString(value: string | number | undefined | null) {
+  return String(value ?? "").replace(/,/g, "").trim()
+}
+
 function toNumber(value: string | number | undefined | null, fallback = 0) {
-  const num = Number(value)
+  const num = Number(normalizeNumberString(value))
   return Number.isFinite(num) ? num : fallback
+}
+
+function onlyDigits(value: string) {
+  return value.replace(/\D/g, "")
+}
+
+function formatCommaNumber(value: string | number | undefined | null) {
+  const normalized = onlyDigits(String(value ?? ""))
+
+  if (!normalized) return ""
+
+  return normalized.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
 }
 
 function formatNumber(value: number) {
@@ -190,12 +232,162 @@ function formatPaybackYears(value: number | null) {
   return `${rounded}년`
 }
 
+function getEquipmentTypeOptionByKey(key: string) {
+  return (
+    EQUIPMENT_TYPE_OPTIONS.find((item) => item.key === key) ??
+    EQUIPMENT_TYPE_OPTIONS[0]
+  )
+}
+
+function normalizeEquipmentTypeValue(value: string | undefined | null) {
+  const normalized = String(value ?? "").toLowerCase()
+
+  if (normalized.includes("cnc")) return getEquipmentTypeOptionByKey("cnc").value
+  if (normalized.includes("injection") || normalized.includes("사출")) {
+    return getEquipmentTypeOptionByKey("injection").value
+  }
+  if (normalized.includes("press") || normalized.includes("프레스")) {
+    return getEquipmentTypeOptionByKey("press").value
+  }
+
+  return getEquipmentTypeOptionByKey("press").value
+}
+
+function getDefaultEquipmentName(equipmentType: string) {
+  const key = getEquipmentCategoryKey(equipmentType)
+  return getEquipmentTypeOptionByKey(key).defaultName
+}
+
+function detectEquipmentTypeFromName(name: string) {
+  const normalized = name.toLowerCase()
+
+  return EQUIPMENT_TYPE_OPTIONS.find((option) =>
+    option.keywords.some((keyword) => normalized.includes(keyword.toLowerCase())),
+  )?.value
+}
+
+function hasConflictingEquipmentName(name: string, equipmentType: string) {
+  const detectedType = detectEquipmentTypeFromName(name)
+
+  if (!detectedType) return false
+
+  return getEquipmentCategoryKey(detectedType) !== getEquipmentCategoryKey(equipmentType)
+}
+
+function isDefaultEquipmentName(name: string) {
+  return EQUIPMENT_TYPE_OPTIONS.some((option) => option.defaultName === name)
+}
+
+function getFirstString(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim()
+    }
+  }
+
+  return ""
+}
+
+function getFirstNumberString(...values: unknown[]) {
+  for (const value of values) {
+    if (value === null || value === undefined) continue
+
+    const normalized = normalizeNumberString(String(value))
+
+    if (normalized) return normalized
+  }
+
+  return ""
+}
+
+function getPrimaryIndustryCode(value: unknown) {
+  if (Array.isArray(value)) {
+    return String(value[0] ?? "").trim()
+  }
+
+  return String(value ?? "").split(",")[0]?.trim() ?? ""
+}
+
+function getInitialFormFromMyPage(): RoiFormState {
+  if (typeof window === "undefined") {
+    return initialForm
+  }
+
+  try {
+    const raw = window.localStorage.getItem(MY_PAGE_STORAGE_KEY)
+    if (!raw) return initialForm
+
+    const saved = JSON.parse(raw)
+    const companyInfo = saved?.companyInfo ?? {}
+    const equipment = Array.isArray(saved?.equipmentList)
+      ? saved.equipmentList[0] ?? {}
+      : {}
+
+    const equipmentType = normalizeEquipmentTypeValue(
+      getFirstString(equipment.category, equipment.equipmentType, equipment.name),
+    )
+    const equipmentName = getFirstString(equipment.name) || getDefaultEquipmentName(equipmentType)
+    const industryCode = getPrimaryIndustryCode(
+      companyInfo.industryCode ?? companyInfo.industry_code,
+    )
+
+    return {
+      equipmentType,
+      industryCode,
+      industryName:
+        getFirstString(companyInfo.industry, companyInfo.industryName) ||
+        findIndustryNameByCode(industryCode) ||
+        initialForm.industryName,
+      region: getFirstString(companyInfo.region) || initialForm.region,
+      equipmentName,
+      equipmentAge: getFirstNumberString(equipment.years, equipment.age_years),
+      annualEnergyCostManwon: formatCommaNumber(
+        getFirstNumberString(equipment.annualEnergyCost, equipment.energy_cost_annual),
+      ),
+      employees: formatCommaNumber(
+        getFirstNumberString(companyInfo.employees, companyInfo.employee_count),
+      ),
+      annualRevenueManwon: formatCommaNumber(
+        getFirstNumberString(companyInfo.annualRevenue, companyInfo.annual_revenue),
+      ),
+      scenarioAInvestmentManwon: formatCommaNumber(
+        getFirstNumberString(
+          equipment.scenarioAInvestment,
+          equipment.scenario_a_investment_manwon,
+        ),
+      ),
+      scenarioBInvestmentManwon: formatCommaNumber(
+        getFirstNumberString(
+          equipment.scenarioBInvestment,
+          equipment.scenario_b_investment_manwon,
+        ),
+      ),
+      defectRate: getFirstNumberString(equipment.defectRate, equipment.defect_rate),
+      annualMaintenanceCostManwon: formatCommaNumber(
+        getFirstNumberString(
+          equipment.maintenanceCostAnnual,
+          equipment.maintenance_cost_annual,
+        ),
+      ),
+    }
+  } catch (error) {
+    console.warn("마이페이지 저장 정보를 ROI 입력값으로 불러오지 못했습니다.", error)
+    return initialForm
+  }
+}
+
 function normalizeIndustryCode(code: string) {
   return code.trim().toUpperCase()
 }
 
 function findIndustryNameByCode(code: string) {
-  return INDUSTRY_CODE_TO_NAME[normalizeIndustryCode(code)] ?? ""
+  const primaryCode =
+    normalizeIndustryCode(code)
+      .split(/[,.\s/]+/)
+      .map((item) => item.trim())
+      .filter(Boolean)[0] ?? ""
+
+  return INDUSTRY_CODE_TO_NAME[primaryCode] ?? ""
 }
 
 function findIndustryCodeByName(name: string) {
@@ -270,29 +462,21 @@ function buildLocalScenarios(form: RoiFormState): ScenarioCard[] {
   const annualRevenue = toNumber(form.annualRevenueManwon, 320000)
   const defectRate = toNumber(form.defectRate, 5.8)
 
-  const baseInvestment =
-    toNumber(form.newEquipmentInvestmentManwon, 0) ||
-    getDefaultInvestmentManwon(form.equipmentType)
+  const defaultScenarioAInvestment = getDefaultInvestmentManwon(form.equipmentType)
+  const scenarioAInvestment =
+    toNumber(form.scenarioAInvestmentManwon, 0) || defaultScenarioAInvestment
+  const scenarioBInvestment =
+    toNumber(form.scenarioBInvestmentManwon, 0) ||
+    Math.round(defaultScenarioAInvestment * 0.227)
 
-  const scenarioAInvestment = baseInvestment
   const scenarioASubsidy = Math.min(Math.round(scenarioAInvestment * 0.545), 12000)
   const scenarioANetInvestment = Math.max(scenarioAInvestment - scenarioASubsidy, 0)
 
-  const scenarioBInvestment = Math.round(scenarioAInvestment * 0.227)
   const scenarioBSubsidy = Math.round(scenarioBInvestment * 0.3)
   const scenarioBNetInvestment = Math.max(scenarioBInvestment - scenarioBSubsidy, 0)
 
-  const inputNewEnergy = toNumber(form.newEquipmentEnergyCostManwon, 0)
-
-  const scenarioAEnergySaving =
-    inputNewEnergy > 0
-      ? Math.max(annualEnergyCost - inputNewEnergy, 0)
-      : Math.round(annualEnergyCost * 0.3)
-
-  const scenarioBEnergySaving =
-    inputNewEnergy > 0
-      ? Math.max(Math.round((annualEnergyCost - inputNewEnergy) * 0.33), 0)
-      : Math.round(annualEnergyCost * 0.1)
+  const scenarioAEnergySaving = Math.round(annualEnergyCost * 0.3)
+  const scenarioBEnergySaving = Math.round(annualEnergyCost * 0.1)
 
   const scenarioAMaintenanceSaving = Math.round(annualMaintenanceCost * 0.55)
   const scenarioBMaintenanceSaving = Math.round(annualMaintenanceCost * 0.25)
@@ -446,17 +630,14 @@ function buildPayload(form: RoiFormState) {
       category: getEquipmentCategoryKey(form.equipmentType),
       age_years: toNumber(form.equipmentAge, 0),
       energy_cost_annual: Math.round(toNumber(form.annualEnergyCostManwon, 4500) * 10000),
-      new_energy_cost_annual: Math.round(
-        (toNumber(form.newEquipmentEnergyCostManwon, 0) ||
-          Math.round(toNumber(form.annualEnergyCostManwon, 4500) * 0.7)) * 10000,
-      ),
-      new_investment_manwon: scenarioA.investmentManwon,
       maintenance_cost_annual: Math.round(
         toNumber(form.annualMaintenanceCostManwon, 1200) * 10000,
       ),
       defect_rate: toNumber(form.defectRate, 0),
       employee_count: toNumber(form.employees, 0),
       annual_revenue_manwon: toNumber(form.annualRevenueManwon, 0),
+      scenario_a_investment_manwon: scenarioA.investmentManwon,
+      scenario_b_investment_manwon: scenarioB.investmentManwon,
     },
     company_context: {
       industry_code: form.industryCode,
@@ -574,8 +755,11 @@ export default function RoiPage() {
   const inputSectionRef = useRef<HTMLDivElement | null>(null)
   const resultSectionRef = useRef<HTMLDivElement | null>(null)
 
-  const [form, setForm] = useState<RoiFormState>(initialForm)
-  const [scenarios, setScenarios] = useState<ScenarioCard[]>(() => buildLocalScenarios(initialForm))
+  const initialLoadedForm = useRef<RoiFormState>(getInitialFormFromMyPage()).current
+  const [form, setForm] = useState<RoiFormState>(initialLoadedForm)
+  const [scenarios, setScenarios] = useState<ScenarioCard[]>(() =>
+    buildLocalScenarios(initialLoadedForm),
+  )
   const [selectedScenarioId, setSelectedScenarioId] = useState<"A" | "B">("A")
   const [recommendedScenarioId, setRecommendedScenarioId] = useState<"A" | "B">("A")
   const [apiStatus, setApiStatus] = useState<ApiStatus>("idle")
@@ -590,8 +774,32 @@ export default function RoiPage() {
         [key]: value,
       }
 
+      if (key === "equipmentType") {
+        const nextEquipmentType = normalizeEquipmentTypeValue(value)
+        next.equipmentType = nextEquipmentType
+
+        if (
+          !prev.equipmentName.trim() ||
+          isDefaultEquipmentName(prev.equipmentName) ||
+          hasConflictingEquipmentName(prev.equipmentName, nextEquipmentType)
+        ) {
+          next.equipmentName = getDefaultEquipmentName(nextEquipmentType)
+        }
+      }
+
+      if (key === "equipmentName") {
+        const detectedEquipmentType = detectEquipmentTypeFromName(value)
+
+        if (detectedEquipmentType) {
+          next.equipmentType = detectedEquipmentType
+        }
+      }
+
       if (key === "industryCode") {
-        const matchedIndustryName = findIndustryNameByCode(value)
+        const nextIndustryCode = value.toUpperCase().replace(/\s/g, "")
+        next.industryCode = nextIndustryCode
+
+        const matchedIndustryName = findIndustryNameByCode(nextIndustryCode)
 
         if (matchedIndustryName) {
           next.industryName = matchedIndustryName
@@ -707,9 +915,10 @@ export default function RoiPage() {
   }
 
   const handleReset = () => {
-    const initialScenarios = buildLocalScenarios(initialForm)
+    const resetForm = getInitialFormFromMyPage()
+    const initialScenarios = buildLocalScenarios(resetForm)
 
-    setForm(initialForm)
+    setForm(resetForm)
     setScenarios(initialScenarios)
     setRecommendedScenarioId("A")
     setSelectedScenarioId("A")
@@ -1025,7 +1234,9 @@ function InputPanel({
             padding: "32px 28px 28px",
           }}
         >
-          <SectionTitle>공통 필수 정보</SectionTitle>
+          <SectionTitle tooltip="마이페이지에 저장된 입력값이 기본으로 채워지며, 이 화면에서 자유롭게 수정할 수 있습니다. 수정한 값은 ROI 계산에만 사용됩니다.">
+            공통 필수 정보
+          </SectionTitle>
 
           <div
             style={{
@@ -1041,9 +1252,11 @@ function InputPanel({
                 onChange={(event) => onChange("equipmentType", event.target.value)}
                 style={selectStyle}
               >
-                <option value="press / 프레스">press / 프레스</option>
-                <option value="cnc / CNC">cnc / CNC</option>
-                <option value="injection / 사출">injection / 사출</option>
+                {EQUIPMENT_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.value}
+                  </option>
+                ))}
               </select>
             </FieldBox>
 
@@ -1081,7 +1294,8 @@ function InputPanel({
             style={{
               display: "grid",
               gridTemplateColumns: "1fr 1fr",
-              gap: "18px 20px",
+              gap: "28px 26px",
+              alignItems: "start",
             }}
           >
             <FieldBox label="설비명">
@@ -1105,8 +1319,10 @@ function InputPanel({
             <FieldBox label="연간 에너지 비용 (만원/년)">
               <input
                 value={form.annualEnergyCostManwon}
-                onChange={(event) => onChange("annualEnergyCostManwon", event.target.value)}
-                placeholder="예: 4500"
+                onChange={(event) =>
+                  onChange("annualEnergyCostManwon", formatCommaNumber(event.target.value))
+                }
+                placeholder="예: 4,500"
                 style={inputStyle}
               />
             </FieldBox>
@@ -1114,7 +1330,7 @@ function InputPanel({
             <FieldBox label="직원 수 (명)">
               <input
                 value={form.employees}
-                onChange={(event) => onChange("employees", event.target.value)}
+                onChange={(event) => onChange("employees", formatCommaNumber(event.target.value))}
                 placeholder="예: 45"
                 style={inputStyle}
               />
@@ -1123,30 +1339,24 @@ function InputPanel({
             <FieldBox label="연매출 (만원/년)">
               <input
                 value={form.annualRevenueManwon}
-                onChange={(event) => onChange("annualRevenueManwon", event.target.value)}
-                placeholder="예: 320000"
+                onChange={(event) =>
+                  onChange("annualRevenueManwon", formatCommaNumber(event.target.value))
+                }
+                placeholder="예: 320,000"
                 style={inputStyle}
               />
             </FieldBox>
 
-            <FieldBox label="새 설비 예상 에너지 비용">
+            <FieldBox label="연간 유지보수 비용 (만원/년)">
               <input
-                value={form.newEquipmentEnergyCostManwon}
+                value={form.annualMaintenanceCostManwon}
                 onChange={(event) =>
-                  onChange("newEquipmentEnergyCostManwon", event.target.value)
+                  onChange(
+                    "annualMaintenanceCostManwon",
+                    formatCommaNumber(event.target.value),
+                  )
                 }
-                placeholder="비워두면 평균값 사용"
-                style={inputStyle}
-              />
-            </FieldBox>
-
-            <FieldBox label="새 설비 예상 투자 비용">
-              <input
-                value={form.newEquipmentInvestmentManwon}
-                onChange={(event) =>
-                  onChange("newEquipmentInvestmentManwon", event.target.value)
-                }
-                placeholder="비워두면 평균값 사용"
+                placeholder="예: 1,200"
                 style={inputStyle}
               />
             </FieldBox>
@@ -1160,17 +1370,98 @@ function InputPanel({
               />
             </FieldBox>
 
-            <FieldBox label="연간 유지보수 비용 (만원/년)">
-              <input
-                value={form.annualMaintenanceCostManwon}
-                onChange={(event) =>
-                  onChange("annualMaintenanceCostManwon", event.target.value)
-                }
-                placeholder="예: 1200"
-                style={inputStyle}
-              />
-            </FieldBox>
+            <div />
           </div>
+
+          <details
+            style={{
+              marginTop: "18px",
+              marginBottom: "18px",
+              border: `1px solid ${colors.lineSoft}`,
+              borderRadius: "24px",
+              background: "#FFFFFF",
+              padding: "22px 24px",
+            }}
+          >
+            <summary
+              style={{
+                color: colors.navy,
+                fontSize: "18px",
+                fontWeight: 950,
+                cursor: "pointer",
+                listStyle: "none",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "14px",
+              }}
+            >
+              <span>예상 투자비용 입력하기</span>
+              <span
+                style={{
+                  color: "#94A3B8",
+                  fontSize: "13px",
+                  fontWeight: 900,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                선택 · ROI 정확도 향상
+              </span>
+            </summary>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "18px 20px",
+                marginTop: "20px",
+              }}
+            >
+              <FieldBox label="전체교체 예상 투자금">
+                <input
+                  value={form.scenarioAInvestmentManwon}
+                  onChange={(event) =>
+                    onChange(
+                      "scenarioAInvestmentManwon",
+                      formatCommaNumber(event.target.value),
+                    )
+                  }
+                  placeholder="예: 22,000"
+                  style={inputStyle}
+                />
+                <HelperText>단위: 만원 · scenario_a_investment_manwon</HelperText>
+              </FieldBox>
+
+              <FieldBox label="부분교체 예상 투자금">
+                <input
+                  value={form.scenarioBInvestmentManwon}
+                  onChange={(event) =>
+                    onChange(
+                      "scenarioBInvestmentManwon",
+                      formatCommaNumber(event.target.value),
+                    )
+                  }
+                  placeholder="예: 4,994"
+                  style={inputStyle}
+                />
+                <HelperText>단위: 만원 · scenario_b_investment_manwon</HelperText>
+              </FieldBox>
+            </div>
+
+            <p
+              style={{
+                color: colors.muted,
+                fontSize: "13px",
+                lineHeight: 1.7,
+                fontWeight: 800,
+                margin: 0,
+                marginTop: "18px",
+              }}
+            >
+              마이페이지에 입력한 값이 있으면 자동으로 채워집니다. 이 페이지에서 수정한
+              값은 ROI 계산에만 사용되며 마이페이지 정보로 저장되지는 않습니다.
+            </p>
+          </details>
 
           <div
             style={{
@@ -2016,7 +2307,15 @@ function EvidenceSection({
   )
 }
 
-function SectionTitle({ children }: { children: ReactNode }) {
+function SectionTitle({
+  children,
+  tooltip,
+}: {
+  children: ReactNode
+  tooltip?: string
+}) {
+  const [tooltipOpen, setTooltipOpen] = useState(false)
+
   return (
     <div
       style={{
@@ -2026,9 +2325,61 @@ function SectionTitle({ children }: { children: ReactNode }) {
         letterSpacing: "-0.03em",
         fontWeight: 900,
         marginBottom: "18px",
+        display: "flex",
+        alignItems: "center",
+        gap: "10px",
+        position: "relative",
+        width: "fit-content",
       }}
     >
-      {children}
+      <span>{children}</span>
+
+      {tooltip && (
+        <span
+          onMouseEnter={() => setTooltipOpen(true)}
+          onMouseLeave={() => setTooltipOpen(false)}
+          style={{
+            width: "24px",
+            height: "24px",
+            borderRadius: "50%",
+            background: "#EEF2F7",
+            color: colors.muted,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "14px",
+            fontWeight: 950,
+            cursor: "help",
+            flexShrink: 0,
+          }}
+        >
+          i
+        </span>
+      )}
+
+      {tooltip && tooltipOpen && (
+        <div
+          style={{
+            position: "absolute",
+            left: "calc(100% + 10px)",
+            top: "-4px",
+            width: "320px",
+            padding: "14px 16px",
+            borderRadius: "16px",
+            border: `1px solid ${colors.lineSoft}`,
+            background: "#FFFFFF",
+            boxShadow: "0 18px 42px rgba(15,23,42,.12)",
+            color: colors.muted,
+            fontSize: "13px",
+            lineHeight: 1.65,
+            fontWeight: 850,
+            letterSpacing: "-0.01em",
+            zIndex: 20,
+          }}
+        >
+          {tooltip}
+        </div>
+      )}
     </div>
   )
 }
@@ -2040,6 +2391,9 @@ function FieldBox({
   label: string
   children: ReactNode
 }) {
+  const isRequired = label.trim().endsWith("*")
+  const displayLabel = isRequired ? label.replace(/\s*\*$/, "") : label
+
   return (
     <div>
       <label
@@ -2052,10 +2406,37 @@ function FieldBox({
           marginBottom: "10px",
         }}
       >
-        {label}
+        {displayLabel}
+        {isRequired && (
+          <span
+            style={{
+              color: "#D94E41",
+              marginLeft: "4px",
+            }}
+          >
+            *
+          </span>
+        )}
       </label>
       {children}
     </div>
+  )
+}
+
+function HelperText({ children }: { children: ReactNode }) {
+  return (
+    <p
+      style={{
+        color: "#94A3B8",
+        fontSize: "13px",
+        lineHeight: 1.55,
+        fontWeight: 900,
+        margin: 0,
+        marginTop: "10px",
+      }}
+    >
+      {children}
+    </p>
   )
 }
 

@@ -2,6 +2,7 @@ from fastapi import APIRouter
 from app.core.database import get_db
 from app.models.company import CompanyContext
 from app.models.equipment import EquipmentInput
+from app.agents.draft import application_draft_node
 from app.agents.capex import capex_advisor_node
 from app.state import FactofitState
 from datetime import datetime
@@ -69,6 +70,7 @@ async def analyze(company_id: str):
     }
 
     result_state = capex_advisor_node(state)
+    result_state = application_draft_node(result_state)
 
     # 4. roi_output 저장
     if result_state.get("roi_result"):
@@ -98,11 +100,27 @@ async def analyze(company_id: str):
         except Exception as e:
             print(f"matched_policy 저장 실패: {e}")
 
+    # 6. draft_result 저장
+    if result_state.get("draft_result"):
+        try:
+            matched_policies = result_state.get("matched_policies", [])
+            policy_id = matched_policies[0].get("id", "") if matched_policies else ""
+            
+            db.table("draft_result").insert({
+                "company_id": company_id,
+                "policy_id": policy_id,
+                "draft_content": result_state["draft_result"],
+                "created_at": datetime.now().isoformat()
+            }).execute()
+        except Exception as e:
+            print(f"draft_result 저장 실패: {e}")
+
     return {
         "success": True,
         "data": {
             "roi_result": result_state.get("roi_result"),
             "matched_policies": result_state.get("matched_policies", []),
+            "draft_result": result_state.get("draft_result"),
             "response": result_state.get("final_response", "")
         }
     }

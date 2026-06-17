@@ -5,6 +5,7 @@ from app.state import FactofitState
 from app.prompts.policy import POLICY_SYSTEM_PROMPT
 from app.tools.vector_search import search_policies
 from app.core.llm import llm
+from app.tools.query_builder import _get_impact_keywords
 from datetime import date
 
 
@@ -225,3 +226,221 @@ def policy_matching_node(state: FactofitState) -> FactofitState:
         state["final_response"] = response.content
 
     return state
+
+
+# ────────────────────────────────────────────────────────────────
+# A/B 후보 병합 & ROI 기반 재정렬
+# ────────────────────────────────────────────────────────────────
+
+def _policy_key(policy: dict) -> str | None:
+    """정책 중복 제거 기준 키."""
+    metadata = policy.get("metadata", {})
+    return (
+        policy.get("id")
+        or metadata.get("policy_id")
+        or metadata.get("title")
+    )
+
+
+def merge_policy_candidates(
+    a_candidates: list[dict],
+    b_candidates: list[dict],
+) -> list[dict]:
+    """
+    A안/B안 검색 결과를 병합합니다.
+    - policy_id(또는 title) 기준 중복 제거
+    - 중복 시 distance는 min값 채택
+    - scenario_match 태그 부착 (["a"], ["b"], ["a","b"])
+    """
+    merged: dict[str, dict] = {}
+
+    for scenario, candidates in [("a", a_candidates), ("b", b_candidates)]:
+        for policy in candidates:
+            key = _policy_key(policy)
+            if not key:
+                continue
+
+            if key not in merged:
+                merged[key] = {**policy, "scenario_match": [scenario]}
+                continue
+
+            existing = merged[key]
+            if scenario not in existing["scenario_match"]:
+                existing["scenario_match"].append(scenario)
+            existing["distance"] = min(
+                existing.get("distance", 1),
+                policy.get("distance", 1),
+            )
+
+    return list(merged.values())
+
+
+def _get_roi_impact_keywords(roi_result: dict, scenario: str) -> list[str]:
+    """
+    ROI breakdown에서 가장 큰 개선 목적에 해당하는 키워드를 반환합니다.
+    scenario: 'a' 또는 'b'
+    """
+    scenario_key = "scenario_a" if scenario == "a" else "scenario_b"
+    breakdown = roi_result.get(scenario_key, {}).get("breakdown", {})
+    return _get_impact_keywords(breakdown)
+
+
+def rerank_policies_with_roi(
+    policies: list[dict],
+    roi_result: dict,
+) -> list[dict]:
+    """
+    ROI 결과 기반으로 정책 후보를 재정렬합니다.
+
+    final_score 구성:
+      base_score   = 1 - distance
+      + scenario_bonus  A 또는 B query에 걸리면 +0.1
+      + common_bonus    A+B 둘 다 걸리면 +0.05
+      + impact_bonus    ROI 목적 키워드와 정책 텍스트 일치 시 +0.1
+      + amount_bonus    max_amount >= 5000만원 이상이면 +0.05
+
+    NOTE: scenario_match, scenario_label, final_score는 응답 전용.
+          DB matched_policy 테이블에는 기존 컬럼만 저장.
+    """
+    ranked = []
+
+    for policy in policies:
+        metadata = policy.get("metadata", {})
+        scenario_match = policy.get("scenario_match", [])
+
+        base_score = 1 - policy.get("distance", 1)
+        scenario_bonus = 0.1 if scenario_match else 0
+        common_bonus = 0.05 if set(scenario_match) == {"a", "b"} else 0
+
+        # 정책 텍스트에서 ROI 목적 키워드 검색
+        text = " ".join([
+            str(metadata.get("title", "")),
+            str(metadata.get("policy_category", "")),
+            str(metadata.get("service_category", "")),
+            str(policy.get("content", "")),
+        ])
+        # 시나리오별 ROI breakdown 기반 목적 키워드로 정책 텍스트 검사
+        impact_keywords: list[str] = []
+        for scenario in scenario_match:
+            impact_keywords += _get_roi_impact_keywords(roi_result, scenario)
+
+        impact_bonus = 0.1 if any(kw in text for kw in impact_keywords) else 0
+
+        # 지원금 규모 보너스
+        amount_bonus = 0
+        try:
+            max_amount = float(metadata.get("max_amount") or 0)
+            if max_amount >= 5000:
+                amount_bonus = 0.05
+        except (TypeError, ValueError):
+            pass
+
+        final_score = base_score + scenario_bonus + common_bonus + impact_bonus + amount_bonus
+
+        # 시나리오 라벨
+        if set(scenario_match) == {"a", "b"}:
+            scenario_label = "A/B 공통 적합"
+        elif scenario_match == ["a"]:
+            scenario_label = "A안 전체교체 적합"
+        elif scenario_match == ["b"]:
+            scenario_label = "B안 부분개선 적합"
+        else:
+            scenario_label = ""
+
+        ranked.append({
+            **policy,
+            "scenario_match": scenario_match,
+            "scenario_label": scenario_label,
+            "final_score": round(final_score, 3),
+            "match_score": round(final_score, 3),
+        })
+
+    return sorted(ranked, key=lambda p: p.get("final_score", 0), reverse=True)
+
+
+def evaluate_and_rerank_with_llm(
+    top_policies: list[dict],
+    company_context: dict,
+    equipment_name: str,
+    roi_result: dict
+) -> list[dict]:
+    """
+    알고리즘이 1차 선별한 TOP 10 공고를 LLM에게 넘겨서
+    최종 별점(llm_score)과 추천 이유(reason)를 받아오고,
+    알고리즘 점수(60%) + LLM 점수(40%)로 하이브리드 최종 랭킹을 산출합니다.
+    """
+    if not top_policies:
+        return []
+
+    from app.prompts.policy_hybrid import POLICY_HYBRID_PROMPT
+
+    # LLM에게 제공할 정책 목록 요약
+    policies_summary = []
+    for p in top_policies:
+        meta = p.get("metadata", {})
+        policies_summary.append(
+            f"- ID: {p.get('id')} | 제목: {meta.get('title')} | "
+            f"지원금: {meta.get('max_amount', '정보없음')} | "
+            f"매칭 시나리오: {p.get('scenario_label')}"
+        )
+
+    # 타겟 시나리오 요약
+    scenario_a = roi_result.get("scenario_a", {}).get("breakdown", {})
+    scenario_b = roi_result.get("scenario_b", {}).get("breakdown", {})
+    a_impact = ", ".join(_get_impact_keywords(scenario_a))
+    b_impact = ", ".join(_get_impact_keywords(scenario_b))
+    roi_scenarios = f"A안(전체교체/대규모) 타겟: {a_impact} / B안(부분개선/소규모) 타겟: {b_impact}"
+
+    prompt = POLICY_HYBRID_PROMPT.format(
+        industry_code=", ".join(company_context.get("industry_code", [])) or "정보 없음",
+        region=company_context.get("region") or "정보 없음",
+        company_type=company_context.get("company_type") or "정보 없음",
+        equipment_info=equipment_name or "제조 설비",
+        roi_scenarios=roi_scenarios,
+        retrieved_policies="\n".join(policies_summary)
+    )
+
+    try:
+        response = llm.invoke([SystemMessage(content=prompt)])
+        content = response.content.strip()
+        if content.startswith("```"):
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+
+        import json as _json
+        result = _json.loads(content.strip())
+        llm_evals = result.get("matched_policies", [])
+
+        eval_map = {
+            item.get("id"): item
+            for item in llm_evals
+            if item.get("id")
+        }
+    except Exception as e:
+        print(f"하이브리드 LLM 평가 실패: {e}")
+        eval_map = {}
+
+    hybrid_ranked = []
+    for p in top_policies:
+        pid = p.get("id")
+        evaluation = eval_map.get(pid, {})
+
+        llm_score_num = evaluation.get("score_num", 3)
+        llm_score_str = evaluation.get("score", "●●●○○")
+        reason = evaluation.get("reason", f"알고리즘 기반 {p.get('scenario_label', '')} 추천 공고입니다.")
+
+        algo_score = p.get("final_score", 0.5)
+
+        # 하이브리드 점수: 알고리즘 60% + LLM(5점 만점 → 1.0 스케일) 40%
+        normalized_llm_score = llm_score_num / 5.0
+        hybrid_score = (algo_score * 0.6) + (normalized_llm_score * 0.4)
+
+        hybrid_ranked.append({
+            **p,
+            "llm_score": llm_score_str,
+            "reason": reason,
+            "hybrid_score": round(hybrid_score, 3),
+        })
+
+    return sorted(hybrid_ranked, key=lambda x: x.get("hybrid_score", 0), reverse=True)

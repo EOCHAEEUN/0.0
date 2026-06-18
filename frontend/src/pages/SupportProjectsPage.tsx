@@ -3,10 +3,12 @@ import { useNavigate } from "react-router-dom"
 
 type SupportProject = {
   id: number
+  policyId: string
   title: string
   agency: string
   deadline: string
   amount: string
+  supportAmountValue: number
   fitScore: number
   category: string
   description: string
@@ -26,9 +28,17 @@ type PolicyState = "loading" | "error" | "empty" | "success"
 
 type PolicyApiItem = {
   id?: string | number
+  policy_id?: string | number
+  title?: string
+  organization?: string
   content?: string
   reason?: string
   llm_score?: string
+  match_score?: number
+  final_score?: number
+  hybrid_score?: number
+  scenario_label?: string
+  scenario_match?: string[]
   metadata?: {
     title?: string
     organization?: string
@@ -52,9 +62,46 @@ const DEFAULT_EQUIPMENT_CONTEXT = {
 const API_BASE = "http://127.0.0.1:8000"
 const COMPANY_ID_STORAGE_KEY = "factofit_company_id"
 const MY_PAGE_STORAGE_KEY = "factofit_mypage_profile"
+const ANALYSIS_RESULT_STORAGE_KEY = "factofit_analysis_result"
+const AUTH_SESSION_STORAGE_KEY = "factofit_auth_session"
+const ACCESS_TOKEN_STORAGE_KEY = "factofit_access_token"
+const DRAFT_RESULT_STORAGE_KEY = "factofit_draft_result"
 
 function getStoredCompanyId() {
   return window.localStorage.getItem(COMPANY_ID_STORAGE_KEY) || ""
+}
+
+function getAccessToken() {
+  const directToken = window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY)
+  if (directToken) return directToken
+
+  try {
+    const raw = window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY)
+    if (!raw) return ""
+    const parsed = JSON.parse(raw)
+    return parsed?.access_token || parsed?.session?.access_token || ""
+  } catch {
+    return ""
+  }
+}
+
+function getStoredAnalysisMeta() {
+  try {
+    const raw = window.localStorage.getItem(ANALYSIS_RESULT_STORAGE_KEY)
+    if (!raw) return { equipmentId: "" }
+
+    const parsed = JSON.parse(raw)
+    return {
+      equipmentId:
+        parsed?.data?.selected_equipment_id ||
+        parsed?.selected_equipment_id ||
+        parsed?.data?.equipment_id ||
+        parsed?.equipment_id ||
+        "",
+    }
+  } catch {
+    return { equipmentId: "" }
+  }
 }
 
 function readSelectedEquipmentContext() {
@@ -95,6 +142,17 @@ function scoreToPercent(score?: string) {
   return Math.min(100, Math.max(0, filled * 20))
 }
 
+function getPolicyFitScore(policy: PolicyApiItem) {
+  const numericScore = Number(
+    policy.hybrid_score ?? policy.final_score ?? policy.match_score,
+  )
+  if (Number.isFinite(numericScore) && numericScore > 0) {
+    return Math.round(numericScore <= 1 ? numericScore * 100 : numericScore)
+  }
+
+  return scoreToPercent(policy.llm_score)
+}
+
 function formatSupportAmount(value?: number | string | null) {
   if (value === null || value === undefined || value === "" || value === "None") {
     return "정보 없음"
@@ -122,17 +180,22 @@ function getProjectTone(score: number): SupportProject["tone"] {
 
 function mapPolicyToProject(policy: PolicyApiItem, index: number): SupportProject {
   const metadata = policy.metadata ?? {}
-  const fitScore = scoreToPercent(policy.llm_score)
+  const policyId = String(policy.id ?? policy.policy_id ?? "")
+  const fitScore = getPolicyFitScore(policy)
+  const supportAmountValue = Number(metadata.max_amount) || 0
 
   return {
     id: Number(policy.id) || index + 1,
+    policyId,
     title: metadata.title || `추천 지원사업 ${index + 1}`,
     agency: metadata.organization || "주관기관 정보 없음",
     deadline: normalizeDeadline(metadata.deadline_display || metadata.deadline),
     amount: formatSupportAmount(metadata.max_amount),
+    supportAmountValue,
     fitScore,
     category: metadata.service_category || metadata.policy_category || "지원사업",
     description:
+      policy.scenario_label ||
       policy.reason ||
       policy.content ||
       "기업 조건과 설비 정보를 기준으로 추천된 지원사업입니다.",
@@ -145,7 +208,31 @@ function mapPolicyToProject(policy: PolicyApiItem, index: number): SupportProjec
   }
 }
 
+function readAnalysisPolicies(): PolicyApiItem[] {
+  try {
+    const raw = window.localStorage.getItem(ANALYSIS_RESULT_STORAGE_KEY)
+    if (!raw) return []
+
+    const parsed = JSON.parse(raw)
+    const policies =
+      parsed?.data?.matched_policies ??
+      parsed?.matched_policies ??
+      parsed?.data?.policies ??
+      parsed?.policies ??
+      []
+
+    return Array.isArray(policies) ? policies : []
+  } catch {
+    return []
+  }
+}
+
 async function fetchPolicyCards(companyId: string): Promise<SupportProject[]> {
+  const analysisPolicies = readAnalysisPolicies()
+  if (analysisPolicies.length > 0) {
+    return analysisPolicies.map((policy, index) => mapPolicyToProject(policy, index))
+  }
+
   const response = await fetch(
     `${API_BASE}/api/policies?company_id=${encodeURIComponent(companyId)}&limit=10`,
   )
@@ -230,6 +317,12 @@ function getBestScore(projects: SupportProject[]) {
 
 function getPriorityCount(projects: SupportProject[]) {
   return projects.filter((project) => project.fitScore >= 85).length
+}
+
+function getMaxSupportAmount(projects: SupportProject[]) {
+  const maxAmount = Math.max(...projects.map((project) => project.supportAmountValue))
+  if (!Number.isFinite(maxAmount) || maxAmount <= 0) return "-"
+  return formatSupportAmount(maxAmount)
 }
 
 function EmptyPolicyState({ onBackToRoi }: { onBackToRoi: () => void }) {
@@ -410,6 +503,7 @@ export default function SupportProjectsPage() {
 
   const [policyState, setPolicyState] = useState<PolicyState>("loading")
   const [policyCards, setPolicyCards] = useState<SupportProject[]>([])
+  const [draftingPolicyId, setDraftingPolicyId] = useState<string | null>(null)
   const selectedEquipmentContext = useMemo(() => readSelectedEquipmentContext(), [])
 
   useEffect(() => {
@@ -452,7 +546,58 @@ export default function SupportProjectsPage() {
   const hasPolicyCards = policyCards.length > 0
 
   const bestScore = getBestScore(policyCards)
+  const maxSupportAmount = getMaxSupportAmount(policyCards)
   const priorityCount = getPriorityCount(policyCards)
+
+  async function handleCreateDraft(project: SupportProject) {
+    if (!project.policyId) {
+      window.alert("policy_id가 없어 신청서 초안을 만들 수 없습니다.")
+      return
+    }
+
+    const companyId = getStoredCompanyId()
+    const { equipmentId } = getStoredAnalysisMeta()
+
+    if (!companyId || !equipmentId) {
+      window.alert("분석 결과의 company_id/equipment_id를 찾지 못했습니다.")
+      return
+    }
+
+    const accessToken = getAccessToken()
+
+    try {
+      setDraftingPolicyId(project.policyId)
+
+      const response = await fetch(`${API_BASE}/api/draft`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          company_id: companyId,
+          equipment_id: equipmentId,
+          policy_id: project.policyId,
+        }),
+      })
+
+      const text = await response.text()
+      const json = text ? JSON.parse(text) : null
+
+      if (!response.ok) {
+        throw new Error(json?.detail || json?.message || `Draft API failed: ${response.status}`)
+      }
+
+      window.localStorage.setItem(DRAFT_RESULT_STORAGE_KEY, JSON.stringify(json))
+      navigate("/application-draft")
+    } catch (error) {
+      console.error("Draft API failed:", error)
+      window.alert(error instanceof Error ? error.message : "신청서 초안 생성에 실패했습니다.")
+    } finally {
+      setDraftingPolicyId(null)
+    }
+  }
 
   return (
     <main className="page">
@@ -507,7 +652,7 @@ export default function SupportProjectsPage() {
 
             <div className="mini-stat">
               <span>예상 최대 지원금</span>
-              <b>{bestScore}</b>
+              <b>{maxSupportAmount}</b>
             </div>
 
             <div className="mini-stat">
@@ -577,7 +722,8 @@ export default function SupportProjectsPage() {
                       <button
                         className="btn dark"
                         type="button"
-                        onClick={() => navigate("/application-draft")}
+                        disabled={draftingPolicyId === topProject.policyId}
+                        onClick={() => handleCreateDraft(topProject)}
                       >
                         신청서 초안 만들기
                       </button>
@@ -977,7 +1123,7 @@ export default function SupportProjectsPage() {
                         gap: "20px",
                       }}
                     >
-                      {policyCards.map((project) => (
+                      {policyCards.slice(0, 5).map((project) => (
                         <article
                           className={`scenario ${
                             project.fitScore >= 85 ? "best" : ""
@@ -1100,7 +1246,8 @@ export default function SupportProjectsPage() {
                             <button
                               className="btn dark"
                               type="button"
-                              onClick={() => navigate("/application-draft")}
+                              disabled={draftingPolicyId === project.policyId}
+                              onClick={() => handleCreateDraft(project)}
                             >
                               신청서 초안
                             </button>

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -10,6 +10,6 @@ class DraftResult(BaseModel):
     company_id: Optional[UUID] = None
     equipment_id: Optional[UUID] = None
     policy_id: Optional[str] = None
-    scenario: Optional[Literal["a", "b", "c"]] = None
+    # Scenario values are read from matched_policy and embedded in draft_content.
     draft_content: dict
     created_at: datetime

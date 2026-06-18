@@ -7,6 +7,7 @@ from app.tools.vector_search import search_policies
 from app.core.llm import llm
 from app.tools.query_builder import _get_impact_keywords
 from datetime import date
+from app.core.database import get_db
 
 
 UNKNOWN_DEADLINE_VALUES = {"", "none", "null", "nan", "마감일 미정", "상시"}
@@ -280,9 +281,22 @@ def _get_roi_impact_keywords(roi_result: dict, scenario: str) -> list[str]:
     ROI breakdown에서 가장 큰 개선 목적에 해당하는 키워드를 반환합니다.
     scenario: 'a' 또는 'b'
     """
+    if scenario == "c":
+        return (
+            _get_impact_keywords(roi_result.get("scenario_a", {}).get("breakdown", {}))
+            + _get_impact_keywords(roi_result.get("scenario_b", {}).get("breakdown", {}))
+        )
+
     scenario_key = "scenario_a" if scenario == "a" else "scenario_b"
     breakdown = roi_result.get(scenario_key, {}).get("breakdown", {})
     return _get_impact_keywords(breakdown)
+
+
+def _normalize_scenario_match_for_response(scenario_match: list[str]) -> list[str]:
+    """Return the persisted/display scenario tag. A+B common fit is stored as c."""
+    if set(scenario_match) == {"a", "b"}:
+        return ["c"]
+    return scenario_match
 
 
 def rerank_policies_with_roi(
@@ -307,6 +321,7 @@ def rerank_policies_with_roi(
     for policy in policies:
         metadata = policy.get("metadata", {})
         scenario_match = policy.get("scenario_match", [])
+        display_scenario_match = _normalize_scenario_match_for_response(scenario_match)
 
         base_score = 1 - policy.get("distance", 1)
         scenario_bonus = 0.1 if scenario_match else 0
@@ -338,18 +353,18 @@ def rerank_policies_with_roi(
         final_score = base_score + scenario_bonus + common_bonus + impact_bonus + amount_bonus
 
         # 시나리오 라벨
-        if set(scenario_match) == {"a", "b"}:
-            scenario_label = "A/B 공통 적합"
-        elif scenario_match == ["a"]:
+        if display_scenario_match == ["c"]:
+            scenario_label = "C안 공통 적합"
+        elif display_scenario_match == ["a"]:
             scenario_label = "A안 전체교체 적합"
-        elif scenario_match == ["b"]:
+        elif display_scenario_match == ["b"]:
             scenario_label = "B안 부분개선 적합"
         else:
             scenario_label = ""
 
         ranked.append({
             **policy,
-            "scenario_match": scenario_match,
+            "scenario_match": display_scenario_match,
             "scenario_label": scenario_label,
             "final_score": round(final_score, 3),
             "match_score": round(final_score, 3),
@@ -444,3 +459,171 @@ def evaluate_and_rerank_with_llm(
         })
 
     return sorted(hybrid_ranked, key=lambda x: x.get("hybrid_score", 0), reverse=True)
+
+
+# -------------------------------------------------------------------
+# Raw policy candidates from DB
+# -------------------------------------------------------------------
+
+
+
+
+def _policy_field(policy: dict, key: str, default=None):
+    """Read a policy value from either a DB row or nested metadata."""
+    if key in policy and policy.get(key) is not None:
+        return policy.get(key)
+
+    metadata = policy.get("metadata")
+    if isinstance(metadata, dict) and metadata.get(key) is not None:
+        return metadata.get(key)
+
+    return default
+
+
+def get_policy_raw_candidates(company_context: dict) -> list[dict]:
+    """
+    Fetch first-pass policy candidates from the policy DB table.
+
+    Purpose:
+    - This is not the AI recommendation result.
+    - This is the raw candidate pool filtered by company condition.
+    - Example: C24 company -> all C24-compatible policy rows.
+    """
+    db = get_db()
+
+    company_codes = _normalize_list(company_context.get("industry_code"))
+    region = company_context.get("region") or ""
+    region_short = region.split()[0] if region else ""
+    company_type_values = _normalize_list(company_context.get("company_type"))
+
+    result = db.table("policy").select("*").execute()
+    rows = result.data or []
+
+    candidates = []
+
+    for policy in rows:
+        policy_codes = _normalize_list(_policy_field(policy, "industry_codes"))
+        policy_region = _policy_field(policy, "region", "") or ""
+        eligible_types = _normalize_list(_policy_field(policy, "eligible_company_types", []))
+
+        code_match = (
+            not company_codes
+            or not policy_codes
+            or "C" in policy_codes
+            or any(code in policy_codes for code in company_codes)
+        )
+
+        region_match = (
+            not region
+            or not policy_region
+            or "전국" in policy_region
+            or region_short in policy_region
+        )
+
+        type_match = (
+            not eligible_types
+            or not company_type_values
+            or any(company_type in eligible_types for company_type in company_type_values)
+        )
+
+        if code_match and region_match and type_match:
+            candidates.append(policy)
+
+    return candidates
+
+
+def format_raw_policy_candidate(policy: dict) -> dict:
+    """
+    Format raw candidates for the frontend list.
+    No AI score, no ranking, no reason.
+    """
+    return {
+        "policy_id": (
+            _policy_field(policy, "policy_id")
+            or _policy_field(policy, "id")
+        ),
+        "title": _policy_field(policy, "title", ""),
+        "organization": _policy_field(policy, "organization", ""),
+        "url": _policy_field(policy, "url", ""),
+        "deadline": _policy_field(policy, "deadline", ""),
+        "max_amount": _policy_field(policy, "max_amount"),
+        "industry_code": _policy_field(policy, "industry_codes"),
+        "region": _policy_field(policy, "region"),
+    }
+
+
+def _policy_text_for_ranking(policy: dict) -> str:
+    return " ".join(
+        str(value or "")
+        for value in [
+            _policy_field(policy, "title", ""),
+            _policy_field(policy, "content", ""),
+            _policy_field(policy, "eligibility_text", ""),
+            _policy_field(policy, "eligibility_evidence", ""),
+            _policy_field(policy, "organization", ""),
+            _policy_field(policy, "industry_code", ""),
+        ]
+    )
+
+
+def rank_candidates_by_query(
+    candidates: list[dict],
+    query: str,
+    limit: int = 10,
+) -> list[dict]:
+    """
+    Rank raw DB candidates by A/B ROI query keywords.
+
+    This keeps recommendation inside the first-pass candidate pool.
+    raw_candidates: DB-filtered company-fit policies
+    ranked candidates: ROI A/B keyword-fit policies
+    """
+    query_tokens = [
+        token.strip()
+        for token in str(query or "").split()
+        if token.strip()
+    ]
+
+    ranked = []
+
+    for policy in candidates:
+        text = _policy_text_for_ranking(policy)
+        keyword_score = sum(1 for token in query_tokens if token in text)
+
+        policy_id = (
+            _policy_field(policy, "policy_id")
+            or _policy_field(policy, "id")
+        )
+
+        title = _policy_field(policy, "title", "")
+        content = _policy_field(policy, "content", "") or text
+
+        metadata = {
+            **policy,
+            "title": title,
+            "organization": _policy_field(policy, "organization", ""),
+            "url": _policy_field(policy, "url", ""),
+            "deadline": _policy_field(policy, "deadline", ""),
+            "max_amount": _policy_field(policy, "max_amount"),
+            "industry_code": _policy_field(policy, "industry_codes"),
+            "region": _policy_field(policy, "region"),
+            "eligible_company_types": _policy_field(policy, "eligible_company_types", []),
+        }
+
+        distance = 1 - min(keyword_score / 10, 0.99)
+
+        ranked.append(
+            {
+                "id": policy_id,
+                "content": content,
+                "metadata": metadata,
+                "distance": distance,
+                "keyword_score": keyword_score,
+            }
+        )
+
+    return sorted(
+        ranked,
+        key=lambda item: item.get("keyword_score", 0),
+        reverse=True,
+    )[:limit]

@@ -1,20 +1,30 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from app.core.database import get_db
 from app.models.company import CompanyContext
 from app.models.equipment import EquipmentInput
-from app.agents.draft import application_draft_node
 from app.agents.capex import capex_advisor_node
 from app.state import FactofitState
 from datetime import datetime
+from app.core.auth import get_current_user
+from app.models.auth import CurrentUser
 
 router = APIRouter()
 
 @router.post("/analyze")
-async def analyze(company_id: str):
+async def analyze(
+    company_id: str,
+    current_user: CurrentUser = Depends(get_current_user),
+):
     db = get_db()
 
     # 1. DB에서 기업 정보 조회
-    company_data = db.table("company").select("*").eq("company_id", company_id).execute()
+    company_data = (
+        db.table("company")
+        .select("*")
+        .eq("company_id", company_id)
+        .eq("user_id", current_user.id)
+        .execute()
+    )
     if not company_data.data:
         return {"success": False, "message": "기업 정보를 찾을 수 없습니다."}
 
@@ -79,7 +89,6 @@ async def analyze(company_id: str):
         print(f"기존 데이터 삭제 실패: {e}")
 
     result_state = capex_advisor_node(state)
-    result_state = application_draft_node(result_state)
 
     # 4. roi_output 저장
     if result_state.get("roi_result"):
@@ -111,28 +120,11 @@ async def analyze(company_id: str):
         except Exception as e:
             print(f"matched_policy 저장 실패: {e}")
 
-    # 6. draft_result 저장
-    if result_state.get("draft_result"):
-        try:
-            matched_policies = result_state.get("matched_policies", [])
-            policy_id = matched_policies[0].get("id", "") if matched_policies else ""
-            
-            db.table("draft_result").insert({
-                "company_id": company_id,
-                "equipment_id": equipment_id,
-                "policy_id": policy_id,
-                "draft_content": result_state["draft_result"],
-                "created_at": datetime.now().isoformat()
-            }).execute()
-        except Exception as e:
-            print(f"draft_result 저장 실패: {e}")
-
     return {
         "success": True,
         "data": {
             "roi_result": result_state.get("roi_result"),
             "matched_policies": result_state.get("matched_policies", []),
-            "draft_result": result_state.get("draft_result"),
             "response": result_state.get("final_response", "")
         }
     }

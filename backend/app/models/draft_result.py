@@ -1,9 +1,15 @@
-from pydantic import BaseModel
 from datetime import datetime
+from typing import Literal, Optional
+from uuid import UUID
+
+from pydantic import BaseModel
+
 
 class DraftResult(BaseModel):
-    company_id: str
-    equipment_id: str
-    policy_id: str           # 어떤 공고 기반으로 작성했는지
-    draft_content: dict     
+    draft_result_id: Optional[UUID] = None
+    company_id: Optional[UUID] = None
+    equipment_id: Optional[UUID] = None
+    policy_id: Optional[str] = None
+    scenario: Optional[Literal["a", "b", "c"]] = None
+    draft_content: dict
     created_at: datetime

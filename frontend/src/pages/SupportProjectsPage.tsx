@@ -7,6 +7,7 @@ type SupportProject = {
   agency: string
   deadline: string
   amount: string
+  supportAmountValue: number
   fitScore: number
   category: string
   description: string
@@ -29,6 +30,10 @@ type PolicyApiItem = {
   content?: string
   reason?: string
   llm_score?: string
+  match_score?: number
+  final_score?: number
+  scenario_label?: string
+  scenario_match?: string[]
   metadata?: {
     title?: string
     organization?: string
@@ -52,6 +57,7 @@ const DEFAULT_EQUIPMENT_CONTEXT = {
 const API_BASE = "http://127.0.0.1:8000"
 const COMPANY_ID_STORAGE_KEY = "factofit_company_id"
 const MY_PAGE_STORAGE_KEY = "factofit_mypage_profile"
+const ANALYSIS_RESULT_STORAGE_KEY = "factofit_analysis_result"
 
 function getStoredCompanyId() {
   return window.localStorage.getItem(COMPANY_ID_STORAGE_KEY) || ""
@@ -95,6 +101,15 @@ function scoreToPercent(score?: string) {
   return Math.min(100, Math.max(0, filled * 20))
 }
 
+function getPolicyFitScore(policy: PolicyApiItem) {
+  const numericScore = Number(policy.final_score ?? policy.match_score)
+  if (Number.isFinite(numericScore) && numericScore > 0) {
+    return Math.round(numericScore <= 1 ? numericScore * 100 : numericScore)
+  }
+
+  return scoreToPercent(policy.llm_score)
+}
+
 function formatSupportAmount(value?: number | string | null) {
   if (value === null || value === undefined || value === "" || value === "None") {
     return "정보 없음"
@@ -122,7 +137,8 @@ function getProjectTone(score: number): SupportProject["tone"] {
 
 function mapPolicyToProject(policy: PolicyApiItem, index: number): SupportProject {
   const metadata = policy.metadata ?? {}
-  const fitScore = scoreToPercent(policy.llm_score)
+  const fitScore = getPolicyFitScore(policy)
+  const supportAmountValue = Number(metadata.max_amount) || 0
 
   return {
     id: Number(policy.id) || index + 1,
@@ -130,9 +146,11 @@ function mapPolicyToProject(policy: PolicyApiItem, index: number): SupportProjec
     agency: metadata.organization || "주관기관 정보 없음",
     deadline: normalizeDeadline(metadata.deadline_display || metadata.deadline),
     amount: formatSupportAmount(metadata.max_amount),
+    supportAmountValue,
     fitScore,
     category: metadata.service_category || metadata.policy_category || "지원사업",
     description:
+      policy.scenario_label ||
       policy.reason ||
       policy.content ||
       "기업 조건과 설비 정보를 기준으로 추천된 지원사업입니다.",
@@ -145,7 +163,31 @@ function mapPolicyToProject(policy: PolicyApiItem, index: number): SupportProjec
   }
 }
 
+function readAnalysisPolicies(): PolicyApiItem[] {
+  try {
+    const raw = window.localStorage.getItem(ANALYSIS_RESULT_STORAGE_KEY)
+    if (!raw) return []
+
+    const parsed = JSON.parse(raw)
+    const policies =
+      parsed?.data?.matched_policies ??
+      parsed?.matched_policies ??
+      parsed?.data?.policies ??
+      parsed?.policies ??
+      []
+
+    return Array.isArray(policies) ? policies : []
+  } catch {
+    return []
+  }
+}
+
 async function fetchPolicyCards(companyId: string): Promise<SupportProject[]> {
+  const analysisPolicies = readAnalysisPolicies()
+  if (analysisPolicies.length > 0) {
+    return analysisPolicies.map((policy, index) => mapPolicyToProject(policy, index))
+  }
+
   const response = await fetch(
     `${API_BASE}/api/policies?company_id=${encodeURIComponent(companyId)}&limit=10`,
   )
@@ -230,6 +272,12 @@ function getBestScore(projects: SupportProject[]) {
 
 function getPriorityCount(projects: SupportProject[]) {
   return projects.filter((project) => project.fitScore >= 85).length
+}
+
+function getMaxSupportAmount(projects: SupportProject[]) {
+  const maxAmount = Math.max(...projects.map((project) => project.supportAmountValue))
+  if (!Number.isFinite(maxAmount) || maxAmount <= 0) return "-"
+  return formatSupportAmount(maxAmount)
 }
 
 function EmptyPolicyState({ onBackToRoi }: { onBackToRoi: () => void }) {
@@ -452,6 +500,7 @@ export default function SupportProjectsPage() {
   const hasPolicyCards = policyCards.length > 0
 
   const bestScore = getBestScore(policyCards)
+  const maxSupportAmount = getMaxSupportAmount(policyCards)
   const priorityCount = getPriorityCount(policyCards)
 
   return (
@@ -507,7 +556,7 @@ export default function SupportProjectsPage() {
 
             <div className="mini-stat">
               <span>예상 최대 지원금</span>
-              <b>{bestScore}</b>
+              <b>{maxSupportAmount}</b>
             </div>
 
             <div className="mini-stat">

@@ -7,6 +7,7 @@ from app.models.auth import (
     CurrentUser,
     EmailCodeRequest,
     LoginRequest,
+    RefreshTokenRequest,
     SignupRequest,
     VerifyEmailCodeRequest,
 )
@@ -212,6 +213,29 @@ async def login(body: LoginRequest):
             content={
                 "success": False,
                 "message": "로그인에 실패했습니다.",
+                "error": str(exc),
+            },
+        )
+
+
+@router.post("/auth/refresh")
+async def refresh(body: RefreshTokenRequest):
+    db = create_service_client()
+
+    try:
+        auth_response = db.auth.refresh_session(body.refresh_token)
+
+        return {
+            "success": True,
+            "data": _session_payload(auth_response),
+        }
+
+    except Exception as exc:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "success": False,
+                "message": "세션이 만료되었습니다. 다시 로그인해주세요.",
                 "error": str(exc),
             },
         )

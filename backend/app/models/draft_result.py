@@ -10,6 +10,7 @@ class DraftResult(BaseModel):
     company_id: Optional[UUID] = None
     equipment_id: Optional[UUID] = None
     policy_id: Optional[str] = None
-    scenario: Optional[Literal["a", "b", "c"]] = None
+    scenario_match: Optional[list[str]] = None
+    scenario_label: Optional[str] = None
     draft_content: dict
     created_at: datetime

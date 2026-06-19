@@ -251,11 +251,6 @@ function toNumberOrNull(value?: number | string | null) {
   return Number.isNaN(amount) ? null : amount
 }
 
-function safeNumber(value: unknown, fallback = 0) {
-  const numberValue = Number(value)
-  return Number.isFinite(numberValue) ? numberValue : fallback
-}
-
 function clampScore(value: number) {
   return Math.min(100, Math.max(0, Math.round(value)))
 }

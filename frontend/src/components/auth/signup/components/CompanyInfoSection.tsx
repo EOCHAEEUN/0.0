@@ -46,6 +46,10 @@ export default function CompanyInfoSection({
   onCompanyTypeChange,
   onMainPurposeChange,
 }: CompanyInfoSectionProps) {
+  const purposeOptions = PURPOSE_OPTIONS.filter(
+    (option) => option.trim() !== "" && option !== "선택",
+  )
+
   return (
     <div className="ff-signup-section">
       <h3>3. 기업 정보</h3>
@@ -97,19 +101,24 @@ export default function CompanyInfoSection({
             onChange={(event) => onCompanyTypeChange(event.target.value)}
           >
             {COMPANY_TYPE_OPTIONS.map((option) => (
-              <option key={option}>{option}</option>
+              <option key={option} value={option}>
+                {option}
+              </option>
             ))}
           </select>
         </div>
 
         <div className="ff-signup-field">
-          <FieldLabel text="주요 목적" required />
+          <FieldLabel text="주요 목적" optional />
           <select
             value={mainPurpose}
             onChange={(event) => onMainPurposeChange(event.target.value)}
           >
-            {PURPOSE_OPTIONS.map((option) => (
-              <option key={option}>{option}</option>
+            <option value="">선택</option>
+            {purposeOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
             ))}
           </select>
         </div>

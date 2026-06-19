@@ -22,7 +22,7 @@ import {
   normalizePhoneNumber,
 } from "./signup.utils"
 
-const DEFAULT_PURPOSE = "지원사업 추천"
+const DEFAULT_PURPOSE = ""
 
 export function useSignupForm({ onClose }: UseSignupFormParams) {
   const [email, setEmail] = useState("")
@@ -407,7 +407,7 @@ export function useSignupForm({ onClose }: UseSignupFormParams) {
       industry_code: uniqueIndustryCodes,
       region: trimmedRegion,
       company_type: companyType,
-      primary_purpose: mainPurpose ? [mainPurpose] : [],
+      primary_purpose: mainPurpose.trim() ? [mainPurpose.trim()] : [],
       annual_revenue: 0,
     }
 

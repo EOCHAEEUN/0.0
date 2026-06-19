@@ -12,6 +12,7 @@ import AccountSection from "./signup/components/AccountSection"
 import AgreementBox from "./signup/components/AgreementBox"
 import CompanyInfoSection from "./signup/components/CompanyInfoSection"
 import UserInfoSection from "./signup/components/UserInfoSection"
+import { COMPANY_TYPE_PLACEHOLDER } from "./signup/signup.constants"
 import type { SignupModalProps } from "./signup/signup.types"
 import { useSignupForm } from "./signup/useSignupForm"
 
@@ -60,15 +61,30 @@ function getIndustryCode(row: unknown) {
   ).trim()
 }
 
-function hasValidIndustryRow(rows: unknown) {
-  if (!Array.isArray(rows)) return false
+function getIndustryRequiredStatus(rows: unknown) {
+  if (!Array.isArray(rows)) {
+    return {
+      hasCompleteIndustry: false,
+      hasIndustryName: false,
+      hasIndustryCode: false,
+    }
+  }
 
-  return rows.some((row) => {
+  const hasCompleteIndustry = rows.some((row) => {
     const industryName = getIndustryName(row)
     const industryCode = getIndustryCode(row)
 
     return industryName.length > 0 && industryCode.length > 0
   })
+
+  const hasIndustryName = rows.some((row) => getIndustryName(row).length > 0)
+  const hasIndustryCode = rows.some((row) => getIndustryCode(row).length > 0)
+
+  return {
+    hasCompleteIndustry,
+    hasIndustryName,
+    hasIndustryCode,
+  }
 }
 
 function normalizeText(value: string) {
@@ -82,6 +98,18 @@ function isPasswordRequirementPassed(
   passwordLabel: unknown,
 ) {
   if (!isFilled(password)) return false
+
+  if (Array.isArray(passwordChecks)) {
+    if (passwordChecks.length > 0) {
+      return passwordChecks.every((item) => {
+        if (item && typeof item === "object" && "valid" in item) {
+          return Boolean((item as { valid?: unknown }).valid)
+        }
+
+        return Boolean(item)
+      })
+    }
+  }
 
   if (passwordChecks && typeof passwordChecks === "object") {
     const values = Object.values(passwordChecks as Record<string, unknown>)
@@ -205,31 +233,19 @@ export default function SignupModal({
   const missingRequiredItems = useMemo(() => {
     const missing: string[] = []
 
-    if (!form.isEmailVerified) {
-      missing.push("이메일 인증")
-    }
-
     if (
       !isPasswordRequirementPassed(
         form.password,
         form.passwordChecks,
         form.passwordLevel,
         form.passwordLabel,
-      )
+      ) ||
+      !isFilled(form.passwordCheck) ||
+      (isFilled(form.password) &&
+        isFilled(form.passwordCheck) &&
+        !form.isPasswordMatched)
     ) {
-      missing.push("비밀번호 조건 충족")
-    }
-
-    if (!isFilled(form.passwordCheck)) {
-      missing.push("비밀번호 확인")
-    }
-
-    if (
-      isFilled(form.password) &&
-      isFilled(form.passwordCheck) &&
-      !form.isPasswordMatched
-    ) {
-      missing.push("비밀번호 일치 여부")
+      missing.push("비밀번호")
     }
 
     if (!isFilled(form.userName)) {
@@ -237,23 +253,43 @@ export default function SignupModal({
     }
 
     if (!isFilled(form.phone)) {
-      missing.push("휴대폰 번호")
+      missing.push("연락처")
     }
 
     if (!isFilled(form.companyName)) {
       missing.push("기업명")
     }
 
-    if (!hasValidIndustryRow(form.industryRows)) {
-      missing.push("업종명/업종코드")
+    const industryStatus = getIndustryRequiredStatus(form.industryRows)
+
+    if (!industryStatus.hasCompleteIndustry) {
+      if (!industryStatus.hasIndustryName) {
+        missing.push("업종명")
+      }
+
+      if (!industryStatus.hasIndustryCode) {
+        missing.push("업종코드")
+      }
+
+      if (
+        industryStatus.hasIndustryName &&
+        industryStatus.hasIndustryCode &&
+        !industryStatus.hasCompleteIndustry
+      ) {
+        missing.push("업종명/업종코드")
+      }
     }
 
     if (!isFilled(form.region)) {
       missing.push("지역")
     }
 
-    if (!isFilled(form.companyType)) {
-      missing.push("사업장 유형")
+    if (
+      !isFilled(form.companyType) ||
+      form.companyType === COMPANY_TYPE_PLACEHOLDER ||
+      form.companyType === "선택"
+    ) {
+      missing.push("기업 규모")
     }
 
     if (!form.agreeService) {
@@ -271,7 +307,6 @@ export default function SignupModal({
     form.companyName,
     form.companyType,
     form.industryRows,
-    form.isEmailVerified,
     form.isPasswordMatched,
     form.password,
     form.passwordCheck,
@@ -357,9 +392,9 @@ export default function SignupModal({
     if (missingRequiredItems.length > 0) {
       setSignupNotice({
         type: "required",
-        title: "필수 정보를 다시 확인해주세요.",
+        title: "필수 정보를 먼저 입력해주세요.",
         message:
-          "회원가입을 완료하려면 아래 필수 항목을 먼저 입력해야 합니다.",
+          "회원가입을 완료하려면 계정 정보와 기업 정보의 필수 항목이 필요합니다.\n입력이 필요한 항목을 확인한 뒤 다시 회원가입 완료를 눌러주세요.",
         items: missingRequiredItems,
       })
 
@@ -519,7 +554,7 @@ export default function SignupModal({
 
             {requiredNotice.items && requiredNotice.items.length > 0 && (
               <ul className="ff-signup-required-popover__list">
-                {requiredNotice.items.slice(0, 8).map((item) => (
+                {requiredNotice.items.slice(0, 10).map((item) => (
                   <li key={item}>{item}</li>
                 ))}
               </ul>

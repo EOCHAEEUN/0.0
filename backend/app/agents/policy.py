@@ -1,56 +1,116 @@
 from langchain_core.messages import SystemMessage, HumanMessage
+import json
+
 from app.state import FactofitState
 from app.prompts.policy import POLICY_SYSTEM_PROMPT
 from app.tools.vector_search import search_policies
-from app.tools.deadline import sort_by_deadline, is_urgent
 from app.core.llm import llm
+from app.tools.query_builder import _get_impact_keywords
 from datetime import date
+from app.core.database import get_db
+
+
+UNKNOWN_DEADLINE_VALUES = {"", "none", "null", "nan", "마감일 미정", "상시"}
+
+
+def _normalize_list(value) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    return [item.strip() for item in str(value).split(",") if item.strip()]
+
+
+def _parse_deadline(value) -> date | None:
+    if value is None:
+        return None
+
+    normalized = str(value).strip()
+    if normalized.lower() in UNKNOWN_DEADLINE_VALUES:
+        return None
+
+    try:
+        return date.fromisoformat(normalized[:10])
+    except ValueError:
+        return None
+
+
+def _decorate_policy_deadline(policy: dict) -> dict:
+    decorated = {**policy, "metadata": dict(policy.get("metadata", {}))}
+    deadline = _parse_deadline(decorated["metadata"].get("deadline"))
+
+    if deadline is None:
+        decorated["deadline_date"] = None
+        decorated["d_day"] = None
+        decorated["urgency_label"] = "마감일 미정"
+        decorated["metadata"]["deadline_display"] = "마감일 미정"
+        decorated["metadata"]["d_day"] = None
+        decorated["metadata"]["urgency_label"] = "마감일 미정"
+        return decorated
+
+    d_day = (deadline - date.today()).days
+    urgency_label = "🚨 긴급" if d_day <= 30 else "⚠️ 임박" if d_day <= 60 else ""
+
+    decorated["deadline_date"] = deadline.isoformat()
+    decorated["d_day"] = d_day
+    decorated["urgency_label"] = urgency_label
+    decorated["metadata"]["deadline_display"] = deadline.isoformat()
+    decorated["metadata"]["d_day"] = d_day
+    decorated["metadata"]["urgency_label"] = urgency_label
+    return decorated
+
+
+def _sort_policy_deadline(policy: dict) -> int:
+    d_day = policy.get("d_day")
+    return d_day if isinstance(d_day, int) else 999999
+
+
+def _equipment_name(equipment) -> str:
+    if not equipment:
+        return "정보 없음"
+    if hasattr(equipment, "equipment") and hasattr(equipment.equipment, "name"):
+        return equipment.equipment.name
+    if hasattr(equipment, "name"):
+        return equipment.name
+    return "정보 있음"
 
 
 def match_policies(company_context: dict, query: str) -> list[dict]:
-    industry_code = company_context.get("industry_code", [])
-    if isinstance(industry_code, list):
-        industry_code = ",".join(industry_code)
-
+    company_codes = _normalize_list(company_context.get("industry_code"))
     region = company_context.get("region", "")
     region_short = region.split()[0] if region else ""
+    company_type_values = _normalize_list(
+        company_context.get("company_type")
+    )
 
     policy_query = query
-    print(f"=== policy_query ===: {policy_query}")
-
     results = search_policies(policy_query, n_results=20, where=None)
-    print(f"=== search 결과 수 ===: {len(results)}")
 
     filtered = []
     for p in results:
-        meta = p["metadata"]
-        print(f"=== 정책 ===: {meta.get('title', '')} / region: {meta.get('region')} / industry_code: {meta.get('industry_code')}")
-        # 업종 필터
-        meta_code = meta.get("industry_code", "")
-        codes = [c.strip() for c in meta_code.split(",")]
+        meta = p.get("metadata", {})
+        policy_codes = _normalize_list(meta.get("industry_code"))
         code_match = (
-            not industry_code
-            or industry_code in codes
-            or "C" in codes
+            not company_codes
+            or not policy_codes
+            or "C" in policy_codes
+            or any(code in policy_codes for code in company_codes)
         )
 
-        # 지역 필터
         meta_region = meta.get("region", "")
         region_match = (
-            not region              # 기업 지역 없으면 통과
-            or not meta_region      # 전국 공고면 통과
-            or region_short in meta_region  # 지역 일치하면 통과
-            or "서울" in meta_region        # 중앙부처/스마트공장 계열 서울 공고 통과
-            or "전국" in meta_region        # 전국 명시된 공고 통과
-)
+            not region
+            or not meta_region
+            or region_short in meta_region
+            or "서울" in meta_region
+            or "전국" in meta_region
+        )
 
-        # 기업유형 필터
-        company_type = company_context.get("company_type", "")
-        eligible_types = meta.get("eligible_company_types", [])
+        eligible_types = _normalize_list(meta.get("eligible_company_types", []))
         type_match = (
-            not eligible_types  # 정책의 eligible_company_types가 없으면 통과 (제한 없는 정책)
-            or not company_type  # 기업의 company_type이 없으면 통과 (기업 정보 부족)
-            or company_type in eligible_types  # 기업 유형이 정책 조건에 포함되면 통과
+            not eligible_types
+            or not company_type_values
+            or any(company_type in eligible_types for company_type in company_type_values)
         )
 
         # 직원수 필터 (일단 주석처리)
@@ -87,17 +147,17 @@ def policy_matching_node(state: FactofitState) -> FactofitState:
         "industry_code": company.industry_code if company else None,
         "region": company.region if company else None,
         "company_type": company.company_type if company else None,
-        # "employee_count": company.employee_count if company else None,
-        # "annual_revenue": company.annual_revenue if company else None,
+        "employee_count": company.employee_count if company else None,
+        "annual_revenue": company.annual_revenue if company else None,
     }
     retrieved = match_policies(company_context, state["user_query"])
 
-    today = date.today()
+    decorated_policies = [_decorate_policy_deadline(p) for p in retrieved]
     valid_policies = [
-        p for p in retrieved
-        if p.get("metadata", {}).get("deadline", "9999-12-31") >= str(today)
+        p for p in decorated_policies
+        if p.get("d_day") is None or p["d_day"] >= 0
     ]
-    sorted_policies = sort_by_deadline(valid_policies)
+    sorted_policies = sorted(valid_policies, key=_sort_policy_deadline)
 
     state["matched_policies"] = sorted_policies
 
@@ -107,7 +167,7 @@ def policy_matching_node(state: FactofitState) -> FactofitState:
         company_type=company.company_type if company else "정보 없음",
         employee_count=company.employee_count if company else "정보 없음",
         annual_revenue=company.annual_revenue or "정보 없음" if company else "정보 없음",
-        equipment_info=equipment.equipment.name if equipment else "정보 없음",
+        equipment_info=_equipment_name(equipment),
         retrieved_policies=sorted_policies if sorted_policies else "검색된 공고 없음",
     )
 
@@ -116,7 +176,6 @@ def policy_matching_node(state: FactofitState) -> FactofitState:
         HumanMessage(content=state["user_query"])
     ])
 
-    import json
     try:
         content = response.content.strip()
         if content.startswith("```"):
@@ -126,20 +185,28 @@ def policy_matching_node(state: FactofitState) -> FactofitState:
         result = json.loads(content.strip())
         
         response_text = result.get("response", "")
-        print(f"=== response_text ===: {response_text}") 
         # LLM이 선택한 공고 + reason + llm_score 저장
         matched_ids_info = result.get("matched_policies", [])
-        reason_map = {p["id"]: p for p in matched_ids_info}
+        reason_map = {
+            item.get("id"): item
+            for item in matched_ids_info
+            if item.get("id")
+        }
+        selected_ids = set(reason_map)
+        selected_policies = (
+            [p for p in sorted_policies if p["id"] in selected_ids]
+            if selected_ids
+            else sorted_policies[:5]
+        )
 
         state["matched_policies"] = [
             {
                 **p,
                 "eligible": True,
-                "reason": reason_map.get(p["id"], {}).get("reason", "RAG 유사도 기반 매칭"),
-                "llm_score": reason_map.get(p["id"], {}).get("score", "")
+                "reason": reason_map.get(p["id"], {}).get("reason", "업종/지역/기업규모 기반 매칭"),
+                "llm_score": reason_map.get(p["id"], {}).get("score", "●●●○○")
             }
-            for p in sorted_policies
-            if p["id"] in reason_map
+            for p in selected_policies
         ]
 
         prefix = ""
@@ -148,7 +215,415 @@ def policy_matching_node(state: FactofitState) -> FactofitState:
         state["final_response"] = prefix + response_text
 
     except Exception as e:
-        print(f"=== 파싱 에러 ===: {e}")
+        state["matched_policies"] = [
+            {
+                **p,
+                "eligible": True,
+                "reason": "업종/지역/기업규모 기반 매칭",
+                "llm_score": "●●●○○",
+            }
+            for p in sorted_policies[:5]
+        ]
         state["final_response"] = response.content
 
     return state
+
+
+# ────────────────────────────────────────────────────────────────
+# A/B 후보 병합 & ROI 기반 재정렬
+# ────────────────────────────────────────────────────────────────
+
+def _policy_key(policy: dict) -> str | None:
+    """정책 중복 제거 기준 키."""
+    metadata = policy.get("metadata", {})
+    return (
+        policy.get("id")
+        or metadata.get("policy_id")
+        or metadata.get("title")
+    )
+
+
+def merge_policy_candidates(
+    a_candidates: list[dict],
+    b_candidates: list[dict],
+) -> list[dict]:
+    """
+    A안/B안 검색 결과를 병합합니다.
+    - policy_id(또는 title) 기준 중복 제거
+    - 중복 시 distance는 min값 채택
+    - scenario_match 태그 부착 (["a"], ["b"], ["a","b"])
+    """
+    merged: dict[str, dict] = {}
+
+    for scenario, candidates in [("a", a_candidates), ("b", b_candidates)]:
+        for policy in candidates:
+            key = _policy_key(policy)
+            if not key:
+                continue
+
+            if key not in merged:
+                merged[key] = {**policy, "scenario_match": [scenario]}
+                continue
+
+            existing = merged[key]
+            if scenario not in existing["scenario_match"]:
+                existing["scenario_match"].append(scenario)
+            existing["distance"] = min(
+                existing.get("distance", 1),
+                policy.get("distance", 1),
+            )
+
+    return list(merged.values())
+
+
+def _get_roi_impact_keywords(roi_result: dict, scenario: str) -> list[str]:
+    """
+    ROI breakdown에서 가장 큰 개선 목적에 해당하는 키워드를 반환합니다.
+    scenario: 'a' 또는 'b'
+    """
+    if scenario == "c":
+        return (
+            _get_impact_keywords(roi_result.get("scenario_a", {}).get("breakdown", {}))
+            + _get_impact_keywords(roi_result.get("scenario_b", {}).get("breakdown", {}))
+        )
+
+    scenario_key = "scenario_a" if scenario == "a" else "scenario_b"
+    breakdown = roi_result.get(scenario_key, {}).get("breakdown", {})
+    return _get_impact_keywords(breakdown)
+
+
+def _normalize_scenario_match_for_response(scenario_match: list[str]) -> list[str]:
+    """Return the persisted/display scenario tag. A+B common fit is stored as c."""
+    if set(scenario_match) == {"a", "b"}:
+        return ["c"]
+    return scenario_match
+
+
+def rerank_policies_with_roi(
+    policies: list[dict],
+    roi_result: dict,
+) -> list[dict]:
+    """
+    ROI 결과 기반으로 정책 후보를 재정렬합니다.
+
+    final_score 구성:
+      base_score   = 1 - distance
+      + scenario_bonus  A 또는 B query에 걸리면 +0.1
+      + common_bonus    A+B 둘 다 걸리면 +0.05
+      + impact_bonus    ROI 목적 키워드와 정책 텍스트 일치 시 +0.1
+      + amount_bonus    max_amount >= 5000만원 이상이면 +0.05
+
+    NOTE: scenario_match, scenario_label, final_score는 응답 전용.
+          DB matched_policy 테이블에는 기존 컬럼만 저장.
+    """
+    ranked = []
+
+    for policy in policies:
+        metadata = policy.get("metadata", {})
+        scenario_match = policy.get("scenario_match", [])
+        display_scenario_match = _normalize_scenario_match_for_response(scenario_match)
+
+        base_score = 1 - policy.get("distance", 1)
+        scenario_bonus = 0.1 if scenario_match else 0
+        common_bonus = 0.05 if set(scenario_match) == {"a", "b"} else 0
+
+        # 정책 텍스트에서 ROI 목적 키워드 검색
+        text = " ".join([
+            str(metadata.get("title", "")),
+            str(metadata.get("policy_category", "")),
+            str(metadata.get("service_category", "")),
+            str(policy.get("content", "")),
+        ])
+        # 시나리오별 ROI breakdown 기반 목적 키워드로 정책 텍스트 검사
+        impact_keywords: list[str] = []
+        for scenario in scenario_match:
+            impact_keywords += _get_roi_impact_keywords(roi_result, scenario)
+
+        impact_bonus = 0.1 if any(kw in text for kw in impact_keywords) else 0
+
+        # 지원금 규모 보너스
+        amount_bonus = 0
+        try:
+            max_amount = float(metadata.get("max_amount") or 0)
+            if max_amount >= 5000:
+                amount_bonus = 0.05
+        except (TypeError, ValueError):
+            pass
+
+        final_score = base_score + scenario_bonus + common_bonus + impact_bonus + amount_bonus
+
+        # 시나리오 라벨
+        if display_scenario_match == ["c"]:
+            scenario_label = "C안 공통 적합"
+        elif display_scenario_match == ["a"]:
+            scenario_label = "A안 전체교체 적합"
+        elif display_scenario_match == ["b"]:
+            scenario_label = "B안 부분개선 적합"
+        else:
+            scenario_label = ""
+
+        ranked.append({
+            **policy,
+            "scenario_match": display_scenario_match,
+            "scenario_label": scenario_label,
+            "final_score": round(final_score, 3),
+            "match_score": round(final_score, 3),
+        })
+
+    return sorted(ranked, key=lambda p: p.get("final_score", 0), reverse=True)
+
+
+def evaluate_and_rerank_with_llm(
+    top_policies: list[dict],
+    company_context: dict,
+    equipment_name: str,
+    roi_result: dict
+) -> list[dict]:
+    """
+    알고리즘이 1차 선별한 TOP 10 공고를 LLM에게 넘겨서
+    최종 별점(llm_score)과 추천 이유(reason)를 받아오고,
+    알고리즘 점수(60%) + LLM 점수(40%)로 하이브리드 최종 랭킹을 산출합니다.
+    """
+    if not top_policies:
+        return []
+
+    from app.prompts.policy_hybrid import POLICY_HYBRID_PROMPT
+
+    # LLM에게 제공할 정책 목록 요약
+    policies_summary = []
+    for p in top_policies:
+        meta = p.get("metadata", {})
+        policies_summary.append(
+            f"- ID: {p.get('id')} | 제목: {meta.get('title')} | "
+            f"지원금: {meta.get('max_amount', '정보없음')} | "
+            f"매칭 시나리오: {p.get('scenario_label')}"
+        )
+
+    # 타겟 시나리오 요약
+    scenario_a = roi_result.get("scenario_a", {}).get("breakdown", {})
+    scenario_b = roi_result.get("scenario_b", {}).get("breakdown", {})
+    a_impact = ", ".join(_get_impact_keywords(scenario_a))
+    b_impact = ", ".join(_get_impact_keywords(scenario_b))
+    roi_scenarios = f"A안(전체교체/대규모) 타겟: {a_impact} / B안(부분개선/소규모) 타겟: {b_impact}"
+
+    prompt = POLICY_HYBRID_PROMPT.format(
+        industry_code=", ".join(company_context.get("industry_code", [])) or "정보 없음",
+        region=company_context.get("region") or "정보 없음",
+        company_type=company_context.get("company_type") or "정보 없음",
+        equipment_info=equipment_name or "제조 설비",
+        roi_scenarios=roi_scenarios,
+        retrieved_policies="\n".join(policies_summary)
+    )
+
+    try:
+        response = llm.invoke([SystemMessage(content=prompt)])
+        content = response.content.strip()
+        if content.startswith("```"):
+            content = content.split("```")[1]
+            if content.startswith("json"):
+                content = content[4:]
+
+        import json as _json
+        result = _json.loads(content.strip())
+        llm_evals = result.get("matched_policies", [])
+
+        eval_map = {
+            item.get("id"): item
+            for item in llm_evals
+            if item.get("id")
+        }
+    except Exception as e:
+        print(f"하이브리드 LLM 평가 실패: {e}")
+        eval_map = {}
+
+    hybrid_ranked = []
+    for p in top_policies:
+        pid = p.get("id")
+        evaluation = eval_map.get(pid, {})
+
+        llm_score_num = evaluation.get("score_num", 3)
+        llm_score_str = evaluation.get("score", "●●●○○")
+        reason = evaluation.get("reason", f"알고리즘 기반 {p.get('scenario_label', '')} 추천 공고입니다.")
+
+        algo_score = p.get("final_score", 0.5)
+
+        # 하이브리드 점수: 알고리즘 60% + LLM(5점 만점 → 1.0 스케일) 40%
+        normalized_llm_score = llm_score_num / 5.0
+        hybrid_score = (algo_score * 0.6) + (normalized_llm_score * 0.4)
+
+        hybrid_ranked.append({
+            **p,
+            "llm_score": llm_score_str,
+            "reason": reason,
+            "hybrid_score": round(hybrid_score, 3),
+        })
+
+    return sorted(hybrid_ranked, key=lambda x: x.get("hybrid_score", 0), reverse=True)
+
+
+# -------------------------------------------------------------------
+# Raw policy candidates from DB
+# -------------------------------------------------------------------
+
+
+
+
+def _policy_field(policy: dict, key: str, default=None):
+    """Read a policy value from either a DB row or nested metadata."""
+    if key in policy and policy.get(key) is not None:
+        return policy.get(key)
+
+    metadata = policy.get("metadata")
+    if isinstance(metadata, dict) and metadata.get(key) is not None:
+        return metadata.get(key)
+
+    return default
+
+
+def get_policy_raw_candidates(company_context: dict) -> list[dict]:
+    """
+    Fetch first-pass policy candidates from the policy DB table.
+
+    Purpose:
+    - This is not the AI recommendation result.
+    - This is the raw candidate pool filtered by company condition.
+    - Example: C24 company -> all C24-compatible policy rows.
+    """
+    db = get_db()
+
+    company_codes = _normalize_list(company_context.get("industry_code"))
+    region = company_context.get("region") or ""
+    region_short = region.split()[0] if region else ""
+    company_type_values = _normalize_list(company_context.get("company_type"))
+
+    result = db.table("policy").select("*").execute()
+    rows = result.data or []
+
+    candidates = []
+
+    for policy in rows:
+        policy_codes = _normalize_list(_policy_field(policy, "industry_codes"))
+        policy_region = _policy_field(policy, "region", "") or ""
+        eligible_types = _normalize_list(_policy_field(policy, "eligible_company_types", []))
+
+        code_match = (
+            not company_codes
+            or not policy_codes
+            or "C" in policy_codes
+            or any(code in policy_codes for code in company_codes)
+        )
+
+        region_match = (
+            not region
+            or not policy_region
+            or "전국" in policy_region
+            or region_short in policy_region
+        )
+
+        type_match = (
+            not eligible_types
+            or not company_type_values
+            or any(company_type in eligible_types for company_type in company_type_values)
+        )
+
+        if code_match and region_match and type_match:
+            candidates.append(policy)
+
+    return candidates
+
+
+def format_raw_policy_candidate(policy: dict) -> dict:
+    """
+    Format raw candidates for the frontend list.
+    No AI score, no ranking, no reason.
+    """
+    return {
+        "policy_id": (
+            _policy_field(policy, "policy_id")
+            or _policy_field(policy, "id")
+        ),
+        "title": _policy_field(policy, "title", ""),
+        "organization": _policy_field(policy, "organization", ""),
+        "url": _policy_field(policy, "url", ""),
+        "deadline": _policy_field(policy, "deadline", ""),
+        "max_amount": _policy_field(policy, "max_amount"),
+        "industry_code": _policy_field(policy, "industry_codes"),
+        "region": _policy_field(policy, "region"),
+    }
+
+
+def _policy_text_for_ranking(policy: dict) -> str:
+    return " ".join(
+        str(value or "")
+        for value in [
+            _policy_field(policy, "title", ""),
+            _policy_field(policy, "content", ""),
+            _policy_field(policy, "eligibility_text", ""),
+            _policy_field(policy, "eligibility_evidence", ""),
+            _policy_field(policy, "organization", ""),
+            _policy_field(policy, "industry_code", ""),
+        ]
+    )
+
+
+def rank_candidates_by_query(
+    candidates: list[dict],
+    query: str,
+    limit: int = 10,
+) -> list[dict]:
+    """
+    Rank raw DB candidates by A/B ROI query keywords.
+
+    This keeps recommendation inside the first-pass candidate pool.
+    raw_candidates: DB-filtered company-fit policies
+    ranked candidates: ROI A/B keyword-fit policies
+    """
+    query_tokens = [
+        token.strip()
+        for token in str(query or "").split()
+        if token.strip()
+    ]
+
+    ranked = []
+
+    for policy in candidates:
+        text = _policy_text_for_ranking(policy)
+        keyword_score = sum(1 for token in query_tokens if token in text)
+
+        policy_id = (
+            _policy_field(policy, "policy_id")
+            or _policy_field(policy, "id")
+        )
+
+        title = _policy_field(policy, "title", "")
+        content = _policy_field(policy, "content", "") or text
+
+        metadata = {
+            **policy,
+            "title": title,
+            "organization": _policy_field(policy, "organization", ""),
+            "url": _policy_field(policy, "url", ""),
+            "deadline": _policy_field(policy, "deadline", ""),
+            "max_amount": _policy_field(policy, "max_amount"),
+            "industry_code": _policy_field(policy, "industry_codes"),
+            "region": _policy_field(policy, "region"),
+            "eligible_company_types": _policy_field(policy, "eligible_company_types", []),
+        }
+
+        distance = 1 - min(keyword_score / 10, 0.99)
+
+        ranked.append(
+            {
+                "id": policy_id,
+                "content": content,
+                "metadata": metadata,
+                "distance": distance,
+                "keyword_score": keyword_score,
+            }
+        )
+
+    return sorted(
+        ranked,
+        key=lambda item: item.get("keyword_score", 0),
+        reverse=True,
+    )[:limit]

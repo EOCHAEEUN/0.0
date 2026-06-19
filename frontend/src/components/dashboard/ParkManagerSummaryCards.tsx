@@ -23,7 +23,6 @@ type CompanyOnboardingData = {
   user_id: string | null
   business_registration_no: string | null
   industry_name: string | null
-  company_size: string | null
   primary_purpose: string[] | null
   updated_at: string | null
   avg_revenue_3y_manwon: number | null

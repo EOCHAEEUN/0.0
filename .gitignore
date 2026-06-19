@@ -28,5 +28,6 @@ data/debug_amount_texts/
 data/raw/*.csv
 data/models/*.pkl
 *.log
+backend/generated_reports/
 .DS_Store
 .vscode/

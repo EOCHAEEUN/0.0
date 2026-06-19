@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { getAccessToken } from "../services/auth"
 
 type DraftStatus = "idle" | "saved" | "downloadReady"
 
@@ -9,10 +10,13 @@ type StoredDraftResponse = {
     scenario_used?: string
     scenario_label?: string
     policy_id?: string
+    company_id?: string
+    equipment_id?: string
   }
 }
 
 const DRAFT_RESULT_STORAGE_KEY = "factofit_draft_result"
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000/api"
 
 function readStoredDraft() {
   try {
@@ -25,6 +29,8 @@ function readStoredDraft() {
       scenarioUsed: parsed?.data?.scenario_used ?? "",
       scenarioLabel: parsed?.data?.scenario_label ?? "",
       policyId: parsed?.data?.policy_id ?? "",
+      companyId: parsed?.data?.company_id ?? "",
+      equipmentId: parsed?.data?.equipment_id ?? "",
     }
   } catch {
     return null
@@ -129,8 +135,50 @@ export default function ApplicationDraftPage() {
     setDraftStatus("saved")
   }
 
-  const handlePrepareDownload = () => {
-    setDraftStatus("downloadReady")
+  const handlePrepareDownload = async () => {
+    if (!storedDraft?.companyId || !storedDraft?.equipmentId) {
+      window.alert("PDF 생성에 필요한 기업·설비 정보를 찾을 수 없습니다.")
+      return
+    }
+
+    try {
+      const token = getAccessToken()
+      const response = await fetch(`${API_BASE}/reports/application.pdf`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          company_id: storedDraft.companyId,
+          equipment_id: storedDraft.equipmentId,
+          policy_id: storedDraft.policyId || null,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => null)
+        throw new Error(error?.detail || "PDF 생성에 실패했습니다.")
+      }
+
+      const blob = await response.blob()
+      const disposition = response.headers.get("Content-Disposition") ?? ""
+      const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/)?.[1]
+      const fileName = encodedName
+        ? decodeURIComponent(encodedName)
+        : "factofit_application_report.pdf"
+      const url = window.URL.createObjectURL(blob)
+      const anchor = document.createElement("a")
+      anchor.href = url
+      anchor.download = fileName
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      window.URL.revokeObjectURL(url)
+      setDraftStatus("downloadReady")
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "PDF 생성에 실패했습니다.")
+    }
   }
 
   return (

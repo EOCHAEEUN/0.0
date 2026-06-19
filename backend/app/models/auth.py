@@ -3,13 +3,15 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
+# legacy: /auth/signup에서는 더 이상 사용하지 않음.
+# 다른 파일에서 import 중이면 임시로 남겨둔다.
 class SignupCompanyInput(BaseModel):
     company_name: str
     industry_name: Optional[str] = None
     industry_code: list[str] = Field(default_factory=list)
     industries: list[dict] = Field(default_factory=list)
     region: str
-    company_size: Optional[str] = None
+    company_type: Optional[str] = None
     main_purpose: Optional[str] = None
     max_employee_count: Optional[int] = Field(default=None, ge=0)
     min_revenue_manwon: Optional[int] = Field(default=None, ge=0)
@@ -25,9 +27,8 @@ class SignupRequest(BaseModel):
     email: str
     password: str = Field(min_length=8)
     name: str
-    phone: Optional[str] = None
+    phone: str
     business_registration_no: Optional[str] = None
-    company: SignupCompanyInput
     agreements: SignupAgreements
 
 

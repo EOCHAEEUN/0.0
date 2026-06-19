@@ -15,7 +15,7 @@ class SafetyRule(BaseModel):
     inspection_type: str
     check_item: str
     cycle_months: int
-    risk_level: RiskLevel # 제약 조건 low medium high critical 4개 중 하나만 입력가능
+    risk_level: RiskLevel
     legal_basis: str | None = None
     source_url: str | None = None
     note: str | None = None

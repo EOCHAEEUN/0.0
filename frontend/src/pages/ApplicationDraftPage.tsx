@@ -1,40 +1,129 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
 type DraftStatus = "idle" | "saved" | "downloadReady"
 
-type ChecklistItem = {
-  label: string
-  status: "완료" | "확인 필요"
-  tone: "ok" | "need"
+type StoredDraftResponse = {
+  data?: {
+    draft_result?: Record<string, unknown>
+    scenario_used?: string
+    scenario_label?: string
+    policy_id?: string
+  }
 }
 
-const checklistItems: ChecklistItem[] = [
-  {
-    label: "ROI 분석 결과 반영",
-    status: "완료",
-    tone: "ok",
-  },
-  {
-    label: "지원사업 적합도 검토",
-    status: "완료",
-    tone: "ok",
-  },
-  {
-    label: "기업 기본정보 확인",
-    status: "확인 필요",
-    tone: "need",
-  },
-  {
-    label: "견적서 및 증빙자료 첨부",
-    status: "확인 필요",
-    tone: "need",
-  },
-]
+const DRAFT_RESULT_STORAGE_KEY = "factofit_draft_result"
+
+function readStoredDraft() {
+  try {
+    const raw = window.localStorage.getItem(DRAFT_RESULT_STORAGE_KEY)
+    if (!raw) return null
+
+    const parsed = JSON.parse(raw) as StoredDraftResponse
+    return {
+      draft: parsed?.data?.draft_result ?? null,
+      scenarioUsed: parsed?.data?.scenario_used ?? "",
+      scenarioLabel: parsed?.data?.scenario_label ?? "",
+      policyId: parsed?.data?.policy_id ?? "",
+    }
+  } catch {
+    return null
+  }
+}
+
+function asText(value: unknown, fallback = "-"): string {
+  if (value === null || value === undefined || value === "") return fallback
+  if (Array.isArray(value)) return value.map((item) => asText(item)).join(", ")
+  if (typeof value === "object") return JSON.stringify(value)
+  return String(value)
+}
+
+function asNumber(value: unknown, fallback = 0) {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : fallback
+}
+
+function asList(value: unknown, fallback: string[] = []) {
+  if (Array.isArray(value)) return value.map((item) => asText(item)).filter(Boolean)
+  if (typeof value === "string" && value.trim()) return [value]
+  return fallback
+}
+
+function formatManwon(value: unknown) {
+  const amount = asNumber(value)
+  if (!amount) return "-"
+  if (amount >= 10000) {
+    const eok = amount / 10000
+    return `${eok.toLocaleString(undefined, {
+      maximumFractionDigits: eok % 1 === 0 ? 0 : 1,
+    })}억원`
+  }
+  return `${amount.toLocaleString()}만원`
+}
+
+function formatMonths(value: unknown) {
+  const months = asNumber(value)
+  if (!months) return "-"
+  return `약 ${months.toLocaleString(undefined, { maximumFractionDigits: 1 })}개월`
+}
+
+function scenarioDisplay(scenarioUsed?: string, scenarioLabel?: string) {
+  const normalized = scenarioUsed?.toUpperCase()
+  if (!normalized && !scenarioLabel) return "-"
+  return `${normalized || "-"}안 · ${scenarioLabel || "시나리오 기준"}`
+}
 
 export default function ApplicationDraftPage() {
   const navigate = useNavigate()
   const [draftStatus, setDraftStatus] = useState<DraftStatus>("idle")
+  const storedDraft = useMemo(() => readStoredDraft(), [])
+  const draft = storedDraft?.draft ?? {}
+
+  const companyName = asText(draft.company_name, "기업 정보 없음")
+  const equipmentName = asText(draft.equipment_name, "설비 정보 없음")
+  const policyTitle = asText(draft.policy_title, "선택된 지원사업")
+  const scenario = scenarioDisplay(storedDraft?.scenarioUsed, storedDraft?.scenarioLabel)
+  const applicationPurpose = asText(
+    draft.application_purpose,
+    "노후 설비 개선 및 생산 효율 향상을 위한 지원사업 신청",
+  )
+  const readinessScore = asNumber(draft.readiness_score, 82)
+  const investment = formatManwon(draft.investment_manwon)
+  const subsidy = formatManwon(draft.subsidy_manwon)
+  const payback = formatMonths(draft.payback_months)
+  const expectedBenefits = asList(draft.expected_benefits, [
+    "생산 효율 개선",
+    "에너지 비용 절감",
+    "유지보수 부담 완화",
+  ])
+  const aiReasons = asList(draft.ai_reasons, [
+    "ROI 분석 결과와 선택한 지원사업 목적이 연결됩니다.",
+    "설비 투자 규모와 예상 지원금이 신청 근거로 활용 가능합니다.",
+    "선택된 정책의 시나리오 기준에 맞춰 초안이 작성되었습니다.",
+  ])
+  const businessNecessity = asText(
+    draft.business_necessity,
+    `${companyName}은 현재 ${equipmentName} 개선을 통해 생산 안정성과 비용 효율을 높일 필요가 있습니다.`,
+  )
+  const implementationPlan = asText(
+    draft.implementation_plan,
+    "선정된 지원사업 기준에 맞춰 설비 도입 범위, 견적 자료, 기대효과를 정리한 뒤 신청서를 보완합니다.",
+  )
+  const expectedEffects = asText(
+    draft.expected_effects,
+    expectedBenefits.join(", "),
+  )
+  const requiredDocuments = asList(draft.required_documents, [
+    "사업자등록증",
+    "설비 견적서",
+    "설비 사진 또는 현황 자료",
+    "최근 매출 및 고용 관련 증빙",
+  ])
+  const checklist = asList(draft.checklist, [
+    "기업 기본정보 확인",
+    "견적서 및 증빙자료 첨부",
+    "ROI 산출 근거 검토",
+  ])
 
   const handleSaveDraft = () => {
     setDraftStatus("saved")
@@ -102,8 +191,8 @@ export default function ApplicationDraftPage() {
                     <div>
                       <h4>신청 준비도</h4>
                       <p>
-                        ROI, 회수기간, 지원사업 적합도 기준으로 신청 가능성을
-                        종합 평가했습니다.
+                        정책 적합도, 사용자 정보, 선택정보, 설비현황, ROI 분석
+                        반영 수준을 종합해 확인합니다.
                       </p>
                     </div>
 
@@ -111,26 +200,27 @@ export default function ApplicationDraftPage() {
                   </div>
 
                   <div className="ready-score">
-                    <b>87</b>
+                    <b>{readinessScore}</b>
                     <small>/100</small>
                   </div>
 
                   <p>
-                    현재 조건에서는 스마트공장 고도화 및 고효율 설비 교체
-                    지원사업에 신청할 만한 근거가 충분합니다. 다만 기업
-                    기본정보와 견적서, 설비 사진 등 증빙자료는 제출 전 추가
-                    확인이 필요합니다.
+                    {policyTitle} 신청을 위해 {companyName}의 {equipmentName} 투자
+                    목적과 기대효과를 초안에 반영했습니다. 최종 제출 전
+                    사업자등록증, 견적서, 설비 현황 자료를 확인해주세요.
                   </p>
 
                   <div className="ready-progress">
-                    <i />
+                    <i style={{ width: `${Math.min(readinessScore, 100)}%` }} />
                   </div>
 
                   <div className="checklist">
-                    {checklistItems.map((item) => (
-                      <div className="check-item" key={item.label}>
-                        <strong>{item.label}</strong>
-                        <span className={item.tone}>{item.status}</span>
+                    {checklist.slice(0, 4).map((item, index) => (
+                      <div className="check-item" key={`${item}-${index}`}>
+                        <strong>{item}</strong>
+                        <span className={index <= 1 ? "ok" : "need"}>
+                          {index <= 1 ? "완료" : "확인 필요"}
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -140,12 +230,9 @@ export default function ApplicationDraftPage() {
                   <h4>AI 작성 근거</h4>
 
                   <ul>
-                    <li>설비 사용연수 11년으로 교체 검토 필요성이 높습니다.</li>
-                    <li>예상 실부담금은 2.0억원, 회수기간은 약 14개월입니다.</li>
-                    <li>정부지원금 적용 시 투자 부담이 크게 낮아집니다.</li>
-                    <li>
-                      에너지 비용, 유지보수비, 불량 손실 개선 효과가 기대됩니다.
-                    </li>
+                    {aiReasons.map((reason) => (
+                      <li key={reason}>{reason}</li>
+                    ))}
                   </ul>
                 </div>
               </div>
@@ -163,8 +250,8 @@ export default function ApplicationDraftPage() {
                         fontWeight: 800,
                       }}
                     >
-                      신청서에 바로 옮겨 적을 수 있도록 목적, 도입 설비,
-                      기대효과를 문장형으로 정리했습니다.
+                      선택한 정책, A/B/C 시나리오, ROI 계산값을 기준으로 목적,
+                      도입 설비, 기대효과를 문장형으로 정리했습니다.
                     </p>
                   </div>
 
@@ -173,65 +260,66 @@ export default function ApplicationDraftPage() {
                   </button>
                 </div>
 
-                <div className="draft-message">
-                  당사는 현재 사용 중인 프레스 설비의 노후화로 인해 에너지
-                  비용 증가, 유지보수 부담, 불량률 상승 문제가 지속적으로
-                  발생하고 있습니다. 이에 고효율 프레스 설비로 교체하고
-                  스마트 모니터링 시스템을 도입하여 생산성 향상과 에너지
-                  절감을 동시에 달성하고자 합니다.
-                </div>
+                <div className="draft-message">{businessNecessity}</div>
 
                 <div className="draft-table">
                   <div className="draft-row">
                     <div>추천 신청사업</div>
-                    <div>스마트공장 구축 및 고도화 지원사업</div>
+                    <div>{policyTitle}</div>
                   </div>
 
                   <div className="draft-row">
                     <div>기업명</div>
-                    <div>안산금속 주식회사</div>
+                    <div>{companyName}</div>
                   </div>
 
                   <div className="draft-row">
                     <div>대상 설비</div>
-                    <div>프레스 설비 / 유압 프레스 라인 A</div>
+                    <div>{equipmentName}</div>
                   </div>
 
                   <div className="draft-row">
                     <div>신청 목적</div>
-                    <div>노후 설비 교체 및 에너지 효율 개선</div>
+                    <div>{applicationPurpose}</div>
+                  </div>
+
+                  <div className="draft-row">
+                    <div>투자 시나리오</div>
+                    <div>{scenario}</div>
                   </div>
 
                   <div className="draft-row">
                     <div>총 투자금</div>
-                    <div>3.2억원</div>
+                    <div>{investment}</div>
                   </div>
 
                   <div className="draft-row">
                     <div>예상 지원금</div>
-                    <div>1.2억원</div>
+                    <div>{subsidy}</div>
                   </div>
 
                   <div className="draft-row">
                     <div>예상 회수기간</div>
-                    <div>약 14개월</div>
+                    <div>{payback}</div>
                   </div>
 
                   <div className="draft-row">
                     <div>주요 기대효과</div>
-                    <div>전기요금 절감, 불량률 감소, 유지보수비 절감</div>
+                    <div>{expectedBenefits.join(", ")}</div>
                   </div>
                 </div>
 
                 <div className="recommended-policy-mini">
                   <div className="policy-mini">
-                    <strong>스마트공장 고도화</strong>
-                    <span>적합도 92% · 우선 검토</span>
+                    <strong>{storedDraft?.scenarioLabel || "선택 정책"}</strong>
+                    <span>{policyTitle}</span>
                   </div>
 
                   <div className="policy-mini">
-                    <strong>고효율 설비 교체</strong>
-                    <span>적합도 88% · 보조 검토</span>
+                    <strong>ROI 반영</strong>
+                    <span>
+                      {investment} 투자 · {subsidy} 지원 · {payback} 회수
+                    </span>
                   </div>
                 </div>
 
@@ -289,8 +377,8 @@ export default function ApplicationDraftPage() {
                       fontWeight: 900,
                     }}
                   >
-                    PDF 다운로드 기능은 이후 연결 예정입니다. 현재는 초안
-                    내용을 화면에서 확인할 수 있습니다.
+                    PDF 저장 기능은 연결 예정입니다. 현재 화면의 초안 내용을
+                    먼저 확인해주세요.
                   </div>
                 )}
               </div>
@@ -305,63 +393,48 @@ export default function ApplicationDraftPage() {
                 <div className="scenario-grid">
                   <div className="scenario best">
                     <h4>사업 필요성</h4>
-                    <p>
-                      당사는 금속가공 제조 공정에서 프레스 설비를 핵심 생산
-                      장비로 활용하고 있습니다. 그러나 현재 설비는 사용연수가
-                      증가하면서 전력 사용량과 유지보수 비용이 높아지고 있으며,
-                      일부 공정에서는 불량률 증가로 인한 손실이 발생하고
-                      있습니다.
-                    </p>
+                    <p>{businessNecessity}</p>
 
                     <div className="kv-grid">
                       <div className="kv">
-                        <span>설비 사용연수</span>
-                        <b>11년</b>
+                        <span>대상 설비</span>
+                        <b>{equipmentName}</b>
                       </div>
 
                       <div className="kv">
-                        <span>현재 불량률</span>
-                        <b>5.8%</b>
+                        <span>적용 시나리오</span>
+                        <b>{scenario}</b>
                       </div>
 
                       <div className="kv wide">
-                        <span>핵심 문제</span>
-                        <b>노후화</b>
+                        <span>신청 목적</span>
+                        <b>{applicationPurpose}</b>
                       </div>
                     </div>
                   </div>
 
                   <div className="scenario">
-                    <h4>도입 후 기대효과</h4>
-                    <p>
-                      신규 고효율 설비 도입을 통해 에너지 사용량을 줄이고,
-                      생산 공정의 안정성을 높일 수 있습니다. 또한 설비 상태를
-                      실시간으로 확인하는 모니터링 체계를 함께 구축하여 고장
-                      위험을 사전에 파악하고 생산 중단 리스크를 줄이고자 합니다.
-                    </p>
+                    <h4>도입 계획 및 기대효과</h4>
+                    <p>{implementationPlan}</p>
 
                     <div className="saving-list">
-                      <div className="saving">
-                        <span>전기요금 절감</span>
-                        <b>연 2,700만원</b>
-                      </div>
+                      {expectedBenefits.slice(0, 3).map((benefit) => (
+                        <div className="saving" key={benefit}>
+                          <span>기대효과</span>
+                          <b>{benefit}</b>
+                        </div>
+                      ))}
 
                       <div className="saving">
-                        <span>불량 손실 감소</span>
-                        <b>연 3,600만원</b>
-                      </div>
-
-                      <div className="saving">
-                        <span>유지보수비 절감</span>
-                        <b>연 3,600만원</b>
-                      </div>
-
-                      <div className="saving">
-                        <span>투자 회수기간</span>
-                        <b>14개월</b>
+                        <span>예상 회수기간</span>
+                        <b>{payback}</b>
                       </div>
                     </div>
                   </div>
+                </div>
+
+                <div className="draft-message" style={{ marginTop: "18px" }}>
+                  {expectedEffects}
                 </div>
               </div>
             </details>
@@ -371,29 +444,18 @@ export default function ApplicationDraftPage() {
 
               <div className="detail-body">
                 <div className="check-grid">
-                  <div className="check-card">
-                    <h4>사업자등록증</h4>
-                    <p>
-                      기업 기본정보 확인을 위해 최신 사업자등록증 사본을
-                      준비합니다.
-                    </p>
-                  </div>
-
-                  <div className="check-card orange">
-                    <h4>설비 견적서</h4>
-                    <p>
-                      도입 예정 설비의 견적서와 사양서를 함께 제출하면
-                      투자금 산정 근거가 명확해집니다.
-                    </p>
-                  </div>
-
-                  <div className="check-card red">
-                    <h4>현 설비 사진</h4>
-                    <p>
-                      노후 설비 상태를 보여주는 사진과 유지보수 내역을
-                      첨부하면 신청 필요성이 강화됩니다.
-                    </p>
-                  </div>
+                  {requiredDocuments.map((document, index) => (
+                    <div
+                      className={`check-card ${index === 1 ? "orange" : index === 2 ? "red" : ""}`}
+                      key={document}
+                    >
+                      <h4>{document}</h4>
+                      <p>
+                        신청서 제출 전 {document} 자료를 최신 기준으로 준비하고,
+                        지원사업 공고의 제출 양식과 일치하는지 확인해주세요.
+                      </p>
+                    </div>
+                  ))}
                 </div>
               </div>
             </details>

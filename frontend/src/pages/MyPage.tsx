@@ -99,7 +99,6 @@ type CompanyOnboardingPayload = {
   region: string
   business_registration_no: string | null
   company_type: string
-  company_size: string
   primary_purpose: string | null
   employee_count: number | null
   annual_revenue: number | null
@@ -1402,8 +1401,7 @@ export default function MyPage() {
       region: companyInfo.region.trim(),
       business_registration_no:
         normalizeBusinessNumber(companyInfo.businessNumber) || null,
-      company_type: "제조업",
-      company_size: companyInfo.companySize,
+      company_type: companyInfo.companySize,
       primary_purpose:
         companyInfo.purpose === "선택 필요" ? null : companyInfo.purpose,
       employee_count: employeeCount,
@@ -2543,7 +2541,7 @@ export default function MyPage() {
                         paddingLeft: "2px",
                       }}
                     >
-                      백엔드 company_size 필수값입니다.
+                      백엔드 company_type 필수값입니다.
                     </p>
                   </div>
                 </div>

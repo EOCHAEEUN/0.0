@@ -1,8 +1,15 @@
-from pydantic import BaseModel
 from datetime import datetime
+from typing import Optional
+from uuid import UUID
+
+from pydantic import BaseModel
+
 
 class DraftResult(BaseModel):
-    company_id: str
-    policy_id: str           # 어떤 공고 기반으로 작성했는지
-    draft_content: str       # 초안서 본문 (마크다운)
+    draft_result_id: Optional[UUID] = None
+    company_id: Optional[UUID] = None
+    equipment_id: Optional[UUID] = None
+    policy_id: Optional[str] = None
+    # Scenario values are read from matched_policy and embedded in draft_content.
+    draft_content: dict
     created_at: datetime

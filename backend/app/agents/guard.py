@@ -6,7 +6,7 @@ from app.core.config import settings
 from app.core.llm import llm
 import json
 
-def safety_node(state: FactofitState) -> FactofitState:
+def guard_node(state: FactofitState) -> FactofitState:
     response = llm.invoke([
         SystemMessage(content=SAFETY_SYSTEM_PROMPT),
         HumanMessage(content=state["user_query"])

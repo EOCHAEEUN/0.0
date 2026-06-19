@@ -217,6 +217,8 @@ async def generate_draft(
                 else None
             ),
             "policy_id": body.policy_id,
+            "company_id": body.company_id,
+            "equipment_id": body.equipment_id,
             "scenario_used": scenario_used,
             "scenario_label": scenario_label,
             "draft_result": draft_content,

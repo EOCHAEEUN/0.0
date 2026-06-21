@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import sys
 import time
 import zlib
 import struct
@@ -9,6 +10,7 @@ import tempfile
 from pathlib import Path
 from html import unescape
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 
 import fitz  # pymupdf
 import olefile
@@ -17,12 +19,28 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 from langchain_openai import ChatOpenAI
 
+try:
+    import pdfplumber
+except Exception:
+    pdfplumber = None
+
+
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
 
 # =========================================================
 # 환경변수 / Supabase 연결
 # =========================================================
 
-load_dotenv()
+ROOT_DIR = Path(__file__).resolve().parents[2]
+BACKEND_DIR = ROOT_DIR / "backend"
+
+load_dotenv(ROOT_DIR / ".env")
+load_dotenv(BACKEND_DIR / ".env")
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip()
 SUPABASE_SERVICE_ROLE_KEY = (
@@ -79,6 +97,44 @@ TERMINAL_AMOUNT_STATUSES = [
 ]
 
 
+@dataclass
+class AmountCandidate:
+    amount: int
+    evidence: str
+    score: int
+    reason: str
+
+
+PREFERRED_AMOUNT_CONTEXT_KEYWORDS = [
+    "정부 지원금", "정부지원금", "정부지원", "정부 지원", "국비", "정부출연금",
+    "정부 출연금", "정부지원 연구개발비", "지원한도", "지원 한도", "지원금액",
+    "지원 금액", "지원액", "최대지원금", "최대 지원금", "기업당", "업체당",
+    "과제당", "개사당", "1개사당", "세부주관기관",
+]
+
+EXCLUDED_AMOUNT_CONTEXT_KEYWORDS = [
+    "총사업비", "총 사업비", "사업비 합계", "합계", "예산규모", "공고 예산",
+    "총예산", "총 예산", "총지원규모", "총 지원규모", "민간부담금",
+    "민간 부담금", "기업부담금", "기업 부담금", "자부담", "도입기업",
+    "포스코 지원금", "지자체 지원금", "운영관리비", "운영 관리비",
+    "총도입비", "총 도입비", "단가표", "부가세", "수수료", "보증 한도",
+    "보증지원", "보증 지원",
+]
+
+AMOUNT_UNIT_HINTS = [
+    ("억원", "억원"),
+    ("억 원", "억원"),
+    ("백만원", "백만원"),
+    ("백만 원", "백만원"),
+    ("천만원", "천만원"),
+    ("천만 원", "천만원"),
+    ("만원", "만원"),
+    ("만 원", "만원"),
+    ("천원", "천원"),
+    ("천 원", "천원"),
+]
+
+
 # =========================================================
 # 텍스트 정리
 # =========================================================
@@ -104,6 +160,21 @@ def clean_text(value: str) -> str:
     text = re.sub(r"[\x01-\x08\x0b\x0c\x0e-\x1f]", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
     return text
+
+
+def clean_document_text(value: str) -> str:
+    """첨부 문서 추출 결과 정리. 표 추출용 탭/줄바꿈은 보존한다."""
+    if not value:
+        return ""
+
+    text = value.replace("\x00", " ")
+    text = re.sub(r"[\x01-\x08\x0b\x0c\x0e-\x1f]", " ", text)
+    lines = []
+    for line in text.replace("\r", "\n").split("\n"):
+        line = re.sub(r"[ ]+", " ", line).strip()
+        if line:
+            lines.append(line)
+    return "\n".join(lines)
 
 
 def has_amount_hint(text: str) -> bool:
@@ -331,12 +402,12 @@ def extract_max_amount_with_evidence(text: str) -> tuple[int | None, str | None]
     candidates = []
 
     patterns = [
-        (r"(?:총|약|기업당|업체당|과제당|1개사당|개사당|최대|최고|지원한도|한도|국비|정부지원금)?(\d+(?:\.\d+)?)억원(?:이내|내외|지원|한도|까지)?", 10000),
-        (r"(?:총|약|기업당|업체당|과제당|1개사당|개사당|최대|최고|지원한도|한도|국비|정부지원금)?(\d+)천만(?:원)?(?:이내|내외|지원|한도|까지)?", 1000),
-        (r"(?:총|약|기업당|업체당|과제당|1개사당|개사당|최대|최고|지원한도|한도|국비|정부지원금)?(\d+)백만(?:원)?(?:이내|내외|지원|한도|까지)?", 100),
-        (r"(?:총|약|기업당|업체당|과제당|1개사당|개사당|최대|최고|지원한도|한도|국비|정부지원금)?(\d+)만원(?:이내|내외|지원|한도|까지)?", 1),
-        (r"(?:총|약|기업당|업체당|과제당|1개사당|개사당|최대|최고|지원한도|한도|국비|정부지원금)?(\d+)천원(?:이내|내외|지원|한도|까지)?", 0.1),
-        (r"(?:총|약|기업당|업체당|과제당|1개사당|개사당|최대|최고|지원한도|한도|국비|정부지원금)?(\d{7,})원(?:이내|내외|지원|한도|까지)?", 1 / 10000),
+        (r"(?:기업당|업체당|과제당|1개사당|개사당|최대|최고|지원한도|한도|국비|정부지원금)?(\d+(?:\.\d+)?)억(?:원)?(?:이내|내외|지원|한도|까지)?", 10000),
+        (r"(?:기업당|업체당|과제당|1개사당|개사당|최대|최고|지원한도|한도|국비|정부지원금)?(\d+)천만(?:원)?(?:이내|내외|지원|한도|까지)?", 1000),
+        (r"(?:기업당|업체당|과제당|1개사당|개사당|최대|최고|지원한도|한도|국비|정부지원금)?(\d+)백만(?:원)?(?:이내|내외|지원|한도|까지)?", 100),
+        (r"(?:기업당|업체당|과제당|1개사당|개사당|최대|최고|지원한도|한도|국비|정부지원금)?(\d+)만원(?:이내|내외|지원|한도|까지)?", 1),
+        (r"(?:기업당|업체당|과제당|1개사당|개사당|최대|최고|지원한도|한도|국비|정부지원금)?(\d+)천원(?:이내|내외|지원|한도|까지)?", 0.1),
+        (r"(?:기업당|업체당|과제당|1개사당|개사당|최대|최고|지원한도|한도|국비|정부지원금)?(\d{7,})원(?:이내|내외|지원|한도|까지)?", 1 / 10000),
     ]
 
     bad_context_keywords = [
@@ -358,7 +429,7 @@ def extract_max_amount_with_evidence(text: str) -> tuple[int | None, str | None]
             except Exception:
                 continue
 
-            if amount < 10 or amount > 10000000:
+            if amount < 10 or amount > 100000:
                 continue
 
             start = max(0, match.start() - 80)
@@ -400,9 +471,10 @@ def extract_max_amount_with_evidence(text: str) -> tuple[int | None, str | None]
 
 
 def build_amount_extraction_prompt(title: str, text: str) -> str:
-    return f"""당신은 정부 지원사업 공고의 후보 문장에서 지원 금액 여부만 판단하는 검수자입니다.
+    return f"""당신은 정부 지원사업 공고의 후보 문장에서 신청 기업/과제 1건 기준의 정부/국비 최대지원금만 판단하는 검수자입니다.
 
-아래는 공고 제목과 금액 키워드 주변 후보 문장입니다. 지원금액/보조금/지원한도/지원규모에 해당하는 금액이 명확히 있는지 판단하세요.
+아래는 공고 제목과 금액 키워드 주변 후보 문장입니다. max_amount는 "정부/국비/정부출연금/지원한도 기준 최대지원금"만 해당합니다.
+총사업비, 예산규모, 총예산, 총지원규모, 민간부담금, 기업부담금, 자부담, 지자체/민간/주관기관 지원금, 포스코 지원금, 보증한도, 단가표, 총도입비, 운영관리비는 제외하세요.
 
 [제목]
 {title}
@@ -412,11 +484,12 @@ def build_amount_extraction_prompt(title: str, text: str) -> str:
 
 【반드시 지켜야 할 규칙】
 1. 지원금액이 명확하면 "최대 3억원", "1억원 이내", "50,000천원"처럼 후보 문장에 있는 표현 그대로 반환하세요.
-2. 총사업비, 자부담, 참가비, 보증금, 부가세만 있으면 "없음"이라고 답변하세요.
-3. 후보 문장에 금액은 있지만 지원금액인지 불명확하면 가장 보수적으로 판단하세요.
-4. 금액 표현이 전혀 없으면 "없음"이라고 답변하세요.
-5. 절대 "null", "None", "N/A", 빈 문자열을 출력하지 마세요.
-6. 반드시 아래 JSON 형식으로만 답변하세요.
+2. 총사업비, 예산규모, 총예산, 총지원규모, 자부담, 참가비, 보증금, 부가세, 단가표, 총도입비만 있으면 "없음"이라고 답변하세요.
+3. 표에 총사업비와 정부지원금이 함께 있으면 반드시 정부지원금/국비/정부출연금/지원한도 컬럼의 금액만 반환하세요.
+4. 후보 문장에 금액은 있지만 정부/국비 최대지원금인지 불명확하면 가장 보수적으로 "없음"이라고 답변하세요.
+5. 금액 표현이 전혀 없으면 "없음"이라고 답변하세요.
+6. 절대 "null", "None", "N/A", 빈 문자열을 출력하지 마세요.
+7. 반드시 아래 JSON 형식으로만 답변하세요.
 
 {{
   "지원금액": "최대 3억원" 또는 "없음",
@@ -449,7 +522,7 @@ def parse_amount_to_manwon(amount_text: str) -> int | None:
                 amount += int(float(extra_value) * 1000)
             else:
                 amount += int(float(extra_value))
-        if amount < 10 or amount > 10000000:
+        if amount < 10 or amount > 100000:
             return None
         return amount
 
@@ -472,10 +545,210 @@ def parse_amount_to_manwon(amount_text: str) -> int | None:
     else:
         amount = int(value)
 
-    if amount < 10 or amount > 10000000:
+    if amount < 10 or amount > 100000:
         return None
 
     return amount
+
+
+def compact_context(text: str) -> str:
+    return normalize_for_match(clean_text(text or ""))
+
+
+def has_any_context(text: str, keywords: list[str]) -> bool:
+    compact = compact_context(text)
+    return any(compact_context(keyword) in compact for keyword in keywords)
+
+
+def infer_amount_unit(context: str) -> str:
+    for keyword, unit in AMOUNT_UNIT_HINTS:
+        if keyword in context:
+            return unit
+    return ""
+
+
+def parse_amount_cell_to_manwon(cell: str, context: str = "") -> int | None:
+    if not cell:
+        return None
+
+    text = clean_text(str(cell))
+    has_currency_unit = (
+        any(keyword in text for keyword, _ in AMOUNT_UNIT_HINTS)
+        or bool(re.search(r"\d+(?:\.\d+)?\s*억", text))
+        or bool(re.search(r"\d[\d,]*(?:\.\d+)?\s*원", text))
+    )
+
+    if has_currency_unit:
+        amount = parse_amount_to_manwon(text)
+        if amount is not None:
+            return amount
+
+    if "%" in text and not has_currency_unit:
+        return None
+
+    unit = infer_amount_unit(context)
+    if not unit:
+        return None
+
+    amount = parse_amount_to_manwon(f"{text}{unit}") if re.fullmatch(r"[\d,]+(?:\.\d+)?", text) else None
+    if amount is not None:
+        return amount
+
+    # 표에서는 헤더/상단에 "(단위: 억원)"처럼 단위가 있고 셀에는 숫자만 있는 경우가 많다.
+    match = re.search(r"\d+(?:\.\d+)?", text.replace(",", ""))
+    if not match:
+        return None
+
+    return parse_amount_to_manwon(f"{match.group(0)}{unit}")
+
+
+def normalize_table_cell(value) -> str:
+    return clean_text(str(value or "").replace("\n", " "))
+
+
+def local_name(tag: str) -> str:
+    return tag.split("}", 1)[-1] if "}" in tag else tag
+
+
+def is_amount_context_excluded(context: str) -> bool:
+    if not has_any_context(context, EXCLUDED_AMOUNT_CONTEXT_KEYWORDS):
+        return False
+
+    # "정부지원금(총사업비 50%)"처럼 설명에 총사업비가 들어가는 경우는 허용한다.
+    return not has_any_context(context, PREFERRED_AMOUNT_CONTEXT_KEYWORDS)
+
+
+def build_table_amount_candidates(rows: list[list[str]], table_context: str = "") -> list[AmountCandidate]:
+    if not rows:
+        return []
+
+    normalized_rows = [
+        [normalize_table_cell(cell) for cell in row]
+        for row in rows
+        if any(normalize_table_cell(cell) for cell in row)
+    ]
+    if not normalized_rows:
+        return []
+
+    if (
+        has_any_context(table_context, ["민간부담금", "민간 부담금", "합계"])
+        and not has_any_context(table_context, ["최대", "지원한도", "지원 한도", "국비 최대"])
+    ):
+        return []
+
+    candidates: list[AmountCandidate] = []
+    header_rows: list[list[str]] = []
+
+    for row_index, row in enumerate(normalized_rows):
+        max_header_len = max((len(header) for header in header_rows), default=0)
+        if (
+            header_rows
+            and max_header_len
+            and len(row) < max_header_len
+            and row
+            and parse_amount_cell_to_manwon(row[0], table_context) is not None
+            and not has_any_context(header_rows[-1][0] if header_rows[-1] else "", PREFERRED_AMOUNT_CONTEXT_KEYWORDS)
+        ):
+            row = [""] + row
+
+        row_text = " ".join(row)
+        has_header_signal = has_any_context(
+            row_text,
+            PREFERRED_AMOUNT_CONTEXT_KEYWORDS + EXCLUDED_AMOUNT_CONTEXT_KEYWORDS + ["지원유형", "구분", "지원내용"],
+        )
+
+        if has_header_signal and row_index <= 3 and not any(re.search(r"\d", cell) for cell in row):
+            header_rows.append(row)
+            continue
+
+        # 표 중간에 다단 헤더가 다시 나오는 경우 갱신한다.
+        if has_header_signal and not any(re.search(r"\d", cell) for cell in row):
+            header_rows.append(row)
+            header_rows = header_rows[-3:]
+            continue
+
+        row_label = " ".join(cell for idx, cell in enumerate(row[:2]) if cell)
+
+        for col_index, cell in enumerate(row):
+            if not re.search(r"\d", cell):
+                continue
+
+            column_labels = []
+            for header in header_rows[-3:]:
+                if col_index < len(header) and header[col_index]:
+                    column_labels.append(header[col_index])
+
+            label = " ".join(column_labels + [row_label]).strip()
+            if has_any_context(label, EXCLUDED_AMOUNT_CONTEXT_KEYWORDS) and not has_any_context(label, PREFERRED_AMOUNT_CONTEXT_KEYWORDS):
+                continue
+            if has_any_context(row_text, ["합계"]) and not has_any_context(row_text, ["최대", "지원한도", "지원 한도", "국비 최대"]):
+                continue
+
+            context = " ".join([table_context, label, row_text]).strip()
+            amount = parse_amount_cell_to_manwon(cell, context)
+            if amount is None or amount < 10 or amount > 100000:
+                continue
+
+            if is_amount_context_excluded(context):
+                continue
+
+            score = 0
+            if has_any_context(label, ["정부 지원금", "정부지원금", "국비", "정부출연금", "정부 출연금", "정부지원 연구개발비"]):
+                score += 120
+            if has_any_context(label, ["지원한도", "지원 한도", "지원금액", "최대지원금", "최대 지원금"]):
+                score += 90
+            if has_any_context(context, ["기업당", "업체당", "과제당", "개사당", "1개사당", "세부주관기관"]):
+                score += 35
+            if has_any_context(context, PREFERRED_AMOUNT_CONTEXT_KEYWORDS):
+                score += 20
+            if has_any_context(context, EXCLUDED_AMOUNT_CONTEXT_KEYWORDS):
+                score -= 60
+
+            if score <= 0:
+                continue
+
+            evidence = clean_text(f"{label} / {cell}")[:700]
+            candidates.append(AmountCandidate(
+                amount=amount,
+                evidence=evidence,
+                score=score,
+                reason="structured_table",
+            ))
+
+    return candidates
+
+
+def extract_structured_table_amount(text: str) -> tuple[int | None, str | None]:
+    """탭으로 직렬화된 표에서 정부/국비 기준 최대지원금을 우선 추출한다."""
+    if not text or "\t" not in text:
+        return None, None
+
+    tables: list[list[list[str]]] = []
+    current: list[list[str]] = []
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if "\t" in line:
+            current.append([cell.strip() for cell in line.split("\t")])
+            continue
+        if current:
+            tables.append(current)
+            current = []
+
+    if current:
+        tables.append(current)
+
+    candidates: list[AmountCandidate] = []
+    for rows in tables:
+        table_context = " ".join(" ".join(row) for row in rows[:3])
+        candidates.extend(build_table_amount_candidates(rows, table_context))
+
+    if not candidates:
+        return None, None
+
+    candidates.sort(key=lambda item: (item.score, item.amount), reverse=True)
+    best = candidates[0]
+    return best.amount, best.evidence
 
 
 def extract_amount_with_llm(title: str, text: str) -> tuple[int | None, str, bool]:
@@ -586,6 +859,23 @@ def extract_pdf_text(file_bytes: bytes):
         tmp_path = tmp.name
 
     try:
+        if pdfplumber is not None:
+            try:
+                with pdfplumber.open(tmp_path) as pdf:
+                    for page_index, page in enumerate(pdf.pages, start=1):
+                        tables = page.extract_tables() or []
+                        for table_index, table in enumerate(tables, start=1):
+                            table_rows = []
+                            for row in table or []:
+                                cells = [normalize_table_cell(cell) for cell in row or []]
+                                if any(cells):
+                                    table_rows.append("\t".join(cells))
+                            if table_rows:
+                                text_parts.append(f"[PDF_TABLE page={page_index} table={table_index}]")
+                                text_parts.extend(table_rows)
+            except Exception as e:
+                print(f"  → PDF 표 추출 실패(pdfplumber): {e}")
+
         doc = fitz.open(tmp_path)
 
         if doc.is_encrypted:
@@ -604,7 +894,7 @@ def extract_pdf_text(file_bytes: bytes):
                 continue
 
         doc.close()
-        return clean_text("\n".join(text_parts))
+        return clean_document_text("\n".join(text_parts))
 
     except Exception as e:
         print(f"  → PDF 텍스트 추출 실패: {e}")
@@ -839,6 +1129,28 @@ def extract_hwpx_text(file_bytes: bytes):
                     xml_data = z.read(xml_name)
                     root = ET.fromstring(xml_data)
 
+                    for table_index, table in enumerate(
+                        [elem for elem in root.iter() if local_name(elem.tag).lower() in ("tbl", "table")],
+                        start=1,
+                    ):
+                        table_rows = []
+                        for row in table.iter():
+                            if local_name(row.tag).lower() not in ("tr", "row"):
+                                continue
+
+                            cells = []
+                            for cell in row:
+                                if local_name(cell.tag).lower() in ("tc", "cell"):
+                                    cell_text = clean_text(" ".join(t.strip() for t in cell.itertext() if t and t.strip()))
+                                    cells.append(cell_text)
+
+                            if any(cells):
+                                table_rows.append("\t".join(cells))
+
+                        if table_rows:
+                            text_parts.append(f"[HWPX_TABLE file={xml_name} table={table_index}]")
+                            text_parts.extend(table_rows)
+
                     for elem in root.iter():
                         if elem.text and elem.text.strip():
                             text_parts.append(elem.text.strip())
@@ -846,7 +1158,7 @@ def extract_hwpx_text(file_bytes: bytes):
                 except Exception:
                     continue
 
-        return clean_text("\n".join(text_parts))
+        return clean_document_text("\n".join(text_parts))
 
     except Exception as e:
         print(f"  → HWPX 텍스트 추출 실패: {e}")
@@ -930,7 +1242,7 @@ def extract_text_from_zip(file_bytes: bytes):
                         pass
 
         if text_parts:
-            return clean_text("\n".join(text_parts)), "attachment_zip_extracted"
+            return clean_document_text("\n".join(text_parts)), "attachment_zip_extracted"
 
         if hwp_failed:
             return "", "attachment_zip_hwp_failed"
@@ -1067,6 +1379,762 @@ def extract_text_from_attachment(file_bytes: bytes, content_type: str, filename:
     return "", "attachment_unknown"
 
 
+
+# =========================================================
+# 매출 조건(revenue_rules) 추출
+# =========================================================
+
+REVENUE_LIMIT = int(os.getenv("REVENUE_ENRICH_LIMIT", str(LIMIT)))
+REVENUE_REPROCESS_EMPTY = os.getenv("REVENUE_REPROCESS_EMPTY", "0").strip() == "1"
+REVENUE_REPROCESS_HINT_ONLY = os.getenv("REVENUE_REPROCESS_HINT_ONLY", "0").strip() == "1"
+
+REVENUE_OPERATOR_MAP = {
+    "이상": "이상",
+    "초과": "초과",
+    "이하": "이하",
+    "미만": "미만",
+    "gte": "이상",
+    "gt": "초과",
+    "lte": "이하",
+    "lt": "미만",
+}
+
+REVENUE_AMOUNT_PATTERN = re.compile(
+    r"(?P<number>\d[\d,]*(?:\.\d+)?)\s*"
+    r"(?P<unit>조\s*원|조원|천억\s*원|천억원|천억|억\s*원|억원|억|천만\s*원|천만원|천만|"
+    r"백만\s*원|백만원|백만|만\s*원|만원|만|원)\s*"
+    r"(?P<operator>이상|초과|이하|미만)"
+)
+
+REVENUE_SECTION_KEYWORDS = [
+    "매출",
+    "매출액",
+    "평균매출",
+    "평균 매출",
+    "연매출",
+    "수출실적",
+    "수출 실적",
+    "수출액",
+    "중견기업",
+    "소상공인",
+    "소기업",
+    "중기업",
+    "지원대상",
+    "신청대상",
+    "신청자격",
+    "지원자격",
+    "자격요건",
+    "제외대상",
+    "지원 제외",
+    "신청 제외",
+]
+
+REVENUE_CONTEXT_QUALIFIERS = [
+    "이상",
+    "초과",
+    "이하",
+    "미만",
+    "제외",
+    "대상",
+    "자격",
+    "요건",
+    "한정",
+    "해당",
+]
+
+REVENUE_EXCLUDED_CONTEXT_KEYWORDS = [
+    "지원금",
+    "사업비",
+    "총사업비",
+    "기업부담금",
+    "민간부담금",
+    "부담금",
+    "자부담",
+    "VAT",
+    "부가세",
+    "예산",
+    "보조금",
+    "수수료",
+    "사용료",
+]
+
+REVENUE_REPROCESS_HINT_KEYWORDS = [
+    "매출",
+    "평균매출",
+    "수출실적",
+    "수출액",
+    "중견기업",
+    "소상공인",
+    "3천억원",
+    "3000억원",
+    "3,000억원",
+]
+
+
+def parse_revenue_to_manwon(value) -> int | None:
+    """매출액 표현을 만원 단위 정수로 변환한다."""
+    if value is None:
+        return None
+
+    if isinstance(value, bool):
+        return None
+
+    if isinstance(value, (int, float)):
+        amount = int(value)
+        return amount if amount >= 0 else None
+
+    text = str(value).replace(",", "").replace(" ", "").strip()
+    if not text:
+        return None
+
+    match = re.search(r"(\d+(?:\.\d+)?)", text)
+    if not match:
+        return None
+
+    number = float(match.group(1))
+
+    if "조원" in text or "조" in text:
+        amount = int(number * 100_000_000)
+    elif "천억원" in text or "천억" in text:
+        amount = int(number * 10_000_000)
+    elif "억원" in text or "억" in text:
+        amount = int(number * 10000)
+    elif "천만원" in text or "천만" in text:
+        amount = int(number * 1000)
+    elif "백만원" in text or "백만" in text:
+        amount = int(number * 100)
+    elif "만원" in text or "만" in text:
+        amount = int(number)
+    elif "원" in text:
+        amount = int(number / 10000)
+    else:
+        # JSON의 value_manwon처럼 단위 없이 숫자만 온 경우
+        amount = int(number)
+
+    return amount if amount >= 0 else None
+
+
+def parse_export_amount_usd(value) -> int | None:
+    """100만불, 1백만 달러 등의 표현을 USD 정수로 변환한다."""
+    if value is None:
+        return None
+
+    if isinstance(value, bool):
+        return None
+
+    if isinstance(value, (int, float)):
+        amount = int(value)
+        return amount if amount >= 0 else None
+
+    text = str(value).replace(",", "").replace(" ", "").strip()
+    if not text:
+        return None
+
+    match = re.search(
+        r"(\d+(?:\.\d+)?)"
+        r"(억|천만|백만|만)?"
+        r"(?:미국달러|달러|불|USD)",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        # JSON에서 숫자 문자열만 온 경우
+        if re.fullmatch(r"\d+(?:\.\d+)?", text):
+            return int(float(text))
+        return None
+
+    number = float(match.group(1))
+    unit = match.group(2) or ""
+
+    multiplier = {
+        "억": 100_000_000,
+        "천만": 10_000_000,
+        "백만": 1_000_000,
+        "만": 10_000,
+        "": 1,
+    }[unit]
+
+    return int(number * multiplier)
+
+
+def infer_revenue_type(text: str) -> str:
+    compact = clean_text(text or "")
+
+    has_average = any(
+        keyword in compact
+        for keyword in ["평균매출", "평균 매출", "3년 평균", "3개 사업연도 평균", "최근 3년"]
+    )
+    has_annual = any(
+        keyword in compact
+        for keyword in ["최근년도", "최근 연도", "연간매출", "연간 매출", "연매출"]
+    )
+
+    if has_average and has_annual and "또는" in compact:
+        return "평균 또는 연간 매출액"
+    if has_average:
+        return "최근 3개 사업연도 평균매출액"
+    if has_annual:
+        return "최근년도 매출액"
+    return "매출액"
+
+
+def infer_track_name(evidence: str) -> str | None:
+    """
+    정규식 추출용 간단한 트랙명 추정.
+    복잡한 트랙명은 LLM 결과를 우선 사용한다.
+    """
+    text = clean_text(evidence or "")
+    if not text:
+        return None
+
+    # "수출지향형: 매출액 50억원 이상"처럼 콜론 앞에 트랙명이 있는 경우
+    for separator in [":", "：", "→"]:
+        if separator in text:
+            prefix = text.split(separator, 1)[0].strip(" -ㆍ·[]()")
+            if (
+                2 <= len(prefix) <= 80
+                and any(keyword in prefix for keyword in ["형", "트랙", "분야", "소부장", "글로벌", "수출"])
+            ):
+                return prefix
+
+    # 매출 표현 앞의 짧은 문구가 트랙명처럼 보이는 경우
+    if "매출" in text:
+        prefix = text.split("매출", 1)[0].strip(" -ㆍ·[]()")
+        if (
+            2 <= len(prefix) <= 60
+            and any(keyword in prefix for keyword in ["형", "트랙", "분야", "소부장", "글로벌", "수출"])
+        ):
+            return prefix
+
+    return None
+
+
+def extract_export_min_usd(text: str) -> int | None:
+    cleaned = clean_text(text or "")
+    patterns = [
+        r"\d[\d,]*(?:\.\d+)?\s*(?:억|천만|백만|만)?\s*(?:미국달러|달러|불|USD)",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, cleaned, flags=re.IGNORECASE)
+        if match:
+            return parse_export_amount_usd(match.group(0))
+
+    return None
+
+
+def split_revenue_segments(text: str) -> list[str]:
+    if not text:
+        return []
+
+    document = clean_document_text(text)
+    segments = []
+
+    for line in document.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+
+        parts = re.split(r"(?<=[.!?。])|※|○|●|□|■|◇|◆|▶|▷|ㆍ|·", line)
+        segments.extend(
+            clean_text(part)
+            for part in parts
+            if part and len(clean_text(part)) >= 4
+        )
+
+    return segments
+
+
+def is_revenue_candidate_segment(segment: str) -> bool:
+    if not segment:
+        return False
+
+    if not re.search(r"\d", segment):
+        return False
+
+    has_section_keyword = any(keyword in segment for keyword in REVENUE_SECTION_KEYWORDS)
+    if not has_section_keyword:
+        return False
+
+    has_qualifier = any(keyword in segment for keyword in REVENUE_CONTEXT_QUALIFIERS)
+    has_money_unit = bool(
+        re.search(
+            r"\d[\d,]*(?:\.\d+)?\s*(?:조\s*원|천억\s*원|억\s*원|억원|억|천만\s*원|만원|원|달러|불|USD)",
+            segment,
+            flags=re.IGNORECASE,
+        )
+    )
+    has_export = any(keyword in segment for keyword in ["수출실적", "수출 실적", "수출액"])
+
+    return has_qualifier or has_money_unit or has_export
+
+
+def extract_revenue_candidate_windows(text: str, window_size: int = 2) -> list[str]:
+    segments = split_revenue_segments(text)
+    windows = []
+    seen = set()
+
+    for index, segment in enumerate(segments):
+        if not is_revenue_candidate_segment(segment):
+            continue
+
+        start = max(0, index - window_size)
+        end = min(len(segments), index + window_size + 1)
+        window = clean_text(" ".join(segments[start:end]))
+
+        if not window or window in seen:
+            continue
+
+        seen.add(window)
+        windows.append(window)
+
+    return windows[:20]
+
+
+def normalize_operator_for_exclusion(operator: str, context: str) -> str:
+    if not any(keyword in context for keyword in ["제외", "지원 제외", "신청 제외", "대상 제외"]):
+        return operator
+
+    return {
+        "이상": "미만",
+        "초과": "이하",
+        "이하": "초과",
+        "미만": "이상",
+    }.get(operator, operator)
+
+
+def extract_revenue_rules_regex(text: str) -> list[dict]:
+    """단순 매출 조건을 정규식으로 추출한다."""
+    rules = []
+    seen = set()
+
+    for window in extract_revenue_candidate_windows(text):
+        if not any(keyword in window for keyword in ["매출", "중견기업", "소상공인", "수출실적", "수출 실적", "수출액"]):
+            continue
+
+        for match in REVENUE_AMOUNT_PATTERN.finditer(window):
+            matched_text = match.group(0)
+            value_manwon = parse_revenue_to_manwon(
+                f"{match.group('number')}{match.group('unit')}"
+            )
+            if value_manwon is None:
+                continue
+
+            # 금액 주변에 매출이라는 단어가 있어야 지원금·사업비와 혼동하지 않는다.
+            start = max(0, match.start() - 140)
+            end = min(len(window), match.end() + 140)
+            nearby = window[start:end]
+            if not any(keyword in nearby for keyword in ["매출", "중견기업", "소상공인", "수출실적", "수출 실적", "수출액"]):
+                continue
+            if any(keyword in nearby for keyword in REVENUE_EXCLUDED_CONTEXT_KEYWORDS):
+                if not any(keyword in nearby for keyword in ["평균매출", "평균 매출", "연매출", "매출액", "수출실적", "수출 실적", "수출액"]):
+                    continue
+
+            rule = {
+                "track": infer_track_name(window),
+                "revenue_type": infer_revenue_type(nearby),
+                "operator": normalize_operator_for_exclusion(match.group("operator"), nearby),
+                "value_manwon": value_manwon,
+                "export_min_usd": extract_export_min_usd(window),
+                "evidence": window[:700],
+            }
+
+            key = (
+                rule["track"] or "",
+                rule["revenue_type"],
+                rule["operator"],
+                rule["value_manwon"],
+                rule["export_min_usd"],
+            )
+            if key in seen:
+                continue
+
+            seen.add(key)
+            rules.append(rule)
+
+    return rules
+
+
+def build_revenue_rules_prompt(title: str, text: str) -> str:
+    return f"""당신은 정부 지원사업 공고에서 신청기업의 매출 자격조건을 구조화하는 검수자입니다.
+
+[공고 제목]
+{title}
+
+[매출 조건 후보 문장]
+{text[:7000]}
+
+반드시 아래 규칙을 지키세요.
+
+1. 신청기업의 매출 자격조건만 추출하세요. 지원금, 사업비, 예산, 보조금 금액은 제외하세요.
+2. 공고 전체 공통 조건이면 track은 null로 반환하세요.
+3. 트랙·유형·분야마다 조건이 다르면 각각 별도 항목으로 반환하세요.
+4. operator는 반드시 "이상", "초과", "이하", "미만" 중 하나만 사용하세요.
+5. value_manwon은 만원 단위 정수로 변환하세요.
+   - 20억원 = 200000
+   - 50억원 = 500000
+   - 100억원 = 1000000
+   - 1200억원 = 12000000
+6. revenue_type은 다음 중 가장 알맞은 값을 사용하세요.
+   - "최근년도 매출액"
+   - "최근 3개 사업연도 평균매출액"
+   - "매출액"
+7. 같은 트랙에서 매출과 수출실적을 모두 요구하면 export_min_usd도 정수로 저장하세요.
+8. "평균매출액 또는 연간매출액"처럼 OR 조건이면 두 항목으로 나누어 반환하세요.
+9. evidence에는 실제 후보 문장을 짧게 보존하세요.
+10. "매출액 3,000억원 이상인 기업 제외"처럼 제외 조건이면 신청 가능한 조건으로 뒤집어 반환하세요. 예: "3,000억원 이상 제외" = operator "미만".
+11. 매출 자격조건이 없으면 빈 배열 []만 반환하세요.
+12. 설명이나 마크다운 없이 JSON 배열만 반환하세요.
+
+반환 형식:
+[
+  {{
+    "track": "트랙명 또는 null",
+    "revenue_type": "최근년도 매출액",
+    "operator": "이상",
+    "value_manwon": 500000,
+    "export_min_usd": 1000000,
+    "evidence": "최근년도 매출액 50억원 이상이고 수출실적 100만불 이상"
+  }}
+]
+"""
+
+
+def normalize_revenue_rule(rule: dict) -> dict | None:
+    if not isinstance(rule, dict):
+        return None
+
+    operator = REVENUE_OPERATOR_MAP.get(str(rule.get("operator") or "").strip())
+    if not operator:
+        return None
+
+    value_manwon = parse_revenue_to_manwon(rule.get("value_manwon"))
+    if value_manwon is None:
+        # 모델이 value나 revenue_amount로 반환한 경우도 허용
+        value_manwon = parse_revenue_to_manwon(
+            rule.get("value")
+            or rule.get("revenue_amount")
+            or rule.get("revenue_amount_manwon")
+        )
+    if value_manwon is None:
+        return None
+
+    track = rule.get("track")
+    if track is not None:
+        track = clean_text(str(track))
+        if track.lower() in ("null", "none", "공통", "전체", ""):
+            track = None
+
+    evidence = clean_text(str(rule.get("evidence") or ""))[:700]
+    revenue_type = clean_text(str(rule.get("revenue_type") or "매출액"))
+    if not revenue_type:
+        revenue_type = infer_revenue_type(evidence)
+
+    export_min_usd = parse_export_amount_usd(rule.get("export_min_usd"))
+    if export_min_usd is None:
+        export_min_usd = extract_export_min_usd(evidence)
+
+    return {
+        "track": track,
+        "revenue_type": revenue_type,
+        "operator": operator,
+        "value_manwon": value_manwon,
+        "export_min_usd": export_min_usd,
+        "evidence": evidence,
+    }
+
+
+def extract_revenue_rules_with_llm(title: str, text: str) -> list[dict]:
+    if not llm or not text:
+        return []
+
+    prompt = build_revenue_rules_prompt(title, text)
+
+    try:
+        response = llm.invoke(prompt)
+        raw = response.content.strip()
+        print(f"  → 매출조건 LLM 응답: {raw[:250]!r}")
+
+        raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.IGNORECASE)
+        raw = re.sub(r"\s*```$", "", raw)
+
+        data = None
+
+        try:
+            data = json.loads(raw)
+        except Exception:
+            array_match = re.search(r"\[[\s\S]*\]", raw)
+            if array_match:
+                data = json.loads(array_match.group(0))
+            else:
+                object_match = re.search(r"\{[\s\S]*\}", raw)
+                if object_match:
+                    parsed_object = json.loads(object_match.group(0))
+                    data = parsed_object.get("revenue_rules", [])
+
+        if isinstance(data, dict):
+            data = data.get("revenue_rules", [])
+
+        if not isinstance(data, list):
+            return []
+
+        normalized = []
+        for item in data:
+            rule = normalize_revenue_rule(item)
+            if rule:
+                normalized.append(rule)
+
+        return normalized
+
+    except Exception as e:
+        print(f"  → 매출조건 LLM 추출 실패: {type(e).__name__}: {e}")
+        return []
+
+
+def merge_revenue_rules(regex_rules: list[dict], llm_rules: list[dict]) -> list[dict]:
+    """
+    트랙을 잘 판단하는 LLM 결과를 우선하고,
+    LLM이 놓친 금액·연산자 조합만 정규식 결과로 보완한다.
+    """
+    merged = []
+    seen_exact = set()
+    seen_condition = set()
+
+    for rule in llm_rules + regex_rules:
+        normalized = normalize_revenue_rule(rule)
+        if not normalized:
+            continue
+
+        exact_key = (
+            normalized["track"] or "",
+            normalized["revenue_type"],
+            normalized["operator"],
+            normalized["value_manwon"],
+            normalized["export_min_usd"],
+        )
+        condition_key = (
+            normalized["revenue_type"],
+            normalized["operator"],
+            normalized["value_manwon"],
+            normalized["export_min_usd"],
+        )
+
+        if exact_key in seen_exact:
+            continue
+
+        # 같은 조건을 LLM이 트랙명과 함께 반환했다면 track=None 정규식 결과는 생략
+        if normalized["track"] is None and condition_key in seen_condition:
+            continue
+
+        seen_exact.add(exact_key)
+        seen_condition.add(condition_key)
+        merged.append(normalized)
+
+    return merged
+
+
+def build_revenue_update_payload(rules: list[dict]) -> dict:
+    """
+    단순 공통 조건이면 기존 min/max 컬럼도 보완한다.
+    트랙별·복합 조건이면 기존 단일 min/max 값은 NULL로 정리한다.
+    """
+    payload = {
+        "revenue_rules": rules,
+    }
+
+    if not rules:
+        # 조건을 찾지 못한 경우 기존 수동/과거 값을 지우지 않는다.
+        return payload
+
+    has_track_rule = any(rule.get("track") for rule in rules)
+    revenue_types = {rule.get("revenue_type") for rule in rules}
+
+    if has_track_rule or len(revenue_types) > 1:
+        payload["revenue_min_manwon"] = None
+        payload["revenue_max_manwon"] = None
+        return payload
+
+    minimum_rules = [
+        rule for rule in rules
+        if rule.get("operator") in ("이상", "초과")
+    ]
+    maximum_rules = [
+        rule for rule in rules
+        if rule.get("operator") in ("이하", "미만")
+    ]
+
+    # 하나의 공통 범위만 기존 단순 컬럼으로 반영한다.
+    payload["revenue_min_manwon"] = (
+        minimum_rules[0]["value_manwon"]
+        if len(minimum_rules) == 1
+        else None
+    )
+    payload["revenue_max_manwon"] = (
+        maximum_rules[0]["value_manwon"]
+        if len(maximum_rules) == 1
+        else None
+    )
+
+    return payload
+
+
+def fetch_policies_without_revenue_rules(limit: int = REVENUE_LIMIT):
+    columns = (
+        "policy_id,title,url,summary,raw_text,raw_json,"
+        "revenue_min_manwon,revenue_max_manwon,revenue_rules"
+    )
+
+    result = (
+        supabase
+        .table("policy")
+        .select(columns)
+        .like("policy_id", "PBLN_%")
+        .is_("revenue_rules", "null")
+        .limit(limit)
+        .execute()
+    )
+
+    rows = result.data or []
+    if not REVENUE_REPROCESS_EMPTY or len(rows) >= limit:
+        return rows
+
+    empty_limit = limit
+    if REVENUE_REPROCESS_HINT_ONLY:
+        empty_limit = max(limit * 5, 300)
+
+    empty_result = (
+        supabase
+        .table("policy")
+        .select(columns)
+        .like("policy_id", "PBLN_%")
+        .eq("revenue_rules", "[]")
+        .limit(empty_limit - len(rows))
+        .execute()
+    )
+
+    empty_rows = empty_result.data or []
+    if REVENUE_REPROCESS_HINT_ONLY:
+        filtered_empty_rows = []
+        for row in empty_rows:
+            haystack = " ".join(
+                str(row.get(key) or "")
+                for key in ["title", "summary", "raw_text"]
+            )
+            if any(keyword in haystack for keyword in REVENUE_REPROCESS_HINT_KEYWORDS):
+                filtered_empty_rows.append(row)
+        empty_rows = filtered_empty_rows[: limit - len(rows)]
+
+    return rows + empty_rows[: limit - len(rows)]
+
+
+def update_revenue_rules(policy_id: str, rules: list[dict]) -> bool:
+    payload = build_revenue_update_payload(rules)
+
+    try:
+        (
+            supabase
+            .table("policy")
+            .update(payload)
+            .eq("policy_id", policy_id)
+            .execute()
+        )
+        return True
+    except Exception as e:
+        print(f"  → revenue_rules DB 저장 실패 [{policy_id}]: {e}")
+        return False
+
+
+def enrich_one_policy_revenue(policy: dict) -> bool:
+    policy_id = policy.get("policy_id")
+    title = policy.get("title") or ""
+    summary = policy.get("summary") or ""
+    raw_text = policy.get("raw_text") or ""
+    url = policy.get("url") or ""
+    raw_json = policy.get("raw_json") or {}
+
+    print("\n" + "=" * 80)
+    print(f"[매출조건 처리] {policy_id}")
+    print(title)
+
+    if not policy_id:
+        return False
+
+    collected: list[tuple[str, str]] = []
+    statuses = []
+
+    if summary:
+        collected.append((summary, "summary"))
+    if raw_text:
+        collected.append((raw_text, "raw_text"))
+
+    try:
+        detail_text = fetch_detail_page_text(url)
+        if detail_text and len(detail_text) >= 50:
+            collected.append((detail_text, "detail_page"))
+            print(f"  → 매출조건용 상세페이지 수집 ({len(detail_text)}자)")
+    except Exception as e:
+        print(f"  → 매출조건용 상세페이지 요청 실패: {e}")
+
+    for attachment in get_attachment_candidates(raw_json):
+        attach_url = attachment["url"]
+        attach_name = attachment["name"]
+        print(f"  → 매출조건용 첨부파일 확인: {attach_name}")
+
+        try:
+            file_bytes, content_type = download_attachment(attach_url)
+            attach_text, source_type = extract_text_from_attachment(
+                file_bytes=file_bytes,
+                content_type=content_type,
+                filename=attach_name,
+            )
+            statuses.append(source_type)
+
+            if attach_text:
+                collected.append((attach_text, source_type))
+                print(f"    → 추출 완료 ({len(attach_text)}자)")
+        except Exception as e:
+            print(f"    → 첨부파일 처리 실패: {e}")
+            statuses.append("attachment_error")
+
+    regex_rules = []
+    candidate_windows = []
+
+    for source_text, source_name in collected:
+        source_regex_rules = extract_revenue_rules_regex(source_text)
+        if source_regex_rules:
+            print(f"  → {source_name} 정규식 매출조건: {len(source_regex_rules)}건")
+            regex_rules.extend(source_regex_rules)
+
+        source_windows = extract_revenue_candidate_windows(source_text)
+        candidate_windows.extend(source_windows)
+
+    # 중복 후보 문장 제거
+    unique_windows = list(dict.fromkeys(candidate_windows))
+    llm_rules = []
+
+    if unique_windows and llm:
+        llm_text = "\n\n".join(unique_windows[:12])
+        llm_rules = extract_revenue_rules_with_llm(title, llm_text)
+        if llm_rules:
+            print(f"  → LLM 매출조건: {len(llm_rules)}건")
+    elif not unique_windows:
+        print("  → 매출 조건 후보 문장 없음")
+    else:
+        print("  → OPENROUTER_API_KEY 없음: 정규식 결과만 사용")
+
+    rules = merge_revenue_rules(regex_rules, llm_rules)
+
+    if not update_revenue_rules(policy_id, rules):
+        return False
+
+    if rules:
+        print(f"  → revenue_rules 저장 완료: {len(rules)}건")
+    else:
+        print("  → 매출 조건 없음: 빈 배열 [] 저장")
+
+    return True
+
+
 # =========================================================
 # Supabase 조회 / 업데이트
 # =========================================================
@@ -1149,6 +2217,21 @@ def try_extract_and_update(
     source: str,
     use_llm: bool = True,
 ) -> tuple[bool, bool]:
+    amount, evidence = extract_structured_table_amount(text)
+
+    if amount:
+        ok = update_amount_extracted(
+            policy_id=policy_id,
+            amount=amount,
+            source=f"structured_table:{source}",
+            evidence=evidence or "",
+        )
+        if ok:
+            print(f"  → {source} 표 기반 추출 성공: {amount}만원")
+            return True, False
+        print(f"  → {source} 표에서 추출했으나 DB 저장 실패 ({amount}만원)")
+        return False, False
+
     amount, evidence = extract_max_amount_with_evidence(text)
 
     if amount:
@@ -1360,15 +2443,14 @@ def enrich_one_policy(policy: dict):
 
 
 # =========================================================
-# 메인
+# 실행
 # =========================================================
 
-def main():
-    # pending 상태이지만 max_amount가 이미 있는 레코드 먼저 보정
+def run_amount_enrichment():
+    """기존 최대 지원금액 보강 작업"""
     fix_pending_with_amount()
 
     policies = fetch_policies_without_amount(limit=LIMIT)
-
     print(f"max_amount NULL 공고 조회: {len(policies)}건")
 
     success_count = 0
@@ -1388,6 +2470,76 @@ def main():
     print("지원금 보강 완료")
     print(f"성공: {success_count}건")
     print(f"실패: {fail_count}건")
+
+
+def run_revenue_enrichment():
+    """트랙별 매출 조건 revenue_rules 보강 작업"""
+    policies = fetch_policies_without_revenue_rules(limit=REVENUE_LIMIT)
+    print(f"revenue_rules NULL 공고 조회: {len(policies)}건")
+
+    success_count = 0
+    fail_count = 0
+
+    for policy in policies:
+        ok = enrich_one_policy_revenue(policy)
+
+        if ok:
+            success_count += 1
+        else:
+            fail_count += 1
+
+        time.sleep(SLEEP_SECONDS)
+
+    print("\n" + "=" * 80)
+    print("매출 조건 보강 완료")
+    print(f"처리 성공: {success_count}건")
+    print(f"처리 실패: {fail_count}건")
+
+
+def main():
+    target = os.getenv("ENRICH_TARGET", "").strip().lower()
+    if len(sys.argv) >= 2:
+        target = sys.argv[1].strip().lower()
+
+    if target in ("amount", "max_amount"):
+        print("=" * 80)
+        print("정책 최대 지원금액 보강 시작")
+        run_amount_enrichment()
+        print("\n" + "=" * 80)
+        print("정책 최대 지원금액 보강 완료")
+        return
+
+    if target in ("revenue", "revenue_rules", "rules"):
+        print("=" * 80)
+        print("정책 매출 조건 revenue_rules 보강 시작")
+        run_revenue_enrichment()
+        print("\n" + "=" * 80)
+        print("정책 매출 조건 revenue_rules 보강 완료")
+        return
+
+    if target == "":
+        print("=" * 80)
+        print("정책 상세정보 보강 실행 파일이 분리되었습니다.")
+        print("최대 지원금액만: python data/scripts/enrich_policy_amount_details.py")
+        print("매출 조건만: python data/scripts/enrich_policy_revenue_rules.py")
+        print("전체 실행이 필요하면: python data/scripts/enrich_policy_details.py all")
+        return
+
+    if target != "all":
+        raise ValueError(
+            "ENRICH_TARGET or CLI argument must be one of: amount, revenue, all"
+        )
+
+    print("=" * 80)
+    print("정책 상세정보 보강 시작")
+    print("1단계: 최대 지원금액")
+    print("2단계: 매출 조건 revenue_rules")
+
+    run_amount_enrichment()
+    run_revenue_enrichment()
+
+    print("\n" + "=" * 80)
+    print("정책 상세정보 보강 전체 완료")
 
 
 if __name__ == "__main__":

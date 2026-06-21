@@ -122,26 +122,6 @@ def capex_advisor_node(state: FactofitState) -> FactofitState:
         )
         return state
 
-    # matched_policies가 없으면 ChromaDB에서 직접 검색합니다.
-    if not matched_policies and company:
-        from app.agents.policy import match_policies
-
-        company_context = {
-            "industry_code": company.industry_code or [],
-            "region": company.region or "",
-            "company_type": company.company_type if company.company_type else "",
-        }
-
-        equipment_name = equipment.name if equipment else ""
-        policy_query = (
-            f"{equipment_name} 지원사업"
-            if equipment_name
-            else "제조설비 지원사업"
-        )
-
-        matched_policies = match_policies(company_context, policy_query)
-        state["matched_policies"] = matched_policies
-
     # LLM에 ROI 계산 Tool을 바인딩합니다.
     llm_with_tools = llm.bind_tools([calculate_equipment_roi])
 

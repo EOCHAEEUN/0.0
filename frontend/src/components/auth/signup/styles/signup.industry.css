@@ -1,0 +1,108 @@
+.ff-signup-combo {
+  z-index: 20;
+}
+
+.ff-signup-suggest-box {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  border-radius: 20px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #ffffff;
+  box-shadow: 0 22px 60px rgba(15, 27, 51, 0.13);
+  padding: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.ff-signup-suggest-box button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.ff-signup-suggest-box button:hover {
+  background: #f4f7fb;
+}
+
+.ff-signup-suggest-box span {
+  color: #0f1b33;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.ff-signup-suggest-box b {
+  color: #4d57b8;
+  font-size: 14px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.ff-signup-industry-list {
+  display: grid;
+  gap: 12px;
+}
+
+.ff-signup-industry-row {
+  position: relative;
+}
+
+.ff-signup-industry-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 2px 0 12px;
+}
+
+.ff-signup-industry-row-top span {
+  min-height: 30px;
+  border-radius: 999px;
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  color: #64748b;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ff-signup-industry-row-top button {
+  height: 34px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff1f2;
+  color: #ef4444;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.ff-signup-add-industry {
+  width: 100%;
+  height: 56px;
+  margin: 0 0 18px;
+  border-radius: 20px;
+  border: 1px dashed rgba(77, 87, 184, 0.42);
+  background: #f8f9ff;
+  color: #4d57b8;
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.ff-signup-add-industry:hover {
+  background: #f3f5ff;
+}

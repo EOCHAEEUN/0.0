@@ -723,9 +723,9 @@ export function RecommendationListCard({
       </div>
 
       <div style={{ display: "grid", gap: "12px" }}>
-        {visibleProjects.map((project) => (
+        {visibleProjects.map((project, index) => (
           <RecommendedProjectRow
-            key={project.id}
+            key={`${project.rawId || project.id}-${project.title}-${index}`}
             project={project}
             selected={selectedProjectId === project.id}
             onSelect={() => onSelectProject(project.id)}
@@ -1143,7 +1143,7 @@ export function OtherMatchedPoliciesPanel({
       >
         {projects.map((project, index) => (
           <div
-            key={project.id}
+            key={`${project.rawId || project.id}-${project.title}-${index}`}
             className="ff-other-policy-row"
             style={{
               display: "grid",

@@ -80,6 +80,24 @@ export type PolicyApiItem = {
   service_category?: string | null
   max_amount?: number | string | null
   max_amount_manwon?: number | string | null
+  matched_policy_id?: string | number
+  import_row_id?: string | number | null
+  summary?: string | null
+  support_summary?: string | null
+  policy_subcategory?: string | null
+  subcategory?: string | null
+  support_amount?: number | string | null
+  subsidy_amount?: number | string | null
+  support_limit?: number | string | null
+  application_start_date?: string | null
+  application_end_date?: string | null
+  reception_start_date?: string | null
+  reception_end_date?: string | null
+  posted_at?: string | null
+  registered_at?: string | null
+  notice_date?: string | null
+  notice_url?: string | null
+  homepage_url?: string | null
   metadata?: {
     title?: string
     organization?: string
@@ -93,17 +111,36 @@ export type PolicyApiItem = {
     created_at?: string | null
     max_amount?: number | string | null
     max_amount_manwon?: number | string | null
+    support_amount?: number | string | null
+    subsidy_amount?: number | string | null
+    support_limit?: number | string | null
     policy_category?: string
+    policy_subcategory?: string | null
     service_category?: string
+    category?: string | null
+    subcategory?: string | null
     urgency_label?: string
     url?: string | null
     source_url?: string | null
+    policy_url?: string | null
+    notice_url?: string | null
+    homepage_url?: string | null
     scenario_match?: string[] | string | null
     scenario_label?: string | null
     reason?: string
     content?: string
     description?: string
+    summary?: string | null
+    support_summary?: string | null
     support_content?: string
+    created_at?: string | null
+    posted_at?: string | null
+    registered_at?: string | null
+    notice_date?: string | null
+    application_start_date?: string | null
+    application_end_date?: string | null
+    reception_start_date?: string | null
+    reception_end_date?: string | null
   }
 }
 

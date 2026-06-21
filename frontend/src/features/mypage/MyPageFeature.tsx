@@ -16,6 +16,8 @@ import {
   STORAGE_KEY,
   USER_ID_STORAGE_KEY,
   COMPANY_ID_STORAGE_KEY,
+  EQUIPMENT_ID_STORAGE_KEY,
+  SELECTED_EQUIPMENT_ID_STORAGE_KEY,
   ANALYSIS_RESULT_STORAGE_KEY,
   CURRENT_YEAR,
   PREVIOUS_YEAR,
@@ -43,6 +45,7 @@ import {
   formatIndustryCodes,
   getIndustryCodeCandidates,
   getIndustryNameByCode,
+  findCompanyId,
   findEquipmentId,
   getErrorMessage,
   safeJsonParse,
@@ -71,6 +74,214 @@ import {
   AiGuideHeroBanner,
   AccordionPanel,
 } from "./myPage.parts";
+
+
+type OnboardingMeResponse = {
+  success?: boolean;
+  data?: {
+    user_profile?: Record<string, unknown> | null;
+    company?: Record<string, unknown> | null;
+    equipments?: unknown[];
+    company_id?: string | null;
+  };
+};
+
+function getObject(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function getStringValue(value: unknown) {
+  if (value === null || value === undefined) return "";
+  return String(value).trim();
+}
+
+function getBooleanValue(value: unknown): boolean | null {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") return true;
+    if (normalized === "false") return false;
+  }
+
+  return null;
+}
+
+function getStringArrayValue(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.map((item) => getStringValue(item)).filter(Boolean);
+  }
+
+  const textValue = getStringValue(value);
+  if (!textValue) return [];
+
+  return textValue
+    .split(/[,，/\s]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function pickNumberText(...values: unknown[]) {
+  for (const value of values) {
+    const textValue = getStringValue(value);
+    if (textValue) return textValue;
+  }
+
+  return "";
+}
+
+
+type EquipmentPayloadFallback = {
+  process: string | null;
+  defect_rate: number | null;
+  maintenance_cost_annual: number | null;
+  current_capacity_value: number | null;
+  production_qty: number | null;
+  contribution_margin_won: number | null;
+  scenario_a_investment_manwon: number | null;
+  scenario_b_investment_manwon: number | null;
+};
+
+function normalizeEquipmentCategory(category: string) {
+  const normalized = category.trim().toLowerCase();
+
+  if (normalized.includes("press") || normalized.includes("프레스")) return "press";
+  if (normalized.includes("cnc") || normalized.includes("공작") || normalized.includes("가공")) return "cnc";
+  if (normalized.includes("injection") || normalized.includes("사출")) return "injection";
+
+  return "etc";
+}
+
+function getEquipmentPayloadFallback(
+  equipment: EquipmentInfo,
+  energyCostAnnual: number,
+): EquipmentPayloadFallback {
+  const category = normalizeEquipmentCategory(equipment.category);
+  const energyBasedMaintenance =
+    energyCostAnnual > 0 ? Math.round(energyCostAnnual * 0.018) : null;
+
+  if (category === "press") {
+    return {
+      process: "프레스공정",
+      defect_rate: 3.4,
+      maintenance_cost_annual: energyBasedMaintenance ?? 900,
+      current_capacity_value: 250,
+      production_qty: 120000,
+      contribution_margin_won: 18000,
+      scenario_a_investment_manwon: 20000,
+      scenario_b_investment_manwon: 4000,
+    };
+  }
+
+  if (category === "cnc") {
+    return {
+      process: "cnc",
+      defect_rate: 1.6,
+      maintenance_cost_annual: energyBasedMaintenance ?? 420,
+      current_capacity_value: 35,
+      production_qty: 85000,
+      contribution_margin_won: 22000,
+      scenario_a_investment_manwon: 10000,
+      scenario_b_investment_manwon: 3000,
+    };
+  }
+
+  if (category === "injection") {
+    return {
+      process: "사출공정",
+      defect_rate: 2.8,
+      maintenance_cost_annual: energyBasedMaintenance ?? 780,
+      current_capacity_value: 450,
+      production_qty: 100000,
+      contribution_margin_won: 16000,
+      scenario_a_investment_manwon: 18000,
+      scenario_b_investment_manwon: 5000,
+    };
+  }
+
+  return {
+    process: equipment.process.trim() || null,
+    defect_rate: 3,
+    maintenance_cost_annual: energyBasedMaintenance ?? 500,
+    current_capacity_value: 100,
+    production_qty: 50000,
+    contribution_margin_won: 12000,
+    scenario_a_investment_manwon: 12000,
+    scenario_b_investment_manwon: 4000,
+  };
+}
+
+function normalizeRemoteIndustries(
+  industryCodes: string[],
+  industryName: string,
+): IndustryItem[] {
+  const codes = industryCodes.length > 0 ? industryCodes : [];
+  const normalized = codes.map((code, index) => ({
+    id: index + 1,
+    industry:
+      index === 0 && industryName
+        ? industryName
+        : getIndustryNameByCode(code) || industryName || "",
+    industryCode: code,
+  }));
+
+  if (normalized.length === 0 && industryName) {
+    normalized.push({
+      ...createEmptyIndustry(1),
+      industry: industryName,
+      industryCode: "",
+    });
+  }
+
+  while (normalized.length < 2) {
+    normalized.push(createEmptyIndustry(normalized.length + 1));
+  }
+
+  return normalized;
+}
+
+function extractOnboardingMeData(response: unknown) {
+  const responseRecord = getObject(response) as OnboardingMeResponse | null;
+  const dataRecord = getObject(responseRecord?.data);
+
+  return dataRecord ?? getObject(response) ?? {};
+}
+
+function mapRemoteEquipment(item: unknown, index: number): EquipmentInfo {
+  const equipment = getObject(item) ?? {};
+  const category = getStringValue(equipment.category);
+
+  return {
+    ...createEmptyEquipment(index + 1),
+    equipmentId:
+      getStringValue(equipment.equipment_id) ||
+      getStringValue(equipment.equipmentId) ||
+      undefined,
+    name: getStringValue(equipment.name),
+    category: category || "선택 필요",
+    process: getStringValue(equipment.process),
+    years: getStringValue(equipment.age_years),
+    annualEnergyCost: formatCommaNumber(getStringValue(equipment.energy_cost_annual)),
+    defectRate: getStringValue(equipment.defect_rate),
+    maintenanceCostAnnual: formatCommaNumber(
+      getStringValue(equipment.maintenance_cost_annual),
+    ),
+    currentCapacityValue: getStringValue(equipment.current_capacity_value),
+    productionQty: getStringValue(equipment.production_qty),
+    contributionMarginWon: formatCommaNumber(
+      getStringValue(equipment.contribution_margin_won),
+    ),
+    scenarioAInvestment: formatCommaNumber(
+      getStringValue(equipment.scenario_a_investment_manwon),
+    ),
+    scenarioBInvestment: formatCommaNumber(
+      getStringValue(equipment.scenario_b_investment_manwon),
+    ),
+    status: "저장된 설비",
+  };
+}
+
 
 export default function MyPage() {
   const storedData = useMemo(() => {
@@ -176,6 +387,146 @@ export default function MyPage() {
       return formattedEquipmentList;
     });
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSavedOnboarding = async () => {
+      if (!getAccessToken()) return;
+
+      try {
+        const response = await fetchSavedOnboarding();
+        if (cancelled) return;
+
+        const data = extractOnboardingMeData(response);
+        const userProfile = getObject(data.user_profile);
+        const company = getObject(data.company);
+        const equipments = Array.isArray(data.equipments) ? data.equipments : [];
+        const companyId = findCompanyId(response);
+
+        if (userProfile) {
+          const profileName = getStringValue(userProfile.name);
+          const profileEmail = getStringValue(userProfile.email);
+          const profilePhone = getStringValue(userProfile.phone);
+          const managerName = getStringValue(userProfile.manager_name);
+          const managerPhone = getStringValue(userProfile.manager_phone);
+
+          setBasicInfo((prev) => ({
+            ...prev,
+            name: profileName || prev.name,
+            email: profileEmail || prev.email,
+            phone: profilePhone ? formatPhoneNumber(profilePhone) : prev.phone,
+            manager: managerName || profileName || prev.manager,
+            managerPhone: managerPhone
+              ? formatPhoneNumber(managerPhone)
+              : profilePhone
+                ? formatPhoneNumber(profilePhone)
+                : prev.managerPhone,
+          }));
+        }
+
+        if (company) {
+          const industryCodes = getStringArrayValue(company.industry_code);
+          const industryName = getStringValue(company.industry_name);
+          const remoteIndustries = normalizeRemoteIndustries(
+            industryCodes,
+            industryName,
+          );
+          const affiliateValue = getBooleanValue(
+            company.is_disclosure_group_member,
+          );
+          const purposeValues = getStringArrayValue(company.primary_purpose);
+          const companyType = getStringValue(company.company_type);
+
+          setCompanyInfo((prev) => ({
+            ...prev,
+            companyName: getStringValue(company.company_name) || prev.companyName,
+            businessNumber: formatBusinessNumber(
+              getStringValue(company.business_registration_no) ||
+                prev.businessNumber,
+            ),
+            assetTotalManwon: formatCommaNumber(
+              pickNumberText(company.total_assets_manwon, prev.assetTotalManwon),
+            ),
+            industry: remoteIndustries[0]?.industry ?? prev.industry,
+            industryCode: remoteIndustries[0]?.industryCode ?? prev.industryCode,
+            industries: remoteIndustries,
+            region: getStringValue(company.region) || prev.region,
+            employees: formatCommaNumber(
+              pickNumberText(company.employee_count, prev.employees),
+            ),
+            annualRevenue: formatCommaNumber(
+              pickNumberText(
+                company.annual_revenue_manwon,
+                company.annual_revenue,
+                prev.annualRevenue,
+              ),
+            ),
+            revenue2YearsAgo: formatCommaNumber(
+              pickNumberText(
+                company.revenue_2y_ago_manwon,
+                prev.revenue2YearsAgo,
+              ),
+            ),
+            revenue3YearsAgo: formatCommaNumber(
+              pickNumberText(
+                company.revenue_3y_ago_manwon,
+                prev.revenue3YearsAgo,
+              ),
+            ),
+            companyType: companyType || prev.companyType || "선택 필요",
+            affiliateStatus:
+              affiliateValue === null
+                ? prev.affiliateStatus
+                : affiliateValue
+                  ? "대기업 계열사 소속"
+                  : "무소속",
+            purpose: purposeValues[0] || prev.purpose,
+            foundedYear:
+              getStringValue(company.established_year) || prev.foundedYear,
+            businessSiteType:
+              getStringValue(company.workplace_type) ||
+              prev.businessSiteType ||
+              "선택 필요",
+          }));
+        }
+
+        if (equipments.length > 0) {
+          const remoteEquipmentList = equipments.map(mapRemoteEquipment);
+          const firstRemoteEquipment = remoteEquipmentList[0];
+
+          setEquipmentList(remoteEquipmentList);
+          setSelectedAnalysisEquipmentId(firstRemoteEquipment?.id ?? 1);
+
+          if (firstRemoteEquipment?.equipmentId) {
+            window.localStorage.setItem(
+              EQUIPMENT_ID_STORAGE_KEY,
+              firstRemoteEquipment.equipmentId,
+            );
+            window.localStorage.setItem(
+              SELECTED_EQUIPMENT_ID_STORAGE_KEY,
+              firstRemoteEquipment.equipmentId,
+            );
+          }
+        }
+
+        if (companyId) {
+          window.localStorage.setItem(COMPANY_ID_STORAGE_KEY, companyId);
+        }
+
+        setProfileCompleted(Boolean(userProfile && company && equipments.length > 0));
+      } catch (error) {
+        console.warn("마이페이지 온보딩 초기값 조회 실패:", error);
+      }
+    };
+
+    void loadSavedOnboarding();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
 
   useEffect(() => {
     if (
@@ -663,34 +1014,41 @@ export default function MyPage() {
           : companyInfo.businessSiteType,
     };
 
-    const equipmentPayloads = completedEquipments.map((equipment) => ({
-      localId: equipment.id,
-      payload: {
-        name: equipment.name.trim(),
-        category:
-          equipment.category === "선택 필요" ? "etc" : equipment.category,
-        process: equipment.process.trim() || null,
-        age_years: toPositiveNumber(equipment.years) ?? 0,
-        energy_cost_annual:
-          toPositiveNumber(normalizeCommaNumber(equipment.annualEnergyCost)) ??
-          0,
-        defect_rate: toNumberOrNull(equipment.defectRate),
-        maintenance_cost_annual: toNumberOrNull(
-          normalizeCommaNumber(equipment.maintenanceCostAnnual),
-        ),
-        current_capacity_value: toNumberOrNull(equipment.currentCapacityValue),
-        production_qty: toNumberOrNull(equipment.productionQty),
-        contribution_margin_won: toNumberOrNull(
-          normalizeCommaNumber(equipment.contributionMarginWon),
-        ),
-        scenario_a_investment_manwon: toNumberOrNull(
-          normalizeCommaNumber(equipment.scenarioAInvestment),
-        ),
-        scenario_b_investment_manwon: toNumberOrNull(
-          normalizeCommaNumber(equipment.scenarioBInvestment),
-        ),
-      } satisfies EquipmentPayload,
-    }));
+    const equipmentPayloads = completedEquipments.map((equipment) => {
+      const energyCostAnnual =
+        toPositiveNumber(normalizeCommaNumber(equipment.annualEnergyCost)) ?? 0;
+      const fallback = getEquipmentPayloadFallback(equipment, energyCostAnnual);
+
+      return {
+        localId: equipment.id,
+        payload: {
+          name: equipment.name.trim(),
+          category:
+            equipment.category === "선택 필요" ? "etc" : equipment.category,
+          process: equipment.process.trim() || fallback.process,
+          age_years: toPositiveNumber(equipment.years) ?? 0,
+          energy_cost_annual: energyCostAnnual,
+          defect_rate: toNumberOrNull(equipment.defectRate) ?? fallback.defect_rate,
+          maintenance_cost_annual:
+            toNumberOrNull(normalizeCommaNumber(equipment.maintenanceCostAnnual)) ??
+            fallback.maintenance_cost_annual,
+          current_capacity_value:
+            toNumberOrNull(equipment.currentCapacityValue) ??
+            fallback.current_capacity_value,
+          production_qty:
+            toNumberOrNull(equipment.productionQty) ?? fallback.production_qty,
+          contribution_margin_won:
+            toNumberOrNull(normalizeCommaNumber(equipment.contributionMarginWon)) ??
+            fallback.contribution_margin_won,
+          scenario_a_investment_manwon:
+            toNumberOrNull(normalizeCommaNumber(equipment.scenarioAInvestment)) ??
+            fallback.scenario_a_investment_manwon,
+          scenario_b_investment_manwon:
+            toNumberOrNull(normalizeCommaNumber(equipment.scenarioBInvestment)) ??
+            fallback.scenario_b_investment_manwon,
+        } satisfies EquipmentPayload,
+      };
+    });
 
     const savedProfileCompleted =
       basicInfoDone && companyInfoDone && equipmentInfoDone;
@@ -713,6 +1071,10 @@ export default function MyPage() {
           companyId,
           equipmentPayload: item.payload,
         });
+        console.log(
+          "온보딩 equipment 최종 payload JSON:",
+          JSON.stringify(item.payload, null, 2),
+        );
 
         const equipmentResponse = await submitEquipmentPayload(
           companyId,
@@ -733,6 +1095,20 @@ export default function MyPage() {
               : equipment,
           );
         }
+      }
+
+      const selectedEquipmentUuid =
+        nextEquipmentList.find(
+          (equipment) => equipment.id === selectedAnalysisEquipmentId,
+        )?.equipmentId ??
+        nextEquipmentList.find((equipment) => equipment.equipmentId)?.equipmentId;
+
+      if (selectedEquipmentUuid) {
+        window.localStorage.setItem(EQUIPMENT_ID_STORAGE_KEY, selectedEquipmentUuid);
+        window.localStorage.setItem(
+          SELECTED_EQUIPMENT_ID_STORAGE_KEY,
+          selectedEquipmentUuid,
+        );
       }
 
       const storageData: MyPageStorageData = {
@@ -788,6 +1164,8 @@ export default function MyPage() {
 
     window.localStorage.removeItem(STORAGE_KEY);
     window.localStorage.removeItem(COMPANY_ID_STORAGE_KEY);
+    window.localStorage.removeItem(EQUIPMENT_ID_STORAGE_KEY);
+    window.localStorage.removeItem(SELECTED_EQUIPMENT_ID_STORAGE_KEY);
     window.localStorage.removeItem(ANALYSIS_RESULT_STORAGE_KEY);
 
     setBasicInfo(emptyBasicInfo);

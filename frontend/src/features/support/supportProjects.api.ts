@@ -115,8 +115,8 @@ export async function fetchPolicyCards(
       const json = (await response.json().catch(() => ({}))) as PolicyApiResponse
 
       if (!response.ok) {
-        if (response.status === 504) {
-          console.warn("정책 추천 timeout fallback:", json)
+        if (response.status === 404 || response.status === 504) {
+          console.warn("정책 추천 API fallback:", { status: response.status, response: json })
           return { cards: [], counters: buildPolicyCounters([]) }
         }
 

@@ -414,13 +414,36 @@ export function normalizeApiData(response: unknown): RoiApiData | null {
   if (!response || typeof response !== "object") return null
 
   const target = response as RoiApiResponse
+  const data = target.data
 
-  if (
-    target.data &&
-    typeof target.data === "object" &&
-    (target.data.scenario_a || target.data.scenario_b)
-  ) {
-    return target.data
+  if (target.roi_result && typeof target.roi_result === "object") {
+    return target.roi_result
+  }
+
+  if (target.roi_data && typeof target.roi_data === "object") {
+    return target.roi_data
+  }
+
+  if (data && typeof data === "object") {
+    if ("roi_result" in data) {
+      const analyzeRoiResult = (data as { roi_result?: RoiApiData | null }).roi_result
+
+      if (analyzeRoiResult && typeof analyzeRoiResult === "object") {
+        return analyzeRoiResult
+      }
+    }
+
+    if ("roi_data" in data) {
+      const analyzeRoiData = (data as { roi_data?: RoiApiData | null }).roi_data
+
+      if (analyzeRoiData && typeof analyzeRoiData === "object") {
+        return analyzeRoiData
+      }
+    }
+
+    if ("scenario_a" in data || "scenario_b" in data) {
+      return data as RoiApiData
+    }
   }
 
   if (target.scenario_a || target.scenario_b) {
@@ -454,12 +477,29 @@ export function mergeApiScenarios(localScenarios: ScenarioCard[], apiData: RoiAp
     )
     const paybackYears = toNumber(api.payback_years, 0)
     const roiPct = toNumber(api.roi_pct, local.roiPct)
+    const breakdown = api.breakdown ?? null
+    const energySaving = toNumber(
+      breakdown?.energy_saving_manwon,
+      local.energySavingManwon,
+    )
+    const maintenanceSaving = toNumber(
+      breakdown?.maintenance_saving_manwon,
+      local.maintenanceSavingManwon,
+    )
+    const defectSaving = toNumber(
+      breakdown?.defect_saving_manwon,
+      local.defectSavingManwon,
+    )
 
     return {
       ...local,
+      title: typeof api.label === "string" && api.label.trim() ? api.label.trim() : local.title,
       investmentManwon: investment,
       subsidyManwon: subsidy,
       netInvestmentManwon: Math.max(netInvestment, 0),
+      energySavingManwon: Math.max(energySaving, 0),
+      maintenanceSavingManwon: Math.max(maintenanceSaving, 0),
+      defectSavingManwon: Math.max(defectSaving, 0),
       annualNetBenefitManwon: annualNetBenefit,
       paybackYears: paybackYears > 0 ? roundTo(paybackYears, 1) : local.paybackYears,
       roiPct: roiPct > 0 && roiPct < 10000 ? roundTo(roiPct, 1) : local.roiPct,

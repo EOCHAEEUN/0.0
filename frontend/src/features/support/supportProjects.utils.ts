@@ -301,7 +301,7 @@ export function getAnalysisFingerprint(analysisData: AnalysisData) {
     .join(":")
 }
 
-export function toNumberOrNull(value?: number | string | null) {
+export function toNumberOrNull(value?: unknown) {
   if (value === null || value === undefined || value === "" || value === "None") {
     return null
   }
@@ -310,7 +310,11 @@ export function toNumberOrNull(value?: number | string | null) {
     return Number.isFinite(value) ? value : null
   }
 
-  const cleaned = String(value).replace(/[^\d.-]/g, "")
+  if (typeof value !== "string") {
+    return null
+  }
+
+  const cleaned = value.replace(/[^\d.-]/g, "")
   if (!cleaned) return null
 
   const amount = Number(cleaned)

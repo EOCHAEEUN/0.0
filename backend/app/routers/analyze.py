@@ -23,6 +23,53 @@ from app.tools.roi_calc import calculate_roi
 router = APIRouter()
 
 
+def _to_percent_score(value) -> float | None:
+    try:
+        score = float(value)
+    except (TypeError, ValueError):
+        return None
+
+    if score <= 1:
+        return score * 100
+    return score
+
+
+def _display_match_score(policy: dict) -> int:
+    raw_score = _to_percent_score(
+        policy.get(
+            "hybrid_score",
+            policy.get(
+                "final_score",
+                round(1 - policy.get("distance", 1), 3),
+            ),
+        )
+    )
+
+    if raw_score is None:
+        raw_score = 50
+
+    # Keep ranking order, but lift strict model scores into a UI-friendly range.
+    display_score = 55 + (raw_score * 0.5)
+    return int(round(max(60, min(95, display_score))))
+
+
+def _decorate_display_scores(policies: list[dict]) -> list[dict]:
+    decorated = []
+
+    for policy in policies:
+        display_score = _display_match_score(policy)
+        decorated.append(
+            {
+                **policy,
+                "match_score": display_score,
+                "hybrid_score": display_score,
+                "final_score": display_score,
+            }
+        )
+
+    return sorted(decorated, key=lambda item: item.get("match_score", 0), reverse=True)
+
+
 @router.post("/analyze")
 async def analyze(
     company_id: str,
@@ -135,6 +182,7 @@ async def analyze(
             equipment.name,
             roi_result,
         )
+        matched_policies = _decorate_display_scores(matched_policies)
 
     except Exception as exc:
         print(f"정책 오케스트레이션 실패: {exc}")
@@ -181,15 +229,7 @@ async def analyze(
                         "equipment_id": equipment_id,
                         "policy_id": policy_id,
                         "title": policy.get("metadata", {}).get("title", ""),
-                        "match_score": int(
-                            policy.get(
-                                "hybrid_score",
-                                policy.get(
-                                    "final_score",
-                                    round(1 - policy.get("distance", 1), 3),
-                                ),
-                            ) * 100
-                        ),
+                        "match_score": policy.get("match_score", _display_match_score(policy)),
                         "eligible": policy.get("eligible", True),
                         "reason": (
                             policy.get("reason")

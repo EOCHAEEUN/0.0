@@ -133,7 +133,6 @@ export type PolicyApiItem = {
     summary?: string | null
     support_summary?: string | null
     support_content?: string
-    created_at?: string | null
     posted_at?: string | null
     registered_at?: string | null
     notice_date?: string | null

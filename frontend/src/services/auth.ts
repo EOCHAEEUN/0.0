@@ -1,4 +1,5 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000/api"
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api"
 
 export type AuthSession = {
   access_token: string | null
@@ -8,9 +9,8 @@ export type AuthSession = {
     id: string | null
     email: string | null
   }
-  profile?: Record<string, unknown> | null
+  user_profile?: Record<string, unknown> | null
   company?: Record<string, unknown> | null
-  companies?: Record<string, unknown>[]
   company_id?: string | null
 }
 
@@ -19,6 +19,14 @@ type ApiResponse<T> = {
   data?: T
   message?: string
   error?: string
+}
+
+function getCompanyIdFromSession(session: AuthSession) {
+  if (session.company_id) return session.company_id
+
+  const nestedCompanyId = session.company?.company_id
+
+  return typeof nestedCompanyId === "string" ? nestedCompanyId : null
 }
 
 export function saveAuthSession(session: AuthSession) {
@@ -30,8 +38,10 @@ export function saveAuthSession(session: AuthSession) {
     localStorage.setItem("factofit_refresh_token", session.refresh_token)
   }
 
-  if (session.company_id) {
-    localStorage.setItem("factofit_company_id", session.company_id)
+  const companyId = getCompanyIdFromSession(session)
+
+  if (companyId) {
+    localStorage.setItem("factofit_company_id", companyId)
   }
 
   localStorage.setItem("factofit_auth_session", JSON.stringify(session))
@@ -47,6 +57,10 @@ async function postAuth<T>(
   options: { authenticated?: boolean } = {},
 ): Promise<T> {
   const token = options.authenticated ? getAccessToken() : null
+
+  if (options.authenticated && !token) {
+    throw new Error("인증 정보가 없습니다. 다시 로그인해주세요.")
+  }
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: "POST",

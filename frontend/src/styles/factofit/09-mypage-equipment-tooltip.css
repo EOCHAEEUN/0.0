@@ -1,0 +1,128 @@
+/* ===== MyPage equipment category tooltip: ROI supported equipment guide ===== */
+.ff-equipment-help-wrap{
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 auto;
+}
+
+.ff-equipment-help-icon{
+  width:18px !important;
+  min-width:18px !important;
+  height:18px !important;
+  min-height:18px !important;
+  padding:0 !important;
+  border:0 !important;
+  border-radius:999px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  background:#F1F5F9;
+  color:#64748B;
+  font-family:'DM Sans','Noto Sans KR',system-ui,sans-serif;
+  font-size:11px;
+  font-weight:800;
+  line-height:1;
+  box-shadow:none;
+  cursor:help;
+  flex:0 0 18px;
+}
+
+.ff-equipment-help-icon:hover,
+.ff-equipment-help-icon:focus-visible{
+  background:#E8EEF5;
+  color:#061B34;
+  outline:none;
+}
+
+.ff-equipment-help-tooltip{
+  position:absolute;
+  left:50%;
+  bottom:calc(100% + 14px);
+  z-index:9999;
+  width:360px;
+  max-width:calc(100vw - 44px);
+  transform:translateX(-34%) translateY(6px);
+  padding:16px 17px;
+  border-radius:18px;
+  background:#061B34;
+  color:#FFFFFF;
+  border:1px solid rgba(255,255,255,.12);
+  box-shadow:0 18px 42px rgba(6,27,52,.22);
+  opacity:0;
+  visibility:hidden;
+  pointer-events:none;
+  transition:
+    opacity .16s ease,
+    transform .16s ease,
+    visibility .16s ease;
+}
+
+.ff-equipment-help-tooltip::after{
+  content:'';
+  position:absolute;
+  left:34%;
+  top:100%;
+  width:12px;
+  height:12px;
+  background:#061B34;
+  border-right:1px solid rgba(255,255,255,.12);
+  border-bottom:1px solid rgba(255,255,255,.12);
+  transform:translate(-50%,-6px) rotate(45deg);
+}
+
+.ff-equipment-help-tooltip strong{
+  display:block;
+  margin-bottom:8px;
+  color:#E7DC91;
+  font-size:13px;
+  line-height:1.35;
+  font-weight:900;
+  letter-spacing:-.1px;
+}
+
+.ff-equipment-help-tooltip span{
+  display:block;
+  color:rgba(255,255,255,.88);
+  font-size:12px;
+  line-height:1.7;
+  font-weight:800;
+  letter-spacing:-.15px;
+}
+
+.ff-equipment-help-wrap:hover .ff-equipment-help-tooltip,
+.ff-equipment-help-wrap:focus-within .ff-equipment-help-tooltip{
+  opacity:1;
+  visibility:visible;
+  transform:translateX(-34%) translateY(0);
+}
+
+@media(max-width:720px){
+  .ff-equipment-help-icon{
+    width:18px !important;
+    min-width:18px !important;
+    height:18px !important;
+    min-height:18px !important;
+    font-size:11px;
+    flex-basis:18px;
+  }
+
+  .ff-equipment-help-tooltip{
+    left:auto;
+    right:-8px;
+    width:280px;
+    transform:translateY(6px);
+  }
+
+  .ff-equipment-help-tooltip::after{
+    left:auto;
+    right:18px;
+    transform:translateY(-6px) rotate(45deg);
+  }
+
+  .ff-equipment-help-wrap:hover .ff-equipment-help-tooltip,
+  .ff-equipment-help-wrap:focus-within .ff-equipment-help-tooltip{
+    transform:translateY(0);
+  }
+}

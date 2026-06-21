@@ -1,562 +1,372 @@
-.ff-signup-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1200;
-  background: rgba(15, 27, 51, 0.62);
-  backdrop-filter: blur(14px);
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 44px 20px;
-  overflow-y: auto;
-}
+@import "./signup/styles/signup.layout.css";
+@import "./signup/styles/signup.header.css";
+@import "./signup/styles/signup.form.css";
+@import "./signup/styles/signup.password.css";
+@import "./signup/styles/signup.industry.css";
+@import "./signup/styles/signup.optional.css";
+@import "./signup/styles/signup.actions.css";
+@import "./signup/styles/signup.responsive.css";
 
-.ff-signup-panel {
+.ff-signup-top-notice {
   position: relative;
-  width: min(920px, 100%);
-  border-radius: 36px;
-  background: #ffffff;
-  box-shadow: 0 34px 110px rgba(15, 27, 51, 0.26);
-  padding: 42px;
-  color: #0f1b33;
+  z-index: 2;
+  margin: 18px 0 28px;
+  border-radius: 24px;
+  padding: 22px 24px;
+  background:
+    radial-gradient(circle at 10% 0%, rgba(215, 209, 124, 0.13), transparent 28%),
+    linear-gradient(135deg, #11162a 0%, #1d2434 58%, #252b34 100%);
+  border: 1px solid rgba(213, 205, 118, 0.3);
+  box-shadow:
+    0 18px 44px rgba(2, 8, 23, 0.18),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
 }
 
-.ff-signup-close {
+.ff-signup-top-notice::before {
+  content: "";
   position: absolute;
-  top: 28px;
-  right: 30px;
-  width: 56px;
-  height: 56px;
+  left: 24px;
+  top: 20px;
+  width: 132px;
+  height: 4px;
   border-radius: 999px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background: #ffffff;
-  color: #0f1b33;
-  font-size: 34px;
-  line-height: 1;
-  cursor: pointer;
+  background: linear-gradient(
+    90deg,
+    #8f7cff 0%,
+    #d9d27c 48%,
+    rgba(217, 210, 124, 0) 100%
+  );
+  opacity: 0.9;
 }
 
-.ff-signup-header {
-  margin-bottom: 34px;
-  padding-right: 72px;
-}
-
-.ff-signup-header h2 {
-  font-size: 48px;
-  font-weight: 900;
-  letter-spacing: -0.07em;
-  margin: 0 0 14px;
-}
-
-.ff-signup-header p {
-  color: #64748b;
-  font-size: 18px;
-  line-height: 1.7;
-  font-weight: 800;
-  margin: 0;
-  word-break: keep-all;
-}
-
-.ff-signup-guide {
-  margin-top: 18px;
+.ff-signup-top-notice__head {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding-top: 26px;
 }
 
-.ff-signup-guide span {
-  min-height: 34px;
+.ff-signup-top-notice strong {
+  display: block;
+  color: #e7dc91;
+  font-size: 19px;
+  line-height: 1.35;
+  font-weight: 950;
+  letter-spacing: -0.3px;
+}
+
+.ff-signup-top-notice p {
+  margin: 10px 0 0;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 14px;
+  line-height: 1.75;
+  font-weight: 850;
+  letter-spacing: -0.2px;
+}
+
+.ff-signup-required-popover {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 9999;
+  width: min(640px, calc(100vw - 48px));
+  max-height: min(68vh, 560px);
+  overflow: auto;
+  transform: translate(-50%, -50%);
+  border-radius: 28px;
+  padding: 30px 34px 32px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(215, 209, 124, 0.13), transparent 28%),
+    linear-gradient(135deg, #11162a 0%, #1d2434 58%, #252b34 100%);
+  border: 1px solid rgba(213, 205, 118, 0.34);
+  box-shadow:
+    0 32px 90px rgba(2, 8, 23, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  animation: ffSignupPopoverIn 0.18s ease-out;
+}
+
+.ff-signup-required-popover::before {
+  content: "";
+  position: absolute;
+  left: 34px;
+  top: 28px;
+  width: 148px;
+  height: 4px;
   border-radius: 999px;
-  background: #f8fafc;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  color: #64748b;
-  padding: 0 14px;
-  display: inline-flex;
-  align-items: center;
-  font-size: 13px;
-  font-weight: 900;
+  background: linear-gradient(
+    90deg,
+    #8f7cff 0%,
+    #d9d27c 48%,
+    rgba(217, 210, 124, 0) 100%
+  );
+  opacity: 0.9;
 }
 
-.ff-signup-guide b {
-  color: #ef4444;
-  margin-right: 4px;
+.ff-signup-required-popover__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 22px;
+  padding-top: 30px;
 }
 
-.ff-signup-section {
-  margin-top: 34px;
+.ff-signup-required-popover strong {
+  display: block;
+  color: #e7dc91;
+  font-size: 25px;
+  line-height: 1.34;
+  font-weight: 950;
+  letter-spacing: -0.55px;
 }
 
-.ff-signup-section h3 {
-  font-size: 28px;
-  font-weight: 900;
-  letter-spacing: -0.05em;
-  margin: 0 0 22px;
+.ff-signup-required-popover p {
+  margin: 18px 0 0;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 14px;
+  line-height: 1.78;
+  font-weight: 850;
+  letter-spacing: -0.2px;
+  white-space: pre-line;
 }
 
-.ff-signup-two-col {
+.ff-signup-required-popover__list {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-  align-items: start;
-}
-
-.ff-signup-password-row {
-  align-items: start;
-}
-
-.ff-signup-field {
-  position: relative;
-  display: grid;
-  align-content: start;
-  gap: 10px;
-  margin-bottom: 18px;
-}
-
-.ff-signup-password-confirm-field {
-  align-self: start;
-}
-
-.ff-signup-label-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.ff-signup-label-row label {
-  color: #64748b;
-  font-size: 15px;
-  font-weight: 900;
-}
-
-.ff-signup-label-row label b {
-  color: #ef4444;
-  margin-left: 3px;
-}
-
-.ff-signup-label-row span {
-  height: 24px;
-  border-radius: 999px;
-  background: #f1f5f9;
-  color: #64748b;
-  padding: 0 9px;
-  display: inline-flex;
-  align-items: center;
-  font-size: 11px;
-  font-weight: 900;
-}
-
-.ff-signup-field input,
-.ff-signup-field select {
-  width: 100%;
-  height: 64px;
-  border-radius: 22px;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  background: #ffffff;
-  color: #0f1b33;
-  padding: 0 22px;
-  font-size: 18px;
-  font-weight: 900;
-  outline: none;
-}
-
-.ff-signup-field input::placeholder {
-  color: #9ca3af;
-}
-
-.ff-signup-field input:focus,
-.ff-signup-field select:focus {
-  border-color: rgba(77, 87, 184, 0.55);
-  box-shadow: 0 0 0 4px rgba(77, 87, 184, 0.09);
-}
-
-.ff-signup-inline {
-  display: grid;
-  grid-template-columns: 1fr 148px;
-  gap: 12px;
-}
-
-.ff-signup-inline button {
-  height: 64px;
-  border: 0;
-  border-radius: 22px;
-  background: #4d57b8;
-  color: #ffffff;
-  font-size: 15px;
-  font-weight: 900;
-  cursor: pointer;
-}
-
-.ff-signup-message {
-  margin: -2px 0 0;
+  gap: 8px 10px;
+  margin: 22px 0 0;
+  padding: 42px 0 0;
+  border-top: 1px solid rgba(231, 220, 145, 0.2);
+  color: #f4eaa8;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.45;
   font-weight: 900;
+  list-style: none;
 }
 
-.ff-signup-message.is-success {
-  color: #16a34a;
+.ff-signup-required-popover__list::before {
+  content: "입력이 필요한 정보";
+  position: absolute;
+  left: 0;
+  top: 15px;
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: -0.1px;
 }
 
-.ff-signup-message.is-error {
-  color: #ef4444;
+.ff-signup-required-popover__list li {
+  position: relative;
+  min-height: 36px;
+  border-radius: 13px;
+  padding: 10px 13px 10px 32px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(231, 220, 145, 0.12);
 }
 
-.ff-signup-message.is-muted {
-  color: #94a3b8;
-}
-
-.ff-password-meter {
-  display: grid;
-  gap: 7px;
-  margin-top: -2px;
-}
-
-.ff-password-meter-track {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-}
-
-.ff-password-meter-track span {
+.ff-signup-required-popover__list li::before {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  width: 7px;
   height: 7px;
   border-radius: 999px;
-  background: #e5e7eb;
+  background: #e7dc91;
+  transform: translateY(-50%);
+  box-shadow: 0 0 14px rgba(231, 220, 145, 0.45);
 }
 
-.ff-password-meter p {
-  margin: 0;
-  color: #94a3b8;
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.ff-password-meter.is-weak .ff-password-meter-track span:nth-child(1) {
-  background: #ef4444;
-}
-
-.ff-password-meter.is-normal .ff-password-meter-track span:nth-child(1),
-.ff-password-meter.is-normal .ff-password-meter-track span:nth-child(2) {
-  background: #f59e0b;
-}
-
-.ff-password-meter.is-strong .ff-password-meter-track span {
-  background: #16a34a;
-}
-
-.ff-password-meter.is-weak p {
-  color: #ef4444;
-}
-
-.ff-password-meter.is-normal p {
-  color: #d97706;
-}
-
-.ff-password-meter.is-strong p {
-  color: #16a34a;
-}
-
-.ff-password-check-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-}
-
-.ff-password-check-list li {
-  min-height: 28px;
+.ff-signup-notice-close {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
   border-radius: 999px;
-  background: #f8fafc;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  color: #94a3b8;
-  padding: 0 10px;
-  display: inline-flex;
-  align-items: center;
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.ff-password-check-list li.is-valid {
-  background: #ecfdf5;
-  border-color: rgba(22, 163, 74, 0.18);
-  color: #16a34a;
-}
-
-.ff-signup-combo {
-  z-index: 20;
-}
-
-.ff-signup-suggest-box {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  right: 0;
-  z-index: 40;
-  border-radius: 20px;
-  border: 1px solid rgba(15, 23, 42, 0.1);
+  border: 1px solid rgba(15, 23, 42, 0.12);
   background: #ffffff;
-  box-shadow: 0 22px 60px rgba(15, 27, 51, 0.13);
-  padding: 8px;
-  max-height: 260px;
-  overflow-y: auto;
-}
-
-.ff-signup-suggest-box button {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  border-radius: 14px;
-  padding: 14px 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 14px;
+  color: #475569;
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 900;
   cursor: pointer;
-  text-align: left;
+  box-shadow: 0 8px 18px rgba(6, 27, 52, 0.08);
 }
 
-.ff-signup-suggest-box button:hover {
-  background: #f4f7fb;
+.ff-signup-notice-close:hover {
+  background: #f8fafc;
+  color: #061b34;
 }
 
-.ff-signup-suggest-box span {
-  color: #0f1b33;
-  font-size: 15px;
-  font-weight: 900;
+.ff-signup-top-notice .ff-signup-notice-close,
+.ff-signup-required-popover .ff-signup-notice-close {
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgba(231, 220, 145, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 36px;
+  font-weight: 700;
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.16),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
 }
 
-.ff-signup-suggest-box b {
-  color: #4d57b8;
-  font-size: 14px;
-  font-weight: 900;
-  white-space: nowrap;
+.ff-signup-top-notice .ff-signup-notice-close:hover,
+.ff-signup-required-popover .ff-signup-notice-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
 }
 
-.ff-signup-industry-list {
-  display: grid;
-  gap: 12px;
+.ff-signup-panel--email-locked input[type="password"] {
+  background: #f8fafc !important;
+  color: #94a3b8 !important;
+  border-color: #e2e8f0 !important;
+  opacity: 0.52;
+  cursor: not-allowed !important;
+  caret-color: transparent;
+  filter: grayscale(1);
 }
 
-.ff-signup-industry-row {
+.ff-signup-panel--email-locked input[type="password"]::placeholder {
+  color: #aab2c0 !important;
+}
+
+.ff-signup-panel--email-locked input[type="password"]:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.ff-signup-panel--email-locked input[type="password"] ~ *,
+.ff-signup-panel--email-locked [class*="password"],
+.ff-signup-panel--email-locked [class*="Password"] {
+  opacity: 0.56;
+}
+
+.ff-signup-panel--email-locked input[type="email"],
+.ff-signup-panel--email-locked input[type="email"] ~ *,
+.ff-signup-panel--email-locked button {
+  opacity: 1;
+  filter: none;
+}
+
+.ff-signup-locked-group {
   position: relative;
 }
 
-.ff-signup-industry-row-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 2px 0 12px;
-}
-
-.ff-signup-industry-row-top span {
-  min-height: 30px;
-  border-radius: 999px;
-  background: #f8fafc;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  color: #64748b;
-  padding: 0 12px;
-  display: inline-flex;
-  align-items: center;
-  font-size: 12px;
-  font-weight: 900;
-}
-
-.ff-signup-industry-row-top button {
-  height: 34px;
+.ff-signup-locked-fieldset {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
   border: 0;
-  border-radius: 999px;
-  background: #fff1f2;
-  color: #ef4444;
-  padding: 0 14px;
-  font-size: 12px;
-  font-weight: 900;
-  cursor: pointer;
+  transition:
+    opacity 0.18s ease,
+    filter 0.18s ease;
 }
 
-.ff-signup-add-industry {
+.ff-signup-locked-fieldset:disabled {
+  opacity: 0.42;
+  filter: grayscale(0.25);
+}
+
+.ff-signup-locked-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
   width: 100%;
-  height: 56px;
-  margin: 0 0 18px;
-  border-radius: 20px;
-  border: 1px dashed rgba(77, 87, 184, 0.42);
-  background: #f8f9ff;
-  color: #4d57b8;
-  font-size: 15px;
-  font-weight: 900;
-  cursor: pointer;
-}
-
-.ff-signup-add-industry:hover {
-  background: #f3f5ff;
-}
-
-.ff-signup-optional {
-  margin-top: 30px;
+  height: 100%;
+  border: 0;
   border-radius: 30px;
-  background: #f8fafc;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 20px 60px rgba(15, 27, 51, 0.05);
-  overflow: hidden;
-}
-
-.ff-signup-optional-summary {
-  width: 100%;
-  min-height: 104px;
-  border: 0;
   background: transparent;
-  padding: 26px 28px;
-  display: grid;
-  grid-template-columns: 190px 1fr 76px;
-  align-items: center;
-  gap: 20px;
-  text-align: left;
-  cursor: pointer;
+  cursor: not-allowed;
 }
 
-.ff-signup-optional-summary span {
-  color: #0f1b33;
-  font-size: 22px;
-  font-weight: 900;
-  letter-spacing: -0.04em;
+.ff-signup-submit--locked {
+  opacity: 0.58;
+  cursor: not-allowed !important;
+  filter: grayscale(0.15);
 }
 
-.ff-signup-optional-summary em {
-  color: #64748b;
-  font-style: normal;
-  font-size: 15px;
-  line-height: 1.6;
-  font-weight: 900;
-  word-break: keep-all;
-}
-
-.ff-signup-optional-summary b {
-  height: 42px;
-  border-radius: 999px;
-  background: #ffffff;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  color: #64748b;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  font-weight: 900;
-}
-
-.ff-signup-optional.is-open .ff-signup-optional-summary {
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-}
-
-.ff-signup-optional-body {
-  padding: 24px 28px 10px;
-}
-
-.ff-signup-agree-box {
-  margin-top: 28px;
-  border-radius: 26px;
-  background: #f8fafc;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  padding: 22px 24px;
-  display: grid;
-  gap: 12px;
-}
-
-.ff-signup-agree-box label {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: #0f1b33;
-  font-size: 16px;
-  font-weight: 900;
-}
-
-.ff-signup-agree-box input {
-  width: 20px;
-  height: 20px;
-  accent-color: #4d57b8;
-}
-
-.ff-signup-agree-box b {
-  color: #ef4444;
-  font-weight: 900;
-}
-
-.ff-signup-submit {
-  width: 100%;
-  height: 72px;
-  margin-top: 30px;
-  border: 0;
-  border-radius: 24px;
-  background: #4d57b8;
-  color: #ffffff;
-  font-size: 22px;
-  font-weight: 900;
-  cursor: pointer;
-  box-shadow: 0 24px 60px rgba(77, 87, 184, 0.28);
-}
-
-.ff-signup-submit:hover {
-  transform: translateY(-1px);
-}
-
-.ff-signup-login-link {
-  width: 100%;
-  margin-top: 22px;
-  border: 0;
-  background: transparent;
-  color: #64748b;
-  font-size: 17px;
-  font-weight: 900;
-  cursor: pointer;
-}
-
-@media (max-width: 760px) {
-  .ff-signup-panel {
-    padding: 32px 24px;
-    border-radius: 28px;
+@keyframes ffSignupPopoverIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -46%) scale(0.96);
   }
 
-  .ff-signup-header {
-    padding-right: 56px;
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@media (max-width: 720px) {
+  .ff-signup-top-notice {
+    border-radius: 20px;
+    padding: 20px;
+    margin: 16px 0 24px;
   }
 
-  .ff-signup-header h2 {
-    font-size: 38px;
+  .ff-signup-top-notice::before {
+    left: 20px;
+    top: 18px;
+    width: 112px;
+    height: 4px;
   }
 
-  .ff-signup-two-col,
-  .ff-signup-inline {
-    grid-template-columns: 1fr;
+  .ff-signup-top-notice__head {
+    gap: 14px;
+    padding-top: 24px;
   }
 
-  .ff-signup-inline button {
-    width: 100%;
+  .ff-signup-top-notice strong {
+    font-size: 17px;
   }
 
-  .ff-signup-close {
+  .ff-signup-top-notice p {
+    font-size: 13px;
+  }
+
+  .ff-signup-required-popover {
+    width: calc(100vw - 28px);
+    max-height: 76vh;
+    border-radius: 22px;
+    padding: 26px 22px 24px;
+  }
+
+  .ff-signup-required-popover::before {
+    left: 22px;
     top: 22px;
-    right: 22px;
-    width: 48px;
-    height: 48px;
+    width: 124px;
+    height: 4px;
   }
 
-  .ff-signup-industry-row-top {
-    margin-bottom: 10px;
+  .ff-signup-required-popover__head {
+    gap: 14px;
+    padding-top: 28px;
   }
 
-  .ff-signup-add-industry {
-    height: 54px;
-    border-radius: 18px;
+  .ff-signup-required-popover strong {
+    font-size: 21px;
   }
 
-  .ff-signup-optional-summary {
+  .ff-signup-required-popover p {
+    margin-top: 16px;
+    font-size: 13px;
+    line-height: 1.7;
+  }
+
+  .ff-signup-required-popover__list {
     grid-template-columns: 1fr;
-    gap: 10px;
+    gap: 8px;
+    padding-top: 40px;
+    font-size: 13px;
   }
 
-  .ff-signup-optional-summary b {
-    width: 72px;
+  .ff-signup-top-notice .ff-signup-notice-close,
+  .ff-signup-required-popover .ff-signup-notice-close {
+    width: 42px;
+    height: 42px;
+    font-size: 32px;
   }
 }

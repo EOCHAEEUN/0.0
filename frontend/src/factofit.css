@@ -1,0 +1,16 @@
+/* 
+  FactoFit global stylesheet split by feature/API-contract domain.
+  This file preserves the original CSS cascade order by importing each slice in sequence.
+  Do not move imports unless you intentionally want to change override priority.
+*/
+
+@import "./styles/factofit/00-foundation-global.css";
+@import "./styles/factofit/01-contract-service-flow.css";
+@import "./styles/factofit/02-visual-polish.css";
+@import "./styles/factofit/03-hero-assets-and-carousel.css";
+@import "./styles/factofit/04-landing-showroom-base.css";
+@import "./styles/factofit/05-dashboard-header-footer.css";
+@import "./styles/factofit/06-home-showroom-architecture.css";
+@import "./styles/factofit/07-contract-ready-polish.css";
+@import "./styles/factofit/08-final-alignment-pass.css";
+@import "./styles/factofit/09-mypage-equipment-tooltip.css";

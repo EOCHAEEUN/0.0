@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useRef, useState, type PointerEvent } from "react"
 
 type DialogType =
   | "why"
@@ -51,306 +51,825 @@ export default function MainDialog({
 }
 
 function WhyFactoFitDialog() {
+  const valueCards = [
+    {
+      number: "01",
+      label: "Policy Discovery",
+      title: "흩어진 공고를 한곳으로",
+      description:
+        "기관별로 분산된 제조업 지원사업을 기업이 직접 찾아다니지 않아도 되도록 정리합니다.",
+    },
+    {
+      number: "02",
+      label: "Eligibility Fit",
+      title: "우리 회사 조건으로 선별",
+      description:
+        "업종, 지역, 매출, 직원 수처럼 공고마다 다른 조건을 회사 정보 기준으로 먼저 걸러냅니다.",
+    },
+    {
+      number: "03",
+      label: "Equipment Context",
+      title: "설비 상황까지 함께 판단",
+      description:
+        "설비 연식, 에너지 비용, 불량률, 유지보수비를 함께 읽어 추천 이유를 더 명확하게 만듭니다.",
+    },
+    {
+      number: "04",
+      label: "Action Ready",
+      title: "신청 준비까지 연결",
+      description:
+        "지원사업 추천에서 끝나지 않고 ROI 분석, 신청서 초안, 일정 관리 흐름으로 이어집니다.",
+    },
+  ]
+
   return (
-    <div className="ff-dialog-content">
-      <div className="ff-dialog-title-row">
-        <div>
+    <div className="ff-dialog-content ff-why-premium-dialog">
+      <section className="ff-why-premium-hero">
+        <div className="ff-why-premium-hero-copy">
           <div className="ff-gold-line" />
           <p className="ff-section-label">WHY FACTOFIT</p>
+
           <h2>
-            지원사업은 많습니다.
-            <br />
-            문제는 우리 공장에 맞게
-            <br />
-            판단하기 어렵다는 것입니다.
+            흩어진 지원사업을 모아, 우리 회사에 맞는 기회로 바꿉니다.
           </h2>
-        </div>
 
-        <p className="ff-dialog-side-desc">
-          팩토핏은 제조기업이 흩어진 공고를 직접 찾는 방식에서 벗어나,
-          설비 노후도·에너지 비용·불량률을 먼저 읽고 투자 판단과 지원사업
-          매칭을 함께 보여주는 AI 의사결정 에이전트입니다.
-        </p>
-      </div>
-
-      <div className="ff-why-problem-grid">
-        <article className="ff-why-problem-card blue">
-          <h3>정보 분산</h3>
           <p>
-            KIAT, 에너지공단, KOTRA, KICOX 등 기관별 공고를 담당자가 직접
-            찾아야 해 놓치기 쉽습니다.
+            FactoFit은 제조기업이 여러 기관의 공고를 직접 찾고, 복잡한 조건을
+            하나씩 해석해야 했던 방식을 바꿉니다.
           </p>
-        </article>
 
-        <article className="ff-why-problem-card orange">
-          <h3>자격 판단 어려움</h3>
           <p>
-            업종, 지역, 종업원 수, 설비 종류, 투자 목적에 따라 받을 수 있는
-            사업이 달라집니다.
-          </p>
-        </article>
-
-        <article className="ff-why-problem-card green">
-          <h3>투자 결정 부담</h3>
-          <p>
-            대표와 담당자는 “교체해야 하나?”를 먼저 고민합니다. 팩토핏은
-            ROI와 실부담금부터 보여줍니다.
-          </p>
-        </article>
-      </div>
-
-      <div className="ff-why-flow-card">
-        <div>
-          <h3>기존 방식</h3>
-          <p>
-            기관별 사이트 접속 → 공고 검색 → 조건 해석 → 엑셀 계산 → 신청서 작성
+            업종, 지역, 매출, 직원 수, 설비 상태를 기준으로 받을 수 있는
+            지원사업을 선별하고, ROI 분석부터 신청 준비까지 하나의 흐름으로
+            연결합니다.
           </p>
         </div>
 
-        <span>→</span>
+        <div className="ff-why-premium-hero-panel">
+          <div className="ff-why-premium-orbit" aria-label="FactoFit matching signals">
+            <span
+              className="ff-why-premium-token is-roi"
+              data-tip="회수기간과 예상 수익성을 계산합니다"
+            >
+              ROI
+            </span>
+            <span
+              className="ff-why-premium-token is-policy"
+              data-tip="회사 조건에 맞는 지원사업을 선별합니다"
+            >
+              POLICY
+            </span>
+            <span
+              className="ff-why-premium-token is-data"
+              data-tip="업종·지역·매출·설비 데이터를 함께 봅니다"
+            >
+              DATA
+            </span>
+          </div>
 
-        <div>
-          <h3>팩토핏 방식</h3>
-          <p>
-            기업·설비 정보 입력 → AI 분석 → ROI 계산 → 지원사업 매칭 → 신청서
-            초안 생성
-          </p>
+          <div className="ff-why-premium-signal-card">
+            <small>FACTOFIT MATCHING</small>
+            <strong>7건</strong>
+            <span>조건 기반 추천사업</span>
+          </div>
+
+          <div className="ff-why-premium-signal-card">
+            <small>EXPECTED SUPPORT</small>
+            <strong>2.0억</strong>
+            <span>예상 확보 가능 금액</span>
+          </div>
         </div>
-      </div>
+      </section>
+
+      <section className="ff-why-premium-value-grid">
+        {valueCards.map((card) => (
+          <article className="ff-why-premium-value-card" key={card.number}>
+            <div className="ff-why-premium-card-top">
+              <span>{card.number}</span>
+              <small>{card.label}</small>
+            </div>
+
+            <h3>{card.title}</h3>
+            <p>{card.description}</p>
+          </article>
+        ))}
+      </section>
+
+      <section className="ff-why-premium-flow">
+        <article className="ff-why-premium-flow-card is-before">
+          <span>기존 방식</span>
+          <h3>담당자가 직접 찾고 해석합니다.</h3>
+          <p>
+            기관별 사이트 접속 → 공고 검색 → 조건 해석 → 엑셀 계산 → 신청서
+            작성
+          </p>
+        </article>
+
+        <div className="ff-why-premium-flow-bridge" aria-hidden="true">
+          <span>→</span>
+          <small>전환</small>
+        </div>
+
+        <article className="ff-why-premium-flow-card is-after">
+          <span>FactoFit 방식</span>
+          <h3>회사와 설비 기준으로 먼저 걸러냅니다.</h3>
+          <p>
+            기업·설비 정보 입력 → 맞춤 지원사업 선별 → ROI 분석 → 신청 준비
+            연결
+          </p>
+        </article>
+      </section>
     </div>
   )
 }
 
 function ServicesDialog() {
-  const serviceRows = [
-    [
-      "투자 실패를 줄입니다",
-      "설비 교체가 필요한지 먼저 판단합니다.",
-      "ROI 분석 시뮬레이션",
-      "투자금, 지원금 적용 후 실부담, 회수기간, 예상 ROI를 계산합니다.",
-    ],
-    [
-      "제조기업의 시간을 아낍니다",
-      "담당자가 여러 사이트를 뒤지는 시간을 줄입니다.",
-      "지원사업 자동 매칭",
-      "업종·지역·설비·투자 목적에 맞는 정부지원사업을 추천합니다.",
-    ],
-    [
-      "숨은 지원금을 찾아냅니다",
-      "놓치기 쉬운 공고와 마감일을 함께 보여줍니다.",
-      "지원사업 캘린더",
-      "D-day, 적합도, 예상 확보 금액을 기준으로 정리합니다.",
-    ],
-    [
-      "데이터 기반 의사결정을 돕습니다",
-      "현장 데이터를 보고서형 결과로 바꿉니다.",
-      "신청서 초안 생성",
-      "기업 정보와 분석 결과를 바탕으로 신청서 항목 초안을 생성합니다.",
-    ],
-    [
-      "지속가능한 제조업을 만듭니다",
-      "운영 리스크를 사전에 관리합니다.",
-      "안전점검 관리 · 알림",
-      "KTL, KOSHA 등 점검 리스크와 마감 알림을 제공합니다.",
-    ],
+  const mockupTrackRef = useRef<HTMLDivElement | null>(null)
+  const dragStateRef = useRef({
+    isDown: false,
+    startX: 0,
+    scrollLeft: 0,
+  })
+
+  const serviceCards = [
+    {
+      number: "01",
+      label: "ROI Simulation",
+      title: "투자 판단을 먼저 계산합니다",
+      description:
+        "설비 교체가 필요한지, 지원금 적용 후 실부담과 회수기간이 어떤지 먼저 보여줍니다.",
+    },
+    {
+      number: "02",
+      label: "Policy Matching",
+      title: "지원사업을 자동 선별합니다",
+      description:
+        "업종, 지역, 매출, 직원 수, 설비 상태를 기준으로 받을 수 있는 공고를 정리합니다.",
+    },
+    {
+      number: "03",
+      label: "Application Draft",
+      title: "신청 준비를 이어갑니다",
+      description:
+        "분석 결과와 기업 정보를 바탕으로 신청서 초안과 준비 체크리스트를 연결합니다.",
+    },
+    {
+      number: "04",
+      label: "Safety & Alert",
+      title: "일정과 리스크를 관리합니다",
+      description:
+        "지원사업 마감일, 안전점검, 인증 리스크를 대시보드에서 끊기지 않게 관리합니다.",
+    },
   ]
 
-  const steps = [
-    ["STEP 01", "기업·설비 입력", "업종, 지역, 설비 연식, 에너지 비용, 불량률 입력"],
-    ["STEP 02", "AI 해석", "제조업 조건과 설비 상태를 자동 분석"],
-    ["STEP 03", "ROI 분석", "실부담금과 회수기간 계산"],
-    ["STEP 04", "지원사업 추천", "기관별 공고를 적합도순으로 매칭"],
-    ["STEP 05", "신청·알림", "신청서 초안과 D-day 알림 제공"],
+  const mockupFlow = [
+    {
+      step: "01",
+      title: "메인",
+      caption: "무료 AI 진단 시작",
+      variant: "landing",
+    },
+    {
+      step: "02",
+      title: "AI 진단",
+      caption: "기업·설비 입력",
+      variant: "diagnosis",
+    },
+    {
+      step: "03",
+      title: "AI 추천",
+      caption: "팝업 요약",
+      variant: "ai",
+    },
+    {
+      step: "04",
+      title: "대시보드",
+      caption: "요약 결과",
+      variant: "dashboard",
+    },
+    {
+      step: "05",
+      title: "설비 추천",
+      caption: "3D 설비·우선순위",
+      variant: "equipment",
+    },
+    {
+      step: "06",
+      title: "지원사업",
+      caption: "캘린더·D-Day",
+      variant: "policy",
+    },
+    {
+      step: "07",
+      title: "ROI 시뮬레이션",
+      caption: "A/B/C 비교",
+      variant: "roi",
+    },
+    {
+      step: "08",
+      title: "신청서 생성",
+      caption: "초안·체크리스트",
+      variant: "draft",
+    },
+    {
+      step: "09",
+      title: "안전점검",
+      caption: "KTL·KOSHA 리스크",
+      variant: "safety",
+    },
   ]
+
+  const handleMockupPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    const track = mockupTrackRef.current
+    if (!track) return
+
+    dragStateRef.current = {
+      isDown: true,
+      startX: event.clientX,
+      scrollLeft: track.scrollLeft,
+    }
+
+    track.dataset.dragging = "true"
+    track.setPointerCapture(event.pointerId)
+  }
+
+  const handleMockupPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    const track = mockupTrackRef.current
+    if (!track || !dragStateRef.current.isDown) return
+
+    event.preventDefault()
+
+    const walk = event.clientX - dragStateRef.current.startX
+    track.scrollLeft = dragStateRef.current.scrollLeft - walk
+  }
+
+  const stopMockupDrag = (event: PointerEvent<HTMLDivElement>) => {
+    const track = mockupTrackRef.current
+    dragStateRef.current.isDown = false
+
+    if (!track) return
+
+    delete track.dataset.dragging
+
+    if (track.hasPointerCapture(event.pointerId)) {
+      track.releasePointerCapture(event.pointerId)
+    }
+  }
 
   return (
-    <div className="ff-dialog-content">
-      <div className="ff-dialog-title-row">
-        <div>
+    <div className="ff-dialog-content ff-services-premium-dialog">
+      <section className="ff-services-premium-hero">
+        <div className="ff-services-premium-hero-copy">
           <div className="ff-gold-line" />
           <p className="ff-section-label">CORE SERVICES</p>
+
           <h2>
-            주요 서비스는
-            <br />
-            팩토핏의 가치와 1:1로
-            <br />
-            연결됩니다.
+            주요 서비스는 기능이 아니라, 사용자의 실행 흐름으로 이어집니다.
           </h2>
+
+          <p>
+            FactoFit은 지원사업 매칭, ROI 분석, 신청서 초안, 안전점검을 각각
+            따로 보여주지 않습니다. 기업과 설비 정보를 기준으로 사용자가 실제로
+            움직이는 순서에 맞춰 연결합니다.
+          </p>
         </div>
 
-        <p className="ff-dialog-side-desc">
-          정부지원금 매칭, ROI 분석, 신청서 초안, 안전점검, 알림 기능이
-          사용자의 실제 의사결정 플로우를 따라 이어집니다.
-        </p>
-      </div>
-
-      <div className="ff-service-flow-table">
-        {serviceRows.map(([leftTitle, leftDesc, rightTitle, rightDesc]) => (
-          <div className="ff-service-flow-row" key={leftTitle}>
-            <div>
-              <h3>{leftTitle}</h3>
-              <p>{leftDesc}</p>
-            </div>
-
-            <span>→</span>
-
-            <div>
-              <h3>{rightTitle}</h3>
-              <p>{rightDesc}</p>
-            </div>
+        <div className="ff-services-premium-hero-map" aria-hidden="true">
+          <div className="ff-services-map-node is-active">
+            <span>01</span>
+            <strong>입력</strong>
           </div>
-        ))}
-      </div>
+          <div className="ff-services-map-line" />
+          <div className="ff-services-map-node">
+            <span>02</span>
+            <strong>분석</strong>
+          </div>
+          <div className="ff-services-map-line" />
+          <div className="ff-services-map-node">
+            <span>03</span>
+            <strong>매칭</strong>
+          </div>
+          <div className="ff-services-map-line" />
+          <div className="ff-services-map-node">
+            <span>04</span>
+            <strong>실행</strong>
+          </div>
+        </div>
+      </section>
 
-      <div className="ff-service-step-box">
-        {steps.map(([step, title, desc]) => (
-          <article className="ff-service-step-card" key={step}>
-            <span>{step}</span>
-            <h3>{title}</h3>
-            <p>{desc}</p>
+      <section className="ff-services-premium-card-grid">
+        {serviceCards.map((card) => (
+          <article className="ff-services-premium-card" key={card.number}>
+            <div className="ff-services-premium-card-top">
+              <span>{card.number}</span>
+              <small>{card.label}</small>
+            </div>
+
+            <h3>{card.title}</h3>
+            <p>{card.description}</p>
           </article>
         ))}
+      </section>
+
+      <section className="ff-services-mockup-preview">
+        <div className="ff-services-mockup-head">
+          <div>
+            <p className="ff-section-label">UX FLOW PREVIEW</p>
+            <h3>
+              AI 진단 이후의 실행 흐름까지,
+              <br />
+              한 번에 이어집니다.
+            </h3>
+          </div>
+
+          <p>
+            기업·설비 정보를 입력하면 지원사업 추천, ROI 계산, 신청서 초안,
+            안전점검 알림까지 하나의 흐름으로 연결됩니다. 옆으로 넘기며
+            FactoFit이 실제로 어떻게 작동하는지 확인해보세요.
+          </p>
+        </div>
+
+        <div className="ff-services-mockup-guide">
+          <span>Drag</span>
+          <strong>마우스로 좌우로 밀어 전체 흐름 보기</strong>
+          <em>→</em>
+
+          <div className="ff-services-mockup-tooltip" role="tooltip">
+            사용자 흐름을 보여주기 위한 임시 앱 화면입니다.
+            <br />
+            실제 서비스 화면은 웹 환경에 맞게 조정될 수 있습니다.
+          </div>
+        </div>
+
+        <div
+          ref={mockupTrackRef}
+          className="ff-services-mockup-track"
+          aria-label="FactoFit service mockup flow"
+          onPointerDown={handleMockupPointerDown}
+          onPointerMove={handleMockupPointerMove}
+          onPointerUp={stopMockupDrag}
+          onPointerCancel={stopMockupDrag}
+          onPointerLeave={stopMockupDrag}
+        >
+          {mockupFlow.map((item) => (
+            <article className="ff-services-mockup-card" key={item.step}>
+              <div className="ff-services-mockup-title">
+                <strong>
+                  {item.step}. {item.title}
+                </strong>
+                <span>{item.caption}</span>
+              </div>
+
+              <ServiceMockupScreen variant={item.variant} />
+            </article>
+          ))}
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function ServiceMockupScreen({ variant }: { variant: string }) {
+  return (
+    <div className={`ff-service-device ff-service-device-${variant}`}>
+      <div className="ff-service-device-notch" />
+
+      <div className="ff-service-device-screen">
+        {variant === "landing" && (
+          <div className="ff-mock-landing">
+            <div className="ff-mock-hero-bg" />
+            <div className="ff-mock-landing-copy">
+              <small>FACTOFIT ONE-PAGE AI</small>
+              <h4>
+                설비투자 ROI와
+                <br />
+                <em>숨은 정부지원금</em>을
+                <br />
+                1분 만에 확인
+              </h4>
+              <p>노후 설비와 에너지 비용을 입력하면 투자 시나리오를 진단합니다.</p>
+              <button type="button">무료 AI 진단 시작하기</button>
+              <div className="ff-mock-proof-grid">
+                <span>
+                  <b>1분</b>
+                  입력 시간
+                </span>
+                <span>
+                  <b>7건</b>
+                  매칭 사업
+                </span>
+                <span>
+                  <b>2.0억</b>
+                  확보 가능
+                </span>
+                <span>
+                  <b>47.5%</b>
+                  예상 ROI
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {variant === "diagnosis" && (
+          <div className="ff-mock-light-screen">
+            <MockTopBar title="FactoFit" subtitle="SMART FACTORY" />
+            <div className="ff-mock-content">
+              <span className="ff-mock-pill">STEP 01</span>
+              <h4>한 번에 끝내는 제조기업 AI 진단</h4>
+              <p>업종과 설비 정보를 입력하면 지원금·ROI·안전점검을 요약합니다.</p>
+              <div className="ff-mock-chip-grid">
+                <span className="is-active">프레스</span>
+                <span>CNC</span>
+                <span>검사</span>
+                <span>포장</span>
+              </div>
+              <MockField label="설비명" value="유압 프레스 라인 A" />
+              <MockField label="설비 연식" value="15년" />
+              <MockField label="불량률" value="3.2%" />
+              <MockField label="연간 에너지 비용" value="4,800만원" />
+            </div>
+          </div>
+        )}
+
+        {variant === "ai" && (
+          <div className="ff-mock-ai-screen">
+            <div className="ff-mock-ai-modal">
+              <div className="ff-mock-ai-head">
+                <span>AI</span>
+                <div>
+                  <h4>FactoFit AI</h4>
+                  <p>대표님, 지금 확인해보세요!</p>
+                </div>
+              </div>
+              <div className="ff-mock-ai-metric">
+                <small>현재 신청 가능한 사업</small>
+                <strong>8건</strong>
+              </div>
+              <div className="ff-mock-ai-kpis">
+                <div>
+                  <small>예상 지원금</small>
+                  <strong>8,200</strong>
+                </div>
+                <div>
+                  <small>예상 ROI</small>
+                  <strong>98%</strong>
+                </div>
+              </div>
+              <div className="ff-mock-ai-rank">
+                <span>추천 1순위</span>
+                <strong>스마트공장 고도화</strong>
+              </div>
+              <button type="button">대시보드 보기 →</button>
+            </div>
+          </div>
+        )}
+
+        {variant === "dashboard" && (
+          <div className="ff-mock-light-screen">
+            <MockTopBar title="FactoFit" subtitle="DASHBOARD" />
+            <div className="ff-mock-content">
+              <div className="ff-mock-dark-card">
+                <small>FACTOFIT INTELLIGENCE</small>
+                <h4>기업 조건에 맞는 지원사업을 AI가 매칭</h4>
+                <p>지원금 · ROI · 신청 우선순위를 함께 분석합니다.</p>
+              </div>
+              <div className="ff-mock-kpi-grid">
+                <MockKpi label="예상 지원금" value="8,200" />
+                <MockKpi label="추천 지원사업" value="8건" />
+                <MockKpi label="예상 ROI" value="98%" wide />
+              </div>
+              <div className="ff-mock-summary-row">
+                <strong>AI 추천 요약</strong>
+                <span>회수기간 1.3년</span>
+              </div>
+            </div>
+            <MockNav active="홈" />
+          </div>
+        )}
+
+        {variant === "equipment" && (
+          <div className="ff-mock-light-screen">
+            <MockTopBar title="설비 추천" subtitle="EQUIPMENT PRIORITY" />
+            <div className="ff-mock-content">
+              <span className="ff-mock-pill">S등급 96%</span>
+              <h4>프레스 성형 라인 교체 우선 대상</h4>
+              <p>노후도·불량률·에너지 비용 기준으로 먼저 검토할 설비입니다.</p>
+              <div className="ff-mock-machine-card">
+                <div className="ff-mock-machine-art">
+                  <div className="ff-mock-press">
+                    <i />
+                    <i />
+                    <i />
+                  </div>
+                </div>
+                <span className="ff-mock-priority-pill">우선순위 03 · S등급 96%</span>
+                <div className="ff-mock-kpi-grid">
+                  <MockKpi label="예상 지원금" value="5,000" />
+                  <MockKpi label="예상 ROI" value="347%" />
+                </div>
+              </div>
+            </div>
+            <MockNav active="설비" />
+          </div>
+        )}
+
+        {variant === "policy" && (
+          <div className="ff-mock-light-screen">
+            <MockTopBar title="지원사업" subtitle="POLICY MATCHING" />
+            <div className="ff-mock-content">
+              <h4>마감일과 확보 가능 금액을 한눈에</h4>
+              <p>월별 마감 건수와 주요 공고를 확인합니다.</p>
+              <div className="ff-mock-month-grid">
+                {["7월", "8월", "9월", "10월", "11월", "12월"].map((month, index) => (
+                  <div key={month}>
+                    <small>{month}</small>
+                    <strong>{[1, 2, 1, 0, 2, 1][index]}</strong>
+                  </div>
+                ))}
+              </div>
+              <MockPolicy title="KIAT 스마트 제조혁신" dday="D-42" />
+              <MockPolicy title="에너지효율 노후설비 교체" dday="D-67" />
+            </div>
+            <MockNav active="사업" />
+          </div>
+        )}
+
+        {variant === "roi" && (
+          <div className="ff-mock-light-screen">
+            <MockTopBar title="ROI 분석" subtitle="SCENARIO SIMULATION" />
+            <div className="ff-mock-content">
+              <div className="ff-mock-roi-card">
+                <h4>AI 최종 권장안: 시나리오 A</h4>
+                <p>고효율 프레스 전체 교체안이 지원사업 매칭과 장기 절감 효과가 가장 높습니다.</p>
+                <div className="ff-mock-roi-mini-grid">
+                  <span>지원금 <b>12,400</b></span>
+                  <span>실부담 <b>5,600</b></span>
+                  <span>ROI <b>47.5%</b></span>
+                  <span>회수 <b>2.1년</b></span>
+                </div>
+              </div>
+
+              <div className="ff-mock-scenario-grid">
+                <span className="is-active">시나리오 A<small>전체 교체</small></span>
+                <span>시나리오 B<small>부분 정비</small></span>
+                <span>시나리오 C<small>모니터링</small></span>
+              </div>
+
+              <div className="ff-mock-bars">
+                <strong>AI 추천 근거</strong>
+                <label>노후도 <i style={{ width: "92%" }} /></label>
+                <label>에너지 <i style={{ width: "81%" }} /></label>
+                <label>지원금 <i style={{ width: "95%" }} /></label>
+              </div>
+
+              <div className="ff-mock-next-action">
+                <strong>다음 실행</strong>
+                <div>
+                  <span>시나리오 저장</span>
+                  <span>신청서 초안 생성</span>
+                </div>
+              </div>
+            </div>
+            <MockNav active="ROI" />
+          </div>
+        )}
+
+        {variant === "draft" && (
+          <div className="ff-mock-light-screen">
+            <MockTopBar title="신청 준비" subtitle="APPLICATION DRAFT" />
+            <div className="ff-mock-content">
+              <h4>지원사업 신청서 초안을 자동 생성</h4>
+              <p>기업 정보와 ROI 결과를 바탕으로 필수 항목을 정리합니다.</p>
+              <div className="ff-mock-doc-card">
+                <strong>스마트공장 고도화 사업</strong>
+                <p>프레스 라인 교체와 에너지 효율 개선 효과 중심으로 작성</p>
+                <span>신청기관 <b>KIAT / 산단공 연계</b></span>
+                <span>준비도 <b>87%</b></span>
+                <span>누락서류 <b>견적서 1건</b></span>
+              </div>
+              <div className="ff-mock-checklist-card">
+                <strong>필수 서류 체크리스트</strong>
+                <span>사업자등록증 <b>완료</b></span>
+                <span>설비 견적서 <b>필요</b></span>
+                <span>에너지 사용 내역 <b>완료</b></span>
+              </div>
+            </div>
+            <MockNav active="신청" />
+          </div>
+        )}
+
+        {variant === "safety" && (
+          <div className="ff-mock-light-screen">
+            <MockTopBar title="안전점검" subtitle="SAFETY COPILOT" />
+            <div className="ff-mock-content">
+              <div className="ff-mock-score-card">
+                <small>AI 안전점검 점수</small>
+                <strong>72점</strong>
+                <p>화학물질 안전점검과 KOSHA 등록 항목을 우선 확인해야 합니다.</p>
+              </div>
+              <div className="ff-mock-risk-grid">
+                <MockKpi label="미이행" value="3" />
+                <MockKpi label="만료 예정" value="2" />
+              </div>
+              <MockTask title="KOSHA 화학물질 안전점검" status="긴급" />
+              <MockTask title="KTL 인증 유효기간 확인" status="30일 내" />
+              <MockTask title="정기점검 캘린더 등록" status="등록" />
+            </div>
+            <MockNav active="안전" />
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
-function DashboardDialog({ onLoginClick }: { onLoginClick: () => void }) {
+function MockTopBar({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <div className="ff-dialog-content">
-      <div className="ff-dialog-title-row">
-        <div>
+    <div className="ff-mock-topbar">
+      <div>
+        <b>F</b>
+        <span>
+          <strong>{title}</strong>
+          <small>{subtitle}</small>
+        </span>
+      </div>
+      <em>•••</em>
+    </div>
+  )
+}
+
+function MockField({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="ff-mock-field">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  )
+}
+
+function MockKpi({
+  label,
+  value,
+  wide = false,
+}: {
+  label: string
+  value: string
+  wide?: boolean
+}) {
+  return (
+    <div className={wide ? "ff-mock-kpi is-wide" : "ff-mock-kpi"}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  )
+}
+
+function MockPolicy({ title, dday }: { title: string; dday: string }) {
+  return (
+    <div className="ff-mock-policy-row">
+      <span>{dday}</span>
+      <strong>{title}</strong>
+      <i />
+    </div>
+  )
+}
+
+function MockTask({ title, status }: { title: string; status: string }) {
+  return (
+    <div className="ff-mock-task-row">
+      <strong>{title}</strong>
+      <span>{status}</span>
+    </div>
+  )
+}
+
+function MockNav({ active }: { active: string }) {
+  return (
+    <div className="ff-mock-nav">
+      {["홈", "설비", "사업", "ROI"].map((item) => (
+        <span className={item === active ? "is-active" : ""} key={item}>
+          {item}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function DashboardDialog({ onLoginClick }: { onLoginClick: () => void }) {
+  const dashboardCards = [
+    {
+      number: "01",
+      metric: "85%",
+      metricLabel: "저장 준비도",
+      label: "Analysis Archive",
+      title: "분석 결과 저장",
+      description:
+        "기업별·설비별 분석 기록을 남기고 다음 비교와 의사결정에 바로 이어갑니다.",
+    },
+    {
+      number: "02",
+      metric: "7건",
+      metricLabel: "관리 중인 공고",
+      label: "Policy Calendar",
+      title: "지원사업 일정 관리",
+      description:
+        "마감일, 적합도, 예상 확보금액을 기준으로 지원사업 일정을 정리합니다.",
+    },
+    {
+      number: "03",
+      metric: "73%",
+      metricLabel: "신청 준비도",
+      label: "Application Ready",
+      title: "신청 준비 연결",
+      description:
+        "신청서 초안, 준비 서류, 누락 항목을 체크하며 실행 단계로 빠르게 넘어갑니다.",
+    },
+    {
+      number: "04",
+      metric: "72",
+      metricLabel: "리스크 점수",
+      label: "Safety Hub",
+      title: "안전점검 알림 허브",
+      description:
+        "점검 일정과 인증 리스크를 한곳에서 묶어 관리하고 놓치기 쉬운 항목을 알려줍니다.",
+    },
+  ]
+
+  return (
+    <div className="ff-dialog-content ff-dashboard-premium-dialog">
+      <section className="ff-dashboard-premium-hero">
+        <div className="ff-dashboard-premium-hero-copy">
           <div className="ff-gold-line" />
           <p className="ff-section-label">DASHBOARD EXPERIENCE</p>
+
           <h2>
-            대시보드는
+            분석 결과는 저장되고,
             <br />
-            결과 확인 이후의
-            <br />
-            실행 공간입니다.
+            실행은 대시보드에서 이어집니다.
           </h2>
+
+          <p>
+            메인에서는 AI 진단 결과의 핵심을 빠르게 확인하고, 로그인 후에는
+            기업별 분석 기록, 지원사업 일정, 신청 준비, 안전점검 알림을 하나의
+            실행 공간에서 관리합니다.
+          </p>
         </div>
 
-        <p className="ff-dialog-side-desc">
-          메인에서는 로그인 전/후 차이를 보여주고, 이 팝업에서는 로그인 후
-          실제로 어떤 관리가 가능해지는지 더 구체적으로 설명합니다.
-        </p>
-      </div>
-
-      <div className="ff-dashboard-dialog-visual-grid">
-        <article className="ff-dashboard-dialog-visual-card">
-          <div className="ff-dashboard-dialog-card-top">
-            <div className="ff-dashboard-icon-box ff-dashboard-icon-bars">
-              <i />
-              <i />
-              <i />
+        <div className="ff-dashboard-premium-panel" aria-hidden="true">
+          <div className="ff-dashboard-premium-topbar">
+            <div>
+              <span>F</span>
+              <strong>FactoFit Dashboard</strong>
             </div>
-
-            <div className="ff-dashboard-mini-bars">
-              <i style={{ height: "58%" }} />
-              <i style={{ height: "76%" }} />
-              <i style={{ height: "92%" }} />
-            </div>
+            <em>Live</em>
           </div>
 
-          <div className="ff-dashboard-dialog-card-value">
-            <strong>85%</strong>
-            <span>저장 준비도</span>
+          <div className="ff-dashboard-premium-intel-card">
+            <small>FACTOFIT INTELLIGENCE</small>
+            <h3>기업 조건에 맞는 실행 항목을 한곳에 정리합니다.</h3>
+            <p>ROI · 지원사업 · 신청 준비 · 안전점검을 이어서 관리합니다.</p>
           </div>
 
-          <h3>분석 결과 저장</h3>
-          <p>기업별·설비별로 분석 기록을 남기고 다음 비교에 바로 이어갑니다.</p>
-        </article>
-
-        <article className="ff-dashboard-dialog-visual-card">
-          <div className="ff-dashboard-dialog-card-top">
-            <div className="ff-dashboard-icon-box ff-dashboard-icon-calendar">
-              <b />
-              <span />
+          <div className="ff-dashboard-premium-mini-grid">
+            <div>
+              <small>예상 지원금</small>
+              <strong>8,200</strong>
             </div>
-
-            <div className="ff-dashboard-mini-calendar">
-              <strong>D-30</strong>
-              <span>마감</span>
+            <div>
+              <small>추천사업</small>
+              <strong>7건</strong>
             </div>
-          </div>
-
-          <div className="ff-dashboard-dialog-card-value">
-            <strong>7건</strong>
-            <span>관리 중인 공고</span>
-          </div>
-
-          <h3>지원사업 일정 관리</h3>
-          <p>마감일, 적합도, 예상 확보금액을 일정 흐름으로 정리합니다.</p>
-        </article>
-
-        <article className="ff-dashboard-dialog-visual-card">
-          <div className="ff-dashboard-dialog-card-top">
-            <div className="ff-dashboard-icon-box ff-dashboard-icon-doc">
-              <i />
-              <i />
-              <em />
-            </div>
-
-            <div className="ff-dashboard-mini-checklist">
-              <span />
-              <span />
-              <span />
+            <div className="is-wide">
+              <small>다음 실행</small>
+              <strong>신청서 초안 생성</strong>
             </div>
           </div>
-
-          <div className="ff-dashboard-dialog-card-value">
-            <strong>73%</strong>
-            <span>신청 준비도</span>
-          </div>
-
-          <h3>신청 준비 연결</h3>
-          <p>초안 생성과 준비 상태 체크를 통해 실행 단계로 빠르게 넘어갑니다.</p>
-        </article>
-
-        <article className="ff-dashboard-dialog-visual-card">
-          <div className="ff-dashboard-dialog-card-top">
-            <div className="ff-dashboard-icon-box ff-dashboard-icon-shield">
-              <span />
-            </div>
-
-            <div className="ff-dashboard-mini-risk-ring">
-              <strong>72</strong>
-            </div>
-          </div>
-
-          <div className="ff-dashboard-dialog-card-value">
-            <strong>72</strong>
-            <span>리스크 점수</span>
-          </div>
-
-          <h3>안전점검 알림 허브</h3>
-          <p>점검 일정과 인증 리스크를 한곳에서 묶어 관리합니다.</p>
-        </article>
-      </div>
-
-      <div className="ff-dashboard-dialog-timeline">
-        <div>
-          <strong>01</strong>
-          <span>결과 저장</span>
         </div>
-        <div>
-          <strong>02</strong>
-          <span>일정 연결</span>
-        </div>
-        <div>
-          <strong>03</strong>
-          <span>신청 준비</span>
-        </div>
-        <div>
-          <strong>04</strong>
-          <span>안전 알림</span>
-        </div>
-      </div>
+      </section>
 
-      <div className="ff-dashboard-dialog-cta">
+      <section className="ff-dashboard-premium-card-grid">
+        {dashboardCards.map((card) => (
+          <article className="ff-dashboard-premium-card" key={card.number}>
+            <div className="ff-dashboard-premium-card-top">
+              <span>{card.number}</span>
+              <small>{card.label}</small>
+            </div>
+
+            <div className="ff-dashboard-premium-metric">
+              <strong>{card.metric}</strong>
+              <span>{card.metricLabel}</span>
+            </div>
+
+            <h3>{card.title}</h3>
+            <p>{card.description}</p>
+          </article>
+        ))}
+      </section>
+
+      <section className="ff-dashboard-premium-cta">
         <div>
-          <strong>핵심은 메인에서 보고, 대시보드에선 실행으로 이어갑니다.</strong>
+          <strong>핵심은 메인에서 보고, 대시보드에서는 실행으로 이어갑니다.</strong>
           <p>
             한 번 분석한 결과를 저장하고, 지원사업·신청서·안전점검을 끊기지
             않는 흐름으로 관리합니다.
@@ -360,7 +879,7 @@ function DashboardDialog({ onLoginClick }: { onLoginClick: () => void }) {
         <button type="button" onClick={onLoginClick}>
           로그인하고 시작하기
         </button>
-      </div>
+      </section>
     </div>
   )
 }

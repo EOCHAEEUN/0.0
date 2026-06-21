@@ -269,13 +269,22 @@ export function readAnalysisData(): AnalysisData {
     if (!raw) return {}
 
     const parsed = JSON.parse(raw)
-    const data = parsed?.data ?? {}
-    const responseDraft = parseResponseDraft(data?.response)
+    const parsedRecord =
+      parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : {}
+    const dataRecord =
+      parsedRecord.data && typeof parsedRecord.data === "object" && !Array.isArray(parsedRecord.data)
+        ? (parsedRecord.data as Record<string, unknown>)
+        : parsedRecord
+    const responseDraft = parseResponseDraft(
+      typeof dataRecord.response === "string" ? dataRecord.response : undefined,
+    )
 
     return {
-      ...data,
-      draft_result: data?.draft_result ?? responseDraft ?? null,
-    }
+      ...dataRecord,
+      draft_result: dataRecord.draft_result ?? responseDraft ?? null,
+    } as AnalysisData
   } catch {
     return {}
   }
@@ -444,6 +453,25 @@ function getFirstText(...values: unknown[]) {
   return ""
 }
 
+function getMetadataRecord(policy: PolicyApiItem) {
+  return policy.metadata && typeof policy.metadata === "object"
+    ? (policy.metadata as Record<string, unknown>)
+    : {}
+}
+
+function getFieldText(source: Record<string, unknown>, ...keys: string[]) {
+  return getFirstText(...keys.map((key) => source[key]))
+}
+
+function getFieldValue(source: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = source[key]
+    if (value !== null && value !== undefined && value !== "") return value
+  }
+
+  return null
+}
+
 function normalizeReasonList(value: unknown) {
   if (Array.isArray(value)) {
     return value
@@ -475,85 +503,148 @@ function normalizeScenario(policy: PolicyApiItem, index: number): ScenarioKey {
 }
 
 function getPolicySourceUrl(policy: PolicyApiItem) {
-  const metadata = policy.metadata ?? {}
+  const metadata = getMetadataRecord(policy)
   return getFirstText(
     policy.source_url,
     policy.policy_url,
     policy.url,
+    policy.notice_url,
+    policy.homepage_url,
     metadata.source_url,
+    metadata.policy_url,
     metadata.url,
+    metadata.notice_url,
+    metadata.homepage_url,
   )
 }
 
 export function mapPolicyToProject(policy: PolicyApiItem, index: number): SupportProject {
-  const metadata = policy.metadata ?? {}
+  const metadata = getMetadataRecord(policy)
+  const policyRecord = policy as unknown as Record<string, unknown>
   const fitScore = scoreToPercent(policy)
   const amountValueManwon = toNumberOrNull(
-    policy.max_amount_manwon ??
-      policy.max_amount ??
-      metadata.max_amount_manwon ??
-      metadata.max_amount,
+    getFieldValue(
+      policyRecord,
+      "max_amount_manwon",
+      "max_amount",
+      "support_amount",
+      "subsidy_amount",
+      "support_limit",
+      "limit_amount",
+    ) ??
+      getFieldValue(
+        metadata,
+        "max_amount_manwon",
+        "max_amount",
+        "support_amount",
+        "subsidy_amount",
+        "support_limit",
+        "limit_amount",
+      ),
   )
   const scenario = normalizeScenario(policy, index)
   const policyCategory = getFirstText(
     policy.policy_category,
     policy.category,
     policy.service_category,
-    metadata.policy_category,
-    metadata.service_category,
+    getFieldText(metadata, "policy_category", "category", "service_category"),
     "지원사업",
   )
-  const title = getFirstText(policy.title, metadata.title, `추천 지원사업 ${index + 1}`)
+  const policySubcategory = getFirstText(
+    policy.policy_subcategory,
+    policy.subcategory,
+    getFieldText(metadata, "policy_subcategory", "subcategory"),
+  )
+  const title = getFirstText(
+    policy.title,
+    getFieldText(metadata, "title", "policy_title", "name"),
+    `추천 지원사업 ${index + 1}`,
+  )
   const agency = getFirstText(
     policy.agency,
     policy.organization,
     policy.provider,
-    metadata.agency,
-    metadata.organization,
-    metadata.provider,
+    getFieldText(policyRecord, "ministry", "department", "host", "sponsor"),
+    getFieldText(metadata, "agency", "organization", "provider", "ministry", "department", "host", "sponsor"),
     "주관사 미확인",
   )
   const rawDeadline = getFirstText(
     policy.deadline,
     policy.deadline_display,
     policy.end_date,
-    metadata.deadline,
-    metadata.deadline_display,
-    metadata.end_date,
+    policy.application_end_date,
+    policy.reception_end_date,
+    getFieldText(
+      metadata,
+      "deadline",
+      "deadline_display",
+      "end_date",
+      "application_end_date",
+      "reception_end_date",
+    ),
   )
   const rawPostedDate = getFirstText(
     policy.posted_date,
     policy.start_date,
     policy.created_at,
-    metadata.posted_date,
-    metadata.start_date,
-    metadata.created_at,
+    policy.posted_at,
+    policy.registered_at,
+    policy.notice_date,
+    policy.application_start_date,
+    policy.reception_start_date,
+    getFieldText(
+      metadata,
+      "posted_date",
+      "start_date",
+      "created_at",
+      "posted_at",
+      "registered_at",
+      "notice_date",
+      "application_start_date",
+      "reception_start_date",
+    ),
   )
   const supportContent = getFirstText(
     policy.support_content,
     policy.supportContent,
+    policy.support_summary,
+    policy.summary,
     policy.content,
     policy.description,
-    metadata.support_content,
-    metadata.content,
-    metadata.description,
+    getFieldText(
+      metadata,
+      "support_content",
+      "supportContent",
+      "support_summary",
+      "summary",
+      "content",
+      "description",
+    ),
     "지원내용 준비 중",
   )
   const reasonText = getFirstText(
     policy.reason,
-    metadata.reason,
-    policy.content,
-    metadata.content,
+    getFieldText(metadata, "reason"),
+    supportContent,
     "RAG 유사도 기반 매칭",
   )
   const reasons = normalizeReasonList(policy.ai_reasons)
     .concat(normalizeReasonList(policy.reasons))
     .concat(normalizeReasonList(policy.reason))
+    .concat(normalizeReasonList(getFieldValue(metadata, "reason")))
     .slice(0, 5)
+  const rawId = String(
+    policy.policy_id ??
+      policy.matched_policy_id ??
+      policy.id ??
+      policy.import_row_id ??
+      getFieldValue(metadata, "policy_id", "matched_policy_id", "id", "import_row_id") ??
+      index + 1,
+  )
 
   return {
     id: Number(policy.id ?? policy.policy_id) || index + 1,
-    rawId: String(policy.id ?? policy.policy_id ?? index + 1),
+    rawId,
     title,
     agency,
     deadline: normalizeDeadline(rawDeadline),
@@ -562,7 +653,7 @@ export function mapPolicyToProject(policy: PolicyApiItem, index: number): Suppor
     amount: formatSupportAmount(amountValueManwon),
     amountValueManwon,
     fitScore,
-    category: policyCategory,
+    category: policySubcategory ? `${policyCategory} · ${policySubcategory}` : policyCategory,
     policyCategory,
     description:
       reasonText || "기업 조건과 설비 정보를 기준으로 추천된 지원사업입니다.",
@@ -576,7 +667,8 @@ export function mapPolicyToProject(policy: PolicyApiItem, index: number): Suppor
             "업종·지역·설비 정보와 정책 조건의 유사도를 함께 반영했습니다.",
           ],
     tags: [
-      metadata.urgency_label,
+      getFieldText(metadata, "urgency_label"),
+      policySubcategory,
       policyCategory,
       agency,
     ].filter(Boolean) as string[],
@@ -811,17 +903,15 @@ export function buildPolicyCounters(
 
   return {
     totalPolicyCount:
-      apiCounters?.totalPolicyCount || DEFAULT_POLICY_COUNTERS.totalPolicyCount,
+      apiCounters?.totalPolicyCount ?? DEFAULT_POLICY_COUNTERS.totalPolicyCount,
     industryMatchedCount:
-      apiCounters?.industryMatchedCount ||
-      Math.max(projects.length, DEFAULT_POLICY_COUNTERS.industryMatchedCount),
+      apiCounters?.industryMatchedCount ?? projects.length,
     aiRecommendedCount:
-      apiCounters?.aiRecommendedCount || rankedCount || DEFAULT_POLICY_COUNTERS.aiRecommendedCount,
+      apiCounters?.aiRecommendedCount ?? rankedCount,
     priorityCount:
-      apiCounters?.priorityCount || (projects.length > 0 ? 1 : 0),
+      apiCounters?.priorityCount ?? (rankedCount > 0 ? 1 : 0),
     otherMatchedCount:
-      apiCounters?.otherMatchedCount ||
-      Math.max(otherCount, DEFAULT_POLICY_COUNTERS.otherMatchedCount),
+      apiCounters?.otherMatchedCount ?? otherCount,
   }
 }
 

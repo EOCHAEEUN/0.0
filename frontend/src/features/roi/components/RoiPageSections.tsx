@@ -432,8 +432,8 @@ export function InputPanel({
                 marginBottom: "18px",
               }}
             >
-              실행 시 백엔드 <b>/api/roi/simulate</b> API를 호출하고, 응답이 있으면
-              추천 결과와 시나리오 카드에 반영합니다.
+              실행 시 백엔드 <b>/api/analyze</b> API를 호출하고, 응답이 있으면
+              ROI 결과와 지원사업 추천 결과에 반영합니다.
             </p>
 
             <button

@@ -20,6 +20,14 @@ export type RoiFormState = {
   annualMaintenanceCostManwon: string
 }
 
+export type RoiApiScenarioBreakdown = {
+  energy_saving_manwon?: number
+  energy_saving_method?: string
+  maintenance_saving_manwon?: number
+  defect_saving_manwon?: number
+  defect_saving_method?: string
+}
+
 export type RoiApiScenario = {
   label?: string
   investment_manwon?: number
@@ -28,6 +36,7 @@ export type RoiApiScenario = {
   annual_net_benefit_manwon?: number
   payback_years?: number
   roi_pct?: number
+  breakdown?: RoiApiScenarioBreakdown | null
 }
 
 export type RoiApiData = {
@@ -36,12 +45,24 @@ export type RoiApiData = {
   recommended?: string
 }
 
+export type AnalyzeApiData = {
+  roi_result?: RoiApiData | null
+  roi_data?: RoiApiData | null
+  matched_policies?: unknown[]
+  policies?: unknown[]
+  raw_candidates?: unknown[]
+  total_candidates?: number
+  response?: string
+}
+
 export type RoiApiResponse = {
   success?: boolean
-  data?: RoiApiData | null
+  data?: RoiApiData | AnalyzeApiData | null
   scenario_a?: RoiApiScenario
   scenario_b?: RoiApiScenario
   recommended?: string
+  roi_result?: RoiApiData | null
+  roi_data?: RoiApiData | null
 }
 
 export type ScenarioCard = {

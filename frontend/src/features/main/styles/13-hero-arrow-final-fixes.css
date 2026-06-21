@@ -1,0 +1,114 @@
+/* Hero scroll arrow 최종 보정 */
+
+/* =========================================================
+   Hero scroll arrow
+   - 메인 화살표 클릭 시 Why FactoFit 섹션으로 이동
+   ========================================================= */
+
+.ff-scroll-arrow {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+
+  color: rgba(255, 255, 255, 0.76);
+  font-family: inherit;
+  font-size: 32px;
+  line-height: 1;
+  font-weight: 400;
+
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+
+  transition:
+    transform 0.2s ease,
+    color 0.2s ease,
+    background 0.2s ease;
+}
+
+.ff-scroll-arrow:hover {
+  transform: translateX(-50%) translateY(4px);
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ff-scroll-arrow:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.72);
+  outline-offset: 4px;
+}
+
+/* 고정 헤더 때문에 섹션 상단이 살짝 가려지는 것 방지 */
+.ff-why-teaser-section {
+  scroll-margin-top: 76px;
+}
+
+/* =========================================================
+   FINAL FIX - Hero scroll arrow button
+   목적:
+   - 메인 히어로 화살표를 button으로 써도 기존 디자인 유지
+   - 클릭 시 Why FactoFit 섹션으로 부드럽게 이동
+   - 기존 UX/UI는 유지하고 버튼 기본 스타일만 제거
+   ========================================================= */
+
+.ff-scroll-arrow {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  appearance: none;
+  background: transparent;
+
+  color: rgba(255, 255, 255, 0.76);
+  font-family: inherit;
+  font-size: 32px;
+  line-height: 1;
+  font-weight: 400;
+
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+
+  transition:
+    transform 0.2s ease,
+    color 0.2s ease,
+    background 0.2s ease;
+}
+
+.ff-scroll-arrow:hover {
+  transform: translateX(-50%) translateY(4px);
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.ff-scroll-arrow:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.72);
+  outline-offset: 4px;
+}
+
+.ff-why-teaser-section {
+  scroll-margin-top: 76px;
+}
+/* =========================================================
+   Hero arrow scroll landing fix
+   - 화살표 클릭 시 HERO 잔상이 위에 남지 않도록 Why 섹션 시작점 고정
+   ========================================================= */
+
+.ff-why-teaser-section {
+  scroll-margin-top: 0 !important;
+}

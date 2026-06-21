@@ -1,0 +1,123 @@
+.ff-signup-section {
+  margin-top: 34px;
+}
+
+.ff-signup-section h3 {
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  margin: 0 0 22px;
+}
+
+.ff-signup-two-col {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+.ff-signup-password-row {
+  align-items: start;
+}
+
+.ff-signup-field {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.ff-signup-password-confirm-field {
+  align-self: start;
+}
+
+.ff-signup-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ff-signup-label-row label {
+  color: #64748b;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.ff-signup-label-row label b {
+  color: #ef4444;
+  margin-left: 3px;
+}
+
+.ff-signup-label-row span {
+  height: 24px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  padding: 0 9px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.ff-signup-field input,
+.ff-signup-field select {
+  width: 100%;
+  height: 64px;
+  border-radius: 22px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  background: #ffffff;
+  color: #0f1b33;
+  padding: 0 22px;
+  font-size: 18px;
+  font-weight: 900;
+  outline: none;
+}
+
+.ff-signup-field input::placeholder {
+  color: #9ca3af;
+}
+
+.ff-signup-field input:focus,
+.ff-signup-field select:focus {
+  border-color: rgba(77, 87, 184, 0.55);
+  box-shadow: 0 0 0 4px rgba(77, 87, 184, 0.09);
+}
+
+.ff-signup-inline {
+  display: grid;
+  grid-template-columns: 1fr 148px;
+  gap: 12px;
+}
+
+.ff-signup-inline button {
+  height: 64px;
+  border: 0;
+  border-radius: 22px;
+  background: #4d57b8;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.ff-signup-message {
+  margin: -2px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 900;
+}
+
+.ff-signup-message.is-success {
+  color: #16a34a;
+}
+
+.ff-signup-message.is-error {
+  color: #ef4444;
+}
+
+.ff-signup-message.is-muted {
+  color: #94a3b8;
+}

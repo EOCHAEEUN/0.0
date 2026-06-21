@@ -24,12 +24,12 @@ const navItems: NavItem[] = [
     path: "/",
   },
   {
-    label: "지원사업",
-    path: "/support-projects",
-  },
-  {
     label: "ROI 분석",
     path: "/roi",
+  },
+  {
+    label: "지원사업",
+    path: "/support-projects",
   },
   {
     label: "신청서 생성",

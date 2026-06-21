@@ -1,0 +1,45 @@
+.ff-signup-header {
+  margin-bottom: 34px;
+  padding-right: 72px;
+}
+
+.ff-signup-header h2 {
+  font-size: 48px;
+  font-weight: 900;
+  letter-spacing: -0.07em;
+  margin: 0 0 14px;
+}
+
+.ff-signup-header p {
+  color: #64748b;
+  font-size: 18px;
+  line-height: 1.7;
+  font-weight: 800;
+  margin: 0;
+  word-break: keep-all;
+}
+
+.ff-signup-guide {
+  margin-top: 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.ff-signup-guide span {
+  min-height: 34px;
+  border-radius: 999px;
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  color: #64748b;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.ff-signup-guide b {
+  color: #ef4444;
+  margin-right: 4px;
+}

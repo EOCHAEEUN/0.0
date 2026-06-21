@@ -1,511 +1,420 @@
-import { useMemo, useState } from "react"
 import {
-  createCompanyOnboarding,
-  saveAuthSession,
-  sendSignupEmailCode,
-  signupWithProfile,
-  verifySignupEmailCode,
-} from "../../services/auth"
+  useEffect,
+  useMemo,
+  useState,
+  type FocusEvent,
+  type KeyboardEvent,
+  type MouseEvent,
+} from "react"
+
 import "./SignupModal.css"
+import AccountSection from "./signup/components/AccountSection"
+import AgreementBox from "./signup/components/AgreementBox"
+import CompanyInfoSection from "./signup/components/CompanyInfoSection"
+import UserInfoSection from "./signup/components/UserInfoSection"
+import { COMPANY_TYPE_PLACEHOLDER } from "./signup/signup.constants"
+import type { SignupModalProps } from "./signup/signup.types"
+import { useSignupForm } from "./signup/useSignupForm"
 
-type IndustryOption = {
-  name: string
-  codes: string[]
+type SignupNotice = {
+  type: "lock" | "required"
+  title: string
+  message: string
+  items?: string[]
 }
 
-type IndustryInputRow = {
-  id: string
-  industryName: string
-  industryCode: string
-  selectedIndustry: IndustryOption | null
-}
+function isFilled(value: unknown) {
+  if (value === null || value === undefined) return false
 
-type SignupModalProps = {
-  onClose: () => void
-  onLoginClick?: () => void
-}
-
-type PasswordLevel = "empty" | "weak" | "normal" | "strong"
-
-const INDUSTRY_OPTIONS: IndustryOption[] = [
-  { name: "스마트공장", codes: ["C"] },
-  { name: "스마트제조", codes: ["C"] },
-
-  { name: "식품", codes: ["C10"] },
-  { name: "섬유", codes: ["C13"] },
-  { name: "화학", codes: ["C20"] },
-  { name: "바이오", codes: ["C21"] },
-  { name: "의약", codes: ["C21"] },
-  { name: "고무", codes: ["C22"] },
-  { name: "플라스틱", codes: ["C22"] },
-
-  { name: "금속", codes: ["C24", "C25"] },
-  { name: "금속가공", codes: ["C25"] },
-
-  { name: "전자", codes: ["C26"] },
-  { name: "반도체", codes: ["C26"] },
-  { name: "의료기기", codes: ["C27"] },
-
-  { name: "전기", codes: ["C28"] },
-  { name: "기계", codes: ["C29"] },
-  { name: "장비", codes: ["C29"] },
-  { name: "로봇", codes: ["C29"] },
-
-  { name: "자동차", codes: ["C30"] },
-  { name: "부품", codes: ["C30"] },
-
-  { name: "소부장", codes: ["C20", "C24", "C25", "C26", "C28", "C29"] },
-  { name: "뿌리", codes: ["C24", "C25", "C28", "C29"] },
-]
-
-const company_type_OPTIONS = [
-  "선택 필요",
-  "소상공인",
-  "소기업",
-  "중소기업",
-  "중견기업",
-  "대기업",
-  "확인 필요",
-]
-
-const PURPOSE_OPTIONS = [
-  "지원사업 추천",
-  "ROI 분석",
-  "설비 교체 검토",
-  "신청서 초안 작성",
-  "안전점검 관리",
-]
-
-const createIndustryInputRow = (): IndustryInputRow => ({
-  id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
-  industryName: "",
-  industryCode: "",
-  selectedIndustry: null,
-})
-
-function onlyDigits(value: string) {
-  return value.replace(/\D/g, "")
-}
-
-function formatPhoneNumber(value: string) {
-  const digits = onlyDigits(value).slice(0, 11)
-
-  if (digits.length <= 3) return digits
-  if (digits.length <= 7) {
-    return `${digits.slice(0, 3)}-${digits.slice(3)}`
+  if (Array.isArray(value)) {
+    return value.some((item) => String(item ?? "").trim().length > 0)
   }
 
-  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`
+  return String(value).trim().length > 0
 }
 
-function formatBusinessNumber(value: string) {
-  const digits = onlyDigits(value).slice(0, 10)
+function getIndustryName(row: unknown) {
+  if (!row || typeof row !== "object") return ""
 
-  if (digits.length <= 3) return digits
-  if (digits.length <= 5) {
-    return `${digits.slice(0, 3)}-${digits.slice(3)}`
-  }
+  const item = row as Record<string, unknown>
 
-  return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`
+  return String(
+    item.industryName ??
+      item.industry_name ??
+      item.name ??
+      item.label ??
+      "",
+  ).trim()
 }
 
-function normalizePhoneNumber(value: string) {
-  return onlyDigits(value)
+function getIndustryCode(row: unknown) {
+  if (!row || typeof row !== "object") return ""
+
+  const item = row as Record<string, unknown>
+
+  return String(
+    item.industryCode ??
+      item.industry_code ??
+      item.code ??
+      item.value ??
+      "",
+  ).trim()
 }
 
-function normalizeBusinessNumber(value: string) {
-  return onlyDigits(value)
-}
-
-export default function SignupModal({ onClose, onLoginClick }: SignupModalProps) {
-  const [email, setEmail] = useState("")
-  const [emailCode, setEmailCode] = useState("")
-  const [isCodeSent, setIsCodeSent] = useState(false)
-  const [isEmailVerified, setIsEmailVerified] = useState(false)
-
-  const [password, setPassword] = useState("")
-  const [passwordCheck, setPasswordCheck] = useState("")
-
-  const [userName, setUserName] = useState("")
-  const [phone, setPhone] = useState("")
-  const [businessNumber, setBusinessNumber] = useState("")
-
-  const [companyName, setCompanyName] = useState("")
-  const [industryRows, setIndustryRows] = useState<IndustryInputRow[]>(() => [
-    createIndustryInputRow(),
-  ])
-  const [openIndustryRowId, setOpenIndustryRowId] = useState<string | null>(null)
-  const [region, setRegion] = useState("")
-  const [companySize, setCompanySize] = useState("선택 필요")
-  const [mainPurpose, setMainPurpose] = useState("지원사업 추천")
-
-
-  const [agreeService, setAgreeService] = useState(true)
-  const [agreePrivacy, setAgreePrivacy] = useState(true)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isSendingCode, setIsSendingCode] = useState(false)
-  const [isVerifyingCode, setIsVerifyingCode] = useState(false)
-
-  const passwordChecks = useMemo(() => {
-    return [
-      {
-        label: "8자 이상",
-        valid: password.length >= 8,
-      },
-      {
-        label: "영문 포함",
-        valid: /[A-Za-z]/.test(password),
-      },
-      {
-        label: "숫자 포함",
-        valid: /\d/.test(password),
-      },
-      {
-        label: "특수문자 포함",
-        valid: /[^A-Za-z0-9]/.test(password),
-      },
-    ]
-  }, [password])
-
-  const passwordScore = passwordChecks.filter((item) => item.valid).length
-
-  const passwordLevel: PasswordLevel =
-    password.length === 0
-      ? "empty"
-      : passwordScore <= 1
-        ? "weak"
-        : passwordScore <= 3
-          ? "normal"
-          : "strong"
-
-  const passwordLabel =
-    passwordLevel === "empty"
-      ? "비밀번호 보안 수준"
-      : passwordLevel === "weak"
-        ? "약함"
-        : passwordLevel === "normal"
-          ? "보통"
-          : "안전"
-
-  const isPasswordMatched =
-    password.length > 0 && passwordCheck.length > 0 && password === passwordCheck
-
-  const isPasswordMismatch =
-    password.length > 0 && passwordCheck.length > 0 && password !== passwordCheck
-
-  const getFilteredIndustries = (row: IndustryInputRow) => {
-    const keyword = `${row.industryName} ${row.industryCode}`
-      .trim()
-      .toLowerCase()
-
-    if (!keyword) return INDUSTRY_OPTIONS.slice(0, 8)
-
-    return INDUSTRY_OPTIONS.filter((item) => {
-      const nameMatched = item.name.toLowerCase().includes(keyword)
-      const codeMatched = item.codes.some((code) =>
-        code.toLowerCase().includes(keyword),
-      )
-
-      return nameMatched || codeMatched
-    }).slice(0, 8)
-  }
-
-  const handleSendEmailCode = async () => {
-    if (isSendingCode) return
-
-    if (!email.includes("@")) {
-      alert("이메일 형식을 확인해주세요.")
-      return
-    }
-
-    try {
-      setIsSendingCode(true)
-      await sendSignupEmailCode(email)
-      setIsCodeSent(true)
-      setIsEmailVerified(false)
-      alert("인증번호를 이메일로 발송했습니다.")
-    } catch (error) {
-      alert(error instanceof Error ? error.message : "인증번호 발송에 실패했습니다.")
-    } finally {
-      setIsSendingCode(false)
+function getIndustryRequiredStatus(rows: unknown) {
+  if (!Array.isArray(rows)) {
+    return {
+      hasCompleteIndustry: false,
+      hasIndustryName: false,
+      hasIndustryCode: false,
     }
   }
 
-  const handleVerifyEmail = async () => {
-    if (isVerifyingCode) return
+  const hasCompleteIndustry = rows.some((row) => {
+    const industryName = getIndustryName(row)
+    const industryCode = getIndustryCode(row)
 
-    if (!isCodeSent) {
-      alert("먼저 인증번호를 받아주세요.")
-      return
-    }
+    return industryName.length > 0 && industryCode.length > 0
+  })
 
-    if (emailCode.trim().length < 4) {
-      alert("인증번호를 입력해주세요.")
-      return
-    }
+  const hasIndustryName = rows.some((row) => getIndustryName(row).length > 0)
+  const hasIndustryCode = rows.some((row) => getIndustryCode(row).length > 0)
 
-    try {
-      setIsVerifyingCode(true)
-      const session = await verifySignupEmailCode(email, emailCode.trim())
-      saveAuthSession(session)
-      setIsEmailVerified(true)
-      alert("이메일 인증이 완료되었습니다.")
-    } catch (error) {
-      alert(error instanceof Error ? error.message : "이메일 인증에 실패했습니다.")
-    } finally {
-      setIsVerifyingCode(false)
-    }
+  return {
+    hasCompleteIndustry,
+    hasIndustryName,
+    hasIndustryCode,
   }
+}
 
-  const handleAddIndustryRow = () => {
-    setIndustryRows((prev) => [...prev, createIndustryInputRow()])
-  }
+function normalizeText(value: string) {
+  return value.replace(/\s+/g, "").toLowerCase()
+}
 
-  const handleRemoveIndustryRow = (rowId: string) => {
-    setIndustryRows((prev) => {
-      if (prev.length <= 1) return prev
-      return prev.filter((row) => row.id !== rowId)
-    })
+function isPasswordRequirementPassed(
+  password: unknown,
+  passwordChecks: unknown,
+  passwordLevel: unknown,
+  passwordLabel: unknown,
+) {
+  if (!isFilled(password)) return false
 
-    if (openIndustryRowId === rowId) {
-      setOpenIndustryRowId(null)
-    }
-  }
-
-  const handleSelectIndustry = (rowId: string, industry: IndustryOption) => {
-    setIndustryRows((prev) =>
-      prev.map((row) =>
-        row.id === rowId
-          ? {
-              ...row,
-              selectedIndustry: industry,
-              industryName: industry.name,
-              industryCode: industry.codes.join(", "),
-            }
-          : row,
-      ),
-    )
-
-    setOpenIndustryRowId(null)
-  }
-
-  const handleIndustryNameChange = (rowId: string, value: string) => {
-    setIndustryRows((prev) =>
-      prev.map((row) => {
-        if (row.id !== rowId) return row
-
-        const exact = INDUSTRY_OPTIONS.find((item) => item.name === value)
-
-        if (exact) {
-          return {
-            ...row,
-            industryName: value,
-            industryCode: exact.codes.join(", "),
-            selectedIndustry: exact,
-          }
+  if (Array.isArray(passwordChecks)) {
+    if (passwordChecks.length > 0) {
+      return passwordChecks.every((item) => {
+        if (item && typeof item === "object" && "valid" in item) {
+          return Boolean((item as { valid?: unknown }).valid)
         }
 
-        return {
-          ...row,
-          industryName: value,
-          selectedIndustry: null,
-        }
-      }),
-    )
-
-    setOpenIndustryRowId(rowId)
-  }
-
-  const handleIndustryCodeChange = (rowId: string, value: string) => {
-    const nextValue = value.toUpperCase()
-    const normalizedValue = nextValue.replace(/\s/g, "")
-
-    setIndustryRows((prev) =>
-      prev.map((row) => {
-        if (row.id !== rowId) return row
-
-        const exact = INDUSTRY_OPTIONS.find((item) =>
-          item.codes.some((code) => code === normalizedValue),
-        )
-
-        if (exact) {
-          return {
-            ...row,
-            industryName: exact.name,
-            industryCode: nextValue,
-            selectedIndustry: exact,
-          }
-        }
-
-        return {
-          ...row,
-          industryCode: nextValue,
-          selectedIndustry: null,
-        }
-      }),
-    )
-
-    setOpenIndustryRowId(rowId)
-  }
-
-  const getNormalizedIndustries = () => {
-    return industryRows
-      .map((row) => {
-        const industryName = row.selectedIndustry?.name ?? row.industryName.trim()
-        const industryCodes =
-          row.selectedIndustry?.codes ??
-          row.industryCode
-            .split(",")
-            .map((code) => code.trim().toUpperCase())
-            .filter(Boolean)
-
-        return {
-          industry_name: industryName,
-          industry_code: industryCodes,
-        }
+        return Boolean(item)
       })
-      .filter((item) => item.industry_name || item.industry_code.length > 0)
+    }
   }
 
-  const handleSubmit = async () => {
-    if (isSubmitting) return
+  if (passwordChecks && typeof passwordChecks === "object") {
+    const values = Object.values(passwordChecks as Record<string, unknown>)
 
-    if (!email || !password || !passwordCheck || !userName || !phone) {
-      alert("필수 계정 정보와 사용자 정보를 입력해주세요.")
-      return
+    if (values.length > 0) {
+      return values.every(Boolean)
     }
+  }
 
-    if (!isEmailVerified) {
-      alert("이메일 인증을 완료해주세요.")
-      return
-    }
+  const labelText = normalizeText(String(passwordLabel ?? ""))
+  const levelText = normalizeText(String(passwordLevel ?? ""))
 
-    if (passwordLevel !== "strong") {
-      alert("비밀번호 보안 수준을 안전 단계로 맞춰주세요.")
-      return
-    }
+  if (
+    labelText.includes("약함") ||
+    labelText.includes("weak") ||
+    levelText.includes("weak") ||
+    levelText.includes("low") ||
+    levelText.includes("bad")
+  ) {
+    return false
+  }
 
-    if (password !== passwordCheck) {
-      alert("비밀번호가 일치하지 않습니다.")
-      return
-    }
+  const levelNumber = Number(passwordLevel)
 
-    const normalizedIndustries = getNormalizedIndustries()
+  if (Number.isFinite(levelNumber)) {
+    return levelNumber >= 2
+  }
 
-    if (!companyName || !region) {
-      alert("기업명, 지역을 입력해주세요.")
-      return
-    }
+  return true
+}
 
-    if (normalizedIndustries.length === 0) {
-      alert("업종을 1개 이상 입력해주세요.")
-      return
-    }
+function isEmailVerificationTarget(target: EventTarget | null) {
+  if (!(target instanceof Element)) return false
 
-    const hasIncompleteIndustry = normalizedIndustries.some(
-      (item) => !item.industry_name || item.industry_code.length === 0,
+  const closeButton = target.closest(".ff-signup-close")
+  const loginButton = target.closest(".ff-signup-login-link")
+  const noticeCloseButton = target.closest(".ff-signup-notice-close")
+
+  if (closeButton || loginButton || noticeCloseButton) return true
+
+  const interactive = target.closest(
+    "input, textarea, select, button, a",
+  ) as HTMLElement | null
+
+  if (!interactive) return true
+
+  if (interactive instanceof HTMLInputElement) {
+    const descriptor = normalizeText(
+      [
+        interactive.type,
+        interactive.name,
+        interactive.id,
+        interactive.placeholder,
+        interactive.getAttribute("aria-label"),
+        interactive.getAttribute("data-field"),
+      ]
+        .filter(Boolean)
+        .join(" "),
     )
 
-    if (hasIncompleteIndustry) {
-      alert("추가한 업종의 업종명과 업종코드를 모두 입력해주세요.")
-      return
-    }
+    if (interactive.type === "hidden") return true
 
-    if (!agreeService || !agreePrivacy) {
-      alert("필수 약관에 동의해주세요.")
-      return
-    }
+    return (
+      interactive.type === "email" ||
+      descriptor.includes("email") ||
+      descriptor.includes("이메일") ||
+      descriptor.includes("code") ||
+      descriptor.includes("인증") ||
+      descriptor.includes("verification") ||
+      descriptor.includes("verify") ||
+      descriptor.includes("otp")
+    )
+  }
 
-    const uniqueIndustryCodes = Array.from(
-      new Set(normalizedIndustries.flatMap((item) => item.industry_code)),
+  if (interactive instanceof HTMLButtonElement) {
+    const descriptor = normalizeText(
+      [
+        interactive.innerText,
+        interactive.textContent,
+        interactive.name,
+        interactive.id,
+        interactive.getAttribute("aria-label"),
+        interactive.getAttribute("data-action"),
+      ]
+        .filter(Boolean)
+        .join(" "),
     )
 
-    const payload = {
-      account: {
-        email,
-        email_verified: isEmailVerified,
-      },
-      user: {
-        name: userName,
-        phone: normalizePhoneNumber(phone),
-        business_number: normalizeBusinessNumber(businessNumber) || null,
-      },
-      company: {
-        company_name: companyName,
+    return (
+      descriptor.includes("이메일") ||
+      descriptor.includes("인증") ||
+      descriptor.includes("코드") ||
+      descriptor.includes("발송") ||
+      descriptor.includes("전송") ||
+      descriptor.includes("verify") ||
+      descriptor.includes("code")
+    )
+  }
 
-        /**
-         * 기존 단일 업종 저장 구조와의 호환을 위해 유지합니다.
-         * 여러 업종을 추가하면 쉼표로 묶어서 저장됩니다.
-         */
-        industry_name: normalizedIndustries
-          .map((item) => item.industry_name)
-          .join(", "),
-        industry_code: uniqueIndustryCodes,
+  return false
+}
 
-        /**
-         * 신규 다중 업종 저장용 필드입니다.
-         * DB 연결 시 이 배열을 기준으로 별도 테이블에 저장하면 됩니다.
-         */
-        industries: normalizedIndustries,
+export default function SignupModal({
+  onClose,
+  onLoginClick,
+}: SignupModalProps) {
+  const form = useSignupForm({ onClose })
 
-        region,
-        company_type: companySize,
-        main_purpose: mainPurpose,
-        max_employee_count: null,
-        min_revenue_manwon: null,
-        max_revenue_manwon: null,
-      },
-      agreements: {
-        service_terms: agreeService,
-        privacy_policy: agreePrivacy,
-      },
+  const [signupNotice, setSignupNotice] = useState<SignupNotice | null>(null)
+  const [isLockNoticeDismissed, setIsLockNoticeDismissed] = useState(false)
+
+  const isSignupUnlocked = form.isEmailVerified
+
+  useEffect(() => {
+    if (isSignupUnlocked) {
+      setSignupNotice(null)
+      setIsLockNoticeDismissed(false)
+    }
+  }, [isSignupUnlocked])
+
+  const missingRequiredItems = useMemo(() => {
+    const missing: string[] = []
+
+    if (
+      !isPasswordRequirementPassed(
+        form.password,
+        form.passwordChecks,
+        form.passwordLevel,
+        form.passwordLabel,
+      ) ||
+      !isFilled(form.passwordCheck) ||
+      (isFilled(form.password) &&
+        isFilled(form.passwordCheck) &&
+        !form.isPasswordMatched)
+    ) {
+      missing.push("비밀번호")
     }
 
-    const signupPayload = {
-      email,
-      password,
-      name: userName,
-      phone: normalizePhoneNumber(phone),
-      business_registration_no: normalizeBusinessNumber(businessNumber) || null,
-      company: payload.company,
-      agreements: payload.agreements,
+    if (!isFilled(form.userName)) {
+      missing.push("이름")
     }
 
-    const onboardingPayload = {
-      company_name: companyName,
-      business_registration_no: normalizeBusinessNumber(businessNumber) || null,
-      industry_name: payload.company.industry_name,
-      industry_code: payload.company.industry_code,
-      region,
-      company_type: companySize,
-      primary_purpose: mainPurpose ? [mainPurpose] : [],
-      employee_count: 0,
-      annual_revenue: 0,
+    if (!isFilled(form.phone)) {
+      missing.push("연락처")
     }
 
-    try {
-      setIsSubmitting(true)
-      const session = await signupWithProfile(signupPayload)
-      saveAuthSession(session)
-      const onboarding = await createCompanyOnboarding(onboardingPayload)
-      localStorage.setItem("factofit_company_id", onboarding.company_id)
-      alert("회원가입이 완료되었습니다.")
-      onClose()
-    } catch (error) {
-      alert(error instanceof Error ? error.message : "회원가입에 실패했습니다.")
-    } finally {
-      setIsSubmitting(false)
+    if (!isFilled(form.companyName)) {
+      missing.push("기업명")
+    }
+
+    const industryStatus = getIndustryRequiredStatus(form.industryRows)
+
+    if (!industryStatus.hasCompleteIndustry) {
+      if (!industryStatus.hasIndustryName) {
+        missing.push("업종명")
+      }
+
+      if (!industryStatus.hasIndustryCode) {
+        missing.push("업종코드")
+      }
+
+      if (
+        industryStatus.hasIndustryName &&
+        industryStatus.hasIndustryCode &&
+        !industryStatus.hasCompleteIndustry
+      ) {
+        missing.push("업종명/업종코드")
+      }
+    }
+
+    if (!isFilled(form.region)) {
+      missing.push("지역")
+    }
+
+    if (
+      !isFilled(form.companyType) ||
+      form.companyType === COMPANY_TYPE_PLACEHOLDER ||
+      form.companyType === "선택"
+    ) {
+      missing.push("기업 규모")
+    }
+
+    if (!form.agreeService) {
+      missing.push("서비스 이용약관 동의")
+    }
+
+    if (!form.agreePrivacy) {
+      missing.push("개인정보 수집·이용 동의")
+    }
+
+    return missing
+  }, [
+    form.agreePrivacy,
+    form.agreeService,
+    form.companyName,
+    form.companyType,
+    form.industryRows,
+    form.isPasswordMatched,
+    form.password,
+    form.passwordCheck,
+    form.passwordChecks,
+    form.passwordLabel,
+    form.passwordLevel,
+    form.phone,
+    form.region,
+    form.userName,
+  ])
+
+  const defaultLockedNotice = useMemo<SignupNotice | null>(() => {
+    if (isSignupUnlocked || isLockNoticeDismissed) return null
+
+    return {
+      type: "lock",
+      title: "이메일 인증을 먼저 완료해주세요.",
+      message:
+        "인증번호 확인 후 비밀번호, 사용자 정보, 기업 정보 입력이 활성화됩니다.",
+    }
+  }, [isLockNoticeDismissed, isSignupUnlocked])
+
+  const lockNotice =
+    !isSignupUnlocked && signupNotice?.type === "lock"
+      ? signupNotice
+      : defaultLockedNotice
+
+  const requiredNotice =
+    isSignupUnlocked && signupNotice?.type === "required" ? signupNotice : null
+
+  const showLockedNotice = () => {
+    setIsLockNoticeDismissed(false)
+    setSignupNotice({
+      type: "lock",
+      title: "이메일 인증이 필요합니다.",
+      message:
+        "이메일 인증번호를 확인한 뒤 나머지 필수 정보를 입력할 수 있습니다.",
+    })
+  }
+
+  const closeLockNotice = () => {
+    setIsLockNoticeDismissed(true)
+
+    if (signupNotice?.type === "lock") {
+      setSignupNotice(null)
+    }
+  }
+
+  const closeRequiredNotice = () => {
+    if (signupNotice?.type === "required") {
+      setSignupNotice(null)
+    }
+  }
+
+  const handleLockedInteraction = (
+    event:
+      | MouseEvent<HTMLElement>
+      | FocusEvent<HTMLElement>
+      | KeyboardEvent<HTMLElement>,
+  ) => {
+    if (isSignupUnlocked) return
+
+    if (isEmailVerificationTarget(event.target)) return
+
+    event.preventDefault()
+    event.stopPropagation()
+
+    const activeElement = document.activeElement
+
+    if (activeElement instanceof HTMLElement) {
+      activeElement.blur()
+    }
+
+    showLockedNotice()
+  }
+
+  const handleSubmit = () => {
+    if (!isSignupUnlocked) {
+      showLockedNotice()
       return
     }
 
-    alert("회원가입 정보가 저장되었습니다. 이후 DB API와 연결하면 마이페이지에서 불러올 수 있습니다.")
+    if (missingRequiredItems.length > 0) {
+      setSignupNotice({
+        type: "required",
+        title: "필수 정보를 먼저 입력해주세요.",
+        message:
+          "회원가입을 완료하려면 계정 정보와 기업 정보의 필수 항목이 필요합니다.\n입력이 필요한 항목을 확인한 뒤 다시 회원가입 완료를 눌러주세요.",
+        items: missingRequiredItems,
+      })
+
+      return
+    }
+
+    setSignupNotice(null)
+    form.handleSubmit()
   }
 
   return (
     <div className="ff-signup-overlay">
       <section
-        className="ff-signup-panel"
+        className={`ff-signup-panel ${
+          isSignupUnlocked ? "" : "ff-signup-panel--email-locked"
+        }`}
         onClick={(event) => event.stopPropagation()}
+        onClickCapture={handleLockedInteraction}
+        onFocusCapture={handleLockedInteraction}
+        onKeyDownCapture={handleLockedInteraction}
       >
         <button type="button" className="ff-signup-close" onClick={onClose}>
           ×
@@ -523,315 +432,146 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
           </div>
         </header>
 
-        <div className="ff-signup-section">
-          <h3>1. 계정 정보</h3>
-
-          <div className="ff-signup-field">
-            <FieldLabel text="이메일" required />
-            <div className="ff-signup-inline">
-              <input
-                type="email"
-                placeholder="이메일을 입력하세요"
-                value={email}
-                onChange={(event) => {
-                  setEmail(event.target.value)
-                  setIsEmailVerified(false)
-                }}
-              />
-              <button
-                type="button"
-                onClick={handleSendEmailCode}
-                disabled={isSendingCode}
-              >
-                {isSendingCode ? "발송 중..." : "인증번호 받기"}
-              </button>
-            </div>
-
-            {email && !email.includes("@") && (
-              <p className="ff-signup-message is-error">
-                이메일 형식으로 입력해주세요.
-              </p>
-            )}
-          </div>
-
-          <div className="ff-signup-field">
-            <FieldLabel text="이메일 인증번호" required />
-            <div className="ff-signup-inline">
-              <input
-                placeholder="인증번호 입력"
-                value={emailCode}
-                onChange={(event) => setEmailCode(event.target.value)}
-              />
-              <button
-                type="button"
-                onClick={handleVerifyEmail}
-                disabled={isVerifyingCode}
-              >
-                {isVerifyingCode ? "확인 중..." : "인증 확인"}
-              </button>
-            </div>
-
-            {isEmailVerified && (
-              <p className="ff-signup-message is-success">
-                이메일 인증이 완료되었습니다.
-              </p>
-            )}
-          </div>
-
-          <div className="ff-signup-two-col ff-signup-password-row">
-            <div className="ff-signup-field">
-              <FieldLabel text="비밀번호" required />
-              <input
-                type="password"
-                placeholder="영문, 숫자, 특수문자 포함 8자 이상"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-              />
-
-              <div className={`ff-password-meter is-${passwordLevel}`}>
-                <div className="ff-password-meter-track">
-                  <span />
-                  <span />
-                  <span />
-                </div>
-                <p>{passwordLabel}</p>
+        {lockNotice && (
+          <div
+            className="ff-signup-top-notice ff-signup-top-notice--lock"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="ff-signup-top-notice__head">
+              <div>
+                <strong>{lockNotice.title}</strong>
+                <p>{lockNotice.message}</p>
               </div>
 
-              <ul className="ff-password-check-list">
-                {passwordChecks.map((item) => (
-                  <li
-                    key={item.label}
-                    className={item.valid ? "is-valid" : undefined}
-                  >
-                    {item.valid ? "✓" : "•"} {item.label}
-                  </li>
+              <button
+                type="button"
+                className="ff-signup-notice-close"
+                onClick={closeLockNotice}
+                aria-label="안내 닫기"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
+
+        <AccountSection
+          email={form.email}
+          emailCode={form.emailCode}
+          isEmailVerified={form.isEmailVerified}
+          password={form.password}
+          passwordCheck={form.passwordCheck}
+          passwordChecks={form.passwordChecks}
+          passwordLevel={form.passwordLevel}
+          passwordLabel={form.passwordLabel}
+          isPasswordMatched={form.isPasswordMatched}
+          isPasswordMismatch={form.isPasswordMismatch}
+          isSendingCode={form.isSendingCode}
+          isVerifyingCode={form.isVerifyingCode}
+          onEmailChange={form.handleEmailChange}
+          onEmailCodeChange={form.setEmailCode}
+          onPasswordChange={form.setPassword}
+          onPasswordCheckChange={form.setPasswordCheck}
+          onSendEmailCode={form.handleSendEmailCode}
+          onVerifyEmail={form.handleVerifyEmail}
+        />
+
+        <div className="ff-signup-locked-group">
+          <fieldset
+            disabled={!isSignupUnlocked}
+            aria-disabled={!isSignupUnlocked}
+            className="ff-signup-locked-fieldset"
+          >
+            <UserInfoSection
+              userName={form.userName}
+              phone={form.phone}
+              onUserNameChange={form.setUserName}
+              onPhoneChange={form.handlePhoneChange}
+            />
+
+            <CompanyInfoSection
+              companyName={form.companyName}
+              industryRows={form.industryRows}
+              openIndustryRowId={form.openIndustryRowId}
+              businessNumber={form.businessNumber}
+              region={form.region}
+              companyType={form.companyType}
+              mainPurpose={form.mainPurpose}
+              getFilteredIndustries={form.getFilteredIndustries}
+              onCompanyNameChange={form.setCompanyName}
+              onOpenIndustrySuggestion={form.handleOpenIndustrySuggestion}
+              onIndustryNameChange={form.handleIndustryNameChange}
+              onIndustryCodeChange={form.handleIndustryCodeChange}
+              onSelectIndustry={form.handleSelectIndustry}
+              onAddIndustryRow={form.handleAddIndustryRow}
+              onRemoveIndustryRow={form.handleRemoveIndustryRow}
+              onBusinessNumberChange={form.handleBusinessNumberChange}
+              onRegionChange={form.setRegion}
+              onCompanyTypeChange={form.setCompanyType}
+              onMainPurposeChange={form.setMainPurpose}
+            />
+
+            <AgreementBox
+              agreeService={form.agreeService}
+              agreePrivacy={form.agreePrivacy}
+              onAgreeServiceChange={form.setAgreeService}
+              onAgreePrivacyChange={form.setAgreePrivacy}
+            />
+          </fieldset>
+
+          {!isSignupUnlocked && (
+            <button
+              type="button"
+              className="ff-signup-locked-layer"
+              onClick={showLockedNotice}
+              aria-label="이메일 인증 후 입력 가능"
+            />
+          )}
+        </div>
+
+        {requiredNotice && (
+          <div
+            className="ff-signup-required-popover"
+            role="alert"
+            aria-live="assertive"
+          >
+            <div className="ff-signup-required-popover__head">
+              <div>
+                <strong>{requiredNotice.title}</strong>
+                <p>{requiredNotice.message}</p>
+              </div>
+
+              <button
+                type="button"
+                className="ff-signup-notice-close"
+                onClick={closeRequiredNotice}
+                aria-label="안내 닫기"
+              >
+                ×
+              </button>
+            </div>
+
+            {requiredNotice.items && requiredNotice.items.length > 0 && (
+              <ul className="ff-signup-required-popover__list">
+                {requiredNotice.items.slice(0, 10).map((item) => (
+                  <li key={item}>{item}</li>
                 ))}
               </ul>
-            </div>
-
-            <div className="ff-signup-field ff-signup-password-confirm-field">
-              <FieldLabel text="비밀번호 확인" required />
-              <input
-                type="password"
-                placeholder="비밀번호를 다시 입력하세요"
-                value={passwordCheck}
-                onChange={(event) => setPasswordCheck(event.target.value)}
-              />
-
-              {passwordCheck.length === 0 && (
-                <p className="ff-signup-message is-muted">
-                  비밀번호를 한 번 더 입력해주세요.
-                </p>
-              )}
-
-              {isPasswordMatched && (
-                <p className="ff-signup-message is-success">
-                  비밀번호가 일치합니다.
-                </p>
-              )}
-
-              {isPasswordMismatch && (
-                <p className="ff-signup-message is-error">
-                  비밀번호가 일치하지 않습니다.
-                </p>
-              )}
-            </div>
+            )}
           </div>
-        </div>
-
-        <div className="ff-signup-section">
-          <h3>2. 사용자 정보</h3>
-
-          <div className="ff-signup-two-col">
-            <div className="ff-signup-field">
-              <FieldLabel text="이름" required />
-              <input
-                placeholder="이름"
-                value={userName}
-                onChange={(event) => setUserName(event.target.value)}
-              />
-            </div>
-
-            <div className="ff-signup-field">
-              <FieldLabel text="연락처" required />
-              <input
-                placeholder="010-0000-0000"
-                value={phone}
-                onChange={(event) => setPhone(formatPhoneNumber(event.target.value))}
-              />
-            </div>
-          </div>
-
-        </div>
-
-        <div className="ff-signup-section">
-          <h3>3. 기업 정보</h3>
-
-          <div className="ff-signup-field">
-            <FieldLabel text="기업명" required />
-            <input
-              placeholder="기업명을 입력하세요"
-              value={companyName}
-              onChange={(event) => setCompanyName(event.target.value)}
-            />
-          </div>
-
-          <div className="ff-signup-industry-list">
-            {industryRows.map((row, index) => {
-              const filteredIndustries = getFilteredIndustries(row)
-              const isSuggestionOpen =
-                openIndustryRowId === row.id &&
-                Boolean(row.industryName || row.industryCode) &&
-                filteredIndustries.length > 0
-
-              return (
-                <div className="ff-signup-industry-row" key={row.id}>
-                  {industryRows.length > 1 && (
-                    <div className="ff-signup-industry-row-top">
-                      <span>업종 {index + 1}</span>
-
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveIndustryRow(row.id)}
-                      >
-                        삭제
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="ff-signup-two-col">
-                    <div className="ff-signup-field ff-signup-combo">
-                      <FieldLabel text="업종명" required />
-                      <input
-                        placeholder="예: 금속가공"
-                        value={row.industryName}
-                        onFocus={() => setOpenIndustryRowId(row.id)}
-                        onChange={(event) =>
-                          handleIndustryNameChange(row.id, event.target.value)
-                        }
-                      />
-
-                      {isSuggestionOpen && (
-                        <div className="ff-signup-suggest-box">
-                          {filteredIndustries.map((item) => (
-                            <button
-                              type="button"
-                              key={`${row.id}-${item.name}-${item.codes.join(
-                                "-",
-                              )}`}
-                              onClick={() => handleSelectIndustry(row.id, item)}
-                            >
-                              <span>{item.name}</span>
-                              <b>{item.codes.join(", ")}</b>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="ff-signup-field">
-                      <FieldLabel text="업종코드" required />
-                      <input
-                        placeholder="예: C25"
-                        value={row.industryCode}
-                        onFocus={() => setOpenIndustryRowId(row.id)}
-                        onChange={(event) =>
-                          handleIndustryCodeChange(row.id, event.target.value)
-                        }
-                      />
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-
-          <button
-            type="button"
-            className="ff-signup-add-industry"
-            onClick={handleAddIndustryRow}
-          >
-            + 업종 추가하기
-          </button>
-
-          <div className="ff-signup-field">
-            <FieldLabel text="사업자등록번호" optional />
-            <input
-              placeholder="예: 123-45-67890"
-              value={businessNumber}
-              onChange={(event) =>
-                setBusinessNumber(formatBusinessNumber(event.target.value))
-              }
-            />
-          </div>
-
-          <div className="ff-signup-field">
-            <FieldLabel text="지역" required />
-            <input
-              placeholder="예: 경기 안산시"
-              value={region}
-              onChange={(event) => setRegion(event.target.value)}
-            />
-          </div>
-
-          <div className="ff-signup-two-col">
-            <div className="ff-signup-field">
-              <FieldLabel text="기업 규모" optional />
-              <select
-                value={companySize}
-                onChange={(event) => setCompanySize(event.target.value)}
-              >
-                {company_type_OPTIONS.map((option) => (
-                  <option key={option}>{option}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="ff-signup-field">
-              <FieldLabel text="주요 목적" optional />
-              <select
-                value={mainPurpose}
-                onChange={(event) => setMainPurpose(event.target.value)}
-              >
-                {PURPOSE_OPTIONS.map((option) => (
-                  <option key={option}>{option}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <div className="ff-signup-agree-box">
-          <label>
-            <input
-              type="checkbox"
-              checked={agreeService}
-              onChange={(event) => setAgreeService(event.target.checked)}
-            />
-            <span>
-              서비스 이용약관에 동의합니다. <b>필수</b>
-            </span>
-          </label>
-
-          <label>
-            <input
-              type="checkbox"
-              checked={agreePrivacy}
-              onChange={(event) => setAgreePrivacy(event.target.checked)}
-            />
-            <span>
-              개인정보 수집 및 이용에 동의합니다. <b>필수</b>
-            </span>
-          </label>
-        </div>
+        )}
 
         <button
           type="button"
-          className="ff-signup-submit"
+          className={`ff-signup-submit ${
+            isSignupUnlocked ? "" : "ff-signup-submit--locked"
+          }`}
           onClick={handleSubmit}
-          disabled={isSubmitting}
+          disabled={form.isSubmitting}
+          aria-disabled={!isSignupUnlocked || form.isSubmitting}
         >
-          {isSubmitting ? "저장 중..." : "회원가입 완료"}
+          {form.isSubmitting ? "저장 중..." : "회원가입 완료"}
         </button>
 
         <button
@@ -842,27 +582,6 @@ export default function SignupModal({ onClose, onLoginClick }: SignupModalProps)
           이미 계정이 있으신가요? 로그인으로 돌아가기
         </button>
       </section>
-    </div>
-  )
-}
-
-function FieldLabel({
-  text,
-  required,
-  optional,
-}: {
-  text: string
-  required?: boolean
-  optional?: boolean
-}) {
-  return (
-    <div className="ff-signup-label-row">
-      <label>
-        {text}
-        {required && <b>*</b>}
-      </label>
-
-      {optional && <span>선택</span>}
     </div>
   )
 }

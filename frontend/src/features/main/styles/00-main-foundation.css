@@ -1,0 +1,82 @@
+/* 전역 변수, 기본 컨테이너, 공통 버튼/라벨 */
+
+:root {
+  --ff-navy: #061b34;
+  --ff-navy-2: #1f2d4a;
+  --ff-blue: #4d57b8;
+  --ff-green: #cce8b7;
+  --ff-gold: #c9973f;
+  --ff-bg: #ffffff;
+  --ff-soft: #f4f6fa;
+  --ff-soft-2: #f7f9fc;
+  --ff-line: #e2e8f0;
+  --ff-text: #061b34;
+  --ff-muted: #526071;
+  --ff-muted-2: #667085;
+
+  --ff-container: min(1360px, calc(100vw - 96px));
+  --ff-wide: min(1500px, calc(100vw - 96px));
+
+  --ff-shadow-soft: 0 24px 70px rgba(6, 27, 52, 0.08);
+  --ff-shadow-strong: 0 34px 100px rgba(6, 27, 52, 0.26);
+}
+
+.ff-main-page {
+  min-height: 100vh;
+  background: var(--ff-bg);
+  color: var(--ff-text);
+  font-family: "Noto Sans KR", "Pretendard", system-ui, sans-serif;
+  word-break: keep-all;
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+}
+
+.ff-main-page * {
+  box-sizing: border-box;
+}
+
+.ff-section-container {
+  width: var(--ff-container);
+  margin: 0 auto;
+}
+
+.ff-wide-container {
+  width: var(--ff-wide);
+  margin: 0 auto;
+}
+
+.ff-gold-line {
+  width: 140px;
+  height: 4px;
+  margin-bottom: 24px;
+  background: linear-gradient(
+    90deg,
+    var(--ff-blue),
+    var(--ff-gold),
+    rgba(201, 151, 63, 0)
+  );
+  border-radius: 999px;
+}
+
+.ff-section-label {
+  color: var(--ff-blue);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 4px;
+  line-height: 1;
+  margin-bottom: 22px;
+}
+
+.ff-pill-button {
+  height: 48px;
+  padding: 0 28px;
+  border-radius: 999px;
+  border: 1px solid #d8e0ea;
+  background: #ffffff;
+  color: var(--ff-navy);
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 14px 34px rgba(6, 27, 52, 0.05);
+}
+

@@ -16,6 +16,8 @@ class SafetyRuleLegal(BaseModel):
     inspection_type: str
     check_item: str
     cycle_months: int
+    pre_work_check_required: bool = False
+    pre_work_check_basis: str | None = None
     risk_level: RiskLevel
     inspection_purpose: InspectionPurpose | None = None
     legal_basis: str

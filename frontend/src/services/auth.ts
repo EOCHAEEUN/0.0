@@ -115,7 +115,7 @@ export async function getCurrentAuthSession() {
       method: "GET",
       headers: { Accept: "application/json" },
     },
-    { timeoutMs: 8000 },
+    { retryAuth: false, timeoutMs: 8000 },
   )
   return readApiResponse<AuthSession>(response)
 }

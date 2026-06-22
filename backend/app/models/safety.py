@@ -1,92 +1,50 @@
-from datetime import date
-from typing import Literal, Optional
 from pydantic import BaseModel
 
-# ==================== 공통 분류 타입 (Literal) ====================
-RiskLevel = Literal["low", "medium", "high", "critical"]
-# SafetyRule.risk_level — 점검 항목 자체의 중요도/위험도. 우선순위 점수(priority_score) 계산에 사용.
-
-InspectionStatus = Literal["normal", "warning", "danger"]
-# SafetyRiskFactor.status, SafetyDashboardItem.status — 점수 구간에 따른 "안전 등급" (화면 색상/라벨용)
-
-LegalRequirement = Literal["법정점검", "자율점검"]
-# SafetyRule.legal_requirement — 법적 의무 여부.
-# 법정점검: 정기점검 의무, 미이행 자체가 과태료/벌칙 대상
-# 자율점검: 평시 강제는 아니나, 사고 발생 시 안전조치 의무 위반 책임 가능
-
-InspectionPurpose = Literal["안전장치점검", "유지보수점검", "안전교육"]
-# SafetyRule.inspection_purpose — 점검의 목적/대상 분류 (화면 카테고리 태그용)
-
-InspectionCompletionStatus = Literal["pending", "overdue"]
-# SafetyInspection.status — 개별 점검 이력의 진행 상태.
-# "completed"는 DB에 저장하지 않음 (저장 직후엔 프론트 토스트로만 안내).
-# next_due_at 기준으로 pending/overdue만 재계산되어 저장됨.
-
-
-# ==================== DB 테이블 1: safety_rule ====================
-# 설비 카테고리별 "어떤 점검을 얼마나 자주 해야 하는가"에 대한 규칙 마스터 테이블.
-class SafetyRule(BaseModel):
-    rule_id: str
-    equipment_category: str               # press / cnc / injection (equipment.category와 매칭)
-    equipment_name_keywords: list[str] = []
-    inspection_type: str
-    check_item: str
-    cycle_months: int
-    risk_level: RiskLevel
-    legal_basis: Optional[str] = None     # 법조항 텍스트 ("산업안전보건법 시행규칙 제123조" 등)
-    legal_requirement: LegalRequirement   # 법정/자율 분류
-    inspection_purpose: InspectionPurpose # 점검 목적 분류
-    note: Optional[str] = None
-    source_name: Optional[str] = None
-    evidence_text: Optional[str] = None
-    source_url: Optional[str] = None
-
-
-# ==================== DB 테이블 2: safety_inspection ====================
-# (company_id, equipment_id, rule_id) 복합 유니크 — 한 rule당 inspection 최대 1개.
-class SafetyInspection(BaseModel):
-    inspection_id: str
-    company_id: str
-    equipment_id: str
-    rule_id: str
-    last_checked_at: Optional[date] = None
-    next_due_at: Optional[date] = None
-    status: Optional[InspectionCompletionStatus] = None
-    assignee: Optional[str] = None
-    evidence_file_url: Optional[str] = None
-    memo: Optional[str] = None
+from app.models.safety_common import (
+    InspectionCompletionStatus,
+    InspectionPurpose,
+    RiskLevel,
+    SafetyRuleType,
+)
+from app.models.safety_rule_legal import SafetyRuleLegal
+from app.models.safety_rule_voluntary import SafetyRuleVoluntary
+from app.models.safety_check_status import SafetyCheckStatus, SafetyCheckStatusSaveRequest
 
 
 # ==================== API 응답 조립용 모델 (DB 테이블 아님) ====================
-class SafetyRiskFactor(BaseModel):
-    """항목별 진단 도넛 그래프 1개에 해당하는 단위. 개수는 가변."""
-    key: str
-    label: str
-    score: int
-    status: InspectionStatus  # 화면 라벨: "안전 등급"
-    reason: str
-
+# v1 설계 원칙: 안전점수/도넛 그래프 같은 "합성 점수"는 만들지 않습니다.
+# 모든 수치는 사실 그대로의 개수(기한초과 N건, 기한임박 N건 등)로만 노출합니다.
+# (점수화를 시도했다가, 항목 수가 설비마다 달라 점수 왜곡이 생기고
+#  "법정점검 위반 1건"과 "자율점검 위반 3건"의 무게를 점수 하나로 합치는 게
+#  근거 없는 추정이라는 문제로 폐기함. tools/safety_calc.py 참고.)
 
 class SafetyDashboardItem(BaseModel):
+    """설비 1대에 대한 대시보드 카드 전체"""
     equipment_id: str
     equipment_name: str
     equipment_category: str
     age_years: int
-    safety_score: int
-    status: InspectionStatus
-    replacement_reasons: list[str]        # v1 미사용, capex 연동 보류 (프론트 렌더링 숨김)
-    risk_factors: list[SafetyRiskFactor]
-    rules: list[SafetyRule]
-    inspections: list[SafetyInspection]
+    total_rule_count: int                 # 헤더 "점검 항목 N개"
+    summary_counts: dict                  # 상단 5개 카드 (overdue_legal/overdue/due_soon/no_record/completed_count)
+    purpose_breakdown: list[dict]         # 분류별 점검 기록 현황 (막대그래프용)
+    priority_items: list[dict]            # 지금 처리해야 할 항목 (정렬+필터된 상위 노출용)
+    all_items: list[dict]                 # 전체 점검 항목 목록 (필터/정렬 없음)
+    legal_rules: list[SafetyRuleLegal]    # 이 설비에 적용되는 법정점검 규칙들
+    voluntary_rules: list[SafetyRuleVoluntary]  # 이 설비에 적용되는 자율점검 규칙들
+    inspection_records: list[SafetyCheckStatus]     # 이 설비의 점검 이력들 (safety_check_status)
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class SafetyDashboardSummary(BaseModel):
-    average_score: int
-    normal_count: int
-    warning_count: int
-    danger_count: int
-    total_rules: int
+    """대시보드 상단 요약 통계 (전체 설비 기준 집계, 회사 레벨)"""
+    total_equipment_count: int
+    overdue_legal_count: int
     overdue_count: int
+    due_soon_count: int
+    no_record_count: int
+    completed_count: int
 
 
 class SafetyDashboardResponse(BaseModel):
@@ -94,7 +52,28 @@ class SafetyDashboardResponse(BaseModel):
     company_id: str
     summary: SafetyDashboardSummary
     items: list[SafetyDashboardItem]
+    company_calendar_view: dict           # 전체 설비 통합 "달력 전체 보기"용. 각 항목에 equipment_name 포함됨
     unsupported_equipment_names: list[str] = []
     # 등록은 됐지만 안전점검 미지원 카테고리(press/cnc/injection 외)인 설비 이름 목록.
     # 화면의 "등록 설비 선택" 리스트에서 이 이름들은 "지원 안 됨" 표시와 함께 노출하고,
     # 클릭 시 capex와 동일한 톤의 UNSUPPORTED_CATEGORY_MESSAGE를 안내.
+
+
+class PreWorkChecklistItem(BaseModel):
+    """오늘의 작업 전 점검 체크리스트 항목 1개"""
+    rule_id: str
+    rule_type: str                        # "legal" 또는 "voluntary"
+    inspection_type: str                  # 체크 단위 제목 (예: "인터록·안전문 점검")
+    check_item: str                       # 세부 내용 설명
+    risk_level: str                       # 위험도
+    checked_today: bool                   # 오늘 체크 여부
+
+
+class PreWorkChecklistResponse(BaseModel):
+    """GET /safety/pre-work-checklist 응답 모델"""
+    equipment_id: str
+    equipment_name: str
+    date: str                             # 오늘 날짜 "YYYY-MM-DD"
+    items: list[PreWorkChecklistItem]
+    total_count: int                      # 전체 항목 수
+    checked_count: int                    # 오늘 체크 완료 수

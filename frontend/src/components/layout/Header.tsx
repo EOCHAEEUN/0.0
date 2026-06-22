@@ -10,7 +10,7 @@ export default function Header() {
         </h1>
 
         <nav className="flex items-center gap-8 text-sm font-semibold">
-          <Link to="/">대시보드</Link>
+          <Link to="/dashboard">대시보드</Link>
           <Link to="/roi">ROI 분석</Link>
           <Link to="/advisor">AI 어드바이저</Link>
           <Link to="/support-projects">지원사업</Link>

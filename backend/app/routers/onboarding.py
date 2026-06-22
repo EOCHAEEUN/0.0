@@ -1,7 +1,10 @@
-from fastapi import APIRouter, Depends
+import logging
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Path, status
 from fastapi.responses import JSONResponse
 
-from app.core.database import get_db
+from app.core.database import create_service_client, get_db
 from app.core.auth import get_current_user
 from app.models.auth import CurrentUser
 from app.models.company import CompanyOnboarding, CompanyUpdate
@@ -10,6 +13,7 @@ from app.models.user_profile import UserProfileCreate, UserProfileUpdate
 from app.tools.equipment_normalizer import normalize_equipment_category
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.post("/onboarding")
 async def register_company(
@@ -49,12 +53,12 @@ async def register_company(
         }
 
     except Exception as e:
+        logger.exception("Company onboarding save failed")
         return JSONResponse(
             status_code=500,
             content={
                 "success": False,
                 "message": "Failed to save onboarding company data.",
-                "error": str(e),
             },
         )
 
@@ -101,12 +105,12 @@ async def get_my_company(
         }
 
     except Exception as exc:
+        logger.exception("Onboarding data lookup failed")
         return JSONResponse(
             status_code=404,
             content={
                 "success": False,
                 "message": "Company not found.",
-                "error": str(exc),
             },
         )
 
@@ -119,16 +123,41 @@ async def update_user_profile(
 
     # 1. Auth 업데이트 (이메일, 비밀번호)
     auth_update = {}
-    if body.email: auth_update["email"] = body.email
-    if body.new_password: auth_update["password"] = body.new_password
+    if body.email and body.email != current_user.email:
+        auth_update["email"] = body.email
+    if body.new_password:
+        auth_update["password"] = body.new_password
 
     if auth_update:
+        if not body.current_password or not current_user.email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Current password is required for account changes.",
+            )
+
+        try:
+            create_service_client().auth.sign_in_with_password(
+                {
+                    "email": current_user.email,
+                    "password": body.current_password,
+                }
+            )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Current password is incorrect.",
+            ) from exc
+
         db.auth.admin.update_user_by_id(current_user.id, auth_update)
 
     # 2. user_profile 업데이트 (이름, 연락처)
     profile_update = {}
     if body.name: profile_update["name"] = body.name
     if body.phone: profile_update["phone"] = body.phone
+    if body.manager_name is not None:
+        profile_update["manager_name"] = body.manager_name
+    if body.manager_phone is not None:
+        profile_update["manager_phone"] = body.manager_phone
 
     if profile_update:
         result = (
@@ -147,7 +176,14 @@ async def update_user_profile(
     
 @router.patch("/onboarding/company/{company_id}")
 async def update_company(
-    company_id: str,
+    company_id: Annotated[
+        str,
+        Path(
+            min_length=36,
+            max_length=36,
+            pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+        ),
+    ],
     body: CompanyUpdate,
     current_user: CurrentUser = Depends(get_current_user),
 ):
@@ -194,19 +230,26 @@ async def update_company(
         }
 
     except Exception as e:
+        logger.exception("Company update failed")
         return JSONResponse(
             status_code=500,
             content={
                 "success": False,
                 "message": "Failed to update company.",
-                "error": str(e),
             },
         )
 
 
 @router.post("/onboarding/{company_id}/equipment")
 async def register_equipment(
-    company_id: str,
+    company_id: Annotated[
+        str,
+        Path(
+            min_length=36,
+            max_length=36,
+            pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+        ),
+    ],
     body: EquipmentInput,
     current_user: CurrentUser = Depends(get_current_user),
 ):
@@ -263,17 +306,24 @@ async def register_equipment(
         }
 
     except Exception as e:
+        logger.exception("Equipment creation failed")
         return JSONResponse(
             status_code=500,
             content={
                 "success": False,
                 "message": "Failed to save equipment.",
-                "error": str(e),
             },
         )
 @router.patch("/equipment/{equipment_id}")
 async def update_equipment(
-    equipment_id: str,
+    equipment_id: Annotated[
+        str,
+        Path(
+            min_length=36,
+            max_length=36,
+            pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+        ),
+    ],
     body: EquipmentInput,
     current_user: CurrentUser = Depends(get_current_user),
 ):
@@ -333,19 +383,26 @@ async def update_equipment(
         }
 
     except Exception as e:
+        logger.exception("Equipment update failed")
         return JSONResponse(
             status_code=500,
             content={
                 "success": False,
                 "message": "Failed to update equipment.",
-                "error": str(e),
             },
         )
 
 
 @router.delete("/equipment/{equipment_id}")
 async def delete_equipment(
-    equipment_id: str,
+    equipment_id: Annotated[
+        str,
+        Path(
+            min_length=36,
+            max_length=36,
+            pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+        ),
+    ],
     current_user: CurrentUser = Depends(get_current_user),
 ):
     db = get_db()
@@ -387,11 +444,11 @@ async def delete_equipment(
         }
 
     except Exception as e:
+        logger.exception("Equipment deletion failed")
         return JSONResponse(
             status_code=500,
             content={
                 "success": False,
                 "message": "Failed to delete equipment.",
-                "error": str(e),
             },
         )

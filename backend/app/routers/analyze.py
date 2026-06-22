@@ -156,6 +156,7 @@ async def analyze(
 
     raw_candidates = []
     matched_policies = []
+    policy_error = None
 
     try:
         raw_candidates = get_policy_raw_candidates(company_context)
@@ -186,6 +187,7 @@ async def analyze(
 
     except Exception as exc:
         print(f"정책 오케스트레이션 실패: {exc}")
+        policy_error = str(exc)
 
     try:
         db.table("roi_output").delete().eq("company_id", company_id).eq(
@@ -250,6 +252,9 @@ async def analyze(
         "success": True,
         "data": {
             "roi_result": roi_result,
+            "company": data,
+            "equipment": eq,
+            "policy_error": policy_error,
             "matched_policies": matched_policies,
             "policies": matched_policies,
             "raw_candidates": [

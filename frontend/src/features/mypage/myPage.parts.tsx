@@ -1,4 +1,5 @@
 import { useState, type HTMLAttributes, type ReactNode } from "react";
+import { apiFetch } from "../../services/apiClient";
 
 export type BasicInfo = {
   name: string;
@@ -85,7 +86,10 @@ export type MyPageStorageData = {
 
 export type UserProfilePayload = {
   name: string;
+  email?: string;
   phone: string;
+  current_password?: string;
+  new_password?: string;
 };
 
 export type CompanyOnboardingPayload = {
@@ -126,21 +130,13 @@ export const USER_ID_STORAGE_KEY = "factofit_user_id";
 export const COMPANY_ID_STORAGE_KEY = "factofit_company_id";
 export const EQUIPMENT_ID_STORAGE_KEY = "factofit_equipment_id";
 export const SELECTED_EQUIPMENT_ID_STORAGE_KEY = "factofit_selected_equipment_id";
-export const ACCESS_TOKEN_STORAGE_KEY = "factofit_access_token";
 export const AUTH_SESSION_STORAGE_KEY = "factofit_auth_session";
 export const ANALYSIS_RESULT_STORAGE_KEY = "factofit_analysis_result";
-
-export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 
 export const CURRENT_YEAR = new Date().getFullYear();
 export const PREVIOUS_YEAR = CURRENT_YEAR - 1;
 export const TWO_YEARS_AGO = CURRENT_YEAR - 2;
 export const THREE_YEARS_AGO = CURRENT_YEAR - 3;
-
-export function buildApiUrl(path: string) {
-  return `${API_BASE_URL}${path}`;
-}
 
 export const emptyBasicInfo: BasicInfo = {
   name: "",
@@ -448,20 +444,6 @@ export function getStoredAuthUserId() {
   return typeof userId === "string" && isUuid(userId) ? userId : null;
 }
 
-export function getAccessToken() {
-  if (typeof window === "undefined") return null;
-
-  const directToken = window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY);
-  if (directToken?.trim()) return directToken.trim();
-
-  const session = getStoredAuthSession();
-  if (!session || typeof session !== "object") return null;
-
-  const token = (session as Record<string, unknown>).access_token;
-
-  return typeof token === "string" && token.trim() ? token.trim() : null;
-}
-
 export function getApiErrorMessage(data: unknown, status: number) {
   if (data && typeof data === "object") {
     const record = data as Record<string, unknown>;
@@ -710,34 +692,22 @@ export async function requestJson(
   options: RequestInit,
   debugLabel: string,
 ) {
-  const accessToken = getAccessToken();
-
-  const response = await fetch(buildApiUrl(path), {
+  const response = await apiFetch(path, {
     ...options,
     headers: {
       "Content-Type": "application/json",
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...(options.headers ?? {}),
     },
-    credentials: "include",
   });
 
   const responseText = await response.text();
   const responseData = safeJsonParse(responseText);
 
   if (response.ok) {
-    console.log(`${debugLabel} 성공:`, responseData);
     return responseData;
   }
 
-  console.error(`${debugLabel} 오류:`, {
-    status: response.status,
-    response: responseData ?? responseText,
-  });
-  console.error(
-    `${debugLabel} 오류 상세:`,
-    JSON.stringify(responseData ?? responseText, null, 2),
-  );
+  console.error(`${debugLabel} 오류:`, { status: response.status });
 
   throw new Error(getApiErrorMessage(responseData, response.status));
 }
@@ -754,11 +724,20 @@ export async function submitUserPayload(payload: UserProfilePayload) {
 }
 
 export async function submitCompanyPayload(payload: CompanyOnboardingPayload) {
+  const {
+    revenue_2y_ago_manwon,
+    revenue_3y_ago_manwon,
+    total_assets_manwon,
+    is_disclosure_group_member,
+    established_year,
+    workplace_type,
+    ...onboardingPayload
+  } = payload;
   const responseData = await requestJson(
     "/api/onboarding",
     {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify(onboardingPayload),
     },
     "온보딩 company API",
   );
@@ -766,9 +745,32 @@ export async function submitCompanyPayload(payload: CompanyOnboardingPayload) {
   const companyId = findCompanyId(responseData);
 
   if (!companyId) {
-    console.error("company_id 추출 실패:", responseData);
     throw new Error(
       "company는 저장되었지만 응답에서 company_id를 찾지 못했습니다. 백엔드 응답에 company_id를 포함해주세요.",
+    );
+  }
+
+  const companyDetailPayload = {
+    revenue_2y_ago_manwon,
+    revenue_3y_ago_manwon,
+    total_assets_manwon,
+    is_disclosure_group_member,
+    established_year,
+    workplace_type,
+  };
+
+  const hasCompanyDetailFields = Object.values(companyDetailPayload).some(
+    (value) => value !== null && value !== undefined && value !== "",
+  );
+
+  if (hasCompanyDetailFields) {
+    await requestJson(
+      `/api/onboarding/company/${encodeURIComponent(companyId)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(companyDetailPayload),
+      },
+      "company detail update API",
     );
   }
 

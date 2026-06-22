@@ -2,46 +2,53 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.equipment import EquipmentInput
 
-class CompanyOnboarding(BaseModel): # 회원가입에서 받는 정보
-    company_name: str
-    business_registration_no: Optional[str] = None
-    industry_name: Optional[str] = None
-    industry_code: list[str]
-    region: str
-    company_type: Optional[str] = None
-    primary_purpose: list[str] = Field(default_factory=list)
-    employee_count: Optional[int] = Field(default=None, ge=0)
-    annual_revenue: int = Field(ge=0)
+class CompanyInputModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-class CompanyUpdate(BaseModel): #마이페이지에서 받는 정보
-    company_name: Optional[str] = None
-    business_registration_no: Optional[str] = None
-    industry_name: Optional[str] = None
-    industry_code: Optional[list[str]] = None
-    region: Optional[str] = None
-    company_type: Optional[str] = None
-    primary_purpose: Optional[list[str]] = None
-    employee_count: Optional[int] = Field(default=None, ge=0)
-    annual_revenue: Optional[int] = Field(default=None, ge=0)
-    revenue_2y_ago_manwon: Optional[int] = Field(default=None, ge=0)
-    revenue_3y_ago_manwon: Optional[int] = Field(default=None, ge=0)
-    total_assets_manwon: Optional[int] = Field(default=None, ge=0)
+
+class CompanyOnboarding(CompanyInputModel):
+    company_name: str = Field(min_length=1, max_length=120)
+    business_registration_no: Optional[str] = Field(default=None, max_length=20)
+    industry_name: Optional[str] = Field(default=None, max_length=120)
+    industry_code: list[str] = Field(min_length=1, max_length=20)
+    region: str = Field(min_length=1, max_length=100)
+    company_type: Optional[str] = Field(default=None, max_length=50)
+    primary_purpose: list[str] = Field(default_factory=list, max_length=20)
+    employee_count: Optional[int] = Field(default=None, ge=0, le=10_000_000)
+    annual_revenue: int = Field(ge=0, le=10**15)
+
+
+class CompanyUpdate(CompanyInputModel):
+    company_name: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    business_registration_no: Optional[str] = Field(default=None, max_length=20)
+    industry_name: Optional[str] = Field(default=None, max_length=120)
+    industry_code: Optional[list[str]] = Field(default=None, max_length=20)
+    region: Optional[str] = Field(default=None, max_length=100)
+    company_type: Optional[str] = Field(default=None, max_length=50)
+    primary_purpose: Optional[list[str]] = Field(default=None, max_length=20)
+    employee_count: Optional[int] = Field(default=None, ge=0, le=10_000_000)
+    annual_revenue: Optional[int] = Field(default=None, ge=0, le=10**15)
+    revenue_2y_ago_manwon: Optional[int] = Field(default=None, ge=0, le=10**15)
+    revenue_3y_ago_manwon: Optional[int] = Field(default=None, ge=0, le=10**15)
+    total_assets_manwon: Optional[int] = Field(default=None, ge=0, le=10**15)
     is_disclosure_group_member: Optional[bool] = None
-    independence_check_passed: Optional[bool] = None  # 독립성 기준 통과 여부
-    established_year: Optional[int] = Field(default=None, ge=1800)
-    workplace_type: Optional[str] = None
+    independence_check_passed: Optional[bool] = None
+    established_year: Optional[int] = Field(default=None, ge=1800, le=2200)
+    workplace_type: Optional[str] = Field(default=None, max_length=50)
 
 
 class CompanyContext(CompanyUpdate):
+    model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
+
     company_id: Optional[UUID | str] = None
     company_name: str = ""
     industry_code: list[str] = Field(default_factory=list)
     region: str = ""
     primary_purpose: list[str] = Field(default_factory=list)
+    energy_cost_annual: Optional[int] = Field(default=None, ge=0, le=10**12)
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

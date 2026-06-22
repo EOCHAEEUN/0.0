@@ -1,3 +1,5 @@
+import { apiFetch } from "./apiClient"
+
 export type BasisType = "law" | "official_guide" | "manual" | "self_check"
 export type SafetyStatus = "normal" | "warning" | "danger"
 
@@ -68,8 +70,6 @@ export type SafetyDashboard = {
   }
   items: SafetyDashboardItem[]
 }
-
-const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:8000"
 
 export const mockSafetyDashboard: SafetyDashboard = {
   company_id: "demo-company-001",
@@ -272,7 +272,7 @@ export const mockSafetyDashboard: SafetyDashboard = {
 
 export async function fetchSafetyDashboard(companyId = "demo-company-001"): Promise<SafetyDashboard> {
   try {
-    const response = await fetch(`${API_BASE}/api/safety/dashboard?company_id=${encodeURIComponent(companyId)}`)
+    const response = await apiFetch(`/safety/dashboard?company_id=${encodeURIComponent(companyId)}`)
     if (!response.ok) {
       throw new Error(`Safety API failed: ${response.status}`)
     }

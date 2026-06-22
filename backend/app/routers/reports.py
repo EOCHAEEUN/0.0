@@ -1,12 +1,15 @@
 from urllib.parse import quote
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
 
 from app.core.auth import get_current_user
+from app.core.config import settings
+from app.core.rate_limit import enforce_rate_limit
 from app.models.auth import CurrentUser
+from app.models.validated_types import PolicyIdText, UuidText
 from app.services.application_report import (
     build_application_report_pdf,
     load_application_report_data,
@@ -18,17 +21,24 @@ router = APIRouter()
 
 
 class ApplicationReportRequest(BaseModel):
-    company_id: str
-    equipment_id: str
-    policy_id: str | None = None
+    company_id: UuidText
+    equipment_id: UuidText
+    policy_id: PolicyIdText | None = None
     tone: Literal["submission", "analyst", "nominal"] = "submission"
 
 
 @router.post("/reports/application.pdf")
 async def generate_application_report(
     body: ApplicationReportRequest,
+    request: Request,
     current_user: CurrentUser = Depends(get_current_user),
 ):
+    enforce_rate_limit(
+        request,
+        scope="application-report",
+        limit=settings.expensive_api_requests_per_minute,
+        identifier=current_user.id,
+    )
     try:
         data = load_application_report_data(
             body.company_id,
@@ -39,7 +49,10 @@ async def generate_application_report(
         )
         pdf = build_application_report_pdf(data)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        ) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=500,

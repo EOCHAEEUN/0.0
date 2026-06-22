@@ -206,6 +206,13 @@ export function normalizePolicySelection(input: unknown): PolicySelection | null
   const scenarioKey = normalizeScenarioKey(scenarioText)
 
   return {
+    projectId:
+      typeof p.id === "number"
+        ? p.id
+        : typeof p.id === "string" && /^\d+$/.test(p.id)
+          ? Number(p.id)
+          : null,
+    rawId: p.rawId ?? p.raw_id ?? p.policy_id ?? null,
     title: p.title ?? p.policy_title ?? p.name ?? null,
     agency: p.agency ?? p.organization ?? p.provider ?? null,
     scenarioKey,
@@ -237,8 +244,12 @@ export function pickFirstMatchedPolicy(
 ): PolicySelection | null {
   const first = policies?.[0]
   if (!first) return null
+  const rawId =
+    first.policy_id ??
+    (first.id !== null && first.id !== undefined ? String(first.id) : null)
 
   return {
+    rawId,
     title: first.title ?? first.policy_title ?? null,
     agency: first.agency ?? first.organization ?? first.provider ?? null,
     scenarioKey: normalizeScenarioKey(

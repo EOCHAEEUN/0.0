@@ -989,7 +989,7 @@ export default function SafetyPage() {
         <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
           <button
             type="button"
-            onClick={() => navigate("/")}
+                  onClick={() => navigate("/dashboard")}
             style={{
               height: "44px",
               padding: "0 18px",
@@ -1026,7 +1026,7 @@ export default function SafetyPage() {
       <div style={{ maxWidth: "1280px", margin: "0 auto" }}>
         <button
           type="button"
-          onClick={() => navigate("/")}
+                  onClick={() => navigate("/dashboard")}
           style={{
             height: "44px",
             padding: "0 18px",

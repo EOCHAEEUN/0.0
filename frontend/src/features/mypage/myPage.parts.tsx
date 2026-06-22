@@ -724,11 +724,20 @@ export async function submitUserPayload(payload: UserProfilePayload) {
 }
 
 export async function submitCompanyPayload(payload: CompanyOnboardingPayload) {
+  const {
+    revenue_2y_ago_manwon,
+    revenue_3y_ago_manwon,
+    total_assets_manwon,
+    is_disclosure_group_member,
+    established_year,
+    workplace_type,
+    ...onboardingPayload
+  } = payload;
   const responseData = await requestJson(
     "/api/onboarding",
     {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify(onboardingPayload),
     },
     "온보딩 company API",
   );
@@ -738,6 +747,30 @@ export async function submitCompanyPayload(payload: CompanyOnboardingPayload) {
   if (!companyId) {
     throw new Error(
       "company는 저장되었지만 응답에서 company_id를 찾지 못했습니다. 백엔드 응답에 company_id를 포함해주세요.",
+    );
+  }
+
+  const companyDetailPayload = {
+    revenue_2y_ago_manwon,
+    revenue_3y_ago_manwon,
+    total_assets_manwon,
+    is_disclosure_group_member,
+    established_year,
+    workplace_type,
+  };
+
+  const hasCompanyDetailFields = Object.values(companyDetailPayload).some(
+    (value) => value !== null && value !== undefined && value !== "",
+  );
+
+  if (hasCompanyDetailFields) {
+    await requestJson(
+      `/api/onboarding/company/${encodeURIComponent(companyId)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(companyDetailPayload),
+      },
+      "company detail update API",
     );
   }
 

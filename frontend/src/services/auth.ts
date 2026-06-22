@@ -109,10 +109,14 @@ export async function createCompanyOnboarding(payload: unknown) {
 }
 
 export async function getCurrentAuthSession() {
-  const response = await apiFetch("/auth/session", {
-    method: "GET",
-    headers: { Accept: "application/json" },
-  })
+  const response = await apiFetch(
+    "/auth/session",
+    {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    },
+    { retryAuth: false, timeoutMs: 8000 },
+  )
   return readApiResponse<AuthSession>(response)
 }
 

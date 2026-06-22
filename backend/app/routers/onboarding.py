@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.database import create_service_client, get_db
 from app.core.auth import get_current_user
+from app.core.ownership import require_owned_company, require_owned_equipment_by_id
 from app.models.auth import CurrentUser
 from app.models.company import CompanyOnboarding, CompanyUpdate
 from app.models.equipment import EquipmentInput
@@ -204,11 +205,11 @@ async def update_company(
         )
 
     try:
+        company = require_owned_company(company_id, current_user)
         result = (
             db.table("company")
             .update(update_payload)
-            .eq("company_id", company_id)
-            .eq("user_id", current_user.id)
+            .eq("company_id", company["company_id"])
             .execute()
         )
 
@@ -229,6 +230,8 @@ async def update_company(
             },
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Company update failed")
         return JSONResponse(
@@ -254,27 +257,10 @@ async def register_equipment(
     current_user: CurrentUser = Depends(get_current_user),
 ):
     db = get_db()
-
-    # 소유권 검증
-    company_result = (
-        db.table("company")
-        .select("company_id")
-        .eq("company_id", company_id)
-        .eq("user_id", current_user.id)
-        .single()
-        .execute()
-    )
-    if not company_result.data:
-        return JSONResponse(
-            status_code=404,
-            content={
-                "success": False,
-                "message": "Company not found or not owned by user.",
-            },
-        )
+    company = require_owned_company(company_id, current_user)
     
     equipment_payload = {
-        "company_id": company_id,
+        "company_id": company["company_id"],
         **body.model_dump(exclude_none=True)
     }
     equipment_payload["category"] = normalize_equipment_category(
@@ -339,38 +325,13 @@ async def update_equipment(
         body.process,
     )
     try:
-        # 소유권 검증
-        equipment_result = (
-            db.table("equipment")
-            .select("company_id")
-            .eq("equipment_id", equipment_id)
-            .single()
-            .execute()
-        )
-
-        company_id = equipment_result.data.get("company_id")
-        company_result = (
-            db.table("company")
-            .select("company_id")
-            .eq("company_id", company_id)
-            .eq("user_id", current_user.id)
-            .single()
-            .execute()
-        )
-
-        if not company_result.data:
-            return JSONResponse(
-                status_code=404,
-                content={
-                    "success": False,
-                    "message": "Equipment not found or not owned by user.",
-                },
-            )
+        company, _ = require_owned_equipment_by_id(equipment_id, current_user)
 
         result = (
             db.table("equipment")
             .update(update_payload)
             .eq("equipment_id", equipment_id)
+            .eq("company_id", company["company_id"])
             .execute()
         )
 
@@ -382,6 +343,8 @@ async def update_equipment(
             },
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Equipment update failed")
         return JSONResponse(
@@ -408,41 +371,19 @@ async def delete_equipment(
     db = get_db()
 
     try:
-        # 소유권 검증
-        equipment_result = (
-            db.table("equipment")
-            .select("company_id")
-            .eq("equipment_id", equipment_id)
-            .single()
-            .execute()
-        )
+        company, _ = require_owned_equipment_by_id(equipment_id, current_user)
 
-        company_id = equipment_result.data.get("company_id")
-        company_result = (
-            db.table("company")
-            .select("company_id")
-            .eq("company_id", company_id)
-            .eq("user_id", current_user.id)
-            .single()
-            .execute()
-        )
-
-        if not company_result.data:
-            return JSONResponse(
-                status_code=404,
-                content={
-                    "success": False,
-                    "message": "Equipment not found or not owned by user.",
-                },
-            )
-
-        db.table("equipment").delete().eq("equipment_id", equipment_id).execute()
+        db.table("equipment").delete().eq("equipment_id", equipment_id).eq(
+            "company_id", company["company_id"]
+        ).execute()
 
         return {
             "success": True,
             "message": "equipment deleted",
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Equipment deletion failed")
         return JSONResponse(

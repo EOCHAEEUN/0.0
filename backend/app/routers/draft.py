@@ -8,6 +8,7 @@ from app.agents.draft import application_draft_node
 from app.core.auth import get_current_user
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.ownership import require_owned_context
 from app.core.rate_limit import enforce_rate_limit
 from app.models.auth import CurrentUser
 from app.models.company import CompanyContext
@@ -74,18 +75,11 @@ async def generate_draft(
         identifier=current_user.id,
     )
     db = get_db()
-
-    company_result = (
-        db.table("company")
-        .select("*")
-        .eq("company_id", body.company_id)
-        .eq("user_id", current_user.id)
-        .execute()
+    company_data, equipment_data = require_owned_context(
+        company_id=body.company_id,
+        equipment_id=body.equipment_id,
+        current_user=current_user,
     )
-    if not company_result.data:
-        raise HTTPException(status_code=404, detail="기업 정보를 찾을 수 없습니다.")
-
-    company_data = company_result.data[0]
     company = CompanyContext(
         company_id=company_data.get("company_id"),
         company_name=company_data.get("company_name", ""),
@@ -103,17 +97,6 @@ async def generate_draft(
         workplace_type=company_data.get("workplace_type"),
     )
 
-    equipment_result = (
-        db.table("equipment")
-        .select("*")
-        .eq("company_id", body.company_id)
-        .eq("equipment_id", body.equipment_id)
-        .execute()
-    )
-    if not equipment_result.data:
-        raise HTTPException(status_code=404, detail="설비 정보를 찾을 수 없습니다.")
-
-    equipment_data = equipment_result.data[0]
     equipment = EquipmentInput(
         name=equipment_data.get("name", ""),
         category=equipment_data.get("category", ""),

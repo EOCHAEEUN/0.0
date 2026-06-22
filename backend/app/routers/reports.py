@@ -1,7 +1,11 @@
 from urllib.parse import quote
+<<<<<<< HEAD
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+=======
+from fastapi import APIRouter, Depends, HTTPException
+>>>>>>> c403473 (feat: 파일 백시키면서 예전파일이던 보고서생성 최신화)
 from fastapi.responses import Response
 from pydantic import BaseModel
 
@@ -28,6 +32,7 @@ class ApplicationReportRequest(BaseModel):
     tone: Literal["submission", "analyst", "nominal"] = "submission"
 
 
+
 @router.post("/reports/application.pdf")
 async def generate_application_report(
     body: ApplicationReportRequest,
@@ -51,7 +56,7 @@ async def generate_application_report(
             body.equipment_id,
             body.policy_id,
             user_id=current_user.id,
-            tone=body.tone,
+            tone="submission",
         )
         pdf = build_application_report_pdf(data)
     except ValueError as exc:

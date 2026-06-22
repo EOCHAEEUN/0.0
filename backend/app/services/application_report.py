@@ -46,9 +46,16 @@ def _first(rows: list[dict] | None) -> dict:
 def _as_list(value: Any) -> list[str]:
     if value is None:
         return []
-    if isinstance(value, list):
-        return [str(item) for item in value if str(item).strip()]
-    return [item.strip() for item in str(value).split(",") if item.strip()]
+    items = value if isinstance(value, list) else str(value).split(",")
+    result: list[str] = []
+    seen: set[str] = set()
+    for item in items:
+        text = str(item).strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        result.append(text)
+    return result
 
 
 def _number(value: Any, default: float = 0) -> float:
@@ -384,7 +391,8 @@ def load_application_report_data(
     )
     policy_title = policy.get("title") or matched_policy.get("title") or "지원사업명 미확인"
     industry_codes = _as_list(company.get("industry_code"))
-    industry_display = company.get("industry_name") or ", ".join(industry_codes) or "-"
+    industry_names = _as_list(company.get("industry_name"))
+    industry_display = ", ".join(industry_names or industry_codes) or "-"
     age_years = _number(equipment.get("age_years"))
     average_cycle = _number(benchmark.get("avg_replacement_cycle_yr"))
     defect_rate = _number(equipment.get("defect_rate"))

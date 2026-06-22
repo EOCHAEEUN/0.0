@@ -1,5 +1,5 @@
-from urllib.parse import quote
 from typing import Literal
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
@@ -43,7 +43,7 @@ async def generate_application_report(
     except Exception as exc:
         raise HTTPException(
             status_code=500,
-            detail="신청서 PDF를 생성하지 못했습니다.",
+            detail="Failed to generate application PDF.",
         ) from exc
 
     file_name = report_file_name(data)

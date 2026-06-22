@@ -21,16 +21,21 @@ DEMO_POLICY_ID = "mss-2026-007"
 def main() -> None:
     output_dir = BACKEND_DIR / "generated_reports"
     output_dir.mkdir(parents=True, exist_ok=True)
-    for tone in ("analyst", "nominal", "submission"):
+    try:
         data = load_application_report_data(
             DEMO_COMPANY_ID,
             DEMO_EQUIPMENT_ID,
             DEMO_POLICY_ID,
-            tone=tone,
+            tone="submission",
         )
-        output_path = output_dir / report_file_name(data)
-        output_path.write_bytes(build_application_report_pdf(data))
-        print(output_path)
+    except ValueError as exc:
+        print(f"Demo report data is not available: {exc}")
+        print("Update DEMO_COMPANY_ID, DEMO_EQUIPMENT_ID, and DEMO_POLICY_ID with existing DB records.")
+        return
+
+    output_path = output_dir / report_file_name(data)
+    output_path.write_bytes(build_application_report_pdf(data))
+    print(output_path)
 
 
 if __name__ == "__main__":

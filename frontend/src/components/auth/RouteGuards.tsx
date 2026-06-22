@@ -5,11 +5,37 @@ import { getCurrentAuthSession } from "../../services/auth"
 
 type SessionStatus = "loading" | "authenticated" | "guest"
 
-function useSessionStatus() {
-  const [status, setStatus] = useState<SessionStatus>("loading")
+const SESSION_CHECK_TIMEOUT_MS = 8500
+
+function hasStoredAuthSession() {
+  try {
+    const raw = window.localStorage.getItem("factofit_auth_session")
+    if (!raw) return false
+
+    const session = JSON.parse(raw)
+    return Boolean(session?.user?.id || session?.user?.email)
+  } catch {
+    return false
+  }
+}
+
+function useSessionStatus(allowStoredSessionFallback = false) {
+  const [status, setStatus] = useState<SessionStatus>(() =>
+    allowStoredSessionFallback && hasStoredAuthSession()
+      ? "authenticated"
+      : "loading",
+  )
 
   useEffect(() => {
     let active = true
+    const timeoutId = window.setTimeout(() => {
+      if (!active) return
+      setStatus(
+        allowStoredSessionFallback && hasStoredAuthSession()
+          ? "authenticated"
+          : "guest",
+      )
+    }, SESSION_CHECK_TIMEOUT_MS)
 
     getCurrentAuthSession()
       .then(() => {
@@ -18,11 +44,15 @@ function useSessionStatus() {
       .catch(() => {
         if (active) setStatus("guest")
       })
+      .finally(() => {
+        window.clearTimeout(timeoutId)
+      })
 
     return () => {
       active = false
+      window.clearTimeout(timeoutId)
     }
-  }, [])
+  }, [allowStoredSessionFallback])
 
   return status
 }
@@ -45,7 +75,7 @@ function SessionLoading() {
 }
 
 export function ProtectedRoute() {
-  const status = useSessionStatus()
+  const status = useSessionStatus(true)
   const location = useLocation()
 
   if (status === "loading") return <SessionLoading />

@@ -8,6 +8,11 @@ type RefreshResult = "refreshed" | "unauthorized" | "unavailable"
 
 let refreshPromise: Promise<RefreshResult> | null = null
 
+type ApiFetchOptions = {
+  retryAuth?: boolean
+  timeoutMs?: number
+}
+
 export function buildApiUrl(path: string) {
   const targetPath = path.startsWith("/") ? path : `/${path}`
 
@@ -41,13 +46,37 @@ export function clearFactofitUserStorage() {
   keys.forEach((key) => window.localStorage.removeItem(key))
 }
 
-async function refreshSession() {
-  if (!refreshPromise) {
-    refreshPromise = fetch(buildApiUrl("/auth/refresh"), {
-      method: "POST",
-      credentials: "include",
-      headers: { Accept: "application/json" },
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs?: number,
+) {
+  if (!timeoutMs) return fetch(input, init)
+
+  const controller = new AbortController()
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
     })
+  } finally {
+    window.clearTimeout(timeoutId)
+  }
+}
+
+async function refreshSession(timeoutMs?: number) {
+  if (!refreshPromise) {
+    refreshPromise = fetchWithTimeout(
+      buildApiUrl("/auth/refresh"),
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+      },
+      timeoutMs,
+    )
       .then((response) => {
         if (response.ok) return "refreshed" as const
         if (response.status === 401 || response.status === 403) {
@@ -67,30 +96,38 @@ async function refreshSession() {
 export async function apiFetch(
   path: string,
   init: RequestInit = {},
-  options: { retryAuth?: boolean } = {},
+  options: ApiFetchOptions = {},
 ) {
-  const response = await fetch(buildApiUrl(path), {
-    ...init,
-    credentials: "include",
-    headers: {
-      ...init.headers,
+  const response = await fetchWithTimeout(
+    buildApiUrl(path),
+    {
+      ...init,
+      credentials: "include",
+      headers: {
+        ...init.headers,
+      },
     },
-  })
+    options.timeoutMs,
+  )
 
   const retryAuth = options.retryAuth ?? true
   if (response.status !== 401 || !retryAuth) {
     return response
   }
 
-  const refreshResult = await refreshSession()
+  const refreshResult = await refreshSession(options.timeoutMs)
   if (refreshResult === "refreshed") {
-    return fetch(buildApiUrl(path), {
-      ...init,
-      credentials: "include",
-      headers: {
-        ...init.headers,
+    return fetchWithTimeout(
+      buildApiUrl(path),
+      {
+        ...init,
+        credentials: "include",
+        headers: {
+          ...init.headers,
+        },
       },
-    })
+      options.timeoutMs,
+    )
   }
 
   if (refreshResult === "unauthorized") {

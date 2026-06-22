@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom"
 
+import { clearLegacyAuthStorage } from "../../services/apiClient"
 import { getCurrentAuthSession } from "../../services/auth"
 
 type SessionStatus = "loading" | "authenticated" | "guest"
@@ -16,6 +17,7 @@ function useSessionStatus() {
         if (active) setStatus("authenticated")
       })
       .catch(() => {
+        clearLegacyAuthStorage()
         if (active) setStatus("guest")
       })
 
@@ -69,13 +71,19 @@ export function GuestRoute() {
 
 export function SessionExpiryRedirect() {
   const navigate = useNavigate()
+  const location = useLocation()
 
   useEffect(() => {
-    const handleExpired = () => navigate("/login", { replace: true })
+    const handleExpired = () => {
+      if (location.pathname !== "/login") {
+        navigate("/login", { replace: true })
+      }
+    }
+
     window.addEventListener("factofit:session-expired", handleExpired)
     return () =>
       window.removeEventListener("factofit:session-expired", handleExpired)
-  }, [navigate])
+  }, [location.pathname, navigate])
 
   return null
 }

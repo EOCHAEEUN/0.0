@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AppHeader from "../../components/AppHeader";
 import { apiFetch } from "../../services/apiClient";
 import type {
@@ -291,6 +291,7 @@ export default function MyPage() {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const saveInFlightRef = useRef(false);
 
   const [passwordTooltipOpen, setPasswordTooltipOpen] = useState(false);
   const [industryTooltipOpen, setIndustryTooltipOpen] = useState(false);
@@ -908,7 +909,8 @@ export default function MyPage() {
   ]);
 
   const handleSave = async () => {
-    if (saving) return;
+    if (saving || saveInFlightRef.current) return;
+    saveInFlightRef.current = true;
 
     const activeIndustries = companyInfo.industries.filter((item) => {
       return item.industry.trim() || item.industryCode.trim();
@@ -1095,6 +1097,8 @@ export default function MyPage() {
         const equipmentResponse = await submitEquipmentPayload(
           companyId,
           item.payload,
+          nextEquipmentList.find((equipment) => equipment.id === item.localId)
+            ?.equipmentId,
         );
 
         equipmentResponses.push(equipmentResponse);
@@ -1170,6 +1174,7 @@ export default function MyPage() {
     } catch (error) {
       window.alert(getErrorMessage(error));
     } finally {
+      saveInFlightRef.current = false;
       setSaving(false);
     }
   };

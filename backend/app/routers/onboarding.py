@@ -259,17 +259,56 @@ async def register_equipment(
     db = get_db()
     company = require_owned_company(company_id, current_user)
     
-    equipment_payload = {
-        "company_id": company["company_id"],
-        **body.model_dump(exclude_none=True)
-    }
-    equipment_payload["category"] = normalize_equipment_category(
+    normalized_category = normalize_equipment_category(
         body.category,
         body.name,
         body.process,
     )
+    equipment_payload = {
+        "company_id": company["company_id"],
+        **body.model_dump(exclude_none=True)
+    }
+    equipment_payload["category"] = normalized_category
 
     try:
+        existing_result = (
+            db.table("equipment")
+            .select("equipment_id")
+            .eq("company_id", company["company_id"])
+            .eq("name", body.name)
+            .eq("category", normalized_category)
+            .limit(1)
+            .execute()
+        )
+
+        if existing_result.data:
+            equipment_id = existing_result.data[0].get("equipment_id")
+            result = (
+                db.table("equipment")
+                .update(equipment_payload)
+                .eq("equipment_id", equipment_id)
+                .execute()
+            )
+
+            if not result.data:
+                return JSONResponse(
+                    status_code=500,
+                    content={
+                        "success": False,
+                        "message": "equipment update returned no data.",
+                    },
+                )
+
+            equipment = result.data[0]
+
+            return {
+                "success": True,
+                "data": {
+                    "equipment_id": equipment.get("equipment_id"),
+                    "equipment": equipment,
+                },
+            }
+
         result = db.table("equipment").insert(equipment_payload).execute()
 
         if not result.data:

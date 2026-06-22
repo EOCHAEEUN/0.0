@@ -783,7 +783,19 @@ export async function submitCompanyPayload(payload: CompanyOnboardingPayload) {
 export async function submitEquipmentPayload(
   companyId: string,
   payload: EquipmentPayload,
+  equipmentId?: string,
 ) {
+  if (equipmentId) {
+    return requestJson(
+      `/api/equipment/${encodeURIComponent(equipmentId)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      },
+      "?⑤낫??equipment API",
+    );
+  }
+
   return requestJson(
     `/api/onboarding/${encodeURIComponent(companyId)}/equipment`,
     {

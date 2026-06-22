@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
+import { logoutCurrentSession } from "../services/auth"
 
 type NavItem = {
   label: string
@@ -21,7 +22,7 @@ type InquiryItem = {
 const navItems: NavItem[] = [
   {
     label: "대시보드",
-    path: "/",
+    path: "/dashboard",
   },
   {
     label: "ROI 분석",
@@ -46,6 +47,9 @@ const navItems: NavItem[] = [
 ]
 
 const INQUIRY_STORAGE_KEY = "factofit_customer_inquiries"
+const MAX_INQUIRY_TITLE_LENGTH = 100
+const MAX_INQUIRY_MESSAGE_LENGTH = 2000
+const MAX_INQUIRY_HISTORY = 50
 
 function createInquiryId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -98,6 +102,11 @@ export default function AppHeader() {
   const selectedInquiry =
     inquiries.find((item) => item.id === selectedInquiryId) ?? inquiries[0]
 
+  const handleLogout = async () => {
+    await logoutCurrentSession()
+    navigate("/login", { replace: true })
+  }
+
   const handleSubmitInquiry = () => {
     if (!title.trim() || !message.trim()) {
       window.alert("문의 제목과 내용을 입력해주세요.")
@@ -115,7 +124,7 @@ export default function AppHeader() {
         "문의가 접수되었습니다. 실제 상담 답변은 고객문의 API 연결 후 관리자 답변으로 저장될 예정입니다.",
     }
 
-    const nextItems = [newInquiry, ...inquiries]
+    const nextItems = [newInquiry, ...inquiries].slice(0, MAX_INQUIRY_HISTORY)
 
     setInquiries(nextItems)
     saveInquiryHistory(nextItems)
@@ -144,7 +153,7 @@ export default function AppHeader() {
       >
         <button
           type="button"
-          onClick={() => navigate("/login")}
+          onClick={handleLogout}
           style={{
             position: "absolute",
             left: "28px",
@@ -163,7 +172,7 @@ export default function AppHeader() {
             whiteSpace: "nowrap",
           }}
         >
-          ← 메인으로
+          로그아웃
         </button>
 
         <div
@@ -184,7 +193,7 @@ export default function AppHeader() {
         >
           <button
             type="button"
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/dashboard")}
             aria-label="FactoFit 대시보드로 이동"
             style={{
               width: "54px",
@@ -501,6 +510,7 @@ export default function AppHeader() {
                       <input
                         value={title}
                         onChange={(event) => setTitle(event.target.value)}
+                        maxLength={MAX_INQUIRY_TITLE_LENGTH}
                         placeholder="예: ROI 분석 결과가 저장되지 않습니다"
                         style={{
                           height: "48px",
@@ -534,6 +544,7 @@ export default function AppHeader() {
                       <textarea
                         value={message}
                         onChange={(event) => setMessage(event.target.value)}
+                        maxLength={MAX_INQUIRY_MESSAGE_LENGTH}
                         placeholder="상담받고 싶은 내용을 입력해주세요."
                         style={{
                           minHeight: "128px",

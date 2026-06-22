@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import AppHeader from "../../components/AppHeader";
+import { apiFetch } from "../../services/apiClient";
 import type {
   BasicInfo,
   PasswordInfo,
@@ -39,7 +40,6 @@ import {
   submitCompanyPayload,
   submitEquipmentPayload,
   fetchSavedOnboarding,
-  buildApiUrl,
   loadStoredMyPageData,
   parseIndustryCodes,
   formatIndustryCodes,
@@ -49,7 +49,6 @@ import {
   findEquipmentId,
   getErrorMessage,
   safeJsonParse,
-  getAccessToken,
   getApiErrorMessage,
   toPositiveNumber,
   toNumberOrNull,
@@ -392,8 +391,6 @@ export default function MyPage() {
     let cancelled = false;
 
     const loadSavedOnboarding = async () => {
-      if (!getAccessToken()) return;
-
       try {
         const response = await fetchSavedOnboarding();
         if (cancelled) return;
@@ -968,20 +965,14 @@ export default function MyPage() {
       return;
     }
 
-    const accessToken = getAccessToken();
-
-    if (!accessToken) {
-      window.alert(
-        "로그인 인증 토큰을 찾지 못했습니다. 다시 로그인한 뒤 저장해주세요.",
-      );
-      return;
-    }
-
     const userId = getCurrentUserId();
 
     const userPayload: UserProfilePayload = {
       name: basicInfo.name.trim(),
+      email: basicInfo.email.trim(),
       phone: normalizePhoneNumber(basicInfo.phone),
+      current_password: passwordInfo.currentPassword.trim(),
+      new_password: passwordInfo.newPassword.trim() || undefined,
     };
 
     const companyPayload: CompanyOnboardingPayload = {
@@ -1056,32 +1047,17 @@ export default function MyPage() {
     try {
       setSaving(true);
 
-      console.log("온보딩 user 요청 payload:", userPayload);
       await submitUserPayload(userPayload);
 
-      console.log("온보딩 company 요청 payload:", companyPayload);
-      const { responseData: companyResponseData, companyId } =
-        await submitCompanyPayload(companyPayload);
+      const { companyId } = await submitCompanyPayload(companyPayload);
 
       let nextEquipmentList = [...equipmentList];
-      const equipmentResponses = [];
 
       for (const item of equipmentPayloads) {
-        console.log("온보딩 equipment 요청 payload:", {
-          companyId,
-          equipmentPayload: item.payload,
-        });
-        console.log(
-          "온보딩 equipment 최종 payload JSON:",
-          JSON.stringify(item.payload, null, 2),
-        );
-
         const equipmentResponse = await submitEquipmentPayload(
           companyId,
           item.payload,
         );
-
-        equipmentResponses.push(equipmentResponse);
 
         const equipmentId = findEquipmentId(equipmentResponse);
 
@@ -1125,8 +1101,6 @@ export default function MyPage() {
         savedAt: new Date().toISOString(),
       };
 
-      const savedOnboarding = await fetchSavedOnboarding();
-
       setEquipmentList(nextEquipmentList);
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(storageData));
 
@@ -1135,15 +1109,6 @@ export default function MyPage() {
       }
 
       window.localStorage.setItem(COMPANY_ID_STORAGE_KEY, companyId);
-
-      console.log(
-        "저장된 user_id:",
-        userId ?? "auth session에서 user_id 미확인",
-      );
-      console.log("저장된 company_id:", companyId);
-      console.log("company 저장 응답:", companyResponseData);
-      console.log("equipment 저장 응답:", equipmentResponses);
-      console.log("온보딩 조회 응답:", savedOnboarding);
 
       setSaved(true);
       setProfileCompleted(savedProfileCompleted);
@@ -1213,14 +1178,8 @@ export default function MyPage() {
         companyId,
       )}${equipmentQuery}`;
 
-      const accessToken = getAccessToken();
-
-      const response = await fetch(buildApiUrl(query), {
+      const response = await apiFetch(query, {
         method: "POST",
-        headers: {
-          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-        },
-        credentials: "include",
       });
 
       const responseText = await response.text();

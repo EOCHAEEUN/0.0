@@ -4,7 +4,6 @@ export const ANALYSIS_RESULT_STORAGE_KEY = "factofit_analysis_result"
 export const APPLICATION_DRAFT_STORAGE_KEY = "factofit_application_draft"
 export const COMPANY_ID_STORAGE_KEY = "factofit_company_id"
 export const EQUIPMENT_ID_STORAGE_KEY = "factofit_equipment_id"
-export const AUTH_TOKEN_STORAGE_KEY = "factofit_access_token"
 
 export const POLICY_SELECTION_STORAGE_KEYS = [
   "factofit_application_policy",

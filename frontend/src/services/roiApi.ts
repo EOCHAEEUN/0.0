@@ -1,5 +1,4 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000/api"
+import { apiFetch } from "./apiClient"
 
 type NullableNumber = number | null
 
@@ -69,24 +68,6 @@ const toOptionalNumber = (value: unknown): NullableNumber => {
 
   const numberValue = Number(value)
   return Number.isNaN(numberValue) ? null : numberValue
-}
-
-const getAccessToken = () => {
-  return (
-    localStorage.getItem("access_token") ??
-    localStorage.getItem("factofit_access_token") ??
-    localStorage.getItem("token") ??
-    ""
-  )
-}
-
-const getAuthHeaders = () => {
-  const token = getAccessToken()
-
-  return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  }
 }
 
 export async function simulateRoi(input: RoiSimulateInput) {
@@ -167,18 +148,16 @@ export async function simulateRoi(input: RoiSimulateInput) {
         ),
       }
 
-  console.log("ROI API 최종 payload:", payload)
-
-  const response = await fetch(`${API_BASE_URL}/roi/simulate`, {
+  const response = await apiFetch("/roi/simulate", {
     method: "POST",
-    headers: getAuthHeaders(),
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   })
 
   const json = await response.json().catch(() => null)
 
   if (!response.ok) {
-    console.error("ROI API 오류 응답:", json)
+    console.error("ROI API 요청 실패:", response.status)
 
     const message =
       json?.message ??
@@ -190,8 +169,6 @@ export async function simulateRoi(input: RoiSimulateInput) {
       typeof message === "string" ? message : JSON.stringify(message),
     )
   }
-
-  console.log("ROI API 응답:", json)
 
   return json?.data ?? json
 }

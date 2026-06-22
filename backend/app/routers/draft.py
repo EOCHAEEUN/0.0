@@ -1,15 +1,18 @@
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from app.agents.draft import application_draft_node
 from app.core.auth import get_current_user
+from app.core.config import settings
 from app.core.database import get_db
+from app.core.rate_limit import enforce_rate_limit
 from app.models.auth import CurrentUser
 from app.models.company import CompanyContext
 from app.models.equipment import EquipmentInput
+from app.models.validated_types import PolicyIdText, UuidText
 from app.state import FactofitState
 
 
@@ -17,9 +20,9 @@ router = APIRouter()
 
 
 class DraftRequest(BaseModel):
-    company_id: str
-    equipment_id: str
-    policy_id: str
+    company_id: UuidText
+    equipment_id: UuidText
+    policy_id: PolicyIdText
 
 
 def _normalize_industry_code(value: Any) -> list[str]:
@@ -61,8 +64,15 @@ def _resolve_draft_scenario(policy: dict, roi_data: dict) -> tuple[str, dict]:
 @router.post("/draft")
 async def generate_draft(
     body: DraftRequest,
+    request: Request,
     current_user: CurrentUser = Depends(get_current_user),
 ):
+    enforce_rate_limit(
+        request,
+        scope="draft",
+        limit=settings.expensive_api_requests_per_minute,
+        identifier=current_user.id,
+    )
     db = get_db()
 
     company_result = (

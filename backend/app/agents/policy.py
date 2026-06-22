@@ -8,6 +8,7 @@ from app.core.llm import llm
 from app.tools.query_builder import _get_impact_keywords
 from datetime import date
 from app.core.database import get_db
+from app.core.llm_security import UNTRUSTED_DATA_INSTRUCTION
 
 
 UNKNOWN_DEADLINE_VALUES = {"", "none", "null", "nan", "마감일 미정", "상시"}
@@ -406,7 +407,7 @@ def evaluate_and_rerank_with_llm(
     b_impact = ", ".join(_get_impact_keywords(scenario_b))
     roi_scenarios = f"A안(전체교체/대규모) 타겟: {a_impact} / B안(부분개선/소규모) 타겟: {b_impact}"
 
-    prompt = POLICY_HYBRID_PROMPT.format(
+    prompt = UNTRUSTED_DATA_INSTRUCTION + "\n\n" + POLICY_HYBRID_PROMPT.format(
         industry_code=", ".join(company_context.get("industry_code", [])) or "정보 없음",
         region=company_context.get("region") or "정보 없음",
         company_type=company_context.get("company_type") or "정보 없음",

@@ -1,9 +1,6 @@
 import { useMemo, useState } from "react"
-import {
-  downloadApplicationReport,
-  requestApplicationDraft,
-} from "../applicationDraft.api"
 import { APPLICATION_DRAFT_STORAGE_KEY, fallbackDraft } from "../applicationDraft.constants"
+import { POLICY_REQUIRED_DOCUMENTS } from "../../documents/documentStorage"
 import type {
   ApplicationDraftSavePayload,
   DraftStatus,
@@ -128,15 +125,11 @@ export function useApplicationDraft(locationState: unknown) {
       : null,
     "ROI 분석 결과, 기업 기본정보, 설비현황 입력률을 초안 생성 기준으로 반영했습니다.",
   ])
-  const requiredDocuments = uniqueList([
-    ...(draft.required_documents ?? []),
-    "사업자등록증",
-    "최근 재무제표",
-    "설비 견적서",
-    "현 설비 사진",
-    "에너지 사용 내역",
-    "지원사업 공고문",
-  ])
+  const requiredDocuments = uniqueList(
+    draft.required_documents?.length
+      ? draft.required_documents
+      : POLICY_REQUIRED_DOCUMENTS,
+  )
   const checklistItems = buildChecklistItems(
     analysisData,
     draft,
@@ -173,63 +166,20 @@ export function useApplicationDraft(locationState: unknown) {
     saved_at: new Date().toISOString(),
   }
 
-  const handleSaveDraft = async () => {
-    try {
-      const policyId = policySelection?.rawId || null
-      const backendDraft = await requestApplicationDraft(analysisData, policyId)
-      const backendDraftResult = backendDraft?.data?.draft_result
-      const savedPayload = {
-        ...savePayload,
-        ...(backendDraftResult && typeof backendDraftResult === "object"
-          ? backendDraftResult
-          : {}),
-        policy_id: backendDraft?.data?.policy_id || policyId,
-        draft_result_id: backendDraft?.data?.draft_result_id || null,
-        saved_at: new Date().toISOString(),
-      }
+  const handleSaveDraft = () => {
+    window.localStorage.setItem(
+      APPLICATION_DRAFT_STORAGE_KEY,
+      JSON.stringify({ ...savePayload, saved_at: new Date().toISOString() }),
+    )
 
-      window.localStorage.setItem(
-        APPLICATION_DRAFT_STORAGE_KEY,
-        JSON.stringify(savedPayload),
-      )
-
-      const currentAnalysisRaw = window.localStorage.getItem("factofit_analysis_result")
-      if (currentAnalysisRaw) {
-        const currentAnalysis = JSON.parse(currentAnalysisRaw)
-        const currentData =
-          currentAnalysis?.data && typeof currentAnalysis.data === "object"
-            ? currentAnalysis.data
-            : currentAnalysis
-        const nextAnalysis = {
-          ...currentAnalysis,
-          data: {
-            ...currentData,
-            draft_result: backendDraftResult || savedPayload,
-          },
-        }
-        window.localStorage.setItem(
-          "factofit_analysis_result",
-          JSON.stringify(nextAnalysis),
-        )
-      }
-
-      setDraftStatus("saved")
-    } catch (error) {
-      window.alert(error instanceof Error ? error.message : "신청서 초안 저장에 실패했습니다.")
-    }
+    setDraftStatus("saved")
   }
 
-  const handlePrepareDownload = async () => {
-    try {
-      await downloadApplicationReport(analysisData, policySelection?.rawId || null)
-      setDraftStatus("downloadReady")
-    } catch (error) {
-      window.alert(error instanceof Error ? error.message : "PDF 다운로드에 실패했습니다.")
-    }
+  const handlePrepareDownload = () => {
+    setDraftStatus("downloadReady")
   }
 
   return {
-    policySelection,
     analysisData,
     draftStatus,
     isChecklistOpen,

@@ -1,12 +1,8 @@
-import logging
-from typing import Annotated
-
-from fastapi import APIRouter, Depends, HTTPException, Path, status
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
-from app.core.database import create_service_client, get_db
+from app.core.database import get_db
 from app.core.auth import get_current_user
-from app.core.ownership import require_owned_company, require_owned_equipment_by_id
 from app.models.auth import CurrentUser
 from app.models.company import CompanyOnboarding, CompanyUpdate
 from app.models.equipment import EquipmentInput
@@ -14,7 +10,6 @@ from app.models.user_profile import UserProfileCreate, UserProfileUpdate
 from app.tools.equipment_normalizer import normalize_equipment_category
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 @router.post("/onboarding")
 async def register_company(
@@ -54,12 +49,12 @@ async def register_company(
         }
 
     except Exception as e:
-        logger.exception("Company onboarding save failed")
         return JSONResponse(
             status_code=500,
             content={
                 "success": False,
                 "message": "Failed to save onboarding company data.",
+                "error": str(e),
             },
         )
 
@@ -106,12 +101,12 @@ async def get_my_company(
         }
 
     except Exception as exc:
-        logger.exception("Onboarding data lookup failed")
         return JSONResponse(
             status_code=404,
             content={
                 "success": False,
                 "message": "Company not found.",
+                "error": str(exc),
             },
         )
 
@@ -124,41 +119,16 @@ async def update_user_profile(
 
     # 1. Auth 업데이트 (이메일, 비밀번호)
     auth_update = {}
-    if body.email and body.email != current_user.email:
-        auth_update["email"] = body.email
-    if body.new_password:
-        auth_update["password"] = body.new_password
+    if body.email: auth_update["email"] = body.email
+    if body.new_password: auth_update["password"] = body.new_password
 
     if auth_update:
-        if not body.current_password or not current_user.email:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Current password is required for account changes.",
-            )
-
-        try:
-            create_service_client().auth.sign_in_with_password(
-                {
-                    "email": current_user.email,
-                    "password": body.current_password,
-                }
-            )
-        except Exception as exc:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Current password is incorrect.",
-            ) from exc
-
         db.auth.admin.update_user_by_id(current_user.id, auth_update)
 
     # 2. user_profile 업데이트 (이름, 연락처)
     profile_update = {}
     if body.name: profile_update["name"] = body.name
     if body.phone: profile_update["phone"] = body.phone
-    if body.manager_name is not None:
-        profile_update["manager_name"] = body.manager_name
-    if body.manager_phone is not None:
-        profile_update["manager_phone"] = body.manager_phone
 
     if profile_update:
         result = (
@@ -177,14 +147,7 @@ async def update_user_profile(
     
 @router.patch("/onboarding/company/{company_id}")
 async def update_company(
-    company_id: Annotated[
-        str,
-        Path(
-            min_length=36,
-            max_length=36,
-            pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
-        ),
-    ],
+    company_id: str,
     body: CompanyUpdate,
     current_user: CurrentUser = Depends(get_current_user),
 ):
@@ -205,11 +168,11 @@ async def update_company(
         )
 
     try:
-        company = require_owned_company(company_id, current_user)
         result = (
             db.table("company")
             .update(update_payload)
-            .eq("company_id", company["company_id"])
+            .eq("company_id", company_id)
+            .eq("user_id", current_user.id)
             .execute()
         )
 
@@ -230,85 +193,54 @@ async def update_company(
             },
         }
 
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.exception("Company update failed")
         return JSONResponse(
             status_code=500,
             content={
                 "success": False,
                 "message": "Failed to update company.",
+                "error": str(e),
             },
         )
 
 
 @router.post("/onboarding/{company_id}/equipment")
 async def register_equipment(
-    company_id: Annotated[
-        str,
-        Path(
-            min_length=36,
-            max_length=36,
-            pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
-        ),
-    ],
+    company_id: str,
     body: EquipmentInput,
     current_user: CurrentUser = Depends(get_current_user),
 ):
     db = get_db()
-    company = require_owned_company(company_id, current_user)
+
+    # 소유권 검증
+    company_result = (
+        db.table("company")
+        .select("company_id")
+        .eq("company_id", company_id)
+        .eq("user_id", current_user.id)
+        .single()
+        .execute()
+    )
+    if not company_result.data:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "success": False,
+                "message": "Company not found or not owned by user.",
+            },
+        )
     
-    normalized_category = normalize_equipment_category(
+    equipment_payload = {
+        "company_id": company_id,
+        **body.model_dump(exclude_none=True)
+    }
+    equipment_payload["category"] = normalize_equipment_category(
         body.category,
         body.name,
         body.process,
     )
-    equipment_payload = {
-        "company_id": company["company_id"],
-        **body.model_dump(exclude_none=True)
-    }
-    equipment_payload["category"] = normalized_category
 
     try:
-        existing_result = (
-            db.table("equipment")
-            .select("equipment_id")
-            .eq("company_id", company["company_id"])
-            .eq("name", body.name)
-            .eq("category", normalized_category)
-            .limit(1)
-            .execute()
-        )
-
-        if existing_result.data:
-            equipment_id = existing_result.data[0].get("equipment_id")
-            result = (
-                db.table("equipment")
-                .update(equipment_payload)
-                .eq("equipment_id", equipment_id)
-                .execute()
-            )
-
-            if not result.data:
-                return JSONResponse(
-                    status_code=500,
-                    content={
-                        "success": False,
-                        "message": "equipment update returned no data.",
-                    },
-                )
-
-            equipment = result.data[0]
-
-            return {
-                "success": True,
-                "data": {
-                    "equipment_id": equipment.get("equipment_id"),
-                    "equipment": equipment,
-                },
-            }
-
         result = db.table("equipment").insert(equipment_payload).execute()
 
         if not result.data:
@@ -331,24 +263,17 @@ async def register_equipment(
         }
 
     except Exception as e:
-        logger.exception("Equipment creation failed")
         return JSONResponse(
             status_code=500,
             content={
                 "success": False,
                 "message": "Failed to save equipment.",
+                "error": str(e),
             },
         )
 @router.patch("/equipment/{equipment_id}")
 async def update_equipment(
-    equipment_id: Annotated[
-        str,
-        Path(
-            min_length=36,
-            max_length=36,
-            pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
-        ),
-    ],
+    equipment_id: str,
     body: EquipmentInput,
     current_user: CurrentUser = Depends(get_current_user),
 ):
@@ -364,13 +289,38 @@ async def update_equipment(
         body.process,
     )
     try:
-        company, _ = require_owned_equipment_by_id(equipment_id, current_user)
+        # 소유권 검증
+        equipment_result = (
+            db.table("equipment")
+            .select("company_id")
+            .eq("equipment_id", equipment_id)
+            .single()
+            .execute()
+        )
+
+        company_id = equipment_result.data.get("company_id")
+        company_result = (
+            db.table("company")
+            .select("company_id")
+            .eq("company_id", company_id)
+            .eq("user_id", current_user.id)
+            .single()
+            .execute()
+        )
+
+        if not company_result.data:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "success": False,
+                    "message": "Equipment not found or not owned by user.",
+                },
+            )
 
         result = (
             db.table("equipment")
             .update(update_payload)
             .eq("equipment_id", equipment_id)
-            .eq("company_id", company["company_id"])
             .execute()
         )
 
@@ -382,53 +332,66 @@ async def update_equipment(
             },
         }
 
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.exception("Equipment update failed")
         return JSONResponse(
             status_code=500,
             content={
                 "success": False,
                 "message": "Failed to update equipment.",
+                "error": str(e),
             },
         )
 
 
 @router.delete("/equipment/{equipment_id}")
 async def delete_equipment(
-    equipment_id: Annotated[
-        str,
-        Path(
-            min_length=36,
-            max_length=36,
-            pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
-        ),
-    ],
+    equipment_id: str,
     current_user: CurrentUser = Depends(get_current_user),
 ):
     db = get_db()
 
     try:
-        company, _ = require_owned_equipment_by_id(equipment_id, current_user)
+        # 소유권 검증
+        equipment_result = (
+            db.table("equipment")
+            .select("company_id")
+            .eq("equipment_id", equipment_id)
+            .single()
+            .execute()
+        )
 
-        db.table("equipment").delete().eq("equipment_id", equipment_id).eq(
-            "company_id", company["company_id"]
-        ).execute()
+        company_id = equipment_result.data.get("company_id")
+        company_result = (
+            db.table("company")
+            .select("company_id")
+            .eq("company_id", company_id)
+            .eq("user_id", current_user.id)
+            .single()
+            .execute()
+        )
+
+        if not company_result.data:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "success": False,
+                    "message": "Equipment not found or not owned by user.",
+                },
+            )
+
+        db.table("equipment").delete().eq("equipment_id", equipment_id).execute()
 
         return {
             "success": True,
             "message": "equipment deleted",
         }
 
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.exception("Equipment deletion failed")
         return JSONResponse(
             status_code=500,
             content={
                 "success": False,
                 "message": "Failed to delete equipment.",
+                "error": str(e),
             },
         )

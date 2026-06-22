@@ -4,6 +4,7 @@ export const ANALYSIS_RESULT_STORAGE_KEY = "factofit_analysis_result"
 export const APPLICATION_DRAFT_STORAGE_KEY = "factofit_application_draft"
 export const COMPANY_ID_STORAGE_KEY = "factofit_company_id"
 export const EQUIPMENT_ID_STORAGE_KEY = "factofit_equipment_id"
+export const AUTH_TOKEN_STORAGE_KEY = "factofit_access_token"
 
 export const POLICY_SELECTION_STORAGE_KEYS = [
   "factofit_application_policy",
@@ -31,5 +32,14 @@ export const fallbackDraft: DraftResult = {
     "현재 설비의 노후화로 인해 에너지 비용, 유지보수 부담, 품질 손실 문제가 발생하고 있어 설비 개선이 필요합니다.",
   expected_effects:
     "고효율 설비 도입을 통해 에너지 사용량을 줄이고 생산 안정성을 높이며, 불량률과 유지보수 비용을 낮출 수 있습니다.",
-  required_documents: ["사업자등록증", "설비 견적서", "현 설비 사진"],
+  required_documents: [
+    "사업신청서",
+    "사업계획서",
+    "사업자등록증",
+    "중소기업확인서",
+    "공장등록증",
+    "재무제표",
+    "국세 납세증명서",
+    "지방세 납세증명서",
+  ],
 }

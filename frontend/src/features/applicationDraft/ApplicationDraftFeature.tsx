@@ -2,6 +2,7 @@ import { useLocation, useNavigate } from "react-router-dom"
 import { ApplicationDraftChecklistDialog } from "./components/ApplicationDraftChecklistDialog"
 import { ApplicationDraftHero } from "./components/ApplicationDraftHero"
 import { ApplicationDraftPdfPreview } from "./components/ApplicationDraftPdfPreview"
+import { PreSubmitDocumentsCheck } from "./components/PreSubmitDocumentsCheck"
 import { ApplicationDraftWorkspace } from "./components/ApplicationDraftWorkspace"
 import { useApplicationDraft } from "./hooks/useApplicationDraft"
 
@@ -9,12 +10,6 @@ export function ApplicationDraftFeature() {
   const navigate = useNavigate()
   const location = useLocation()
   const draft = useApplicationDraft(location.state)
-  const goSupportProjects = () =>
-    navigate("/support-projects", {
-      state: {
-        selectedProjectId: draft.policySelection?.projectId ?? null,
-      },
-    })
 
   return (
     <main className="page ff-draft-page">
@@ -22,7 +17,7 @@ export function ApplicationDraftFeature() {
         <div className="container">
           <button
             type="button"
-            onClick={goSupportProjects}
+            onClick={() => navigate("/support-projects")}
             className="ff-draft-back-button"
           >
             ← 지원사업 목록으로 돌아가기
@@ -58,13 +53,15 @@ export function ApplicationDraftFeature() {
             onOpenChecklist={draft.openChecklist}
           />
 
+          <PreSubmitDocumentsCheck requiredDocuments={draft.requiredDocuments} />
+
           <ApplicationDraftPdfPreview
             scenarioLabel={draft.scenarioLabel}
             expectedBenefits={draft.expectedBenefits}
             draftStatus={draft.draftStatus}
             onSaveDraft={draft.handleSaveDraft}
             onPrepareDownload={draft.handlePrepareDownload}
-            onGoSupportProjects={goSupportProjects}
+            onGoSupportProjects={() => navigate("/support-projects")}
           />
 
           <ApplicationDraftChecklistDialog

@@ -5,7 +5,10 @@ import type {
   PolicyState,
   SupportProject,
 } from "../supportProjects.contract"
+import { fetchPolicyCards, getStoredCompanyId } from "../supportProjects.api"
 import {
+  DEMO_POLICY_COUNTERS,
+  buildDemoSupportProjects,
   buildPolicyCounters,
   getAnalysisFingerprint,
   getEquipmentContext,
@@ -163,6 +166,19 @@ export function useSupportProjects() {
     if (hasStartedFetchRef.current) return
     hasStartedFetchRef.current = true
 
+    const companyId =
+      analysisData.company?.company_id ||
+      analysisData.equipment?.company_id ||
+      getStoredCompanyId()
+
+    function applyDemoFallback() {
+      const demoCards = normalizeProjectIds(rankProjects(buildDemoSupportProjects()))
+      setPolicyCards(demoCards)
+      setPolicyCounters(DEMO_POLICY_COUNTERS)
+      setSelectedProjectId(demoCards[0]?.id ?? null)
+      setPolicyState("success")
+    }
+
     const localPolicyResult = buildLocalPolicyResult(analysisData)
 
     if (localPolicyResult && localPolicyResult.cards.length > 0) {
@@ -173,10 +189,58 @@ export function useSupportProjects() {
       return
     }
 
-    setPolicyCards([])
-    setPolicyCounters(buildPolicyCounters([]))
-    setSelectedProjectId(null)
-    setPolicyState("empty")
+    if (!companyId) {
+      applyDemoFallback()
+      return
+    }
+
+    let ignore = false
+
+    async function loadPolicies() {
+      try {
+        setPolicyState("loading")
+
+        const result = await fetchPolicyCards(companyId, analysisFingerprint)
+
+        if (ignore) return
+
+        if (result.cards.length === 0) {
+          applyDemoFallback()
+          return
+        }
+
+        const normalizedCards = normalizeProjectIds(result.cards)
+        const aiRecommendedCount = Math.min(normalizedCards.length, FINAL_RECOMMENDED_LIMIT)
+        setPolicyCards(normalizedCards)
+        setPolicyCounters(
+          buildPolicyCounters(normalizedCards, {
+            ...result.counters,
+            industryMatchedCount:
+              result.counters.industryMatchedCount || normalizedCards.length,
+            aiRecommendedCount,
+            priorityCount: aiRecommendedCount > 0 ? 1 : 0,
+            otherMatchedCount: Math.max(
+              normalizedCards.length - FINAL_RECOMMENDED_LIMIT,
+              0,
+            ),
+          }),
+        )
+        setSelectedProjectId(normalizedCards[0]?.id ?? null)
+        setPolicyState("success")
+      } catch (error) {
+        console.error("정책 추천 API 호출 실패:", error)
+
+        if (!ignore) {
+          applyDemoFallback()
+        }
+      }
+    }
+
+    void loadPolicies()
+
+    return () => {
+      ignore = true
+    }
   }, [analysisData, analysisFingerprint])
 
   const rankedPolicyCards = useMemo(() => rankProjects(policyCards), [policyCards])

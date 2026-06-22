@@ -114,8 +114,6 @@ export type AnalysisData = {
 }
 
 export type PolicySelection = {
-  projectId?: number | null
-  rawId?: string | null
   title?: string | null
   agency?: string | null
   scenarioKey?: ScenarioKey | null

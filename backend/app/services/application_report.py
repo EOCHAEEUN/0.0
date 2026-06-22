@@ -66,37 +66,6 @@ def _percent(value: Any) -> str:
     return f"{_number(value):,.1f}%"
 
 
-def _submission_sentence(text: Any, fallback: str) -> str:
-    sentence = re.sub(r"\s+", " ", str(text or "").strip())
-    if not sentence:
-        sentence = fallback
-
-    replacements = (
-        ("할 수 있습니다", "가능합니다"),
-        ("수 있습니다", "가능합니다"),
-        ("기대됩니다", "기대 효과가 있습니다"),
-        ("추정됩니다", "추정 근거가 있습니다"),
-        ("판단됩니다", "판단 근거가 있습니다"),
-        ("예상됩니다", "예상 근거가 있습니다"),
-        ("부합함", "부합합니다"),
-        ("적합함", "적합합니다"),
-        ("일치함", "일치합니다"),
-        ("가능함", "가능합니다"),
-        ("확인됨", "확인됩니다"),
-        ("필요함", "필요합니다"),
-        ("양호함", "양호합니다"),
-    )
-    for source, target in replacements:
-        sentence = re.sub(rf"{re.escape(source)}(?=[.!?。]|$)", target, sentence)
-
-    sentence = sentence.rstrip(".!?。").strip()
-    if sentence.endswith(("합니다", "습니다", "입니다")):
-        return f"{sentence}."
-    if sentence.endswith(("함", "됨", "음")):
-        return f"{sentence[:-1]}입니다."
-    return f"{sentence}입니다."
-
-
 def _validate_submission_narratives(narratives: dict[str, str]) -> None:
     banned_patterns = (
         "겠습니다",
@@ -361,7 +330,7 @@ def load_application_report_data(
         .data
     )
     if not roi_output:
-        roi_output = {}
+        raise ValueError("ROI 분석 결과를 찾을 수 없습니다.")
 
     matched_query = (
         db.table("matched_policy")
@@ -375,10 +344,7 @@ def load_application_report_data(
         matched_query.order("match_score", desc=True).limit(1).execute().data
     )
     if not matched_policy:
-        if policy_id:
-            matched_policy = {}
-        else:
-            raise ValueError("추천 정책 정보를 찾을 수 없습니다.")
+        raise ValueError("추천 정책 정보를 찾을 수 없습니다.")
 
     policy_id = str(matched_policy.get("policy_id") or policy_id or "")
     policy = _first(
@@ -401,7 +367,6 @@ def load_application_report_data(
     scenario = roi_data.get(scenario_key) or {}
     breakdown = scenario.get("breakdown") or {}
     benchmark = roi_data.get("benchmark") or {}
-    draft = draft or {}
     draft_sections = _draft_sections(draft.get("draft_content"))
 
     investment = _number(scenario.get("investment_manwon"))
@@ -661,10 +626,6 @@ def load_application_report_data(
         matched_policy.get("reason")
         or "정책 대상 업종, 기업 유형, 지역 조건과 기업 정보를 대조한 결과"
     )
-    submission_eligibility_basis = _submission_sentence(
-        eligibility_basis,
-        "정책 대상 업종, 기업 유형, 지역 조건과 기업 정보를 대조한 결과입니다.",
-    )
     application_background = ""
     scenario_rationale = ""
     policy_utilization_strategy = ""
@@ -759,7 +720,7 @@ def load_application_report_data(
             "도입 전후의 성과를 동일한 기준으로 비교하도록 기준값을 관리합니다."
         )
         policy_analysis = (
-            f"정책 추천 적합도는 {match_score:.1f}점입니다. {submission_eligibility_basis} "
+            f"정책 추천 적합도는 {match_score:.1f}점입니다. {eligibility_basis} "
             "해당 매칭 결과를 기준으로 본 지원사업과의 연계 조건을 충족합니다. "
             "아래 원문 발췌는 신청자격이 아니라 "
             "AI 스마트공장 구축 지원 범위와 지원 한도를 설명하는 근거입니다. 추천 점수는 "

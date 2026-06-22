@@ -29,7 +29,7 @@ export function useLoginForm() {
 
   const handleContinue = () => {
     setModalType(null)
-    navigate("/dashboard")
+    navigate("/")
   }
 
   const handleBackToMain = () => {

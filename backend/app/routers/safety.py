@@ -11,7 +11,6 @@ routers/onboarding.py와 동일한 컨벤션을 따릅니다.
 """
 
 from __future__ import annotations
-import logging
 from datetime import date
 
 from fastapi import APIRouter, Depends
@@ -23,7 +22,6 @@ from app.models.auth import CurrentUser
 from app.services.equipment_safety import get_safety_dashboard
 
 router = APIRouter()
-logger = logging.getLogger(__name__)
 
 
 @router.get("/safety/dashboard")
@@ -73,11 +71,11 @@ async def read_safety_dashboard(
         }
 
     except Exception as e:
-        logger.exception("Safety dashboard lookup failed")
         return JSONResponse(
             status_code=500,
             content={
                 "success": False,
                 "message": "Failed to load safety dashboard.",
+                "error": str(e),
             },
         )

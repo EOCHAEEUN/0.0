@@ -1,7 +1,7 @@
 import { NavLink } from "react-router-dom"
 
 const menuItems = [
-  { label: "홈 대시보드", path: "/dashboard" },
+  { label: "홈 대시보드", path: "/" },
   { label: "ROI 분석", path: "/roi" },
   { label: "신청서 초안", path: "/application-draft" },
   { label: "지원사업", path: "/support-projects" },

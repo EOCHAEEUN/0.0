@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import AppHeader from "../../components/AppHeader";
-import { apiFetch } from "../../services/apiClient";
+import { MYPAGE_DOCUMENT_STORAGE_KEY } from "../documents/documentStorage";
+import { MyPageDocumentUploadPanel } from "./MyPageDocumentUploadPanel";
 import type {
   BasicInfo,
   PasswordInfo,
@@ -40,6 +41,7 @@ import {
   submitCompanyPayload,
   submitEquipmentPayload,
   fetchSavedOnboarding,
+  buildApiUrl,
   loadStoredMyPageData,
   parseIndustryCodes,
   formatIndustryCodes,
@@ -49,6 +51,7 @@ import {
   findEquipmentId,
   getErrorMessage,
   safeJsonParse,
+  getAccessToken,
   getApiErrorMessage,
   toPositiveNumber,
   toNumberOrNull,
@@ -291,7 +294,6 @@ export default function MyPage() {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
-  const saveInFlightRef = useRef(false);
 
   const [passwordTooltipOpen, setPasswordTooltipOpen] = useState(false);
   const [industryTooltipOpen, setIndustryTooltipOpen] = useState(false);
@@ -311,6 +313,7 @@ export default function MyPage() {
     basic: false,
     company: false,
     equipment: false,
+    documents: true,
   });
   const [analysisBlockNoticeOpen, setAnalysisBlockNoticeOpen] = useState(false);
 
@@ -392,6 +395,8 @@ export default function MyPage() {
     let cancelled = false;
 
     const loadSavedOnboarding = async () => {
+      if (!getAccessToken()) return;
+
       try {
         const response = await fetchSavedOnboarding();
         if (cancelled) return;
@@ -402,11 +407,6 @@ export default function MyPage() {
         const equipments = Array.isArray(data.equipments) ? data.equipments : [];
         const companyId = findCompanyId(response);
 
-        let snapBasic = { ...basicInfo };
-        let snapCompany = { ...companyInfo };
-        let snapEquipmentList = [...equipmentList];
-        let snapSelectedEquipmentId = selectedAnalysisEquipmentId;
-
         if (userProfile) {
           const profileName = getStringValue(userProfile.name);
           const profileEmail = getStringValue(userProfile.email);
@@ -414,19 +414,18 @@ export default function MyPage() {
           const managerName = getStringValue(userProfile.manager_name);
           const managerPhone = getStringValue(userProfile.manager_phone);
 
-          snapBasic = {
-            ...snapBasic,
-            name: profileName || snapBasic.name,
-            email: profileEmail || snapBasic.email,
-            phone: profilePhone ? formatPhoneNumber(profilePhone) : snapBasic.phone,
-            manager: managerName || profileName || snapBasic.manager,
+          setBasicInfo((prev) => ({
+            ...prev,
+            name: profileName || prev.name,
+            email: profileEmail || prev.email,
+            phone: profilePhone ? formatPhoneNumber(profilePhone) : prev.phone,
+            manager: managerName || profileName || prev.manager,
             managerPhone: managerPhone
               ? formatPhoneNumber(managerPhone)
               : profilePhone
                 ? formatPhoneNumber(profilePhone)
-                : snapBasic.managerPhone,
-          };
-          setBasicInfo(snapBasic);
+                : prev.managerPhone,
+          }));
         }
 
         if (company) {
@@ -442,75 +441,74 @@ export default function MyPage() {
           const purposeValues = getStringArrayValue(company.primary_purpose);
           const companyType = getStringValue(company.company_type);
 
-          snapCompany = {
-            ...snapCompany,
-            companyName: getStringValue(company.company_name) || snapCompany.companyName,
+          setCompanyInfo((prev) => ({
+            ...prev,
+            companyName: getStringValue(company.company_name) || prev.companyName,
             businessNumber: formatBusinessNumber(
               getStringValue(company.business_registration_no) ||
-                snapCompany.businessNumber,
+                prev.businessNumber,
             ),
             assetTotalManwon: formatCommaNumber(
-              pickNumberText(company.total_assets_manwon, snapCompany.assetTotalManwon),
+              pickNumberText(company.total_assets_manwon, prev.assetTotalManwon),
             ),
-            industry: remoteIndustries[0]?.industry ?? snapCompany.industry,
-            industryCode: remoteIndustries[0]?.industryCode ?? snapCompany.industryCode,
+            industry: remoteIndustries[0]?.industry ?? prev.industry,
+            industryCode: remoteIndustries[0]?.industryCode ?? prev.industryCode,
             industries: remoteIndustries,
-            region: getStringValue(company.region) || snapCompany.region,
+            region: getStringValue(company.region) || prev.region,
             employees: formatCommaNumber(
-              pickNumberText(company.employee_count, snapCompany.employees),
+              pickNumberText(company.employee_count, prev.employees),
             ),
             annualRevenue: formatCommaNumber(
               pickNumberText(
                 company.annual_revenue_manwon,
                 company.annual_revenue,
-                snapCompany.annualRevenue,
+                prev.annualRevenue,
               ),
             ),
             revenue2YearsAgo: formatCommaNumber(
               pickNumberText(
                 company.revenue_2y_ago_manwon,
-                snapCompany.revenue2YearsAgo,
+                prev.revenue2YearsAgo,
               ),
             ),
             revenue3YearsAgo: formatCommaNumber(
               pickNumberText(
                 company.revenue_3y_ago_manwon,
-                snapCompany.revenue3YearsAgo,
+                prev.revenue3YearsAgo,
               ),
             ),
-            companyType: companyType || snapCompany.companyType || "선택 필요",
+            companyType: companyType || prev.companyType || "선택 필요",
             affiliateStatus:
               affiliateValue === null
-                ? snapCompany.affiliateStatus
+                ? prev.affiliateStatus
                 : affiliateValue
                   ? "대기업 계열사 소속"
                   : "무소속",
-            purpose: purposeValues[0] || snapCompany.purpose,
+            purpose: purposeValues[0] || prev.purpose,
             foundedYear:
-              getStringValue(company.established_year) || snapCompany.foundedYear,
+              getStringValue(company.established_year) || prev.foundedYear,
             businessSiteType:
               getStringValue(company.workplace_type) ||
-              snapCompany.businessSiteType ||
+              prev.businessSiteType ||
               "선택 필요",
-          };
-          setCompanyInfo(snapCompany);
+          }));
         }
 
         if (equipments.length > 0) {
-          snapEquipmentList = equipments.map(mapRemoteEquipment);
-          snapSelectedEquipmentId = snapEquipmentList[0]?.id ?? 1;
+          const remoteEquipmentList = equipments.map(mapRemoteEquipment);
+          const firstRemoteEquipment = remoteEquipmentList[0];
 
-          setEquipmentList(snapEquipmentList);
-          setSelectedAnalysisEquipmentId(snapSelectedEquipmentId);
+          setEquipmentList(remoteEquipmentList);
+          setSelectedAnalysisEquipmentId(firstRemoteEquipment?.id ?? 1);
 
-          if (snapEquipmentList[0]?.equipmentId) {
+          if (firstRemoteEquipment?.equipmentId) {
             window.localStorage.setItem(
               EQUIPMENT_ID_STORAGE_KEY,
-              snapEquipmentList[0].equipmentId,
+              firstRemoteEquipment.equipmentId,
             );
             window.localStorage.setItem(
               SELECTED_EQUIPMENT_ID_STORAGE_KEY,
-              snapEquipmentList[0].equipmentId,
+              firstRemoteEquipment.equipmentId,
             );
           }
         }
@@ -519,19 +517,7 @@ export default function MyPage() {
           window.localStorage.setItem(COMPANY_ID_STORAGE_KEY, companyId);
         }
 
-        const isCompleted = Boolean(userProfile && company && equipments.length > 0);
-        setProfileCompleted(isCompleted);
-
-        const storageData: MyPageStorageData = {
-          basicInfo: snapBasic,
-          companyInfo: snapCompany,
-          equipmentList: snapEquipmentList,
-          selectedAnalysisEquipmentId: snapSelectedEquipmentId,
-          profileCompleted: isCompleted,
-          savedAt: new Date().toISOString(),
-        };
-
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(storageData));
+        setProfileCompleted(Boolean(userProfile && company && equipments.length > 0));
       } catch (error) {
         console.warn("마이페이지 온보딩 초기값 조회 실패:", error);
       }
@@ -909,8 +895,7 @@ export default function MyPage() {
   ]);
 
   const handleSave = async () => {
-    if (saving || saveInFlightRef.current) return;
-    saveInFlightRef.current = true;
+    if (saving) return;
 
     const activeIndustries = companyInfo.industries.filter((item) => {
       return item.industry.trim() || item.industryCode.trim();
@@ -986,7 +971,7 @@ export default function MyPage() {
       return;
     }
 
-    const accessToken = "cookie-session";
+    const accessToken = getAccessToken();
 
     if (!accessToken) {
       window.alert(
@@ -1097,8 +1082,6 @@ export default function MyPage() {
         const equipmentResponse = await submitEquipmentPayload(
           companyId,
           item.payload,
-          nextEquipmentList.find((equipment) => equipment.id === item.localId)
-            ?.equipmentId,
         );
 
         equipmentResponses.push(equipmentResponse);
@@ -1174,7 +1157,6 @@ export default function MyPage() {
     } catch (error) {
       window.alert(getErrorMessage(error));
     } finally {
-      saveInFlightRef.current = false;
       setSaving(false);
     }
   };
@@ -1188,6 +1170,7 @@ export default function MyPage() {
     window.localStorage.removeItem(EQUIPMENT_ID_STORAGE_KEY);
     window.localStorage.removeItem(SELECTED_EQUIPMENT_ID_STORAGE_KEY);
     window.localStorage.removeItem(ANALYSIS_RESULT_STORAGE_KEY);
+    window.localStorage.removeItem(MYPAGE_DOCUMENT_STORAGE_KEY);
 
     setBasicInfo(emptyBasicInfo);
     setPasswordInfo(emptyPasswordInfo);
@@ -1234,8 +1217,14 @@ export default function MyPage() {
         companyId,
       )}${equipmentQuery}`;
 
-      const response = await apiFetch(query, {
+      const accessToken = getAccessToken();
+
+      const response = await fetch(buildApiUrl(query), {
         method: "POST",
+        headers: {
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        credentials: "include",
       });
 
       const responseText = await response.text();
@@ -2827,6 +2816,19 @@ export default function MyPage() {
               </div>
             </AccordionPanel>
           </div>
+
+
+
+            <AccordionPanel
+              id="document-upload-form"
+              title="첨부파일"
+              description="저장한 서류는 신청서 생성 화면의 제출 전 확인 목록에서 자동으로 비교됩니다."
+              badge={<span className="badge green">PDF 저장 문서</span>}
+              open={openSections.documents}
+              onToggle={() => toggleSection("documents")}
+            >
+              <MyPageDocumentUploadPanel />
+            </AccordionPanel>
 
           <section
             style={{

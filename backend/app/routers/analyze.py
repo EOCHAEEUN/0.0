@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends
 
 from app.core.auth import get_current_user
 from app.core.database import get_db
+from app.core.ownership import get_owned_equipment_or_404, require_owned_context
 from app.models.auth import CurrentUser
 from app.models.company import CompanyContext
 from app.models.equipment import EquipmentInput
@@ -77,19 +78,13 @@ async def analyze(
     current_user: CurrentUser = Depends(get_current_user),
 ):
     db = get_db()
-
-    company_data = (
-        db.table("company")
-        .select("*")
-        .eq("company_id", company_id)
-        .eq("user_id", current_user.id)
-        .execute()
+    data, eq = require_owned_context(
+        company_id=company_id,
+        equipment_id=equipment_id,
+        current_user=current_user,
     )
-
-    if not company_data.data:
-        return {"success": False, "message": "기업 정보를 찾을 수 없습니다."}
-
-    data = company_data.data[0]
+    if eq is None:
+        eq = get_owned_equipment_or_404(None, data)
 
     if isinstance(data.get("industry_code"), str):
         data["industry_code"] = [
@@ -109,21 +104,6 @@ async def analyze(
         energy_cost_annual=data.get("energy_cost_annual"),
     )
 
-    equipment_query = (
-        db.table("equipment")
-        .select("*")
-        .eq("company_id", company_id)
-    )
-
-    if equipment_id:
-        equipment_query = equipment_query.eq("equipment_id", equipment_id)
-
-    equipment_data = equipment_query.execute()
-
-    if not equipment_data.data:
-        return {"success": False, "message": "설비 정보를 찾을 수 없습니다."}
-
-    eq = equipment_data.data[0]
     equipment_id = eq.get("equipment_id")
 
     equipment = EquipmentInput(

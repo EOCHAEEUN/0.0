@@ -1,4 +1,5 @@
-import { useNavigate } from "react-router-dom"
+import { useEffect } from "react"
+import { useLocation, useNavigate } from "react-router-dom"
 import { useSupportProjects } from "./hooks/useSupportProjects"
 import { PolicyDetailDialog } from "./components/SupportProjectDialogs"
 import {
@@ -15,6 +16,7 @@ import {
 
 export default function SupportProjectsFeature() {
   const navigate = useNavigate()
+  const location = useLocation()
   const {
     selectedEquipmentContext,
     policyState,
@@ -34,6 +36,19 @@ export default function SupportProjectsFeature() {
     policyState === "success" && hasPolicyCards && Boolean(topProject) && Boolean(selectedProject)
   const shouldShowEmpty = policyState === "empty" && !hasPolicyCards
 
+  useEffect(() => {
+    const selectedProjectId = (
+      location.state as { selectedProjectId?: number | null } | null
+    )?.selectedProjectId
+
+    if (
+      typeof selectedProjectId === "number" &&
+      finalRecommendedProjects.some((project) => project.id === selectedProjectId)
+    ) {
+      setSelectedProjectId(selectedProjectId)
+    }
+  }, [finalRecommendedProjects, location.state, setSelectedProjectId])
+
   return (
     <main className="page">
       <PolicyDetailDialog
@@ -45,7 +60,7 @@ export default function SupportProjectsFeature() {
         <div className="container">
           <button
             type="button"
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/dashboard")}
             style={backButtonStyle}
           >
             ← 대시보드로 돌아가기
@@ -97,7 +112,14 @@ export default function SupportProjectsFeature() {
                 selectedProjectId={selectedProjectId}
                 onSelectProject={setSelectedProjectId}
                 onOpenDetail={setDetailProject}
-                onGoDraft={() => navigate("/application-draft")}
+                onGoDraft={() =>
+                  navigate("/application-draft", {
+                    state: {
+                      selectedProject,
+                      from: "/support-projects",
+                    },
+                  })
+                }
               />
 
               <OtherMatchedPoliciesPanel

@@ -1,16 +1,9 @@
 import {
-  AUTH_TOKEN_STORAGE_KEY,
   COMPANY_ID_STORAGE_KEY,
   EQUIPMENT_ID_STORAGE_KEY,
 } from "./applicationDraft.constants"
 import type { AnalysisData, ScenarioKey } from "./applicationDraft.contract"
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") || "http://127.0.0.1:8000/api"
-
-function getAccessToken() {
-  return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || ""
-}
+import { apiFetch } from "../../services/apiClient"
 
 function normalizeDraftScenario(scenario: ScenarioKey) {
   return scenario.toLowerCase() as "a" | "b"
@@ -54,14 +47,11 @@ export async function requestApplicationDraft(
     throw new Error("company_id 또는 equipment_id가 없어 신청서 초안 API를 호출할 수 없습니다.")
   }
 
-  const accessToken = getAccessToken()
-  const response = await fetch(`${API_BASE_URL}/draft`, {
+  const response = await apiFetch("/draft", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
-    credentials: "include",
     body: JSON.stringify(payload),
   })
 

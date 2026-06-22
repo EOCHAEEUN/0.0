@@ -158,6 +158,9 @@ function createAdvisorAnswer(input: string) {
   return "현재 FactoFit 분석 결과를 종합하면, 프레스 설비 교체는 ROI, 지원사업 적합도, 안전 리스크 측면에서 검토 가치가 높습니다. 다음 단계로는 견적서와 설비 사진을 준비하고, 스마트공장 고도화 지원사업 신청서 초안을 작성하는 흐름을 추천합니다."
 }
 
+const MAX_ADVISOR_MESSAGE_LENGTH = 1000
+const MAX_ADVISOR_HISTORY = 50
+
 export default function AiAdvisorPage() {
   const navigate = useNavigate()
 
@@ -176,11 +179,15 @@ export default function AiAdvisorPage() {
     if (!userInput.trim()) {
       return
     }
+    if (userInput.length > MAX_ADVISOR_MESSAGE_LENGTH) {
+      window.alert(`질문은 ${MAX_ADVISOR_MESSAGE_LENGTH}자 이내로 입력해주세요.`)
+      return
+    }
 
     const answer = createAdvisorAnswer(userInput)
 
     setMessages((prev) => [
-      ...prev,
+      ...prev.slice(-(MAX_ADVISOR_HISTORY - 2)),
       {
         role: "user",
         content: userInput,
@@ -200,7 +207,7 @@ export default function AiAdvisorPage() {
         <div className="container">
           <button
             type="button"
-            onClick={() => navigate("/")}
+                    onClick={() => navigate("/dashboard")}
             style={{
               marginBottom: "28px",
               height: "44px",
@@ -548,6 +555,7 @@ export default function AiAdvisorPage() {
                   <input
                     value={input}
                     onChange={(event) => setInput(event.target.value)}
+                    maxLength={MAX_ADVISOR_MESSAGE_LENGTH}
                     onKeyDown={(event) => {
                       if (event.key === "Enter") {
                         handleSend()

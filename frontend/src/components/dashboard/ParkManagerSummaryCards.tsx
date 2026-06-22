@@ -237,6 +237,7 @@ export default function ParkManagerSummaryCards({
           headers: {
             Accept: "application/json",
           },
+          credentials: "include",
           signal: controller.signal,
         })
 

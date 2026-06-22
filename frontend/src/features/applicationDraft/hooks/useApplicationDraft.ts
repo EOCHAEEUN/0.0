@@ -183,6 +183,7 @@ export function useApplicationDraft(locationState: unknown) {
   }
 
   return {
+    policySelection,
     analysisData,
     draftStatus,
     isChecklistOpen,

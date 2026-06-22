@@ -206,6 +206,13 @@ export function normalizePolicySelection(input: unknown): PolicySelection | null
   const scenarioKey = normalizeScenarioKey(scenarioText)
 
   return {
+    projectId:
+      typeof p.id === "number"
+        ? p.id
+        : typeof p.id === "string" && /^\d+$/.test(p.id)
+          ? Number(p.id)
+          : null,
+    rawId: p.rawId ?? p.raw_id ?? p.policy_id ?? null,
     title: p.title ?? p.policy_title ?? p.name ?? null,
     agency: p.agency ?? p.organization ?? p.provider ?? null,
     scenarioKey,

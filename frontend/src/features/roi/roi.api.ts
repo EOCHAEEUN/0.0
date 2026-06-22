@@ -1,3 +1,5 @@
+import { apiFetch } from "../../services/apiClient"
+
 type RoiSimulationPayload = Record<string, unknown>
 
 type StoredMyPageProfile = {
@@ -6,24 +8,9 @@ type StoredMyPageProfile = {
   equipmentList?: Array<Record<string, unknown>>
 }
 
-const API_BASE_URL =
-  (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
-  "http://127.0.0.1:8000/api"
-
 const COMPANY_ID_STORAGE_KEY = "factofit_company_id"
 const MY_PAGE_STORAGE_KEY = "factofit_mypage_profile"
 const ANALYSIS_RESULT_STORAGE_KEY = "factofit_analysis_result"
-
-function buildApiUrl(path: string) {
-  const base = API_BASE_URL.replace(/\/+$/, "")
-  const targetPath = path.startsWith("/") ? path : `/${path}`
-
-  if (base.endsWith("/api") && targetPath.startsWith("/api/")) {
-    return `${base}${targetPath.slice(4)}`
-  }
-
-  return `${base}${targetPath}`
-}
 
 function safeJsonParse<T = unknown>(value: string | null): T | null {
   if (!value) return null
@@ -33,28 +20,6 @@ function safeJsonParse<T = unknown>(value: string | null): T | null {
   } catch {
     return null
   }
-}
-
-function getAccessToken() {
-  if (typeof window === "undefined") return ""
-
-  const directToken = window.localStorage.getItem("factofit_access_token")
-
-  if (directToken) return directToken
-
-  const authSession = safeJsonParse<Record<string, unknown>>(
-    window.localStorage.getItem("factofit_auth_session"),
-  )
-
-  const sessionData = authSession?.data as Record<string, unknown> | undefined
-  const nestedSession = authSession?.session as Record<string, unknown> | undefined
-
-  return String(
-    authSession?.access_token ??
-      sessionData?.access_token ??
-      nestedSession?.access_token ??
-      "",
-  )
 }
 
 function getFirstString(...values: unknown[]) {
@@ -157,15 +122,11 @@ export async function requestRoiSimulation(payload: RoiSimulationPayload) {
     : ""
 
   const query = `/api/analyze?company_id=${encodeURIComponent(companyId)}${equipmentQuery}`
-  const accessToken = getAccessToken()
-
-  const response = await fetch(buildApiUrl(query), {
+  const response = await apiFetch(query, {
     method: "POST",
     headers: {
       Accept: "application/json",
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
-    credentials: "include",
   })
 
   const responseText = await response.text()

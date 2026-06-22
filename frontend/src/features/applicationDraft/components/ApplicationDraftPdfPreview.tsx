@@ -63,7 +63,7 @@ export function ApplicationDraftPdfPreview({
           disabled={draftStatus === "idle"}
           onClick={onPrepareDownload}
         >
-          PDF 다운로드 준비
+          PDF 다운로드
         </button>
         <button className="green" type="button" onClick={onGoSupportProjects}>
           지원사업 목록 보기
@@ -77,7 +77,7 @@ export function ApplicationDraftPdfPreview({
       )}
       {draftStatus === "downloadReady" && (
         <div className="ff-draft-alert warning">
-          PDF 다운로드 기능은 이후 연결 예정입니다. 현재는 저장된 초안을 기준으로 화면 미리보기를 확인할 수 있습니다.
+          PDF 다운로드가 완료되었습니다. 저장된 초안과 ROI 분석 결과를 기준으로 보고서를 생성했습니다.
         </div>
       )}
     </section>

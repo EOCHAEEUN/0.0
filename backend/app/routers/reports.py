@@ -51,7 +51,7 @@ async def generate_application_report(
     except ValueError as exc:
         raise HTTPException(
             status_code=404,
-            detail="Requested report data was not found.",
+            detail=str(exc),
         ) from exc
     except Exception as exc:
         raise HTTPException(

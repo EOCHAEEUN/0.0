@@ -401,6 +401,11 @@ export default function MyPage() {
         const equipments = Array.isArray(data.equipments) ? data.equipments : [];
         const companyId = findCompanyId(response);
 
+        let snapBasic = { ...basicInfo };
+        let snapCompany = { ...companyInfo };
+        let snapEquipmentList = [...equipmentList];
+        let snapSelectedEquipmentId = selectedAnalysisEquipmentId;
+
         if (userProfile) {
           const profileName = getStringValue(userProfile.name);
           const profileEmail = getStringValue(userProfile.email);
@@ -408,18 +413,19 @@ export default function MyPage() {
           const managerName = getStringValue(userProfile.manager_name);
           const managerPhone = getStringValue(userProfile.manager_phone);
 
-          setBasicInfo((prev) => ({
-            ...prev,
-            name: profileName || prev.name,
-            email: profileEmail || prev.email,
-            phone: profilePhone ? formatPhoneNumber(profilePhone) : prev.phone,
-            manager: managerName || profileName || prev.manager,
+          snapBasic = {
+            ...snapBasic,
+            name: profileName || snapBasic.name,
+            email: profileEmail || snapBasic.email,
+            phone: profilePhone ? formatPhoneNumber(profilePhone) : snapBasic.phone,
+            manager: managerName || profileName || snapBasic.manager,
             managerPhone: managerPhone
               ? formatPhoneNumber(managerPhone)
               : profilePhone
                 ? formatPhoneNumber(profilePhone)
-                : prev.managerPhone,
-          }));
+                : snapBasic.managerPhone,
+          };
+          setBasicInfo(snapBasic);
         }
 
         if (company) {
@@ -435,74 +441,75 @@ export default function MyPage() {
           const purposeValues = getStringArrayValue(company.primary_purpose);
           const companyType = getStringValue(company.company_type);
 
-          setCompanyInfo((prev) => ({
-            ...prev,
-            companyName: getStringValue(company.company_name) || prev.companyName,
+          snapCompany = {
+            ...snapCompany,
+            companyName: getStringValue(company.company_name) || snapCompany.companyName,
             businessNumber: formatBusinessNumber(
               getStringValue(company.business_registration_no) ||
-                prev.businessNumber,
+                snapCompany.businessNumber,
             ),
             assetTotalManwon: formatCommaNumber(
-              pickNumberText(company.total_assets_manwon, prev.assetTotalManwon),
+              pickNumberText(company.total_assets_manwon, snapCompany.assetTotalManwon),
             ),
-            industry: remoteIndustries[0]?.industry ?? prev.industry,
-            industryCode: remoteIndustries[0]?.industryCode ?? prev.industryCode,
+            industry: remoteIndustries[0]?.industry ?? snapCompany.industry,
+            industryCode: remoteIndustries[0]?.industryCode ?? snapCompany.industryCode,
             industries: remoteIndustries,
-            region: getStringValue(company.region) || prev.region,
+            region: getStringValue(company.region) || snapCompany.region,
             employees: formatCommaNumber(
-              pickNumberText(company.employee_count, prev.employees),
+              pickNumberText(company.employee_count, snapCompany.employees),
             ),
             annualRevenue: formatCommaNumber(
               pickNumberText(
                 company.annual_revenue_manwon,
                 company.annual_revenue,
-                prev.annualRevenue,
+                snapCompany.annualRevenue,
               ),
             ),
             revenue2YearsAgo: formatCommaNumber(
               pickNumberText(
                 company.revenue_2y_ago_manwon,
-                prev.revenue2YearsAgo,
+                snapCompany.revenue2YearsAgo,
               ),
             ),
             revenue3YearsAgo: formatCommaNumber(
               pickNumberText(
                 company.revenue_3y_ago_manwon,
-                prev.revenue3YearsAgo,
+                snapCompany.revenue3YearsAgo,
               ),
             ),
-            companyType: companyType || prev.companyType || "선택 필요",
+            companyType: companyType || snapCompany.companyType || "선택 필요",
             affiliateStatus:
               affiliateValue === null
-                ? prev.affiliateStatus
+                ? snapCompany.affiliateStatus
                 : affiliateValue
                   ? "대기업 계열사 소속"
                   : "무소속",
-            purpose: purposeValues[0] || prev.purpose,
+            purpose: purposeValues[0] || snapCompany.purpose,
             foundedYear:
-              getStringValue(company.established_year) || prev.foundedYear,
+              getStringValue(company.established_year) || snapCompany.foundedYear,
             businessSiteType:
               getStringValue(company.workplace_type) ||
-              prev.businessSiteType ||
+              snapCompany.businessSiteType ||
               "선택 필요",
-          }));
+          };
+          setCompanyInfo(snapCompany);
         }
 
         if (equipments.length > 0) {
-          const remoteEquipmentList = equipments.map(mapRemoteEquipment);
-          const firstRemoteEquipment = remoteEquipmentList[0];
+          snapEquipmentList = equipments.map(mapRemoteEquipment);
+          snapSelectedEquipmentId = snapEquipmentList[0]?.id ?? 1;
 
-          setEquipmentList(remoteEquipmentList);
-          setSelectedAnalysisEquipmentId(firstRemoteEquipment?.id ?? 1);
+          setEquipmentList(snapEquipmentList);
+          setSelectedAnalysisEquipmentId(snapSelectedEquipmentId);
 
-          if (firstRemoteEquipment?.equipmentId) {
+          if (snapEquipmentList[0]?.equipmentId) {
             window.localStorage.setItem(
               EQUIPMENT_ID_STORAGE_KEY,
-              firstRemoteEquipment.equipmentId,
+              snapEquipmentList[0].equipmentId,
             );
             window.localStorage.setItem(
               SELECTED_EQUIPMENT_ID_STORAGE_KEY,
-              firstRemoteEquipment.equipmentId,
+              snapEquipmentList[0].equipmentId,
             );
           }
         }
@@ -511,7 +518,19 @@ export default function MyPage() {
           window.localStorage.setItem(COMPANY_ID_STORAGE_KEY, companyId);
         }
 
-        setProfileCompleted(Boolean(userProfile && company && equipments.length > 0));
+        const isCompleted = Boolean(userProfile && company && equipments.length > 0);
+        setProfileCompleted(isCompleted);
+
+        const storageData: MyPageStorageData = {
+          basicInfo: snapBasic,
+          companyInfo: snapCompany,
+          equipmentList: snapEquipmentList,
+          selectedAnalysisEquipmentId: snapSelectedEquipmentId,
+          profileCompleted: isCompleted,
+          savedAt: new Date().toISOString(),
+        };
+
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(storageData));
       } catch (error) {
         console.warn("마이페이지 온보딩 초기값 조회 실패:", error);
       }
@@ -965,14 +984,20 @@ export default function MyPage() {
       return;
     }
 
+    const accessToken = "cookie-session";
+
+    if (!accessToken) {
+      window.alert(
+        "로그인 인증 토큰을 찾지 못했습니다. 다시 로그인한 뒤 저장해주세요.",
+      );
+      return;
+    }
+
     const userId = getCurrentUserId();
 
     const userPayload: UserProfilePayload = {
       name: basicInfo.name.trim(),
-      email: basicInfo.email.trim(),
       phone: normalizePhoneNumber(basicInfo.phone),
-      current_password: passwordInfo.currentPassword.trim(),
-      new_password: passwordInfo.newPassword.trim() || undefined,
     };
 
     const companyPayload: CompanyOnboardingPayload = {
@@ -1047,17 +1072,32 @@ export default function MyPage() {
     try {
       setSaving(true);
 
+      console.log("온보딩 user 요청 payload:", userPayload);
       await submitUserPayload(userPayload);
 
-      const { companyId } = await submitCompanyPayload(companyPayload);
+      console.log("온보딩 company 요청 payload:", companyPayload);
+      const { responseData: companyResponseData, companyId } =
+        await submitCompanyPayload(companyPayload);
 
       let nextEquipmentList = [...equipmentList];
+      const equipmentResponses = [];
 
       for (const item of equipmentPayloads) {
+        console.log("온보딩 equipment 요청 payload:", {
+          companyId,
+          equipmentPayload: item.payload,
+        });
+        console.log(
+          "온보딩 equipment 최종 payload JSON:",
+          JSON.stringify(item.payload, null, 2),
+        );
+
         const equipmentResponse = await submitEquipmentPayload(
           companyId,
           item.payload,
         );
+
+        equipmentResponses.push(equipmentResponse);
 
         const equipmentId = findEquipmentId(equipmentResponse);
 
@@ -1101,6 +1141,8 @@ export default function MyPage() {
         savedAt: new Date().toISOString(),
       };
 
+      const savedOnboarding = await fetchSavedOnboarding();
+
       setEquipmentList(nextEquipmentList);
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(storageData));
 
@@ -1109,6 +1151,15 @@ export default function MyPage() {
       }
 
       window.localStorage.setItem(COMPANY_ID_STORAGE_KEY, companyId);
+
+      console.log(
+        "저장된 user_id:",
+        userId ?? "auth session에서 user_id 미확인",
+      );
+      console.log("저장된 company_id:", companyId);
+      console.log("company 저장 응답:", companyResponseData);
+      console.log("equipment 저장 응답:", equipmentResponses);
+      console.log("온보딩 조회 응답:", savedOnboarding);
 
       setSaved(true);
       setProfileCompleted(savedProfileCompleted);

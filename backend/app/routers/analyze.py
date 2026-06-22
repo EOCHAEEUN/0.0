@@ -1,23 +1,21 @@
 from typing import Optional
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends
 
 from app.core.auth import get_current_user
 from app.core.database import get_db
-from app.core.config import settings
-from app.core.rate_limit import enforce_rate_limit
 from app.models.auth import CurrentUser
 from app.models.company import CompanyContext
 from app.models.equipment import EquipmentInput
 from app.agents.policy import (
     evaluate_and_rerank_with_llm,
+    format_raw_policy_candidate,
     get_policy_raw_candidates,
     merge_policy_candidates,
     rank_candidates_by_query,
     rerank_policies_with_roi,
 )
-from app.services.policy_response import format_policy_collections
 from app.tools.query_builder import build_policy_queries_from_roi
 from app.tools.roi_calc import calculate_roi
 
@@ -74,26 +72,10 @@ def _decorate_display_scores(policies: list[dict]) -> list[dict]:
 
 @router.post("/analyze")
 async def analyze(
-    request: Request,
-    company_id: str = Query(
-        min_length=36,
-        max_length=36,
-        pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
-    ),
-    equipment_id: Optional[str] = Query(
-        default=None,
-        min_length=36,
-        max_length=36,
-        pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
-    ),
+    company_id: str,
+    equipment_id: Optional[str] = None,
     current_user: CurrentUser = Depends(get_current_user),
 ):
-    enforce_rate_limit(
-        request,
-        scope="analyze",
-        limit=settings.expensive_api_requests_per_minute,
-        identifier=current_user.id,
-    )
     db = get_db()
 
     company_data = (
@@ -174,6 +156,7 @@ async def analyze(
 
     raw_candidates = []
     matched_policies = []
+    policy_error = None
 
     try:
         raw_candidates = get_policy_raw_candidates(company_context)
@@ -204,10 +187,7 @@ async def analyze(
 
     except Exception as exc:
         print(f"정책 오케스트레이션 실패: {exc}")
-
-    frontend_matched_policies, frontend_raw_candidates = (
-        format_policy_collections(matched_policies, raw_candidates)
-    )
+        policy_error = str(exc)
 
     try:
         db.table("roi_output").delete().eq("company_id", company_id).eq(
@@ -272,9 +252,15 @@ async def analyze(
         "success": True,
         "data": {
             "roi_result": roi_result,
-            "matched_policies": frontend_matched_policies,
-            "policies": frontend_matched_policies,
-            "raw_candidates": frontend_raw_candidates,
+            "company": data,
+            "equipment": eq,
+            "policy_error": policy_error,
+            "matched_policies": matched_policies,
+            "policies": matched_policies,
+            "raw_candidates": [
+                format_raw_policy_candidate(policy)
+                for policy in raw_candidates
+            ],
             "total_candidates": len(raw_candidates),
             "response": "ROI 계산 및 정책 추천이 완료되었습니다.",
         },

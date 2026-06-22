@@ -244,8 +244,12 @@ export function pickFirstMatchedPolicy(
 ): PolicySelection | null {
   const first = policies?.[0]
   if (!first) return null
+  const rawId =
+    first.policy_id ??
+    (first.id !== null && first.id !== undefined ? String(first.id) : null)
 
   return {
+    rawId,
     title: first.title ?? first.policy_title ?? null,
     agency: first.agency ?? first.organization ?? first.provider ?? null,
     scenarioKey: normalizeScenarioKey(

@@ -1,58 +1,30 @@
 import { useEffect, useState } from "react"
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom"
 
+import { clearLegacyAuthStorage } from "../../services/apiClient"
 import { getCurrentAuthSession } from "../../services/auth"
 
 type SessionStatus = "loading" | "authenticated" | "guest"
 
-const SESSION_CHECK_TIMEOUT_MS = 8500
-
-function hasStoredAuthSession() {
-  try {
-    const raw = window.localStorage.getItem("factofit_auth_session")
-    if (!raw) return false
-
-    const session = JSON.parse(raw)
-    return Boolean(session?.user?.id || session?.user?.email)
-  } catch {
-    return false
-  }
-}
-
-function useSessionStatus(allowStoredSessionFallback = false) {
-  const [status, setStatus] = useState<SessionStatus>(() =>
-    allowStoredSessionFallback && hasStoredAuthSession()
-      ? "authenticated"
-      : "loading",
-  )
+function useSessionStatus() {
+  const [status, setStatus] = useState<SessionStatus>("loading")
 
   useEffect(() => {
     let active = true
-    const timeoutId = window.setTimeout(() => {
-      if (!active) return
-      setStatus(
-        allowStoredSessionFallback && hasStoredAuthSession()
-          ? "authenticated"
-          : "guest",
-      )
-    }, SESSION_CHECK_TIMEOUT_MS)
 
     getCurrentAuthSession()
       .then(() => {
         if (active) setStatus("authenticated")
       })
       .catch(() => {
+        clearLegacyAuthStorage()
         if (active) setStatus("guest")
-      })
-      .finally(() => {
-        window.clearTimeout(timeoutId)
       })
 
     return () => {
       active = false
-      window.clearTimeout(timeoutId)
     }
-  }, [allowStoredSessionFallback])
+  }, [])
 
   return status
 }
@@ -75,7 +47,7 @@ function SessionLoading() {
 }
 
 export function ProtectedRoute() {
-  const status = useSessionStatus(true)
+  const status = useSessionStatus()
   const location = useLocation()
 
   if (status === "loading") return <SessionLoading />
@@ -99,13 +71,19 @@ export function GuestRoute() {
 
 export function SessionExpiryRedirect() {
   const navigate = useNavigate()
+  const location = useLocation()
 
   useEffect(() => {
-    const handleExpired = () => navigate("/login", { replace: true })
+    const handleExpired = () => {
+      if (location.pathname !== "/login") {
+        navigate("/login", { replace: true })
+      }
+    }
+
     window.addEventListener("factofit:session-expired", handleExpired)
     return () =>
       window.removeEventListener("factofit:session-expired", handleExpired)
-  }, [navigate])
+  }, [location.pathname, navigate])
 
   return null
 }

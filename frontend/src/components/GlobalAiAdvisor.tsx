@@ -32,8 +32,6 @@ const MIN_WIDTH = 360
 const MIN_HEIGHT = 480
 const MAX_WIDTH = 760
 const MAX_HEIGHT = 780
-const MAX_MESSAGE_LENGTH = 1000
-const MAX_MESSAGE_HISTORY = 50
 
 function createWidgetAnswer(question: string) {
   const normalized = question.trim()
@@ -108,13 +106,9 @@ export default function GlobalAiAdvisor() {
   const handleSend = (value?: string) => {
     const question = (value ?? input).trim()
     if (!question) return
-    if (question.length > MAX_MESSAGE_LENGTH) {
-      window.alert(`질문은 ${MAX_MESSAGE_LENGTH}자 이내로 입력해주세요.`)
-      return
-    }
 
     setMessages((prev) => [
-      ...prev.slice(-(MAX_MESSAGE_HISTORY - 2)),
+      ...prev,
       {
         role: "user",
         text: question,
@@ -571,7 +565,6 @@ export default function GlobalAiAdvisor() {
                 <input
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
-                  maxLength={MAX_MESSAGE_LENGTH}
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
                       handleSend()

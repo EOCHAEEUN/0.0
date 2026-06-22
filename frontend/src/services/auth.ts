@@ -1,10 +1,9 @@
-import {
-  apiFetch,
-  clearFactofitUserStorage,
-  clearLegacyAuthStorage,
-} from "./apiClient"
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api"
 
 export type AuthSession = {
+  access_token: string | null
+  refresh_token: string | null
   expires_at: number | null
   user: {
     id: string | null
@@ -20,119 +19,89 @@ type ApiResponse<T> = {
   data?: T
   message?: string
   error?: string
-  detail?: string
 }
 
 function getCompanyIdFromSession(session: AuthSession) {
   if (session.company_id) return session.company_id
 
   const nestedCompanyId = session.company?.company_id
+
   return typeof nestedCompanyId === "string" ? nestedCompanyId : null
 }
 
 export function saveAuthSession(session: AuthSession) {
-  clearLegacyAuthStorage()
-  localStorage.setItem("factofit_auth_session", JSON.stringify(session))
+  if (session.access_token) {
+    localStorage.setItem("factofit_access_token", session.access_token)
+  }
+
+  if (session.refresh_token) {
+    localStorage.setItem("factofit_refresh_token", session.refresh_token)
+  }
 
   const companyId = getCompanyIdFromSession(session)
+
   if (companyId) {
     localStorage.setItem("factofit_company_id", companyId)
   }
+
+  localStorage.setItem("factofit_auth_session", JSON.stringify(session))
 }
 
-async function readApiResponse<T>(response: Response): Promise<T> {
-  const json = (await response.json().catch(() => ({}))) as ApiResponse<T>
+export function getAccessToken() {
+  return localStorage.getItem("factofit_access_token")
+}
+
+async function postAuth<T>(
+  path: string,
+  payload: unknown,
+  options: { authenticated?: boolean } = {},
+): Promise<T> {
+  const token = options.authenticated ? getAccessToken() : null
+
+  if (options.authenticated && !token) {
+    throw new Error("인증 정보가 없습니다. 다시 로그인해주세요.")
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(payload),
+  })
+
+  const json = (await response.json()) as ApiResponse<T>
 
   if (!response.ok || !json.success || !json.data) {
-    throw new Error(
-      json.error || json.message || json.detail || "API request failed.",
-    )
+    throw new Error(json.error || json.message || "API request failed.")
   }
 
   return json.data
 }
 
-async function postAuth<T>(
-  path: string,
-  payload?: unknown,
-  options: { retryAuth?: boolean } = {},
-): Promise<T> {
-  const response = await apiFetch(
-    path,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
-    },
-    options,
-  )
-
-  return readApiResponse<T>(response)
-}
-
 export async function signupWithProfile(payload: unknown) {
-  return postAuth<AuthSession>("/auth/signup", payload)
+  return postAuth<AuthSession>("/auth/signup", payload, { authenticated: true })
 }
 
 export async function loginWithPassword(email: string, password: string) {
-  return postAuth<AuthSession>(
-    "/auth/login",
-    { email, password },
-    { retryAuth: false },
-  )
+  return postAuth<AuthSession>("/auth/login", { email, password })
 }
 
 export async function sendSignupEmailCode(email: string) {
-  return postAuth<{ email: string; message: string }>(
-    "/auth/send-email-code",
-    { email },
-    { retryAuth: false },
-  )
+  return postAuth<{ email: string; message: string }>("/auth/send-email-code", {
+    email,
+  })
 }
 
 export async function verifySignupEmailCode(email: string, token: string) {
-  return postAuth<AuthSession>(
-    "/auth/verify-email-code",
-    { email, token },
-    { retryAuth: false },
-  )
+  return postAuth<AuthSession>("/auth/verify-email-code", { email, token })
 }
 
 export async function createCompanyOnboarding(payload: unknown) {
   return postAuth<{ company_id: string; company: Record<string, unknown> }>(
     "/onboarding",
     payload,
+    { authenticated: true },
   )
-}
-
-export async function getCurrentAuthSession() {
-  const response = await apiFetch(
-    "/auth/session",
-    {
-      method: "GET",
-      headers: { Accept: "application/json" },
-    },
-    { retryAuth: false, timeoutMs: 8000 },
-  )
-  return readApiResponse<AuthSession>(response)
-}
-
-export async function logoutCurrentSession() {
-  try {
-    await apiFetch(
-      "/auth/logout",
-      {
-        method: "POST",
-        headers: { Accept: "application/json" },
-      },
-      { retryAuth: false },
-    )
-  } catch {
-    // 서버 연결이 끊겨도 브라우저의 로그인 흔적은 제거한다.
-  } finally {
-    clearFactofitUserStorage()
-  }
 }

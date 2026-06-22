@@ -310,11 +310,7 @@ export function toNumberOrNull(value?: unknown) {
     return Number.isFinite(value) ? value : null
   }
 
-  if (typeof value !== "string") {
-    return null
-  }
-
-  const cleaned = value.replace(/[^\d.-]/g, "")
+  const cleaned = String(value).replace(/[^\d.-]/g, "")
   if (!cleaned) return null
 
   const amount = Number(cleaned)

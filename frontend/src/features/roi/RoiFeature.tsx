@@ -250,7 +250,7 @@ export default function RoiFeature() {
         >
           <button
             type="button"
-            onClick={() => navigate("/dashboard")}
+            onClick={() => navigate("/")}
             style={{
               marginBottom: "28px",
               height: "44px",

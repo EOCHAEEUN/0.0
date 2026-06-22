@@ -1,15 +1,34 @@
 import type { PolicyApiItem, PolicyApiResponse, PolicyCounters, SupportProject } from "./supportProjects.contract"
 import { buildPolicyCounters, mapPolicyToProject, rankProjects, toNumberOrNull } from "./supportProjects.utils"
-import { apiFetch } from "../../services/apiClient"
 
 const COMPANY_ID_STORAGE_KEY = "factofit_company_id"
+const AUTH_TOKEN_STORAGE_KEY = "factofit_access_token"
 const POLICY_FETCH_LIMIT = 40
 
 const policyCardsMemoryCache = new Map<string, { cards: SupportProject[]; counters: PolicyCounters }>()
 const policyCardsInFlightCache = new Map<string, Promise<{ cards: SupportProject[]; counters: PolicyCounters }>>()
 
+function getApiBase() {
+  const envBase = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api"
+  return String(envBase).replace(/\/$/, "")
+}
+
+function buildApiUrl(path: string) {
+  const base = getApiBase()
+
+  if (base.endsWith("/api")) {
+    return `${base}${path.replace(/^\/api/, "")}`
+  }
+
+  return `${base}${path}`
+}
+
 export function getStoredCompanyId() {
   return window.localStorage.getItem(COMPANY_ID_STORAGE_KEY) || ""
+}
+
+export function getStoredAccessToken() {
+  return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || ""
 }
 
 function getPolicyListFromResponse(json: PolicyApiResponse) {
@@ -80,12 +99,16 @@ export async function fetchPolicyCards(
   const inFlight = policyCardsInFlightCache.get(cacheKey)
   if (inFlight) return inFlight
 
-  const url = `/api/policies?company_id=${encodeURIComponent(companyId)}&limit=${POLICY_FETCH_LIMIT}`
+  const token = getStoredAccessToken()
+  const url = buildApiUrl(
+    `/api/policies?company_id=${encodeURIComponent(companyId)}&limit=${POLICY_FETCH_LIMIT}`,
+  )
 
-  const requestPromise = apiFetch(url, {
+  const requestPromise = fetch(url, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
   })
     .then(async (response) => {
@@ -93,7 +116,7 @@ export async function fetchPolicyCards(
 
       if (!response.ok) {
         if (response.status === 404 || response.status === 504) {
-          console.warn("정책 추천 API fallback:", { status: response.status })
+          console.warn("정책 추천 API fallback:", { status: response.status, response: json })
           return { cards: [], counters: buildPolicyCounters([]) }
         }
 

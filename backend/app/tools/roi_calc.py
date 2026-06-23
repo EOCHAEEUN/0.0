@@ -278,6 +278,80 @@ def _calc_ai_recommendation(
         score_a += 1
 
     decision = "A" if score_a >= score_b else "B"
+    chosen = scenario_a if decision == "A" else scenario_b
+    other = scenario_b if decision == "A" else scenario_a
+    other_label = "B" if decision == "A" else "A"
+
+    def _clamp_score(value: float, minimum: int = 0, maximum: int = 100) -> int:
+        return max(minimum, min(maximum, round(value)))
+
+    def _safe_ratio(numerator, denominator) -> float:
+        if denominator in (None, 0):
+            return 0.0
+        return float(numerator or 0) / float(denominator)
+
+    subsidy_fit = _clamp_score(
+        _safe_ratio(chosen.get("subsidy_manwon"), chosen.get("investment_manwon")) * 150,
+        35,
+        96,
+    )
+    saving_effect = _clamp_score(
+        _safe_ratio(
+            chosen.get("annual_net_benefit_manwon"),
+            chosen.get("net_investment_manwon"),
+        )
+        * 190,
+        25,
+        96,
+    )
+    equipment_aging = _clamp_score(
+        _safe_ratio(equipment.age_years, bench["avg_replacement_cycle_yr"]) * 82,
+        35,
+        96,
+    )
+    safety_risk = _clamp_score(
+        equipment.age_years * 4.8 + (equipment.defect_rate or 0) * 3.5,
+        35,
+        96,
+    )
+    score_total = _clamp_score(
+        subsidy_fit * 0.35
+        + saving_effect * 0.25
+        + equipment_aging * 0.2
+        + safety_risk * 0.2
+    )
+
+    reason_bullets = []
+    if (scenario_a.get("subsidy_manwon") or 0) > (scenario_b.get("subsidy_manwon") or 0):
+        reason_bullets.append("A안은 B안보다 예상 지원금 규모가 커서 초기 투자 부담 완화에 유리합니다.")
+    elif (scenario_b.get("subsidy_manwon") or 0) > (scenario_a.get("subsidy_manwon") or 0):
+        reason_bullets.append("B안은 A안보다 예상 지원금 비율이 높아 지원금 효율 검토에 유리합니다.")
+
+    if (scenario_a.get("annual_net_benefit_manwon") or 0) > (scenario_b.get("annual_net_benefit_manwon") or 0):
+        reason_bullets.append("A안은 B안보다 연간 총 절감액이 커서 전체 개선 효과가 큽니다.")
+    elif (scenario_b.get("annual_net_benefit_manwon") or 0) > (scenario_a.get("annual_net_benefit_manwon") or 0):
+        reason_bullets.append("B안은 A안보다 연간 순효과 대비 회수 효율이 높을 수 있습니다.")
+
+    if is_overdue:
+        reason_bullets.append("설비 사용연수가 업종 평균 교체주기를 초과해 전체 교체 필요성이 높습니다.")
+
+    if decision == "A" and b_payback is not None and a_payback is not None and b_payback < a_payback:
+        reason_bullets.append("B안은 회수기간은 짧지만 개선 범위가 제한적이어서 A안의 총효과를 함께 검토해야 합니다.")
+    elif decision == "B" and a_net > b_net:
+        reason_bullets.append("A안은 총 절감액은 크지만 초기 투자 부담이 커서 B안의 회수 효율을 우선 검토합니다.")
+
+    if not reason_bullets:
+        reason_bullets.append(f"{decision}안이 지원금, 절감 효과, 설비 상태를 종합한 투자안 판단에서 우선 검토 대상으로 산정되었습니다.")
+
+    summary = (
+        f"ROI 효율은 {other_label}안이 더 높을 수 있지만, 지원금 규모와 연간 절감 총액, "
+        f"설비 노후도를 종합하면 {decision}안이 우선 검토 대상입니다."
+        if decision == "A" and b_payback is not None and a_payback is not None and b_payback < a_payback
+        else (
+            f"{decision}안은 지원금, 비용 절감 효과, 설비 노후도, 안전 리스크를 종합한 "
+            "A/B 투자안 판단에서 우선 검토 대상으로 산정되었습니다."
+        )
+    )
 
     # 신뢰도
     base = 0.4 + data_quality["score"] * 0.4
@@ -313,7 +387,6 @@ def _calc_ai_recommendation(
 
     # 리스크
     risks = []
-    chosen = scenario_a if decision == "A" else scenario_b
     if chosen["net_investment_manwon"] is not None and chosen["net_investment_manwon"] > 5000:
         risks.append({
             "type": "cashflow_risk",
@@ -329,8 +402,6 @@ def _calc_ai_recommendation(
 
     # 전환 조건 (두 시나리오 회수기간이 같아지는 지원금 임계점)
     switching_conditions = []
-    other_label = "B" if decision == "A" else "A"
-    other = scenario_b if decision == "A" else scenario_a
     if (
         chosen["investment_manwon"] is not None
         and other["net_investment_manwon"] is not None
@@ -361,8 +432,16 @@ def _calc_ai_recommendation(
 
     return {
         "decision": decision,
+        "score_total": score_total,
+        "scores": {
+            "subsidy_fit": subsidy_fit,
+            "saving_effect": saving_effect,
+            "equipment_aging": equipment_aging,
+            "safety_risk": safety_risk,
+        },
+        "reason_bullets": reason_bullets[:3],
         "confidence_score": confidence,
-        "summary": f"AI는 시나리오 {decision}를 추천합니다. (신뢰도 {int(confidence * 100)}%, 데이터 품질 {data_quality['level']})",
+        "summary": summary,
         "top_reasons": top_reasons,
         "risks": risks,
         "switching_conditions": switching_conditions,

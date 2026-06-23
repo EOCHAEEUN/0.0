@@ -444,7 +444,7 @@ def build_pre_work_checklist(
         record = status_by_rule_id.get(rule.rule_id)
         checked_today = (
             record is not None
-            and record.last_checked_at == today
+            and record.pre_work_checked_date == today
         )
         items.append({
             "rule_id": rule.rule_id,
@@ -461,7 +461,7 @@ def build_pre_work_checklist(
         record = status_by_rule_id.get(rule.rule_id)
         checked_today = (
             record is not None
-            and record.last_checked_at == today
+            and record.pre_work_checked_date == today
         )
         items.append({
             "rule_id": rule.rule_id,

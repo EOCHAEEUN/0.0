@@ -25,6 +25,7 @@ class SafetyCheckStatus(BaseModel):
     status: InspectionCompletionStatus | None = None
     evidence_file_url: str | None = None
     evidence_submitted_at: datetime | None = None
+    pre_work_checked_date: date | None = None
     assignee: str | None = None
     memo: str | None = None
     checked_at: datetime
@@ -32,8 +33,6 @@ class SafetyCheckStatus(BaseModel):
 
 
 class SafetyCheckStatusSaveRequest(BaseModel):
-    """사용자가 점검 수행 여부와 최근 점검 정보를 저장할 때 받는 요청."""
-
     equipment_id: UUID | None = None
     rule_type: SafetyRuleType
     rule_id: str
@@ -42,3 +41,4 @@ class SafetyCheckStatusSaveRequest(BaseModel):
     evidence_file_url: str | None = None
     assignee: str | None = None
     memo: str | None = None
+    is_pre_work_check: bool = False

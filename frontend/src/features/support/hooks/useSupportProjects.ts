@@ -7,8 +7,6 @@ import type {
 } from "../supportProjects.contract"
 import { fetchPolicyCards, getStoredCompanyId } from "../supportProjects.api"
 import {
-  DEMO_POLICY_COUNTERS,
-  buildDemoSupportProjects,
   buildPolicyCounters,
   getAnalysisFingerprint,
   getEquipmentContext,
@@ -18,7 +16,6 @@ import {
 } from "../supportProjects.utils"
 
 const FINAL_RECOMMENDED_LIMIT = 5
-const RECOMMENDATION_PREVIEW_LIMIT = 10
 
 type UnknownRecord = Record<string, unknown>
 
@@ -171,16 +168,24 @@ export function useSupportProjects() {
       analysisData.equipment?.company_id ||
       getStoredCompanyId()
 
-    function applyDemoFallback() {
-      const demoCards = normalizeProjectIds(rankProjects(buildDemoSupportProjects()))
-      setPolicyCards(demoCards)
-      setPolicyCounters(DEMO_POLICY_COUNTERS)
-      setSelectedProjectId(demoCards[0]?.id ?? null)
-      setPolicyState("success")
+    function applyEmptyState() {
+      setPolicyCards([])
+      setPolicyCounters(buildPolicyCounters([]))
+      setSelectedProjectId(null)
+      setPolicyState("empty")
+    }
+
+    function applyErrorState() {
+      setPolicyCards([])
+      setPolicyCounters(buildPolicyCounters([]))
+      setSelectedProjectId(null)
+      setPolicyState("error")
     }
 
     const localPolicyResult = buildLocalPolicyResult(analysisData)
 
+    // 1순위: /api/analyze 응답을 localStorage에 저장한 값.
+    // 백엔드 analyze 응답의 data.matched_policies / data.policies / data.raw_candidates를 우선 사용합니다.
     if (localPolicyResult && localPolicyResult.cards.length > 0) {
       setPolicyCards(localPolicyResult.cards)
       setPolicyCounters(localPolicyResult.counters)
@@ -189,8 +194,10 @@ export function useSupportProjects() {
       return
     }
 
+    // DB 연동 검증 단계에서는 demo/mock fallback을 사용하지 않습니다.
+    // company_id가 없으면 실제 정책 조회를 할 수 없으므로 empty 상태로 노출합니다.
     if (!companyId) {
-      applyDemoFallback()
+      applyEmptyState()
       return
     }
 
@@ -205,7 +212,7 @@ export function useSupportProjects() {
         if (ignore) return
 
         if (result.cards.length === 0) {
-          applyDemoFallback()
+          applyEmptyState()
           return
         }
 
@@ -231,7 +238,7 @@ export function useSupportProjects() {
         console.error("정책 추천 API 호출 실패:", error)
 
         if (!ignore) {
-          applyDemoFallback()
+          applyErrorState()
         }
       }
     }
@@ -245,7 +252,7 @@ export function useSupportProjects() {
 
   const rankedPolicyCards = useMemo(() => rankProjects(policyCards), [policyCards])
   const finalRecommendedProjects = useMemo(
-    () => rankedPolicyCards.slice(0, RECOMMENDATION_PREVIEW_LIMIT),
+    () => rankedPolicyCards.slice(0, FINAL_RECOMMENDED_LIMIT),
     [rankedPolicyCards],
   )
   const otherMatchedProjects = useMemo(

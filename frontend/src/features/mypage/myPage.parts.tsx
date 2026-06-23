@@ -107,6 +107,12 @@ export type CompanyOnboardingPayload = {
 };
 
 export type EquipmentPayload = {
+  /**
+   * 기존 설비 수정 기준값입니다.
+   * 값이 있으면 백엔드에서 같은 equipment row를 update/upsert해야 합니다.
+   * 값이 없으면 신규 설비로 생성합니다.
+   */
+  equipment_id?: string | null;
   name: string;
   category: string;
   process: string | null;
@@ -788,7 +794,31 @@ export async function submitEquipmentPayload(
       method: "POST",
       body: JSON.stringify(payload),
     },
-    "온보딩 equipment API",
+    "신규 설비 생성 API",
+  );
+}
+
+export async function updateEquipmentPayload(
+  equipmentId: string,
+  payload: EquipmentPayload,
+) {
+  return requestJson(
+    `/api/equipment/${encodeURIComponent(equipmentId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    },
+    "기존 설비 수정 API",
+  );
+}
+
+export async function deleteEquipmentPayload(equipmentId: string) {
+  return requestJson(
+    `/api/equipment/${encodeURIComponent(equipmentId)}`,
+    {
+      method: "DELETE",
+    },
+    "설비 삭제 API",
   );
 }
 

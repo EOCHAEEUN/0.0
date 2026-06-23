@@ -80,6 +80,7 @@ def _format_policy_for_frontend(policy: dict) -> dict:
       - summary
       - raw_text
       - created_at
+
     Frontend/detail dialog can read:
       - url/source_url/policy_url
       - summary/description/content/support_content
@@ -231,12 +232,36 @@ def _format_policy_for_frontend(policy: dict) -> dict:
 
 
 def _format_raw_policy_candidate_for_frontend(policy: dict) -> dict:
-    """
-    Keep existing raw-candidate shape and add detail fields for the support page.
-    """
+    """Keep existing raw-candidate shape and add detail fields for the support page."""
     formatted = format_raw_policy_candidate(policy)
     merged = {**policy, **formatted}
     return _format_policy_for_frontend(merged)
+
+
+def _score_to_percent(policy: dict) -> int:
+    """
+    Convert policy score to 0~100 integer for matched_policy storage.
+
+    hybrid_score/final_score/distance are usually 0~1 scale.
+    If a score already looks like 0~100, keep it as percent.
+    """
+    value = policy.get(
+        "hybrid_score",
+        policy.get(
+            "final_score",
+            round(1 - policy.get("distance", 1), 3),
+        ),
+    )
+
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        numeric = 0
+
+    if numeric <= 1:
+        numeric *= 100
+
+    return int(max(0, min(100, round(numeric))))
 
 
 @router.post("/analyze")
@@ -247,6 +272,9 @@ async def analyze(
 ):
     db = get_db()
 
+    # ------------------------------------------------------------------
+    # 1. Company 조회
+    # ------------------------------------------------------------------
     company_data = (
         db.table("company")
         .select("*")
@@ -278,6 +306,17 @@ async def analyze(
         energy_cost_annual=data.get("energy_cost_annual"),
     )
 
+    company_context = {
+        "industry_code": company.industry_code or [],
+        "region": company.region or "",
+        "company_type": company.company_type or "",
+        "employee_count": company.employee_count,
+        "annual_revenue": company.annual_revenue,
+    }
+
+    # ------------------------------------------------------------------
+    # 2. Equipment 조회
+    # ------------------------------------------------------------------
     equipment_query = (
         db.table("equipment")
         .select("*")
@@ -310,50 +349,92 @@ async def analyze(
         scenario_b_investment_manwon=eq.get("scenario_b_investment_manwon"),
     )
 
+    # ------------------------------------------------------------------
+    # 3. ROI 계산
+    # ------------------------------------------------------------------
     try:
         roi_result = calculate_roi(equipment)
     except ValueError as exc:
         return {"success": False, "message": str(exc)}
 
-    company_context = {
-        "industry_code": company.industry_code or [],
-        "region": company.region or "",
-        "company_type": company.company_type or "",
-        "employee_count": company.employee_count,
-        "annual_revenue": company.annual_revenue,
-    }
-
+    # ------------------------------------------------------------------
+    # 4. 정책 후보/추천
+    #
+    # 기존 코드 문제:
+    # - 정책 오케스트레이션 실패 시 except에서 에러를 삼키고 success:true로 응답
+    # - raw_candidates가 몇 개인지, 어느 단계에서 실패했는지 프론트에서 확인 불가
+    #
+    # 수정:
+    # - 단계별 count/debug 응답 추가
+    # - raw_candidates 조회 성공 후 이후 단계가 실패해도 raw_candidates는 응답에 유지
+    # - matched_policy DB 삭제는 추천 결과 유무와 상관없이 실행
+    # ------------------------------------------------------------------
     raw_candidates = []
     matched_policies = []
+    queries = {"a": "", "b": ""}
+    a_candidates = []
+    b_candidates = []
+    merged = []
+    ranked = []
+
+    policy_status = "success"
+    policy_error = None
+    policy_stage = "not_started"
 
     try:
+        policy_stage = "raw_candidates"
         raw_candidates = get_policy_raw_candidates(company_context)
+        print("[analyze] company_context:", company_context)
+        print("[analyze] raw_candidates count:", len(raw_candidates))
 
+        policy_stage = "query_builder"
         queries = build_policy_queries_from_roi(equipment, roi_result)
+        print("[analyze] policy queries:", queries)
 
+        policy_stage = "rank_a"
         a_candidates = rank_candidates_by_query(
             raw_candidates,
-            queries["a"],
+            queries.get("a", ""),
             limit=10,
         )
+        print("[analyze] a_candidates count:", len(a_candidates))
+
+        policy_stage = "rank_b"
         b_candidates = rank_candidates_by_query(
             raw_candidates,
-            queries["b"],
+            queries.get("b", ""),
             limit=10,
         )
+        print("[analyze] b_candidates count:", len(b_candidates))
 
+        policy_stage = "merge"
         merged = merge_policy_candidates(a_candidates, b_candidates)
-        ranked = rerank_policies_with_roi(merged, roi_result)
+        print("[analyze] merged count:", len(merged))
 
+        policy_stage = "rerank"
+        ranked = rerank_policies_with_roi(merged, roi_result)
+        print("[analyze] ranked count:", len(ranked))
+
+        policy_stage = "llm_evaluate"
         matched_policies = evaluate_and_rerank_with_llm(
             ranked[:10],
             company_context,
             equipment.name,
             roi_result,
         )
+        print("[analyze] matched_policies count:", len(matched_policies))
+
+        if len(raw_candidates) == 0:
+            policy_status = "empty"
+            policy_error = "정책 DB에서 기업 조건에 맞는 1차 후보(raw_candidates)가 없습니다."
+        elif len(matched_policies) == 0:
+            policy_status = "empty"
+            policy_error = "1차 후보는 있으나 최종 추천 정책(matched_policies)이 없습니다."
 
     except Exception as exc:
-        print(f"정책 오케스트레이션 실패: {exc}")
+        policy_status = "error"
+        policy_error = f"{policy_stage}: {str(exc)}"
+        print(f"정책 오케스트레이션 실패[{policy_stage}]: {exc}")
 
     frontend_matched_policies = [
         _format_policy_for_frontend(policy)
@@ -364,13 +445,22 @@ async def analyze(
         for policy in raw_candidates
     ]
 
+    # ------------------------------------------------------------------
+    # 5. 결과 저장
+    # ------------------------------------------------------------------
     try:
+        # 같은 company/equipment 기준 기존 결과는 항상 먼저 정리합니다.
         db.table("roi_output").delete().eq("company_id", company_id).eq(
             "equipment_id",
             equipment_id,
         ).execute()
 
         db.table("draft_result").delete().eq("company_id", company_id).eq(
+            "equipment_id",
+            equipment_id,
+        ).execute()
+
+        db.table("matched_policy").delete().eq("company_id", company_id).eq(
             "equipment_id",
             equipment_id,
         ).execute()
@@ -385,15 +475,10 @@ async def analyze(
         ).execute()
 
     except Exception as exc:
-        print(f"roi_output 저장 실패: {exc}")
+        print(f"분석 결과 초기화/roi_output 저장 실패: {exc}")
 
     if frontend_matched_policies:
         try:
-            db.table("matched_policy").delete().eq("company_id", company_id).eq(
-                "equipment_id",
-                equipment_id,
-            ).execute()
-
             for policy in frontend_matched_policies:
                 policy_id = policy.get("id") or policy.get("policy_id") or None
 
@@ -406,15 +491,7 @@ async def analyze(
                         "equipment_id": equipment_id,
                         "policy_id": policy_id,
                         "title": policy.get("metadata", {}).get("title", ""),
-                        "match_score": int(
-                            policy.get(
-                                "hybrid_score",
-                                policy.get(
-                                    "final_score",
-                                    round(1 - policy.get("distance", 1), 3),
-                                ),
-                            ) * 100
-                        ),
+                        "match_score": _score_to_percent(policy),
                         "eligible": policy.get("eligible", True),
                         "reason": (
                             policy.get("reason")
@@ -431,6 +508,13 @@ async def analyze(
         except Exception as exc:
             print(f"matched_policy 저장 실패: {exc}")
 
+    if policy_status == "success":
+        response_message = "ROI 계산 및 정책 추천이 완료되었습니다."
+    elif policy_status == "empty":
+        response_message = "ROI 계산은 완료되었지만 조건에 맞는 정책 추천 결과가 없습니다."
+    else:
+        response_message = "ROI 계산은 완료되었지만 정책 추천 중 오류가 발생했습니다."
+
     return {
         "success": True,
         "data": {
@@ -439,6 +523,19 @@ async def analyze(
             "policies": frontend_matched_policies,
             "raw_candidates": frontend_raw_candidates,
             "total_candidates": len(raw_candidates),
-            "response": "ROI 계산 및 정책 추천이 완료되었습니다.",
+            "policy_status": policy_status,
+            "policy_error": policy_error,
+            "policy_debug": {
+                "stage": policy_stage,
+                "company_context": company_context,
+                "queries": queries,
+                "raw_candidates_count": len(raw_candidates),
+                "a_candidates_count": len(a_candidates),
+                "b_candidates_count": len(b_candidates),
+                "merged_count": len(merged),
+                "ranked_count": len(ranked),
+                "matched_policies_count": len(matched_policies),
+            },
+            "response": response_message,
         },
     }

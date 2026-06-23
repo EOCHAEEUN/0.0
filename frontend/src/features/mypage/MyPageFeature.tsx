@@ -40,6 +40,8 @@ import {
   submitUserPayload,
   submitCompanyPayload,
   submitEquipmentPayload,
+  updateEquipmentPayload,
+  deleteEquipmentPayload,
   fetchSavedOnboarding,
   buildApiUrl,
   loadStoredMyPageData,
@@ -313,7 +315,7 @@ export default function MyPage() {
     basic: false,
     company: false,
     equipment: false,
-    documents: true,
+    documents: false,
   });
   const [analysisBlockNoticeOpen, setAnalysisBlockNoticeOpen] = useState(false);
 
@@ -332,18 +334,14 @@ export default function MyPage() {
     storedData?.companyInfo ?? emptyCompanyInfo,
   );
 
-  const [equipmentList, setEquipmentList] = useState<EquipmentInfo[]>(
-    storedData?.equipmentList && storedData.equipmentList.length > 0
-      ? storedData.equipmentList
-      : [createEmptyEquipment(1)],
-  );
+  const [equipmentList, setEquipmentList] = useState<EquipmentInfo[]>([
+    createEmptyEquipment(1),
+  ]);
+
+  const [deletedEquipmentIds, setDeletedEquipmentIds] = useState<string[]>([]);
 
   const [selectedAnalysisEquipmentId, setSelectedAnalysisEquipmentId] =
-    useState<number | null>(
-      storedData?.selectedAnalysisEquipmentId ??
-        storedData?.equipmentList?.[0]?.id ??
-        1,
-    );
+    useState<number | null>(1);
 
   useEffect(() => {
     setBasicInfo((prev) => ({
@@ -499,6 +497,7 @@ export default function MyPage() {
           const firstRemoteEquipment = remoteEquipmentList[0];
 
           setEquipmentList(remoteEquipmentList);
+          setDeletedEquipmentIds([]);
           setSelectedAnalysisEquipmentId(firstRemoteEquipment?.id ?? 1);
 
           if (firstRemoteEquipment?.equipmentId) {
@@ -836,10 +835,20 @@ export default function MyPage() {
       return;
     }
 
-    setEquipmentList((prev) => prev.filter((equipment) => equipment.id !== id));
+    const targetEquipment = equipmentList.find((equipment) => equipment.id === id);
+
+    if (targetEquipment?.equipmentId) {
+      setDeletedEquipmentIds((prev) =>
+        prev.includes(targetEquipment.equipmentId as string)
+          ? prev
+          : [...prev, targetEquipment.equipmentId as string],
+      );
+    }
+
+    const remain = equipmentList.filter((equipment) => equipment.id !== id);
+    setEquipmentList(remain);
 
     if (selectedAnalysisEquipmentId === id) {
-      const remain = equipmentList.filter((equipment) => equipment.id !== id);
       setSelectedAnalysisEquipmentId(remain[0]?.id ?? null);
     }
   };
@@ -1024,6 +1033,7 @@ export default function MyPage() {
 
       return {
         localId: equipment.id,
+        equipmentId: equipment.equipmentId,
         payload: {
           name: equipment.name.trim(),
           category:
@@ -1068,32 +1078,47 @@ export default function MyPage() {
 
       let nextEquipmentList = [...equipmentList];
       const equipmentResponses = [];
+      const deletedEquipmentResponses = [];
+
+      for (const equipmentId of deletedEquipmentIds) {
+        console.log("삭제된 설비 DB 삭제 요청:", equipmentId);
+        const deletedResponse = await deleteEquipmentPayload(equipmentId);
+        deletedEquipmentResponses.push(deletedResponse);
+      }
 
       for (const item of equipmentPayloads) {
-        console.log("온보딩 equipment 요청 payload:", {
-          companyId,
-          equipmentPayload: item.payload,
-        });
+        const isExistingEquipment = Boolean(item.equipmentId);
+
         console.log(
-          "온보딩 equipment 최종 payload JSON:",
+          isExistingEquipment
+            ? "기존 설비 수정 요청 payload:"
+            : "신규 설비 생성 요청 payload:",
+          {
+            companyId,
+            equipmentId: item.equipmentId ?? null,
+            equipmentPayload: item.payload,
+          },
+        );
+        console.log(
+          "설비 저장 최종 payload JSON:",
           JSON.stringify(item.payload, null, 2),
         );
 
-        const equipmentResponse = await submitEquipmentPayload(
-          companyId,
-          item.payload,
-        );
+        const equipmentResponse = item.equipmentId
+          ? await updateEquipmentPayload(item.equipmentId, item.payload)
+          : await submitEquipmentPayload(companyId, item.payload);
 
         equipmentResponses.push(equipmentResponse);
 
-        const equipmentId = findEquipmentId(equipmentResponse);
+        const resolvedEquipmentId =
+          item.equipmentId ?? findEquipmentId(equipmentResponse) ?? undefined;
 
-        if (equipmentId) {
+        if (resolvedEquipmentId) {
           nextEquipmentList = nextEquipmentList.map((equipment) =>
             equipment.id === item.localId
               ? {
                   ...equipment,
-                  equipmentId,
+                  equipmentId: resolvedEquipmentId,
                 }
               : equipment,
           );
@@ -1129,8 +1154,31 @@ export default function MyPage() {
       };
 
       const savedOnboarding = await fetchSavedOnboarding();
+      const savedOnboardingData = extractOnboardingMeData(savedOnboarding);
+      const savedEquipments = Array.isArray(savedOnboardingData.equipments)
+        ? savedOnboardingData.equipments
+        : [];
 
-      setEquipmentList(nextEquipmentList);
+      if (savedEquipments.length > 0) {
+        const remoteEquipmentList = savedEquipments.map(mapRemoteEquipment);
+        setEquipmentList(remoteEquipmentList);
+
+        const selectedRemoteEquipment = selectedEquipmentUuid
+          ? remoteEquipmentList.find(
+              (equipment) => equipment.equipmentId === selectedEquipmentUuid,
+            )
+          : null;
+
+        setSelectedAnalysisEquipmentId(
+          selectedRemoteEquipment?.id ?? remoteEquipmentList[0]?.id ?? 1,
+        );
+      } else {
+        setEquipmentList([createEmptyEquipment(1)]);
+        setSelectedAnalysisEquipmentId(1);
+      }
+
+      setDeletedEquipmentIds([]);
+
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(storageData));
 
       if (userId) {
@@ -1146,6 +1194,7 @@ export default function MyPage() {
       console.log("저장된 company_id:", companyId);
       console.log("company 저장 응답:", companyResponseData);
       console.log("equipment 저장 응답:", equipmentResponses);
+      console.log("equipment 삭제 응답:", deletedEquipmentResponses);
       console.log("온보딩 조회 응답:", savedOnboarding);
 
       setSaved(true);
@@ -1393,7 +1442,7 @@ export default function MyPage() {
           <div
             style={{
               display: "grid",
-              gap: "24px",
+              gap: "28px",
             }}
           >
             <AccordionPanel
@@ -2815,9 +2864,6 @@ export default function MyPage() {
                 })}
               </div>
             </AccordionPanel>
-          </div>
-
-
 
             <AccordionPanel
               id="document-upload-form"
@@ -2829,6 +2875,7 @@ export default function MyPage() {
             >
               <MyPageDocumentUploadPanel />
             </AccordionPanel>
+          </div>
 
           <section
             style={{

@@ -301,6 +301,10 @@ def save_check_status(
         "evidence_file_url": request.evidence_file_url,
     }
 
+    # 작업 전 점검일 때만 추가 (None으로 덮어쓰는 것 방지)
+    if request.is_pre_work_check:
+        payload["pre_work_checked_date"] = request.last_checked_at.isoformat()
+        
     result = (
         db.table("safety_check_status")
         .upsert(payload, on_conflict="company_id,equipment_id,rule_id")

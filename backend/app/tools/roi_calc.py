@@ -19,6 +19,7 @@ LangChain, Tool, Agent와는 완전히 독립적이며,
 from __future__ import annotations
 from typing import Optional
 from app.models.equipment import EquipmentInput
+from app.tools.equipment_normalizer import normalize_equipment_category
 # ==================== 2. 투자금 추정 테이블 ====================
 INVESTMENT_TABLE = {
     "press": [
@@ -139,14 +140,11 @@ def _build_scenario(
     scenario_key: str,
     investment_override: Optional[int],
 ) -> dict:
-    # category 정규화 추가
-    category = equipment.category.lower()
-    if "프레스" in category or "press" in category:
-        category = "press"
-    elif "cnc" in category:
-        category = "cnc"
-    elif "사출" in category or "injection" in category:
-        category = "injection"
+    category = normalize_equipment_category(
+        equipment.category,
+        equipment.name,
+        equipment.process,
+    )
 
     s = bench[scenario_key]
 
@@ -375,14 +373,11 @@ def _calc_ai_recommendation(
 # ==================== 5. 메인 계산 ====================
 def calculate_roi(equipment: EquipmentInput) -> dict:
 
-    # category 정규화
-    category = equipment.category.lower()
-    if "프레스" in category or "press" in category:
-        category = "press"
-    elif "cnc" in category:
-        category = "cnc"
-    elif "사출" in category or "injection" in category:
-        category = "injection"
+    category = normalize_equipment_category(
+        equipment.category,
+        equipment.name,
+        equipment.process,
+    )
 
     bench = BENCHMARKS.get(category)
 

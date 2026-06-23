@@ -788,27 +788,32 @@ export async function submitEquipmentPayload(
   companyId: string,
   payload: EquipmentPayload,
 ) {
+  const equipmentId = payload.equipment_id?.trim();
+
+  if (equipmentId) {
+    const { equipment_id: _ignoredEquipmentId, ...updatePayload } = payload;
+    void _ignoredEquipmentId;
+
+    return requestJson(
+      `/api/equipment/${encodeURIComponent(equipmentId)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify(updatePayload),
+      },
+      "설비 수정 API",
+    );
+  }
+
+  const { equipment_id: _ignoredEquipmentId, ...createPayload } = payload;
+  void _ignoredEquipmentId;
+
   return requestJson(
     `/api/onboarding/${encodeURIComponent(companyId)}/equipment`,
     {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify(createPayload),
     },
-    "신규 설비 생성 API",
-  );
-}
-
-export async function updateEquipmentPayload(
-  equipmentId: string,
-  payload: EquipmentPayload,
-) {
-  return requestJson(
-    `/api/equipment/${encodeURIComponent(equipmentId)}`,
-    {
-      method: "PATCH",
-      body: JSON.stringify(payload),
-    },
-    "기존 설비 수정 API",
+    "설비 신규 등록 API",
   );
 }
 
@@ -1397,7 +1402,7 @@ export function hasRequiredEquipmentFields(equipment: EquipmentInfo) {
   return Boolean(categoryReady && nameReady && yearsReady && energyReady);
 }
 
-export type MyPagePanelKey = "basic" | "company" | "equipment";
+export type MyPagePanelKey = "basic" | "company" | "equipment" | "documents";
 
 export const COMPANY_TYPE_OPTIONS = [
   "선택 필요",

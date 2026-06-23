@@ -53,6 +53,7 @@ export function ApplicationDraftFeature() {
           />
 
           <ApplicationDraftPdfPreview
+            model={draft}
             scenarioLabel={draft.scenarioLabel}
             expectedBenefits={draft.expectedBenefits}
             draftStatus={draft.draftStatus}

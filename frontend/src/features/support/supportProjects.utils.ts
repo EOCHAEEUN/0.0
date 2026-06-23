@@ -504,17 +504,47 @@ function normalizeScenario(policy: PolicyApiItem, index: number): ScenarioKey {
 
 function getPolicySourceUrl(policy: PolicyApiItem) {
   const metadata = getMetadataRecord(policy)
+  const policyRecord = policy as unknown as Record<string, unknown>
+
   return getFirstText(
     policy.source_url,
     policy.policy_url,
     policy.url,
     policy.notice_url,
     policy.homepage_url,
+    getFieldText(
+      policyRecord,
+      "detail_url",
+      "apply_url",
+      "link",
+      "homepage",
+      "source_link",
+      "notice_link",
+      "pblanc_url",
+      "pblancUrl",
+      "pblanc_url_addr",
+      "biz_url",
+      "business_url",
+    ),
     metadata.source_url,
     metadata.policy_url,
     metadata.url,
     metadata.notice_url,
     metadata.homepage_url,
+    getFieldText(
+      metadata,
+      "detail_url",
+      "apply_url",
+      "link",
+      "homepage",
+      "source_link",
+      "notice_link",
+      "pblanc_url",
+      "pblancUrl",
+      "pblanc_url_addr",
+      "biz_url",
+      "business_url",
+    ),
   )
 }
 
@@ -531,6 +561,12 @@ export function mapPolicyToProject(policy: PolicyApiItem, index: number): Suppor
       "subsidy_amount",
       "support_limit",
       "limit_amount",
+      "max_support_amount",
+      "support_amount_manwon",
+      "subsidy_amount_manwon",
+      "budget_amount",
+      "budget_manwon",
+      "amount",
     ) ??
       getFieldValue(
         metadata,
@@ -540,6 +576,12 @@ export function mapPolicyToProject(policy: PolicyApiItem, index: number): Suppor
         "subsidy_amount",
         "support_limit",
         "limit_amount",
+        "max_support_amount",
+        "support_amount_manwon",
+        "subsidy_amount_manwon",
+        "budget_amount",
+        "budget_manwon",
+        "amount",
       ),
   )
   const scenario = normalizeScenario(policy, index)
@@ -564,8 +606,47 @@ export function mapPolicyToProject(policy: PolicyApiItem, index: number): Suppor
     policy.agency,
     policy.organization,
     policy.provider,
-    getFieldText(policyRecord, "ministry", "department", "host", "sponsor"),
-    getFieldText(metadata, "agency", "organization", "provider", "ministry", "department", "host", "sponsor"),
+    getFieldText(
+      policyRecord,
+      "ministry",
+      "department",
+      "host",
+      "sponsor",
+      "agency_name",
+      "organization_name",
+      "provider_name",
+      "supervising_agency",
+      "operating_agency",
+      "institution",
+      "institution_name",
+      "organizer",
+      "department_name",
+      "managing_agency",
+      "support_agency",
+      "jurisdiction",
+    ),
+    getFieldText(
+      metadata,
+      "agency",
+      "organization",
+      "provider",
+      "ministry",
+      "department",
+      "host",
+      "sponsor",
+      "agency_name",
+      "organization_name",
+      "provider_name",
+      "supervising_agency",
+      "operating_agency",
+      "institution",
+      "institution_name",
+      "organizer",
+      "department_name",
+      "managing_agency",
+      "support_agency",
+      "jurisdiction",
+    ),
     "주관사 미확인",
   )
   const rawDeadline = getFirstText(
@@ -575,12 +656,31 @@ export function mapPolicyToProject(policy: PolicyApiItem, index: number): Suppor
     policy.application_end_date,
     policy.reception_end_date,
     getFieldText(
+      policyRecord,
+      "close_date",
+      "deadline_date",
+      "apply_end_date",
+      "reception_deadline",
+      "receipt_end_date",
+      "pblanc_end_date",
+      "end_dt",
+      "biz_end_date",
+    ),
+    getFieldText(
       metadata,
       "deadline",
       "deadline_display",
       "end_date",
       "application_end_date",
       "reception_end_date",
+      "close_date",
+      "deadline_date",
+      "apply_end_date",
+      "reception_deadline",
+      "receipt_end_date",
+      "pblanc_end_date",
+      "end_dt",
+      "biz_end_date",
     ),
   )
   const rawPostedDate = getFirstText(
@@ -593,6 +693,17 @@ export function mapPolicyToProject(policy: PolicyApiItem, index: number): Suppor
     policy.application_start_date,
     policy.reception_start_date,
     getFieldText(
+      policyRecord,
+      "open_date",
+      "announcement_date",
+      "announce_date",
+      "created_date",
+      "reg_date",
+      "pblanc_begin_date",
+      "start_dt",
+      "biz_start_date",
+    ),
+    getFieldText(
       metadata,
       "posted_date",
       "start_date",
@@ -602,6 +713,14 @@ export function mapPolicyToProject(policy: PolicyApiItem, index: number): Suppor
       "notice_date",
       "application_start_date",
       "reception_start_date",
+      "open_date",
+      "announcement_date",
+      "announce_date",
+      "created_date",
+      "reg_date",
+      "pblanc_begin_date",
+      "start_dt",
+      "biz_start_date",
     ),
   )
   const supportContent = getFirstText(
@@ -612,26 +731,50 @@ export function mapPolicyToProject(policy: PolicyApiItem, index: number): Suppor
     policy.content,
     policy.description,
     getFieldText(
+      policyRecord,
+      "raw_text",
+      "rawText",
+      "detail_content",
+      "detailContent",
+      "business_content",
+      "support_detail",
+      "supportDetail",
+      "notice_content",
+      "pblanc_content",
+      "body",
+    ),
+    getFieldText(
       metadata,
       "support_content",
       "supportContent",
       "support_summary",
       "summary",
+      "raw_text",
+      "rawText",
       "content",
       "description",
+      "detail_content",
+      "detailContent",
+      "business_content",
+      "support_detail",
+      "supportDetail",
+      "notice_content",
+      "pblanc_content",
+      "body",
     ),
     "지원내용 준비 중",
   )
   const reasonText = getFirstText(
     policy.reason,
     getFieldText(metadata, "reason"),
-    supportContent,
-    "RAG 유사도 기반 매칭",
+    policy.scenario_label,
+    getFieldText(metadata, "scenario_label"),
+    "업종·지역·설비 정보와 정책 조건을 기준으로 추천되었습니다.",
   )
-  const reasons = normalizeReasonList(policy.ai_reasons)
-    .concat(normalizeReasonList(policy.reasons))
-    .concat(normalizeReasonList(policy.reason))
+  const reasons = normalizeReasonList(policy.reason)
     .concat(normalizeReasonList(getFieldValue(metadata, "reason")))
+    .concat(normalizeReasonList(policy.ai_reasons))
+    .concat(normalizeReasonList(policy.reasons))
     .slice(0, 5)
   const rawId = String(
     policy.policy_id ??
@@ -934,12 +1077,9 @@ export function getDotFillRatio(score: number, dotIndex: number) {
 }
 
 export function getPolicyReasonSummary(project: SupportProject, equipmentName: string) {
-  const firstReason = project.reasons[0] || project.reasonText || "RAG 유사도 기반 매칭"
-  const secondReason = project.reasons[1]
+  const firstReason = project.reasonText || project.reasons[0]
 
   return [
-    firstReason,
-    secondReason || `${equipmentName} 투자 목적과 정책 지원 방향의 유사도가 높습니다.`,
-    `현재 추천 적합도는 ${project.fitScore}%이며, 최종 추천 5개 중 우선 검토 대상으로 판단됩니다.`,
+    firstReason || `${equipmentName} 기준 업종·지역·설비 정보와 정책 조건을 바탕으로 추천되었습니다.`,
   ]
 }

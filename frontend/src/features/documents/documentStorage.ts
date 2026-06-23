@@ -7,16 +7,42 @@ export type StoredDocument = {
   uploadedAt: string
 }
 
-export const DOCUMENT_OPTIONS = [
-  "사업자등록증",
-  "재무제표",
-  "설비 견적서",
-  "공장등록증",
-  "4대보험 가입자 명부",
-  "국세·지방세 완납증명서",
-  "중소기업 확인서",
-  "기타 증빙서류",
-]
+export const DOCUMENT_GROUPS = [
+  {
+    label: "기업증빙",
+    options: [
+      "사업자등록증",
+      "공장등록증",
+      "법인등기부등본",
+      "중소기업확인서",
+      "재무제표",
+    ],
+  },
+  {
+    label: "세무증빙",
+    options: [
+      "견적서",
+      "국세 납세증명서",
+      "지방세 납세증명서",
+      "부가가치세과세표준증명원",
+      "통장사본",
+    ],
+  },
+  {
+    label: "기타증빙",
+    options: [
+      "참여확약서",
+      "기업부설연구소인정서",
+      "4대보험 가입자명부",
+    ],
+  },
+] as const
+
+export type DocumentGroupLabel = (typeof DOCUMENT_GROUPS)[number]["label"]
+
+export const DOCUMENT_OPTIONS = DOCUMENT_GROUPS.flatMap((group) => [
+  ...group.options,
+])
 
 export function normalizeDocumentName(value: string) {
   return String(value || "")

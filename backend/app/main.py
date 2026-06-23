@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import chat, dashboard, industry, onboarding, policies, roi, safety,analyze, auth
+from app.routers import chat, industry, onboarding, safety, analyze, auth, draft, reports, documents
 
 app = FastAPI(
     title="FactoFit API",
@@ -26,9 +26,9 @@ app.add_middleware(
 app.include_router(chat.router, prefix="/api", tags=["chat"])
 app.include_router(auth.router, prefix="/api", tags=["auth"])
 app.include_router(onboarding.router, prefix="/api", tags=["onboarding"])
-app.include_router(roi.router, prefix="/api", tags=["roi"])
-app.include_router(dashboard.router, prefix="/api", tags=["dashboard"])
-app.include_router(policies.router, prefix="/api", tags=["policies"])
 app.include_router(industry.router, prefix="/api", tags=["industry"])
 app.include_router(safety.router, prefix="/api", tags=["safety"])
 app.include_router(analyze.router, prefix="/api", tags=["analyze"])
+app.include_router(draft.router, prefix="/api", tags=["draft"])
+app.include_router(reports.router, prefix="/api", tags=["reports"])
+app.include_router(documents.router, prefix="/api", tags=["documents"])

@@ -16,7 +16,7 @@ class CompanyOnboarding(BaseModel): # 회원가입에서 받는 정보
     primary_purpose: list[str] = Field(default_factory=list)
     employee_count: Optional[int] = Field(default=None, ge=0)
     annual_revenue: int = Field(ge=0)
-    
+
 class CompanyUpdate(BaseModel): #마이페이지에서 받는 정보
     company_name: Optional[str] = None
     business_registration_no: Optional[str] = None

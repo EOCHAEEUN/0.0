@@ -1,20 +1,30 @@
 import { useMemo, useRef, useState, type DragEvent } from "react"
 import {
-  DOCUMENT_OPTIONS,
+  DOCUMENT_GROUPS,
   createStoredDocument,
   normalizeDocumentName,
   readStoredDocuments,
   writeStoredDocuments,
+  type DocumentGroupLabel,
   type StoredDocument,
 } from "../documents/documentStorage"
 
 export function MyPageDocumentUploadPanel() {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const [selectedDocument, setSelectedDocument] = useState(DOCUMENT_OPTIONS[2])
+  const defaultGroup = DOCUMENT_GROUPS[0]
+  const [selectedGroup, setSelectedGroup] = useState<DocumentGroupLabel>(
+    defaultGroup.label,
+  )
+  const [selectedDocument, setSelectedDocument] = useState<string>(defaultGroup.options[0])
   const [selectedFileName, setSelectedFileName] = useState("")
   const [dragOver, setDragOver] = useState(false)
   const [documents, setDocuments] = useState<StoredDocument[]>(() =>
     readStoredDocuments(),
+  )
+
+  const selectedGroupInfo = useMemo(
+    () => DOCUMENT_GROUPS.find((group) => group.label === selectedGroup) ?? DOCUMENT_GROUPS[0],
+    [selectedGroup],
   )
 
   const savedDocumentNames = useMemo(
@@ -25,6 +35,14 @@ export function MyPageDocumentUploadPanel() {
   const saveDocuments = (nextDocuments: StoredDocument[]) => {
     setDocuments(nextDocuments)
     writeStoredDocuments(nextDocuments)
+  }
+
+  const handleGroupSelect = (groupLabel: DocumentGroupLabel) => {
+    const nextGroup = DOCUMENT_GROUPS.find((group) => group.label === groupLabel)
+    if (!nextGroup) return
+
+    setSelectedGroup(groupLabel)
+    setSelectedDocument(nextGroup.options[0])
   }
 
   const handleFileSelect = (fileName: string) => {
@@ -78,11 +96,39 @@ export function MyPageDocumentUploadPanel() {
           gap: 12px;
         }
 
-        .ff-doc-upload-field label {
+        .ff-doc-upload-field label,
+        .ff-doc-sub-label {
           color: #061B34;
           font-size: 16px;
           font-weight: 950;
           letter-spacing: -0.03em;
+        }
+
+        .ff-doc-group-chips {
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+        }
+
+        .ff-doc-group-chip {
+          min-height: 42px;
+          border-radius: 999px;
+          border: 1px solid #DCE3F0;
+          background: #FFFFFF;
+          color: #475569;
+          padding: 0 16px;
+          font-size: 14px;
+          font-weight: 900;
+          letter-spacing: -0.03em;
+          cursor: pointer;
+          transition: .18s ease;
+        }
+
+        .ff-doc-group-chip.is-active {
+          border-color: rgba(52,75,160,.28);
+          background: #F1F5FF;
+          color: #244BC3;
+          box-shadow: 0 8px 18px rgba(36,75,195,.08);
         }
 
         .ff-doc-select,
@@ -143,7 +189,7 @@ export function MyPageDocumentUploadPanel() {
 
         .ff-doc-upload-actions {
           display: flex;
-          justify-content: flex-start;
+          justify-content: flex-end;
         }
 
         .ff-doc-add-button {
@@ -254,14 +300,30 @@ export function MyPageDocumentUploadPanel() {
 
       <div className="ff-doc-upload-grid">
         <div className="ff-doc-upload-field">
-          <label htmlFor="mypage-document-name">서류명 선택</label>
+          <label>증빙 서류 구분</label>
+          <div className="ff-doc-group-chips" role="tablist" aria-label="증빙 서류 구분">
+            {DOCUMENT_GROUPS.map((group) => (
+              <button
+                key={group.label}
+                type="button"
+                role="tab"
+                aria-selected={selectedGroup === group.label}
+                className={`ff-doc-group-chip${selectedGroup === group.label ? " is-active" : ""}`}
+                onClick={() => handleGroupSelect(group.label)}
+              >
+                {group.label}
+              </button>
+            ))}
+          </div>
+
+          <span className="ff-doc-sub-label">서류명 선택</span>
           <select
             id="mypage-document-name"
             className="ff-doc-select"
             value={selectedDocument}
             onChange={(event) => setSelectedDocument(event.target.value)}
           >
-            {DOCUMENT_OPTIONS.map((documentName) => (
+            {selectedGroupInfo.options.map((documentName) => (
               <option key={documentName} value={documentName}>
                 {documentName}
                 {savedDocumentNames.has(normalizeDocumentName(documentName))
@@ -328,12 +390,6 @@ export function MyPageDocumentUploadPanel() {
         </div>
       </div>
 
-      <div className="ff-doc-upload-actions">
-        <button type="button" className="ff-doc-add-button" onClick={handleAddDocument}>
-          추가하기
-        </button>
-      </div>
-
       <div className="ff-doc-saved-card">
         <div className="ff-doc-saved-title">
           <h3>등록된 첨부파일</h3>
@@ -357,6 +413,12 @@ export function MyPageDocumentUploadPanel() {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="ff-doc-upload-actions">
+        <button type="button" className="ff-doc-add-button" onClick={handleAddDocument}>
+          추가하기
+        </button>
       </div>
     </div>
   )

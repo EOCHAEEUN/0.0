@@ -1,0 +1,462 @@
+.ff-advisor-floating-button {
+  background: transparent;
+  border: 0;
+  bottom: 32px;
+  cursor: pointer;
+  height: 92px;
+  padding: 0;
+  position: fixed;
+  right: 32px;
+  width: 92px;
+  z-index: 80;
+}
+
+.ff-advisor-floating-ring {
+  align-items: center;
+  background: #ffffff;
+  border-radius: 999px;
+  box-shadow: 0 18px 42px rgba(9, 16, 32, 0.26);
+  display: flex;
+  height: 92px;
+  justify-content: center;
+  overflow: hidden;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  width: 92px;
+}
+
+.ff-advisor-floating-button img {
+  display: block;
+  height: 92px;
+  object-fit: cover;
+  width: 92px;
+}
+
+.ff-advisor-floating-button:hover .ff-advisor-floating-ring {
+  box-shadow: 0 22px 52px rgba(9, 16, 32, 0.32);
+  transform: translateY(-3px) scale(1.02);
+}
+
+.ff-advisor-floating-button.is-open .ff-advisor-floating-ring {
+  transform: scale(0.92);
+}
+
+.ff-advisor-agent-shell {
+  align-items: center;
+  background: rgba(5, 9, 20, 0.58);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 28px;
+  position: fixed;
+  z-index: 90;
+}
+
+.ff-advisor-agent-stage {
+  background:
+    radial-gradient(circle at 18% 10%, rgba(216, 173, 67, 0.16), transparent 28%),
+    linear-gradient(180deg, #f8f9fc 0%, #f4f6fb 100%);
+  border-radius: 32px;
+  box-shadow: 0 30px 90px rgba(0, 11, 32, 0.32);
+  max-height: min(900px, 94vh);
+  max-width: 1040px;
+  overflow: hidden;
+  position: relative;
+  width: min(1040px, 100%);
+}
+
+.ff-advisor-agent-header {
+  align-items: center;
+  background: #171b49;
+  color: #fff;
+  display: flex;
+  justify-content: space-between;
+  min-height: 118px;
+  padding: 0 34px;
+}
+
+.ff-advisor-brand-block {
+  align-items: center;
+  display: flex;
+  gap: 18px;
+}
+
+.ff-advisor-brand-icon {
+  align-items: center;
+  background: #fff;
+  border-radius: 24px;
+  display: flex;
+  height: 76px;
+  justify-content: center;
+  overflow: hidden;
+  width: 76px;
+}
+
+.ff-advisor-brand-icon img {
+  height: 76px;
+  object-fit: cover;
+  width: 76px;
+}
+
+.ff-advisor-brand-block span {
+  color: rgba(216, 173, 67, 0.95);
+  display: block;
+  font-size: 14px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
+}
+
+.ff-advisor-brand-block h2 {
+  font-size: 30px;
+  letter-spacing: -0.04em;
+  margin: 0;
+}
+
+.ff-advisor-agent-header > button {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  font-size: 48px;
+  font-weight: 200;
+  height: 72px;
+  justify-content: center;
+  line-height: 1;
+  width: 72px;
+}
+
+.ff-advisor-agent-main {
+  max-height: calc(min(900px, 94vh) - 118px);
+  overflow-y: auto;
+  padding: 36px;
+}
+
+.ff-advisor-agent-hero {
+  align-items: stretch;
+  background: #101527;
+  border-radius: 28px;
+  color: #fff;
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  margin-bottom: 22px;
+  padding: 34px;
+}
+
+.ff-advisor-mini-pill {
+  background: rgba(216, 173, 67, 0.14);
+  border: 1px solid rgba(216, 173, 67, 0.36);
+  border-radius: 999px;
+  color: #f0d47b;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+  margin-bottom: 18px;
+  padding: 8px 14px;
+}
+
+.ff-advisor-agent-hero h3 {
+  font-size: 38px;
+  letter-spacing: -0.05em;
+  line-height: 1.2;
+  margin: 0 0 16px;
+}
+
+.ff-advisor-agent-hero p {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 15px;
+  line-height: 1.75;
+  margin: 0;
+  max-width: 540px;
+}
+
+.ff-advisor-bot-card {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 220px;
+  padding: 22px;
+  text-align: center;
+}
+
+.ff-advisor-bot-card img {
+  height: 118px;
+  margin-bottom: 12px;
+  object-fit: contain;
+  width: 118px;
+}
+
+.ff-advisor-bot-card strong {
+  display: block;
+  font-size: 20px;
+  margin-bottom: 8px;
+}
+
+.ff-advisor-bot-card span {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.ff-advisor-stage-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 22px;
+}
+
+.ff-advisor-stage-grid article {
+  background: #fff;
+  border: 1px solid #e3e6ef;
+  border-radius: 20px;
+  box-shadow: 0 12px 28px rgba(13, 24, 52, 0.06);
+  padding: 20px;
+}
+
+.ff-advisor-stage-grid span {
+  color: #d8ad43;
+  display: block;
+  font-size: 12px;
+  font-weight: 950;
+  margin-bottom: 10px;
+}
+
+.ff-advisor-stage-grid strong {
+  color: #11172a;
+  display: block;
+  font-size: 17px;
+  margin-bottom: 8px;
+}
+
+.ff-advisor-stage-grid p {
+  color: #747b8d;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.ff-advisor-action-card,
+.ff-advisor-chat-card,
+.ff-advisor-agent-footer {
+  background: #fff;
+  border: 1px solid #e3e6ef;
+  border-radius: 24px;
+  box-shadow: 0 14px 36px rgba(13, 24, 52, 0.06);
+  margin-bottom: 22px;
+  padding: 24px;
+}
+
+.ff-advisor-section-head {
+  align-items: flex-start;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.ff-advisor-section-head h4 {
+  color: #11172a;
+  font-size: 21px;
+  letter-spacing: -0.03em;
+  margin: 0 0 6px;
+}
+
+.ff-advisor-section-head p {
+  color: #747b8d;
+  font-size: 13px;
+  margin: 0;
+}
+
+.ff-advisor-loading {
+  background: #f6eddb;
+  border-radius: 999px;
+  color: #8a641f;
+  font-size: 12px;
+  font-weight: 950;
+  padding: 8px 12px;
+}
+
+.ff-advisor-quick-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.ff-advisor-quick-grid button {
+  background: #fbfbfd;
+  border: 1px solid #e4e6ef;
+  border-radius: 18px;
+  color: #11172a;
+  cursor: pointer;
+  min-height: 116px;
+  padding: 18px;
+  text-align: left;
+}
+
+.ff-advisor-quick-grid button:hover {
+  border-color: #d8ad43;
+  box-shadow: 0 12px 24px rgba(216, 173, 67, 0.12);
+}
+
+.ff-advisor-quick-grid b {
+  display: block;
+  font-size: 16px;
+  margin-bottom: 9px;
+}
+
+.ff-advisor-quick-grid span {
+  color: #747b8d;
+  display: block;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.ff-advisor-message-list {
+  background: #f7f8fc;
+  border: 1px solid #edf0f6;
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 280px;
+  min-height: 210px;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.ff-advisor-message {
+  border-radius: 18px;
+  font-size: 14px;
+  line-height: 1.75;
+  max-width: 82%;
+  padding: 14px 16px;
+}
+
+.ff-advisor-message.assistant {
+  align-self: flex-start;
+  background: #fff;
+  border: 1px solid #e3e6ef;
+  color: #343a4a;
+}
+
+.ff-advisor-message.user {
+  align-self: flex-end;
+  background: #31377d;
+  color: #fff;
+}
+
+.ff-advisor-input-row {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr 118px;
+  margin-top: 16px;
+}
+
+.ff-advisor-input-row input {
+  border: 1px solid #e0e3ec;
+  border-radius: 16px;
+  color: #11172a;
+  font-size: 15px;
+  font-weight: 800;
+  min-height: 56px;
+  padding: 0 18px;
+}
+
+.ff-advisor-input-row input::placeholder {
+  color: #9aa1b0;
+}
+
+.ff-advisor-input-row button {
+  background: #31377d;
+  border: 0;
+  border-radius: 16px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 950;
+}
+
+.ff-advisor-input-row button:disabled {
+  background: #aeb4c6;
+  cursor: not-allowed;
+}
+
+.ff-advisor-agent-footer {
+  align-items: center;
+  display: flex;
+  gap: 14px;
+  margin-bottom: 0;
+}
+
+.ff-advisor-agent-footer b {
+  color: #11172a;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.ff-advisor-agent-footer span {
+  color: #747b8d;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .ff-advisor-agent-shell {
+    padding: 16px;
+  }
+
+  .ff-advisor-agent-hero,
+  .ff-advisor-stage-grid,
+  .ff-advisor-quick-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ff-advisor-agent-header {
+    padding: 0 22px;
+  }
+
+  .ff-advisor-agent-main {
+    padding: 22px;
+  }
+
+  .ff-advisor-floating-button {
+    bottom: 22px;
+    right: 22px;
+  }
+}
+
+@media (max-width: 560px) {
+  .ff-advisor-floating-button,
+  .ff-advisor-floating-ring,
+  .ff-advisor-floating-button img {
+    height: 74px;
+    width: 74px;
+  }
+
+  .ff-advisor-agent-stage {
+    border-radius: 24px;
+    max-height: 96vh;
+  }
+
+  .ff-advisor-brand-block h2 {
+    font-size: 24px;
+  }
+
+  .ff-advisor-agent-header > button {
+    height: 54px;
+    width: 54px;
+  }
+
+  .ff-advisor-input-row {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -25,17 +25,98 @@ class DraftRequest(BaseModel):
 def _normalize_industry_code(value: Any) -> list[str]:
     if value is None:
         return []
+
     if isinstance(value, list):
         return [str(code).strip() for code in value if str(code).strip()]
-    return [code.strip() for code in str(value).split(",") if code.strip()]
+
+    text = str(value).strip()
+    if not text:
+        return []
+
+    if text.startswith("{") and text.endswith("}"):
+        text = text[1:-1]
+
+    return [
+        code.strip().strip('"').strip("'")
+        for code in text.split(",")
+        if code.strip().strip('"').strip("'")
+    ]
+
+
+def _normalize_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+
+    text = str(value).strip()
+    if not text:
+        return []
+
+    if text.startswith("{") and text.endswith("}"):
+        text = text[1:-1]
+
+    return [
+        item.strip().strip('"').strip("'")
+        for item in text.split(",")
+        if item.strip().strip('"').strip("'")
+    ]
 
 
 def _normalize_scenario_match(value: Any) -> list[str]:
     if value is None:
         return []
+
     if isinstance(value, list):
-        return [str(item).lower() for item in value if str(item).strip()]
-    return [str(value).lower()]
+        return [str(item).strip().lower() for item in value if str(item).strip()]
+
+    text = str(value).strip().lower()
+    if not text:
+        return []
+
+    if text.startswith("{") and text.endswith("}"):
+        text = text[1:-1]
+
+    return [
+        item.strip().strip('"').strip("'").lower()
+        for item in text.split(",")
+        if item.strip().strip('"').strip("'")
+    ]
+
+
+def _safe_text(*values: Any, default: str = "") -> str:
+    for value in values:
+        if value is None:
+            continue
+
+        text = str(value).strip()
+        if text:
+            return text
+
+    return default
+
+
+def _safe_number(*values: Any) -> float | int | None:
+    for value in values:
+        if value is None or value == "":
+            continue
+
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            continue
+
+        if number.is_integer():
+            return int(number)
+
+        return number
+
+    return None
+
+
+def _as_dict(value: Any) -> dict:
+    return value if isinstance(value, dict) else {}
 
 
 def _resolve_draft_scenario(policy: dict, roi_data: dict) -> tuple[str, dict]:
@@ -44,157 +125,331 @@ def _resolve_draft_scenario(policy: dict, roi_data: dict) -> tuple[str, dict]:
 
     A: use scenario_a
     B: use scenario_b
-    C: common-fit policy, but agreed draft basis is recommended A -> scenario_a
+    C or A+B: common-fit policy, but draft basis defaults to scenario_a.
     """
     scenario_match = _normalize_scenario_match(policy.get("scenario_match"))
 
     if "c" in scenario_match or set(scenario_match) == {"a", "b"}:
-        return "a", roi_data.get("scenario_a", {})
+        return "a", _as_dict(roi_data.get("scenario_a"))
+
     if "a" in scenario_match:
-        return "a", roi_data.get("scenario_a", {})
+        return "a", _as_dict(roi_data.get("scenario_a"))
+
     if "b" in scenario_match:
-        return "b", roi_data.get("scenario_b", {})
+        return "b", _as_dict(roi_data.get("scenario_b"))
 
-    return "a", roi_data.get("scenario_a", {})
+    recommended = _safe_text(
+        roi_data.get("recommended"),
+        roi_data.get("recommended_scenario"),
+        roi_data.get("selected_scenario"),
+    ).lower()
 
+    if "b" in recommended:
+        return "b", _as_dict(roi_data.get("scenario_b"))
 
-def _parse_date(value: Any) -> date | None:
-    if value is None:
-        return None
-    if isinstance(value, datetime):
-        return value.date()
-    if isinstance(value, date):
-        return value
-    if isinstance(value, str):
-        try:
-            return datetime.fromisoformat(value.replace("Z", "+00:00")).date()
-        except ValueError:
-            return None
-    return None
+    return "a", _as_dict(roi_data.get("scenario_a"))
 
 
-def _status_period_date(row: dict) -> date | None:
-    for key in (
-        "due_date",
-        "due_at",
-        "scheduled_at",
-        "target_date",
-        "check_date",
-        "checked_at",
-        "completed_at",
-        "updated_at",
-        "created_at",
-    ):
-        parsed = _parse_date(row.get(key))
-        if parsed:
-            return parsed
-    return None
+def _get_scenario_investment(scenario: dict, equipment_data: dict, scenario_used: str):
+    if scenario_used == "b":
+        fallback_investment = equipment_data.get("scenario_b_investment_manwon")
+    else:
+        fallback_investment = equipment_data.get("scenario_a_investment_manwon")
+
+    return _safe_number(
+        scenario.get("investment_manwon"),
+        scenario.get("total_investment_manwon"),
+        scenario.get("investment_cost_manwon"),
+        scenario.get("total_cost_manwon"),
+        scenario.get("initial_investment_manwon"),
+        scenario.get("investment"),
+        fallback_investment,
+    )
 
 
-def _build_safety_management_context(
-    db: Any,
-    company_id: str,
-    equipment_id: str,
-    today: date | None = None,
-) -> dict[str, Any]:
-    if today is None:
-        today = date.today()
+def _get_scenario_subsidy(scenario: dict, policy_detail: dict):
+    return _safe_number(
+        scenario.get("subsidy_manwon"),
+        scenario.get("subsidy_amount_manwon"),
+        scenario.get("expected_subsidy_manwon"),
+        scenario.get("support_amount_manwon"),
+        scenario.get("support_amount"),
+        policy_detail.get("max_amount"),
+        policy_detail.get("max_amount_manwon"),
+        policy_detail.get("support_amount"),
+        policy_detail.get("subsidy_amount"),
+        policy_detail.get("support_limit"),
+    )
 
-    since = today - timedelta(days=183)
+
+def _get_scenario_payback(scenario: dict):
+    return _safe_number(
+        scenario.get("payback_months"),
+        scenario.get("payback_period_months"),
+        scenario.get("payback"),
+        scenario.get("payback_month"),
+        scenario.get("recovery_months"),
+    )
+
+
+def _fetch_policy_detail_by_id(db: Any, policy_id: str) -> dict:
+    if not policy_id:
+        return {}
+
     try:
-        status_result = (
-            db.table("safety_check_status")
+        result = (
+            db.table("policy")
             .select("*")
-            .eq("company_id", company_id)
-            .eq("equipment_id", equipment_id)
+            .eq("policy_id", policy_id)
+            .limit(1)
             .execute()
         )
+        if result.data:
+            return result.data[0]
     except Exception as exc:
-        return {
-            "completion_rate_6m": None,
-            "grade": "unknown",
-            "severe_overdue_count": 0,
-            "sentence": "안전점검 이력 데이터 확인이 필요합니다.",
-            "error": str(exc),
-        }
+        print(f"policy 상세정보 조회 실패: {exc}")
 
-    status_rows = status_result.data or []
-    rule_ids = sorted({row.get("rule_id") for row in status_rows if row.get("rule_id")})
-    legal_by_rule_id: dict[str, dict] = {}
+    return {}
 
-    if rule_ids:
-        try:
-            legal_result = (
-                db.table("safety_rule_legal")
-                .select("rule_id, penalty_type")
-                .in_("rule_id", rule_ids)
-                .execute()
-            )
-            legal_by_rule_id = {
-                row.get("rule_id"): row
-                for row in (legal_result.data or [])
-                if row.get("rule_id")
-            }
-        except Exception:
-            legal_by_rule_id = {}
 
-    completed_statuses = {"done", "completed", "complete", "normal"}
-    severe_penalties = {"direct_fine", "criminal_liability"}
-    recent_rows = [
-        row
-        for row in status_rows
-        if (period_date := _status_period_date(row)) and since <= period_date <= today
-    ]
-    completed_count = sum(
-        1
-        for row in recent_rows
-        if str(row.get("status", "")).lower() in completed_statuses
-    )
-    total_count = len(recent_rows)
-    completion_rate = round((completed_count / total_count) * 100) if total_count else None
-    severe_overdue_count = sum(
-        1
-        for row in status_rows
-        if str(row.get("status", "")).lower() == "overdue"
-        and legal_by_rule_id.get(row.get("rule_id"), {}).get("penalty_type")
-        in severe_penalties
-    )
+def _merge_policy(matched_policy: dict, policy_detail: dict) -> dict:
+    """
+    matched_policy: recommendation result.
+    policy: canonical announcement detail.
+    Recommendation fields should override only recommendation-specific fields.
+    """
+    policy_detail = policy_detail or {}
+    matched_policy = matched_policy or {}
 
-    if severe_overdue_count > 0 or (completion_rate is not None and completion_rate < 70):
-        grade = "needs_improvement"
-        sentence = (
-            f"최근 6개월 안전점검 이행률은 {completion_rate}%이며, "
-            f"과태료·형사책임 대상 지연 항목이 {severe_overdue_count}건 확인되어 "
-            "안전관리 보완이 필요합니다."
-            if completion_rate is not None
-            else (
-                f"과태료·형사책임 대상 지연 항목이 {severe_overdue_count}건 확인되어 "
-                "안전관리 보완이 필요합니다."
-            )
-        )
-    elif completion_rate is not None and completion_rate >= 90:
-        grade = "excellent"
-        sentence = (
-            f"최근 6개월 안전점검 이행률이 {completion_rate}%이며, "
-            "과태료·형사책임 대상 지연 항목이 없어 안전관리 체계가 우수합니다."
-        )
-    elif completion_rate is not None:
-        grade = "normal"
-        sentence = (
-            f"최근 6개월 안전점검 이행률이 {completion_rate}%로 보통 수준이며, "
-            "주요 법정 안전점검 항목을 지속적으로 관리하고 있습니다."
-        )
-    else:
-        grade = "unknown"
-        sentence = "최근 6개월 안전점검 이력 데이터 확인이 필요합니다."
+    metadata = {
+        **_as_dict(policy_detail.get("metadata")),
+        **_as_dict(matched_policy.get("metadata")),
+    }
 
     return {
-        "completion_rate_6m": completion_rate,
-        "grade": grade,
-        "severe_overdue_count": severe_overdue_count,
-        "sentence": sentence,
-        "completed_count_6m": completed_count,
-        "total_count_6m": total_count,
+        **policy_detail,
+        **matched_policy,
+        "policy_id": _safe_text(
+            matched_policy.get("policy_id"),
+            policy_detail.get("policy_id"),
+            policy_detail.get("id"),
+        ),
+        "title": _safe_text(
+            matched_policy.get("title"),
+            policy_detail.get("title"),
+            metadata.get("title"),
+        ),
+        "organization": _safe_text(
+            policy_detail.get("organization"),
+            policy_detail.get("agency"),
+            policy_detail.get("provider"),
+            metadata.get("organization"),
+            metadata.get("agency"),
+            matched_policy.get("organization"),
+        ),
+        "summary": _safe_text(
+            policy_detail.get("summary"),
+            policy_detail.get("description"),
+            metadata.get("summary"),
+            metadata.get("description"),
+        ),
+        "raw_text": _safe_text(
+            policy_detail.get("raw_text"),
+            policy_detail.get("content"),
+            policy_detail.get("support_content"),
+            metadata.get("raw_text"),
+            metadata.get("content"),
+        ),
+        "url": _safe_text(
+            policy_detail.get("url"),
+            policy_detail.get("source_url"),
+            policy_detail.get("policy_url"),
+            metadata.get("url"),
+            metadata.get("source_url"),
+            metadata.get("policy_url"),
+        ),
+        "max_amount": _safe_number(
+            policy_detail.get("max_amount"),
+            policy_detail.get("max_amount_manwon"),
+            policy_detail.get("support_amount"),
+            policy_detail.get("subsidy_amount"),
+            policy_detail.get("support_limit"),
+            metadata.get("max_amount"),
+        ),
+        "deadline": _safe_text(
+            policy_detail.get("deadline"),
+            policy_detail.get("end_date"),
+            policy_detail.get("deadline_display"),
+            metadata.get("deadline"),
+            metadata.get("end_date"),
+        ),
+        "reason": _safe_text(
+            matched_policy.get("reason"),
+            metadata.get("reason"),
+            "업종·지역·설비 정보와 ROI 분석 결과를 기준으로 추천되었습니다.",
+        ),
+        "llm_score": _safe_text(matched_policy.get("llm_score"), metadata.get("llm_score")),
+        "scenario_match": matched_policy.get("scenario_match") or metadata.get("scenario_match"),
+        "scenario_label": _safe_text(
+            matched_policy.get("scenario_label"),
+            metadata.get("scenario_label"),
+        ),
+        "match_score": matched_policy.get("match_score"),
+    }
+
+
+def _coerce_draft_dict(value: Any) -> dict:
+    if isinstance(value, dict):
+        return dict(value)
+
+    if isinstance(value, str) and value.strip():
+        return {
+            "business_necessity": value.strip(),
+        }
+
+    return {}
+
+
+def _build_expected_benefits(draft_content: dict, scenario: dict, equipment_data: dict) -> list[str]:
+    existing = draft_content.get("expected_benefits")
+
+    if isinstance(existing, list):
+        benefits = [str(item).strip() for item in existing if str(item).strip()]
+        if benefits:
+            return benefits
+
+    energy_saving = _safe_number(
+        scenario.get("energy_saving_manwon"),
+        scenario.get("energy_saving_annual_manwon"),
+        scenario.get("annual_energy_saving_manwon"),
+    )
+    maintenance_saving = _safe_number(
+        scenario.get("maintenance_saving_manwon"),
+        scenario.get("maintenance_saving_annual_manwon"),
+        scenario.get("annual_maintenance_saving_manwon"),
+    )
+    defect_rate = _safe_number(equipment_data.get("defect_rate"))
+
+    benefits = [
+        "노후 설비 개선을 통한 생산 안정성 향상",
+        "에너지 사용 효율 개선 및 운영 비용 절감",
+        "유지보수 부담 완화와 품질 관리 기준 강화",
+    ]
+
+    if energy_saving is not None:
+        benefits[1] = f"연간 에너지 비용 약 {energy_saving:,}만원 절감 기대"
+
+    if maintenance_saving is not None:
+        benefits[2] = f"연간 유지보수 비용 약 {maintenance_saving:,}만원 절감 기대"
+
+    if defect_rate is not None:
+        benefits.append(f"현재 불량률 {defect_rate:g}% 개선을 통한 품질 안정화 기대")
+
+    return benefits[:4]
+
+
+def _build_required_documents(draft_content: dict) -> list[str]:
+    existing = draft_content.get("required_documents")
+
+    if isinstance(existing, list):
+        documents = [str(item).strip() for item in existing if str(item).strip()]
+        if documents:
+            return documents
+
+    return [
+        "사업자등록증",
+        "설비 견적서",
+        "현 설비 사진",
+        "최근 재무제표",
+        "지원사업 공고문",
+    ]
+
+
+def _enrich_draft_content(
+    draft_content: Any,
+    *,
+    body: DraftRequest,
+    company_data: dict,
+    equipment_data: dict,
+    selected_policy: dict,
+    selected_roi_scenario: dict,
+    scenario_used: str,
+    scenario_label: str,
+) -> dict:
+    """
+    LLM writes the sentences, but DB is the source of truth for IDs,
+    company/equipment names, policy details, scenario amounts and core values.
+    """
+    content = _coerce_draft_dict(draft_content)
+
+    company_name = _safe_text(company_data.get("company_name"), default="기업명 미입력")
+    equipment_name = _safe_text(equipment_data.get("name"), default="설비명 미입력")
+    policy_title = _safe_text(selected_policy.get("title"), default="추천 지원사업 미선택")
+    organization = _safe_text(
+        selected_policy.get("organization"),
+        selected_policy.get("agency"),
+        selected_policy.get("provider"),
+        default="주관사 정보 없음",
+    )
+
+    investment_manwon = _get_scenario_investment(
+        selected_roi_scenario,
+        equipment_data,
+        scenario_used,
+    )
+    subsidy_manwon = _get_scenario_subsidy(selected_roi_scenario, selected_policy)
+    payback_months = _get_scenario_payback(selected_roi_scenario)
+
+    application_purpose = _safe_text(
+        content.get("application_purpose"),
+        f"{equipment_name} 설비의 노후화 개선 및 생산 효율 향상을 위해 {policy_title}을 활용하고자 합니다.",
+    )
+
+    business_necessity = _safe_text(
+        content.get("business_necessity"),
+        f"현재 {equipment_name} 설비의 사용연수와 운영비 부담을 고려할 때, 설비 개선을 통한 에너지 비용 절감과 생산 안정성 확보가 필요합니다.",
+    )
+
+    expected_effects = _safe_text(
+        content.get("expected_effects"),
+        f"{scenario_label} 기준 설비투자를 통해 에너지 효율 개선, 유지보수 부담 완화, 품질 안정화 효과를 기대할 수 있습니다.",
+    )
+
+    ai_reasons = content.get("ai_reasons")
+    if not isinstance(ai_reasons, list) or not ai_reasons:
+        ai_reasons = [
+            _safe_text(selected_policy.get("reason"), "지원사업 조건과 기업·설비 정보의 적합성이 확인되었습니다."),
+            f"{scenario_label} 기준 ROI 분석 결과를 신청 목적과 투자 근거에 반영했습니다.",
+            "DB에 저장된 기업정보, 설비정보, 추천정책 정보를 신청서 초안의 기준값으로 사용했습니다.",
+        ]
+
+    return {
+        **content,
+        "company_id": body.company_id,
+        "equipment_id": body.equipment_id,
+        "policy_id": body.policy_id,
+        "company_name": company_name,
+        "equipment_name": equipment_name,
+        "selected_policy": policy_title,
+        "agency": organization,
+        "organization": organization,
+        "policy_url": _safe_text(selected_policy.get("url")),
+        "policy_summary": _safe_text(selected_policy.get("summary")),
+        "policy_raw_text": _safe_text(selected_policy.get("raw_text")),
+        "policy_deadline": _safe_text(selected_policy.get("deadline")),
+        "application_purpose": application_purpose,
+        "investment_manwon": investment_manwon,
+        "subsidy_manwon": subsidy_manwon,
+        "payback_months": payback_months,
+        "expected_benefits": _build_expected_benefits(content, selected_roi_scenario, equipment_data),
+        "readiness_score": _safe_number(content.get("readiness_score"), selected_policy.get("match_score"), 70),
+        "ai_reasons": [str(item).strip() for item in ai_reasons if str(item).strip()],
+        "business_necessity": business_necessity,
+        "expected_effects": expected_effects,
+        "required_documents": _build_required_documents(content),
+        "scenario_used": scenario_used,
+        "scenario_label": scenario_label,
+        "created_at": datetime.now().isoformat(),
     }
 
 
@@ -212,10 +467,12 @@ async def generate_draft(
         .eq("user_id", current_user.id)
         .execute()
     )
+
     if not company_result.data:
         raise HTTPException(status_code=404, detail="기업 정보를 찾을 수 없습니다.")
 
     company_data = company_result.data[0]
+
     company = CompanyContext(
         company_id=company_data.get("company_id"),
         company_name=company_data.get("company_name", ""),
@@ -223,7 +480,7 @@ async def generate_draft(
         industry_name=company_data.get("industry_name"),
         region=company_data.get("region", ""),
         company_type=company_data.get("company_type"),
-        primary_purpose=company_data.get("primary_purpose") or [],
+        primary_purpose=_normalize_list(company_data.get("primary_purpose")),
         employee_count=company_data.get("employee_count"),
         annual_revenue=company_data.get("annual_revenue"),
         revenue_2y_ago_manwon=company_data.get("revenue_2y_ago_manwon"),
@@ -240,10 +497,12 @@ async def generate_draft(
         .eq("equipment_id", body.equipment_id)
         .execute()
     )
+
     if not equipment_result.data:
         raise HTTPException(status_code=404, detail="설비 정보를 찾을 수 없습니다.")
 
     equipment_data = equipment_result.data[0]
+
     equipment = EquipmentInput(
         name=equipment_data.get("name", ""),
         category=equipment_data.get("category", ""),
@@ -268,6 +527,7 @@ async def generate_draft(
         .limit(1)
         .execute()
     )
+
     if not roi_result.data:
         raise HTTPException(status_code=404, detail="ROI 분석 결과를 찾을 수 없습니다.")
 
@@ -282,30 +542,34 @@ async def generate_draft(
         .limit(5)
         .execute()
     )
+
     top_policies = top_policy_result.data or []
-    selected_policy = next(
-        (policy for policy in top_policies if policy.get("policy_id") == body.policy_id),
+    selected_matched_policy = next(
+        (
+            policy
+            for policy in top_policies
+            if str(policy.get("policy_id", "")).strip() == body.policy_id
+        ),
         None,
     )
 
-    if not selected_policy:
+    if not selected_matched_policy:
         raise HTTPException(
             status_code=400,
             detail="신청서 초안은 추천 TOP 5 정책에 대해서만 생성할 수 있습니다.",
         )
 
+    policy_detail = _fetch_policy_detail_by_id(db, body.policy_id)
+    selected_policy = _merge_policy(selected_matched_policy, policy_detail)
+
     scenario_used, selected_roi_scenario = _resolve_draft_scenario(
         selected_policy,
         roi_data,
     )
-    scenario_label = selected_policy.get("scenario_label") or (
-        "A안 전체교체 적합" if scenario_used == "a" else "B안 부분개선 적합"
-    )
 
-    safety_management = _build_safety_management_context(
-        db,
-        body.company_id,
-        body.equipment_id,
+    scenario_label = _safe_text(
+        selected_policy.get("scenario_label"),
+        "A안 전체교체 적합" if scenario_used == "a" else "B안 부분개선 적합",
     )
 
     state: FactofitState = {
@@ -315,36 +579,46 @@ async def generate_draft(
         "company_info": company,
         "equipment": equipment,
         "equipment_id": body.equipment_id,
+        "equipments": [equipment_data],
+        "selected_equipment_id": body.equipment_id,
         "matched_policies": [selected_policy],
         "roi_result": selected_roi_scenario,
         "draft_result": None,
-        "chat_history": [],
-        "final_response": "",
-        "unsupported_equipment": False,
-        "chat_id": None,
         "draft_context": {
             "scenario_used": scenario_used,
             "scenario_label": scenario_label,
             "policy": selected_policy,
             "roi_recommended": roi_data.get("recommended"),
-            "safety_management": safety_management,
         },
+        "chat_history": [],
+        "final_response": "",
+        "unsupported_equipment": False,
+        "chat_id": None,
+        "safety_dashboard": None,
     }
 
-    result_state = application_draft_node(state)
-    draft_content = result_state.get("draft_result")
+    try:
+        result_state = application_draft_node(state)
+        raw_draft_content = result_state.get("draft_result")
+    except Exception as exc:
+        # LLM quota/rate-limit/API errors should not break the draft API.
+        # The router will still create a DB-backed draft using company/equipment/ROI/policy data.
+        print(f"신청서 LLM 생성 실패 - DB 기반 fallback 초안으로 대체합니다: {exc}")
+        raw_draft_content = {}
 
-    if not draft_content:
-        raise HTTPException(status_code=500, detail="신청서 초안 생성에 실패했습니다.")
+    if not raw_draft_content:
+        raw_draft_content = {}
 
-    if isinstance(draft_content, dict):
-        draft_content = {
-            **draft_content,
-            "scenario_used": scenario_used,
-            "scenario_label": scenario_label,
-            "policy_id": body.policy_id,
-            "safety_management": safety_management,
-        }
+    draft_content = _enrich_draft_content(
+        raw_draft_content,
+        body=body,
+        company_data=company_data,
+        equipment_data=equipment_data,
+        selected_policy=selected_policy,
+        selected_roi_scenario=selected_roi_scenario,
+        scenario_used=scenario_used,
+        scenario_label=scenario_label,
+    )
 
     draft_payload = {
         "company_id": body.company_id,
@@ -353,6 +627,18 @@ async def generate_draft(
         "draft_content": draft_content,
         "created_at": datetime.now().isoformat(),
     }
+
+    # Keep only one latest draft for the same company/equipment/policy.
+    db.table("draft_result").delete().eq(
+        "company_id",
+        body.company_id,
+    ).eq(
+        "equipment_id",
+        body.equipment_id,
+    ).eq(
+        "policy_id",
+        body.policy_id,
+    ).execute()
 
     saved_draft = db.table("draft_result").insert(draft_payload).execute()
 

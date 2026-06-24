@@ -1,16 +1,20 @@
-from typing import Optional
+from typing import Any, Optional
 from datetime import datetime
+import asyncio
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import JSONResponse
 
 from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.models.auth import CurrentUser
 from app.models.company import CompanyContext
 from app.models.equipment import EquipmentInput
+from app.state import FactofitState
 from app.agents.policy import (
     evaluate_and_rerank_with_llm,
     format_raw_policy_candidate,
+    policy_matching_node,
     get_policy_raw_candidates,
     merge_policy_candidates,
     rank_candidates_by_query,
@@ -187,6 +191,7 @@ def _format_policy_for_frontend(policy: dict) -> dict:
         metadata.get("policy_subcategory"),
         metadata.get("subcategory"),
     )
+
     reason = _first_text(
         policy.get("reason"),
         metadata.get("reason"),
@@ -590,114 +595,421 @@ async def analyze(
         },
     }
 
+# ------------------------------------------------------------------
+# /api/analyze/support-projects - 지원사업 화면 DB 조회 라우터
+# NOTE: backend/app/routers/policies.py 파일은 사용하지 않습니다.
+#       main.py는 analyze.router만 include하고, 프론트는 이 주소를 호출합니다.
+# ------------------------------------------------------------------
 
-def _policy_rows_by_id(db, policy_ids: list[str]) -> dict[str, dict]:
-    if not policy_ids:
+def normalize_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+
+    if isinstance(value, list):
+        return [str(v).strip() for v in value if str(v).strip()]
+
+    if isinstance(value, str):
+        value = value.strip()
+
+        if not value:
+            return []
+
+        if value.startswith("{") and value.endswith("}"):
+            value = value[1:-1]
+
+        return [
+            item.strip().strip('"').strip("'")
+            for item in value.split(",")
+            if item.strip()
+        ]
+
+    return []
+
+
+def get_first_row(result: Any):
+    data = getattr(result, "data", None)
+
+    if isinstance(data, list) and data:
+        return data[0]
+
+    if isinstance(data, dict):
+        return data
+
+    return None
+
+
+def get_policy_id(policy: dict) -> str:
+    metadata = policy.get("metadata", {}) or {}
+
+    return (
+        policy.get("policy_id")
+        or policy.get("id")
+        or metadata.get("policy_id")
+        or metadata.get("id")
+        or ""
+    )
+
+
+def get_policy_title(policy: dict) -> str:
+    metadata = policy.get("metadata", {}) or {}
+
+    return (
+        policy.get("title")
+        or metadata.get("title")
+        or policy.get("name")
+        or metadata.get("name")
+        or ""
+    )
+
+
+def get_match_score(policy: dict) -> float:
+    if policy.get("match_score") is not None:
+        try:
+            return round(float(policy.get("match_score")), 3)
+        except Exception:
+            return 0.0
+
+    try:
+        return round(1 - float(policy.get("distance", 1)), 3)
+    except Exception:
+        return 0.0
+
+
+def normalize_policy_id(value: Any) -> str:
+    if value is None:
+        return ""
+
+    return str(value).strip()
+
+
+def fetch_policy_details_by_ids(db: Any, policy_ids: list[Any]) -> dict[str, dict]:
+    """
+    Fetch public.policy rows and return them by policy_id.
+
+    backend/app/routers/policies.py is intentionally not used.
+    /api/analyze/support-projects reads matched_policy first, then enriches it
+    with the canonical policy table so the frontend never has to show fallback
+    values such as '주관사 미확인' or '지원내용 준비 중' when DB data exists.
+    """
+    unique_ids = []
+    seen = set()
+
+    for policy_id in policy_ids:
+        normalized = normalize_policy_id(policy_id)
+        if not normalized or normalized in seen:
+            continue
+        unique_ids.append(normalized)
+        seen.add(normalized)
+
+    if not unique_ids:
         return {}
 
     try:
         result = (
             db.table("policy")
             .select("*")
-            .in_("policy_id", policy_ids)
+            .in_("policy_id", unique_ids)
             .execute()
         )
-    except Exception as exc:
-        print(f"policy detail lookup failed: {exc}")
+        rows = getattr(result, "data", []) or []
+
+        return {
+            normalize_policy_id(row.get("policy_id") or row.get("id")): row
+            for row in rows
+            if isinstance(row, dict)
+            and normalize_policy_id(row.get("policy_id") or row.get("id"))
+        }
+    except Exception as e:
+        print(f"policy 상세정보 조회 실패: {e}")
         return {}
 
-    return {
-        str(row.get("policy_id")): row
-        for row in (getattr(result, "data", None) or [])
-        if row.get("policy_id")
+
+def saved_policy_to_response(row: dict, policy_detail: Optional[dict] = None) -> dict:
+    """Merge matched_policy cache row with public.policy detail row.
+
+    matched_policy keeps recommendation-specific values:
+      - reason, match_score, llm_score, scenario labels
+
+    policy keeps canonical announcement details:
+      - organization, url, summary, raw_text, created_at, etc.
+    """
+    policy_detail = policy_detail or {}
+    policy_metadata = dict(_as_dict(policy_detail.get("metadata")))
+    row_metadata = dict(_as_dict(row.get("metadata")))
+
+    policy_id = normalize_policy_id(
+        row.get("policy_id")
+        or policy_detail.get("policy_id")
+        or policy_detail.get("id")
+    )
+    reason = row.get("reason") or row_metadata.get("reason") or policy_detail.get("reason")
+    llm_score = row.get("llm_score") or row_metadata.get("llm_score") or policy_detail.get("llm_score")
+    scenario_match = (
+        row.get("scenario_match")
+        or row_metadata.get("scenario_match")
+        or policy_detail.get("scenario_match")
+    )
+    scenario_label = (
+        row.get("scenario_label")
+        or row_metadata.get("scenario_label")
+        or policy_detail.get("scenario_label")
+    )
+    match_score = (
+        row.get("match_score")
+        if row.get("match_score") is not None
+        else row_metadata.get("match_score")
+        if row_metadata.get("match_score") is not None
+        else policy_detail.get("match_score")
+    )
+
+    merged_metadata = {
+        **policy_metadata,
+        **row_metadata,
+        "policy_id": policy_id,
+        "title": row.get("title") or policy_detail.get("title") or policy_metadata.get("title"),
+        "match_score": match_score,
+        "eligible": row.get("eligible", True),
+        "reason": reason,
+        "llm_score": llm_score,
+        "scenario_match": scenario_match,
+        "scenario_label": scenario_label,
+        "matched_policy_created_at": row.get("created_at"),
     }
 
-
-def _format_cached_policy_for_frontend(row: dict, policy_detail: dict | None = None) -> dict:
-    detail = policy_detail or {}
-    metadata = {
-        **detail,
-        **row,
-        "policy_id": row.get("policy_id"),
-        "title": row.get("title") or detail.get("title"),
-        "reason": row.get("reason"),
-        "match_score": row.get("match_score"),
-        "llm_score": row.get("llm_score"),
-        "scenario_match": row.get("scenario_match"),
-        "scenario_label": row.get("scenario_label"),
+    merged_policy = {
+        **policy_detail,
+        "id": policy_id,
+        "policy_id": policy_id,
+        "title": row.get("title") or policy_detail.get("title"),
+        "match_score": match_score,
+        "eligible": row.get("eligible", True),
+        "reason": reason,
+        "llm_score": llm_score,
+        "scenario_match": scenario_match,
+        "scenario_label": scenario_label,
+        "matched_policy_created_at": row.get("created_at"),
+        "metadata": merged_metadata,
     }
-    merged = {
-        **detail,
-        **row,
-        "id": row.get("policy_id"),
-        "policy_id": row.get("policy_id"),
-        "title": row.get("title") or detail.get("title"),
-        "metadata": metadata,
-    }
-    return _format_policy_for_frontend(merged)
+
+    return _format_policy_for_frontend(merged_policy)
 
 
-@router.get("/policies")
-async def get_policies(
+async def run_policy_node(state: FactofitState):
+    return await asyncio.wait_for(
+        asyncio.to_thread(policy_matching_node, state),
+        timeout=90,
+    )
+
+
+@router.get("/analyze/support-projects")
+async def get_support_projects(
     company_id: str = Query(...),
     equipment_id: Optional[str] = None,
-    limit: int = Query(default=40),
-    current_user: CurrentUser = Depends(get_current_user),
+    limit: int = Query(default=10),
+    refresh: bool = Query(default=False),
 ):
     db = get_db()
 
-    company_result = (
-        db.table("company")
-        .select("company_id")
-        .eq("company_id", company_id)
-        .eq("user_id", current_user.id)
-        .limit(1)
-        .execute()
+    # 1. 기존 matched_policy 결과가 있으면 먼저 반환
+    # 지원사업 페이지를 다시 열 때마다 LLM/vector search를 매번 돌리지 않기 위함
+    if not refresh:
+        try:
+            saved_query = (
+                db.table("matched_policy")
+                .select("*")
+                .eq("company_id", company_id)
+            )
+            if equipment_id:
+                saved_query = saved_query.eq("equipment_id", equipment_id)
+
+            saved_result = (
+                saved_query
+                .order("match_score", desc=True)
+                .limit(limit)
+                .execute()
+            )
+
+            saved_rows = getattr(saved_result, "data", []) or []
+
+            if saved_rows:
+                policy_ids = [row.get("policy_id") for row in saved_rows if isinstance(row, dict)]
+                policy_details_by_id = fetch_policy_details_by_ids(db, policy_ids)
+                policies = [
+                    saved_policy_to_response(
+                        row,
+                        policy_details_by_id.get(normalize_policy_id(row.get("policy_id"))),
+                    )
+                    for row in saved_rows
+                    if isinstance(row, dict)
+                ]
+
+                return {
+                    "success": True,
+                    "data": {
+                        "policies": policies,
+                        "total": len(policies),
+                        "source": "matched_policy_cache",
+                    },
+                }
+        except Exception as e:
+            print(f"matched_policy 캐시 조회 실패: {e}")
+
+    # 2. 기업 정보 조회
+    try:
+        company_result = (
+            db.table("company")
+            .select("*")
+            .eq("company_id", company_id)
+            .limit(1)
+            .execute()
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "message": "기업 정보를 조회하지 못했습니다.",
+                "error": str(e),
+            },
+        )
+
+    company_row = get_first_row(company_result)
+
+    if not company_row:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "success": False,
+                "message": "기업 정보를 찾을 수 없습니다.",
+            },
+        )
+
+    # 3. CompanyContext 생성
+    company = CompanyContext(
+        company_id=company_row.get("company_id"),
+        company_name=company_row.get("company_name") or "",
+        business_registration_no=company_row.get("business_registration_no"),
+        industry_name=company_row.get("industry_name"),
+        industry_code=normalize_list(company_row.get("industry_code")),
+        region=company_row.get("region") or "",
+        company_type=company_row.get("company_type"),
+        primary_purpose=normalize_list(company_row.get("primary_purpose")),
+        employee_count=company_row.get("employee_count"),
+        annual_revenue=company_row.get("annual_revenue"),
+        revenue_2y_ago_manwon=company_row.get("revenue_2y_ago_manwon"),
+        revenue_3y_ago_manwon=company_row.get("revenue_3y_ago_manwon"),
+        total_assets_manwon=company_row.get("total_assets_manwon"),
+        is_disclosure_group_member=company_row.get("is_disclosure_group_member"),
+        established_year=company_row.get("established_year"),
+        workplace_type=company_row.get("workplace_type"),
+        created_at=company_row.get("created_at"),
+        updated_at=company_row.get("updated_at"),
     )
 
-    if not company_result.data:
+    # 4. 기존 policy_matching_node 그대로 호출
+    # 노드 구조 변경 없음
+    state: FactofitState = {
+        "user_query": "제조설비 지원사업",
+        "intent": "policy",
+        "is_safe": True,
+        "company_info": company,
+        "equipment": None,
+        "equipment_id": equipment_id,      # ← 추가
+        "equipments": [],                  # ← 추가
+        "selected_equipment_id": equipment_id,     # ← 추가
+        "matched_policies": [],
+        "roi_result": None,
+        "draft_result": None,
+        "draft_context": None,             # ← 추가
+        "chat_history": [],
+        "final_response": "",
+        "unsupported_equipment": False,
+        "chat_id": None,
+        "safety_dashboard": None          # ← 추가
+    }
+
+    try:
+        result_state = await run_policy_node(state)
+
+    except asyncio.TimeoutError:
+        # 504로 터뜨리지 않고 프론트가 정상 처리할 수 있게 빈 결과 반환
         return {
-            "success": False,
-            "message": "기업 정보를 찾을 수 없습니다.",
-            "data": {"policies": [], "total": 0, "source": "matched_policy_cache"},
+            "success": True,
+            "data": {
+                "policies": [],
+                "total": 0,
+                "saved_count": 0,
+                "source": "policy_timeout_fallback",
+                "message": "지원사업 추천 처리 시간이 오래 걸려 임시로 빈 결과를 반환했습니다.",
+            },
         }
 
-    matched_query = (
-        db.table("matched_policy")
-        .select("*")
-        .eq("company_id", company_id)
-    )
-    if equipment_id:
-        matched_query = matched_query.eq("equipment_id", equipment_id)
-
-    matched_result = (
-        matched_query
-        .order("match_score", desc=True)
-        .limit(limit)
-        .execute()
-    )
-    matched_rows = getattr(matched_result, "data", None) or []
-
-    policy_ids = [
-        str(row.get("policy_id"))
-        for row in matched_rows
-        if row.get("policy_id")
-    ]
-    policy_details = _policy_rows_by_id(db, policy_ids)
-    policies = [
-        _format_cached_policy_for_frontend(
-            row,
-            policy_details.get(str(row.get("policy_id"))),
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "message": "지원사업 추천 노드 실행 실패",
+                "error": str(e),
+            },
         )
-        for row in matched_rows
+
+    matched = result_state.get("matched_policies", []) or []
+    limited = [
+        _format_policy_for_frontend(policy)
+        for policy in matched[:limit]
+        if isinstance(policy, dict)
     ]
+
+    # 5. 기존 matched_policy 삭제 후 새 결과 저장
+    try:
+        delete_query = (
+            db.table("matched_policy")
+            .delete()
+            .eq("company_id", company_id)
+        )
+        if equipment_id:
+            delete_query = delete_query.eq("equipment_id", equipment_id)
+        delete_query.execute()
+    except Exception as e:
+        print(f"기존 matched_policy 삭제 실패: {e}")
+
+    saved_count = 0
+
+    for policy in limited:
+        if not isinstance(policy, dict):
+            continue
+
+        try:
+            (
+                db.table("matched_policy")
+                .insert(
+                    {
+                        "company_id": company_id,
+                        "equipment_id": equipment_id,
+                        "policy_id": get_policy_id(policy),
+                        "title": get_policy_title(policy),
+                        "match_score": get_match_score(policy),
+                        "eligible": policy.get("eligible", True),
+                        "reason": policy.get("reason", "RAG 유사도 기반 매칭"),
+                        "llm_score": policy.get("llm_score", ""),
+                        "scenario_match": policy.get("scenario_match"),
+                        "scenario_label": policy.get("scenario_label"),
+                        "created_at": datetime.now().isoformat(),
+                    }
+                )
+                .execute()
+            )
+            saved_count += 1
+        except Exception as e:
+            print(f"matched_policy 저장 실패: {e}")
 
     return {
         "success": True,
         "data": {
-            "policies": policies,
-            "matched_policies": policies,
-            "total": len(policies),
-            "source": "matched_policy_cache",
+            "policies": limited,
+            "total": len(matched),
+            "saved_count": saved_count,
+            "source": "policy_matching_node",
         },
     }

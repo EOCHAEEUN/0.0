@@ -89,9 +89,10 @@ function extractCounters(json: PolicyApiResponse, cards: SupportProject[]): Poli
 
 export async function fetchPolicyCards(
   companyId: string,
+  equipmentId: string,
   analysisFingerprint: string,
 ): Promise<{ cards: SupportProject[]; counters: PolicyCounters }> {
-  const cacheKey = `policies:${companyId}:${analysisFingerprint || "latest"}:${POLICY_FETCH_LIMIT}`
+  const cacheKey = `support-projects:${companyId}:${equipmentId || "all"}:${analysisFingerprint || "latest"}:${POLICY_FETCH_LIMIT}`
 
   const cached = policyCardsMemoryCache.get(cacheKey)
   if (cached) return cached
@@ -100,9 +101,14 @@ export async function fetchPolicyCards(
   if (inFlight) return inFlight
 
   const token = getStoredAccessToken()
-  const url = buildApiUrl(
-    `/api/policies?company_id=${encodeURIComponent(companyId)}&limit=${POLICY_FETCH_LIMIT}`,
-  )
+  const query = new URLSearchParams({
+    company_id: companyId,
+    limit: String(POLICY_FETCH_LIMIT),
+  })
+  if (equipmentId) {
+    query.set("equipment_id", equipmentId)
+  }
+  const url = buildApiUrl(`/api/analyze/support-projects?${query.toString()}`)
 
   const requestPromise = fetch(url, {
     method: "GET",
@@ -115,12 +121,12 @@ export async function fetchPolicyCards(
       const json = (await response.json().catch(() => ({}))) as PolicyApiResponse
 
       // DB/API 연동 검증 단계에서는 404/504도 숨기지 않습니다.
-      // 백엔드 라우터가 없거나 실패하면 지원사업 화면이 error 상태로 드러나야 합니다.
+      // analyze 라우터가 없거나 실패하면 지원사업 화면이 error 상태로 드러나야 합니다.
       if (!response.ok) {
         throw new Error(
           json?.message ||
             json?.error ||
-            `Policy API failed: ${response.status}`,
+            `Support projects API failed: ${response.status}`,
         )
       }
 

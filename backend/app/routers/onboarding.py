@@ -283,13 +283,11 @@ async def update_equipment(
         k: v for k, v in body.model_dump().items()
         if v is not None and v != ""
     }
-
     update_payload["category"] = normalize_equipment_category(
         body.category,
         body.name,
         body.process,
     )
-
     try:
         # 소유권 검증
         equipment_result = (

@@ -14,7 +14,6 @@ import {
   getDotFillRatio,
   getFitLabel,
   getMaxSupportAmount,
-  getPolicyReasonSummary,
   getPriorityCount,
   getProjectScoreColor,
   getReadinessComment,
@@ -760,7 +759,10 @@ export function RecommendationFitCard({
   project: SupportProject
   equipmentName: string
 }) {
-  const reasons = getPolicyReasonSummary(project, equipmentName)
+  const reasonText =
+    project.reasonText ||
+    project.reasons[0] ||
+    `${equipmentName} 기준 업종·지역·설비 정보와 정책 조건을 바탕으로 추천되었습니다.`
 
   return (
     <div
@@ -883,56 +885,43 @@ export function RecommendationFitCard({
             {project.title}
           </h4>
 
-          <ul
-            style={{
-              display: "grid",
-              gap: "8px",
-              color: "#667085",
-              fontSize: "14px",
-              lineHeight: 1.7,
-              fontWeight: 800,
-              paddingLeft: "18px",
-            }}
-          >
-            {reasons.map((reason) => (
-              <li key={reason}>{reason}</li>
-            ))}
-          </ul>
-
           <div
             style={{
-              marginTop: "22px",
-              height: "12px",
-              background: "#E8EEF5",
-              borderRadius: "999px",
-              overflow: "hidden",
+              border: "1px solid #E2E8F0",
+              background: "#F8FAFC",
+              borderRadius: "20px",
+              padding: "18px 20px",
+              color: "#475467",
+              fontSize: "14px",
+              lineHeight: 1.75,
+              fontWeight: 800,
             }}
           >
-            <i
+            <strong
               style={{
                 display: "block",
-                width: `${project.fitScore}%`,
-                height: "100%",
-                background: "linear-gradient(90deg, #0B7A53, #A8DDB5)",
-                borderRadius: "999px",
+                color: "#061B34",
+                fontSize: "15px",
+                fontWeight: 950,
+                marginBottom: "8px",
               }}
-            />
+            >
+              AI 추천 근거
+            </strong>
+            <p style={{ margin: 0, wordBreak: "keep-all" }}>{reasonText}</p>
           </div>
 
-          <div
+          <p
             style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginTop: "10px",
+              marginTop: "14px",
               color: "#667085",
               fontSize: "12px",
-              fontWeight: 900,
+              lineHeight: 1.7,
+              fontWeight: 850,
             }}
           >
-            <span>낮음</span>
-            <span>보통</span>
-            <span>매우 적합</span>
-          </div>
+            원형 그래프는 추천 우선순위 점수이며, 추천 근거는 DB matched_policy.reason을 기준으로 표시합니다.
+          </p>
         </div>
       </div>
     </div>

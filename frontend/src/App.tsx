@@ -10,7 +10,7 @@ import SupportDetailPage from "./pages/SupportDetailPage"
 import AiAdvisorPage from "./pages/AiAdvisorPage"
 import SafetyPage from "./pages/SafetyPage"
 import MyPage from "./pages/MyPage"
-import GlobalAiAdvisor from "./components/GlobalAiAdvisor"
+import GlobalAiAdvisor from "./components/advisor/GlobalAiAdvisor"
 
 function App() {
   return (

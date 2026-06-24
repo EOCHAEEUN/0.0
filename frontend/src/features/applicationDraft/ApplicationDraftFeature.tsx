@@ -2,7 +2,6 @@ import { useLocation, useNavigate } from "react-router-dom"
 import { ApplicationDraftChecklistDialog } from "./components/ApplicationDraftChecklistDialog"
 import { ApplicationDraftHero } from "./components/ApplicationDraftHero"
 import { ApplicationDraftPdfPreview } from "./components/ApplicationDraftPdfPreview"
-import { PreSubmitDocumentsCheck } from "./components/PreSubmitDocumentsCheck"
 import { ApplicationDraftWorkspace } from "./components/ApplicationDraftWorkspace"
 import { useApplicationDraft } from "./hooks/useApplicationDraft"
 
@@ -53,9 +52,8 @@ export function ApplicationDraftFeature() {
             onOpenChecklist={draft.openChecklist}
           />
 
-          <PreSubmitDocumentsCheck requiredDocuments={draft.requiredDocuments} />
-
           <ApplicationDraftPdfPreview
+            model={draft}
             scenarioLabel={draft.scenarioLabel}
             expectedBenefits={draft.expectedBenefits}
             draftStatus={draft.draftStatus}

@@ -40,6 +40,7 @@ import {
   submitUserPayload,
   submitCompanyPayload,
   submitEquipmentPayload,
+  deleteEquipmentPayload,
   fetchSavedOnboarding,
   buildApiUrl,
   loadStoredMyPageData,
@@ -313,7 +314,7 @@ export default function MyPage() {
     basic: false,
     company: false,
     equipment: false,
-    documents: true,
+    documents: false,
   });
   const [analysisBlockNoticeOpen, setAnalysisBlockNoticeOpen] = useState(false);
 
@@ -830,18 +831,62 @@ export default function MyPage() {
     }
   };
 
-  const removeEquipment = (id: number) => {
+  const removeEquipment = async (id: number) => {
     if (equipmentList.length <= 1) {
       window.alert("설비 정보는 최소 1개 이상 필요합니다.");
       return;
     }
 
-    setEquipmentList((prev) => prev.filter((equipment) => equipment.id !== id));
+    const targetEquipment = equipmentList.find((equipment) => equipment.id === id);
+    if (!targetEquipment) return;
 
-    if (selectedAnalysisEquipmentId === id) {
-      const remain = equipmentList.filter((equipment) => equipment.id !== id);
-      setSelectedAnalysisEquipmentId(remain[0]?.id ?? null);
+    if (targetEquipment.equipmentId) {
+      try {
+        await deleteEquipmentPayload(targetEquipment.equipmentId);
+      } catch (error) {
+        window.alert(getErrorMessage(error));
+        return;
+      }
     }
+
+    const nextEquipmentList = equipmentList.filter(
+      (equipment) => equipment.id !== id,
+    );
+    const nextSelectedAnalysisEquipmentId =
+      selectedAnalysisEquipmentId === id
+        ? nextEquipmentList[0]?.id ?? null
+        : selectedAnalysisEquipmentId;
+
+    setEquipmentList(nextEquipmentList);
+    setSelectedAnalysisEquipmentId(nextSelectedAnalysisEquipmentId);
+
+    const nextSelectedEquipmentUuid =
+      nextEquipmentList.find(
+        (equipment) => equipment.id === nextSelectedAnalysisEquipmentId,
+      )?.equipmentId ??
+      nextEquipmentList.find((equipment) => equipment.equipmentId)?.equipmentId;
+
+    if (nextSelectedEquipmentUuid) {
+      window.localStorage.setItem(EQUIPMENT_ID_STORAGE_KEY, nextSelectedEquipmentUuid);
+      window.localStorage.setItem(
+        SELECTED_EQUIPMENT_ID_STORAGE_KEY,
+        nextSelectedEquipmentUuid,
+      );
+    } else {
+      window.localStorage.removeItem(EQUIPMENT_ID_STORAGE_KEY);
+      window.localStorage.removeItem(SELECTED_EQUIPMENT_ID_STORAGE_KEY);
+    }
+
+    const storageData: MyPageStorageData = {
+      basicInfo,
+      companyInfo,
+      equipmentList: nextEquipmentList,
+      selectedAnalysisEquipmentId: nextSelectedAnalysisEquipmentId,
+      profileCompleted,
+      savedAt: new Date().toISOString(),
+    };
+
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(storageData));
   };
 
   const toggleSection = (sectionKey: MyPagePanelKey) => {
@@ -1025,6 +1070,7 @@ export default function MyPage() {
       return {
         localId: equipment.id,
         payload: {
+          equipment_id: equipment.equipmentId ?? null,
           name: equipment.name.trim(),
           category:
             equipment.category === "선택 필요" ? "etc" : equipment.category,
@@ -2815,9 +2861,6 @@ export default function MyPage() {
                 })}
               </div>
             </AccordionPanel>
-          </div>
-
-
 
             <AccordionPanel
               id="document-upload-form"
@@ -2829,6 +2872,7 @@ export default function MyPage() {
             >
               <MyPageDocumentUploadPanel />
             </AccordionPanel>
+          </div>
 
           <section
             style={{
@@ -2848,9 +2892,9 @@ export default function MyPage() {
               <h2
                 style={{
                   color: "#061B34",
-                  fontSize: "24px",
-                  fontWeight: 900,
-                  letterSpacing: "-0.4px",
+                  fontSize: "30px",
+                  fontWeight: 950,
+                  letterSpacing: "-.7px",
                   margin: 0,
                 }}
               >
@@ -2861,8 +2905,8 @@ export default function MyPage() {
                 style={{
                   color: "#667085",
                   fontSize: "14px",
-                  fontWeight: 800,
-                  lineHeight: 1.7,
+                  fontWeight: 850,
+                  lineHeight: 1.65,
                   margin: "8px 0 0",
                 }}
               >

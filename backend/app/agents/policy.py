@@ -1,5 +1,6 @@
 from langchain_core.messages import SystemMessage, HumanMessage
 import json
+import re
 
 from app.state import FactofitState
 from app.prompts.policy import POLICY_SYSTEM_PROMPT
@@ -11,6 +12,7 @@ from app.core.database import get_db
 
 
 UNKNOWN_DEADLINE_VALUES = {"", "none", "null", "nan", "마감일 미정", "상시"}
+POLICY_REASON_CHECK_SENTENCE = "세부 지원한도와 제출서류, 마감일, 자격조건은 공고 원문 확인이 필요합니다."
 
 
 def _normalize_list(value) -> list[str]:
@@ -299,6 +301,95 @@ def _normalize_scenario_match_for_response(scenario_match: list[str]) -> list[st
     return scenario_match
 
 
+def _first_policy_text(*values) -> str:
+    for value in values:
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        if value is not None and not isinstance(value, (dict, list)):
+            return str(value).strip()
+    return ""
+
+
+def _shorten_policy_reason(reason: str) -> str:
+    cleaned = " ".join(str(reason or "").split())
+    if not cleaned:
+        return ""
+
+    sentences = [
+        sentence.strip()
+        for sentence in re.split(r"(?<=[.!?。])\s+", cleaned)
+        if sentence.strip()
+    ]
+    if len(sentences) <= 2:
+        return cleaned
+    return " ".join(sentences[:2])
+
+
+def _policy_support_focus(policy: dict) -> str:
+    metadata = policy.get("metadata", {})
+    text = " ".join(
+        str(value or "")
+        for value in [
+            metadata.get("service_category"),
+            metadata.get("policy_category"),
+            metadata.get("title"),
+            policy.get("content"),
+        ]
+    )
+
+    if any(keyword in text for keyword in ["스마트공장", "자동화", "DX", "AI"]):
+        return "스마트공장·자동화 지원"
+    if any(keyword in text for keyword in ["에너지", "효율", "절감"]):
+        return "에너지효율 개선 지원"
+    if any(keyword in text for keyword in ["안전", "위험", "노후"]):
+        return "노후·안전 개선 지원"
+    if any(keyword in text for keyword in ["컨설팅", "진단"]):
+        return "컨설팅·진단 지원"
+    if any(keyword in text for keyword in ["인증", "시험", "평가"]):
+        return "인증·평가 지원"
+    return "설비·공정 개선 지원"
+
+
+def _default_policy_reason(
+    policy: dict,
+    company_context: dict,
+    equipment_name: str,
+) -> str:
+    industry_codes = company_context.get("industry_code") or []
+    if isinstance(industry_codes, str):
+        industry_text = industry_codes
+    else:
+        industry_text = ", ".join(str(code) for code in industry_codes if code)
+
+    region = company_context.get("region") or "대상 지역"
+    company_type = company_context.get("company_type") or "기업 조건"
+    scenario_label = policy.get("scenario_label") or "투자 목적"
+    support_focus = _policy_support_focus(policy)
+    equipment_text = equipment_name or "해당 설비"
+
+    first_sentence = (
+        f"{industry_text or '해당 업종'} 및 {region} 지역, {company_type} 조건과 부합하며, "
+        f"{equipment_text}의 {scenario_label} 목적과 {support_focus} 방향이 유사합니다."
+    )
+    return f"{first_sentence} {POLICY_REASON_CHECK_SENTENCE}"
+
+
+def _standardize_policy_reason(
+    policy: dict,
+    company_context: dict,
+    equipment_name: str,
+    llm_reason: str | None,
+) -> str:
+    reason = _first_policy_text(llm_reason)
+    if not reason:
+        return _default_policy_reason(policy, company_context, equipment_name)
+
+    if "확인" not in reason and "원문" not in reason:
+        reason = f"{reason.rstrip('.')} {POLICY_REASON_CHECK_SENTENCE}"
+
+    return _shorten_policy_reason(reason)
+
+
 def rerank_policies_with_roi(
     policies: list[dict],
     roi_result: dict,
@@ -396,6 +487,8 @@ def evaluate_and_rerank_with_llm(
         policies_summary.append(
             f"- ID: {p.get('id')} | 제목: {meta.get('title')} | "
             f"지원금: {meta.get('max_amount', '정보없음')} | "
+            f"분류: {meta.get('service_category') or meta.get('policy_category') or '정보없음'} | "
+            f"지역: {meta.get('region', '정보없음')} | "
             f"매칭 시나리오: {p.get('scenario_label')}"
         )
 
@@ -443,7 +536,12 @@ def evaluate_and_rerank_with_llm(
 
         llm_score_num = evaluation.get("score_num", 3)
         llm_score_str = evaluation.get("score", "●●●○○")
-        reason = evaluation.get("reason", f"알고리즘 기반 {p.get('scenario_label', '')} 추천 공고입니다.")
+        reason = _standardize_policy_reason(
+            p,
+            company_context,
+            equipment_name,
+            evaluation.get("reason"),
+        )
 
         algo_score = p.get("final_score", 0.5)
 

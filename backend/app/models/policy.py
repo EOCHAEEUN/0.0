@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 from pydantic import BaseModel
 
@@ -18,13 +18,23 @@ class PolicyAnnouncement(BaseModel):
 
     # 지원 정보
     max_amount: Optional[int] = None               # 만원
+    max_amount_actual: Optional[str] = None        # 화면/검수용 원문 금액 표현
     max_amount_note: Optional[str] = None          # 금액이 불명확한 경우 설명
     max_amount_source: Optional[str] = None        # 추출 출처 (summary/detail_page/attachment_pdf 등)
     max_amount_evidence: Optional[str] = None      # 추출 근거 (발췌 텍스트)
     amount_extraction_status: Optional[str] = None # extracted/not_found/attachment_error 등
 
+    posted_at: Optional[date] = None
     deadline: Optional[date] = None
+    deadline_start_date: Optional[date] = None
+    deadline_display: Optional[str] = None
     deadline_note: Optional[str] = None            # 마감일이 불명확한 경우 설명
+
+    # 제출 서류
+    required_documents: Optional[str] = None
+    required_documents_json: Optional[list[dict] | list[str] | dict] = None
+    required_documents_status: Optional[str] = None
+    required_documents_count: Optional[int] = None
 
     # 대상 조건
     industry_codes: list[str]
@@ -39,6 +49,7 @@ class PolicyAnnouncement(BaseModel):
     employee_max: Optional[int] = None
     revenue_min_manwon: Optional[int] = None
     revenue_max_manwon: Optional[int] = None
+    revenue_rules: Optional[dict | list | str] = None
     company_age_min: Optional[int] = None
     company_age_max: Optional[int] = None
     eligible_company_types: Optional[list[str]] = None
@@ -48,6 +59,7 @@ class PolicyAnnouncement(BaseModel):
 
     url: str
     summary: Optional[str] = None
+    support_method: Optional[str] = None
     
     # 데이터 소스 및 보존
     source_name: Optional[str] = None              # 수집처 (bizinfo 등)
@@ -60,3 +72,5 @@ class PolicyAnnouncement(BaseModel):
     relevance_score: Optional[int] = None          # 제조업 관련성 점수
     is_selected: Optional[bool] = None             # 사용자 선택 여부
     selected_reason: Optional[str] = None          # 선택 이유
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None

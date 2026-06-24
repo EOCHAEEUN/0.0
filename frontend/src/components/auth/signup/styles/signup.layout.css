@@ -1,0 +1,37 @@
+.ff-signup-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(15, 27, 51, 0.62);
+  backdrop-filter: blur(14px);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 44px 20px;
+  overflow-y: auto;
+}
+
+.ff-signup-panel {
+  position: relative;
+  width: min(920px, 100%);
+  border-radius: 36px;
+  background: #ffffff;
+  box-shadow: 0 34px 110px rgba(15, 27, 51, 0.26);
+  padding: 42px;
+  color: #0f1b33;
+}
+
+.ff-signup-close {
+  position: absolute;
+  top: 28px;
+  right: 30px;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #ffffff;
+  color: #0f1b33;
+  font-size: 34px;
+  line-height: 1;
+  cursor: pointer;
+}

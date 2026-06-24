@@ -1,0 +1,22 @@
+{
+  "policy_id": "mss-2026-020",
+  "title": "2026년 표준공정 기반 공정최적화 기술개발 사업",
+  "organization": "중소벤처기업부",
+  "max_amount": 100000,
+  "deadline": null,
+  "deadline_note": "제조현장진단은 2026년 2월~3월 신청접수 예정, R&D는 제조현장진단 참여기업 내 선정",
+  "industry_codes": [
+    "C24",
+    "C25",
+    "C22",
+    "C29"
+  ],
+  "region": null,
+  "url": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000116022",
+  "summary": "중소기업의 제조공정 애로 해결을 위해 제조현장진단과 공정최적화·고도화 R&D를 지원. R&D 기준 최대 10억원.",
+  "max_employee_count": null,
+  "min_revenue": null,
+  "max_revenue": null,
+  "policy_category": "제조데이터/제조AI",
+  "policy_subcategory": "표준공정 기반 공정최적화"
+}

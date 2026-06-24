@@ -1,7 +1,7 @@
 from typing import Optional
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from app.core.auth import get_current_user
 from app.core.database import get_db
@@ -187,6 +187,42 @@ def _format_policy_for_frontend(policy: dict) -> dict:
         metadata.get("policy_subcategory"),
         metadata.get("subcategory"),
     )
+    reason = _first_text(
+        policy.get("reason"),
+        metadata.get("reason"),
+        policy.get("scenario_label"),
+        metadata.get("scenario_label"),
+        "업종·지역·설비 정보와 정책 조건을 기준으로 추천되었습니다.",
+    )
+    llm_score = _first_value(
+        policy.get("llm_score"),
+        metadata.get("llm_score"),
+        "●●●○○",
+    )
+    scenario_match = _first_value(
+        policy.get("scenario_match"),
+        metadata.get("scenario_match"),
+    )
+    scenario_label = _first_value(
+        policy.get("scenario_label"),
+        metadata.get("scenario_label"),
+    )
+    match_score = _first_value(
+        policy.get("match_score"),
+        policy.get("hybrid_score"),
+        policy.get("final_score"),
+        metadata.get("match_score"),
+        metadata.get("hybrid_score"),
+        metadata.get("final_score"),
+    )
+    hybrid_score = _first_value(
+        policy.get("hybrid_score"),
+        metadata.get("hybrid_score"),
+    )
+    final_score = _first_value(
+        policy.get("final_score"),
+        metadata.get("final_score"),
+    )
 
     enriched_metadata = {
         **metadata,
@@ -206,6 +242,13 @@ def _format_policy_for_frontend(policy: dict) -> dict:
         "created_at": created_at,
         "policy_category": policy_category,
         "policy_subcategory": policy_subcategory,
+        "reason": reason,
+        "llm_score": llm_score,
+        "scenario_match": scenario_match,
+        "scenario_label": scenario_label,
+        "match_score": match_score,
+        "hybrid_score": hybrid_score,
+        "final_score": final_score,
     }
 
     return {
@@ -227,6 +270,13 @@ def _format_policy_for_frontend(policy: dict) -> dict:
         "created_at": created_at,
         "policy_category": policy_category,
         "policy_subcategory": policy_subcategory,
+        "reason": reason,
+        "llm_score": llm_score,
+        "scenario_match": scenario_match,
+        "scenario_label": scenario_label,
+        "match_score": match_score,
+        "hybrid_score": hybrid_score,
+        "final_score": final_score,
         "metadata": enriched_metadata,
     }
 
@@ -537,5 +587,117 @@ async def analyze(
                 "matched_policies_count": len(matched_policies),
             },
             "response": response_message,
+        },
+    }
+
+
+def _policy_rows_by_id(db, policy_ids: list[str]) -> dict[str, dict]:
+    if not policy_ids:
+        return {}
+
+    try:
+        result = (
+            db.table("policy")
+            .select("*")
+            .in_("policy_id", policy_ids)
+            .execute()
+        )
+    except Exception as exc:
+        print(f"policy detail lookup failed: {exc}")
+        return {}
+
+    return {
+        str(row.get("policy_id")): row
+        for row in (getattr(result, "data", None) or [])
+        if row.get("policy_id")
+    }
+
+
+def _format_cached_policy_for_frontend(row: dict, policy_detail: dict | None = None) -> dict:
+    detail = policy_detail or {}
+    metadata = {
+        **detail,
+        **row,
+        "policy_id": row.get("policy_id"),
+        "title": row.get("title") or detail.get("title"),
+        "reason": row.get("reason"),
+        "match_score": row.get("match_score"),
+        "llm_score": row.get("llm_score"),
+        "scenario_match": row.get("scenario_match"),
+        "scenario_label": row.get("scenario_label"),
+    }
+    merged = {
+        **detail,
+        **row,
+        "id": row.get("policy_id"),
+        "policy_id": row.get("policy_id"),
+        "title": row.get("title") or detail.get("title"),
+        "metadata": metadata,
+    }
+    return _format_policy_for_frontend(merged)
+
+
+@router.get("/policies")
+async def get_policies(
+    company_id: str = Query(...),
+    equipment_id: Optional[str] = None,
+    limit: int = Query(default=40),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    db = get_db()
+
+    company_result = (
+        db.table("company")
+        .select("company_id")
+        .eq("company_id", company_id)
+        .eq("user_id", current_user.id)
+        .limit(1)
+        .execute()
+    )
+
+    if not company_result.data:
+        return {
+            "success": False,
+            "message": "기업 정보를 찾을 수 없습니다.",
+            "data": {"policies": [], "total": 0, "source": "matched_policy_cache"},
+        }
+
+    matched_query = (
+        db.table("matched_policy")
+        .select("*")
+        .eq("company_id", company_id)
+    )
+    if equipment_id:
+        matched_query = matched_query.eq("equipment_id", equipment_id)
+
+    matched_result = (
+        matched_query
+        .order("match_score", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    matched_rows = getattr(matched_result, "data", None) or []
+
+    policy_ids = [
+        str(row.get("policy_id"))
+        for row in matched_rows
+        if row.get("policy_id")
+    ]
+    policy_details = _policy_rows_by_id(db, policy_ids)
+    policies = [
+        _format_cached_policy_for_frontend(
+            row,
+            policy_details.get(str(row.get("policy_id"))),
+        )
+        for row in matched_rows
+    ]
+
+    return {
+        "success": True,
+        "data": {
+            "policies": policies,
+            "matched_policies": policies,
+            "total": len(policies),
+            "source": "matched_policy_cache",
         },
     }

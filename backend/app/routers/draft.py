@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -56,6 +56,146 @@ def _resolve_draft_scenario(policy: dict, roi_data: dict) -> tuple[str, dict]:
         return "b", roi_data.get("scenario_b", {})
 
     return "a", roi_data.get("scenario_a", {})
+
+
+def _parse_date(value: Any) -> date | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00")).date()
+        except ValueError:
+            return None
+    return None
+
+
+def _status_period_date(row: dict) -> date | None:
+    for key in (
+        "due_date",
+        "due_at",
+        "scheduled_at",
+        "target_date",
+        "check_date",
+        "checked_at",
+        "completed_at",
+        "updated_at",
+        "created_at",
+    ):
+        parsed = _parse_date(row.get(key))
+        if parsed:
+            return parsed
+    return None
+
+
+def _build_safety_management_context(
+    db: Any,
+    company_id: str,
+    equipment_id: str,
+    today: date | None = None,
+) -> dict[str, Any]:
+    if today is None:
+        today = date.today()
+
+    since = today - timedelta(days=183)
+    try:
+        status_result = (
+            db.table("safety_check_status")
+            .select("*")
+            .eq("company_id", company_id)
+            .eq("equipment_id", equipment_id)
+            .execute()
+        )
+    except Exception as exc:
+        return {
+            "completion_rate_6m": None,
+            "grade": "unknown",
+            "severe_overdue_count": 0,
+            "sentence": "안전점검 이력 데이터 확인이 필요합니다.",
+            "error": str(exc),
+        }
+
+    status_rows = status_result.data or []
+    rule_ids = sorted({row.get("rule_id") for row in status_rows if row.get("rule_id")})
+    legal_by_rule_id: dict[str, dict] = {}
+
+    if rule_ids:
+        try:
+            legal_result = (
+                db.table("safety_rule_legal")
+                .select("rule_id, penalty_type")
+                .in_("rule_id", rule_ids)
+                .execute()
+            )
+            legal_by_rule_id = {
+                row.get("rule_id"): row
+                for row in (legal_result.data or [])
+                if row.get("rule_id")
+            }
+        except Exception:
+            legal_by_rule_id = {}
+
+    completed_statuses = {"done", "completed", "complete", "normal"}
+    severe_penalties = {"direct_fine", "criminal_liability"}
+    recent_rows = [
+        row
+        for row in status_rows
+        if (period_date := _status_period_date(row)) and since <= period_date <= today
+    ]
+    completed_count = sum(
+        1
+        for row in recent_rows
+        if str(row.get("status", "")).lower() in completed_statuses
+    )
+    total_count = len(recent_rows)
+    completion_rate = round((completed_count / total_count) * 100) if total_count else None
+    severe_overdue_count = sum(
+        1
+        for row in status_rows
+        if str(row.get("status", "")).lower() == "overdue"
+        and legal_by_rule_id.get(row.get("rule_id"), {}).get("penalty_type")
+        in severe_penalties
+    )
+
+    if severe_overdue_count > 0 or (completion_rate is not None and completion_rate < 70):
+        grade = "needs_improvement"
+        sentence = (
+            f"최근 6개월 안전점검 이행률은 {completion_rate}%이며, "
+            f"과태료·형사책임 대상 지연 항목이 {severe_overdue_count}건 확인되어 "
+            "안전관리 보완이 필요합니다."
+            if completion_rate is not None
+            else (
+                f"과태료·형사책임 대상 지연 항목이 {severe_overdue_count}건 확인되어 "
+                "안전관리 보완이 필요합니다."
+            )
+        )
+    elif completion_rate is not None and completion_rate >= 90:
+        grade = "excellent"
+        sentence = (
+            f"최근 6개월 안전점검 이행률이 {completion_rate}%이며, "
+            "과태료·형사책임 대상 지연 항목이 없어 안전관리 체계가 우수합니다."
+        )
+    elif completion_rate is not None:
+        grade = "normal"
+        sentence = (
+            f"최근 6개월 안전점검 이행률이 {completion_rate}%로 보통 수준이며, "
+            "주요 법정 안전점검 항목을 지속적으로 관리하고 있습니다."
+        )
+    else:
+        grade = "unknown"
+        sentence = "최근 6개월 안전점검 이력 데이터 확인이 필요합니다."
+
+    return {
+        "completion_rate_6m": completion_rate,
+        "grade": grade,
+        "severe_overdue_count": severe_overdue_count,
+        "sentence": sentence,
+        "completed_count_6m": completed_count,
+        "total_count_6m": total_count,
+    }
 
 
 @router.post("/draft")
@@ -162,6 +302,12 @@ async def generate_draft(
         "A안 전체교체 적합" if scenario_used == "a" else "B안 부분개선 적합"
     )
 
+    safety_management = _build_safety_management_context(
+        db,
+        body.company_id,
+        body.equipment_id,
+    )
+
     state: FactofitState = {
         "user_query": f"{equipment.name} {selected_policy.get('title', '')} 신청서 초안 작성",
         "intent": "draft",
@@ -181,6 +327,7 @@ async def generate_draft(
             "scenario_label": scenario_label,
             "policy": selected_policy,
             "roi_recommended": roi_data.get("recommended"),
+            "safety_management": safety_management,
         },
     }
 
@@ -196,6 +343,7 @@ async def generate_draft(
             "scenario_used": scenario_used,
             "scenario_label": scenario_label,
             "policy_id": body.policy_id,
+            "safety_management": safety_management,
         }
 
     draft_payload = {

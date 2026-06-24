@@ -77,6 +77,151 @@ function readText(value: unknown): string {
   return typeof value === "string" ? value.trim() : ""
 }
 
+function parseJsonObject(value: string): Dict | null {
+  const text = value.trim()
+  if (!text) return null
+
+  const unfenced = text
+    .replace(/^```(?:json)?/i, "")
+    .replace(/```$/i, "")
+    .trim()
+  const start = unfenced.indexOf("{")
+  const end = unfenced.lastIndexOf("}")
+  const jsonText = start >= 0 && end > start ? unfenced.slice(start, end + 1) : unfenced
+
+  try {
+    return asDict(JSON.parse(jsonText))
+  } catch {
+    return null
+  }
+}
+
+function readTextFromAliases(source: Dict, aliases: string[]): string {
+  for (const alias of aliases) {
+    const text = readText(source[alias])
+    if (text) return text
+  }
+
+  return ""
+}
+
+function readListFromAliases(source: Dict, aliases: string[]): string[] {
+  for (const alias of aliases) {
+    const value = source[alias]
+    const items = asStringList(value)
+    if (items.length > 0) return items
+  }
+
+  return []
+}
+
+function normalizeDraftObject(source: Dict): DraftContent {
+  const nested = asDict(source.content)
+  const merged = nested ? { ...source, ...nested } : source
+  const businessNecessity =
+    readTextFromAliases(merged, [
+      "business_necessity",
+      "business necessity",
+      "necessity",
+      "사업 필요성",
+    ]) ||
+    readTextFromAliases(merged, [
+      "application_purpose",
+      "application purpose",
+      "신청 목적",
+    ])
+
+  return {
+    ...merged,
+    company_name: readTextFromAliases(merged, ["company_name", "company name", "companyName"]),
+    equipment_name: readTextFromAliases(merged, [
+      "equipment_name",
+      "equipment name",
+      "equipmentName",
+    ]),
+    selected_policy: readTextFromAliases(merged, [
+      "selected_policy",
+      "selected policy",
+      "_selected_policy",
+      "policy_title",
+      "policy title",
+    ]),
+    agency: readTextFromAliases(merged, ["agency", "organization", "provider", "주관사"]),
+    organization: readTextFromAliases(merged, ["organization", "agency", "provider", "주관사"]),
+    application_purpose: readTextFromAliases(merged, [
+      "application_purpose",
+      "application purpose",
+      "신청 목적",
+    ]),
+    business_necessity: businessNecessity,
+    expected_effects: readTextFromAliases(merged, [
+      "expected_effects",
+      "expected effects",
+      "기대효과",
+      "기대 효과",
+    ]),
+    expected_benefits: readListFromAliases(merged, [
+      "expected_benefits",
+      "expected benefits",
+      "기대효과 목록",
+    ]),
+    ai_reasons: readListFromAliases(merged, ["ai_reasons", "ai reasons", "작성 근거"]),
+    required_documents: readListFromAliases(merged, [
+      "required_documents",
+      "required documents",
+      "제출 서류",
+    ]),
+  } as DraftContent
+}
+
+function cleanDraftPreviewText(value: unknown): string {
+  if (typeof value === "string") {
+    const parsed = parseJsonObject(value)
+    if (parsed) {
+      const draft = normalizeDraftObject(parsed)
+
+      return [draft.business_necessity, draft.expected_effects, draft.application_purpose]
+        .map(readText)
+        .filter(Boolean)
+        .join(" ")
+    }
+  }
+
+  return readText(value)
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/```(?:json)?/gi, " ")
+    .replace(/[#*_`>]/g, " ")
+    .replace(/\|[-:\s|]+\|/g, " ")
+    .replace(/\|/g, " ")
+    .replace(/-{3,}/g, " ")
+    .replace(/\[[^\]]*]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function shortenDraftPreviewText(value: unknown, fallback: string): string {
+  const text = cleanDraftPreviewText(value)
+
+  if (!text) return fallback
+
+  const withoutHeadings = text
+    .replace(/^\d+\.\s*/g, "")
+    .replace(/^(사업\s*필요성|신청\s*목적|기대\s*효과|추진\s*내용)\s*[:：-]?\s*/g, "")
+    .trim()
+
+  const sentences =
+    withoutHeadings.match(/[^.!?。]+(?:[.!?。]|습니다\.|니다\.|다\.)?/g) ?? []
+  const summary = sentences
+    .map((sentence) => sentence.trim())
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(" ")
+
+  const result = summary || withoutHeadings
+
+  return result.length > 360 ? `${result.slice(0, 360).trim()}...` : result
+}
+
 function readNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null
 
@@ -314,13 +459,16 @@ function getDraftObject(value: DraftApiData["draft_result"]): DraftContent | nul
   if (!value) return null
 
   if (typeof value === "string") {
+    const parsed = parseJsonObject(value)
+    if (parsed) return normalizeDraftObject(parsed)
+
     return {
-      business_necessity: value,
+      business_necessity: cleanDraftPreviewText(value),
       expected_effects: "",
     }
   }
 
-  return value
+  return normalizeDraftObject(value as Dict)
 }
 
 function buildReadinessPartsFromDb(params: {
@@ -551,9 +699,10 @@ export function useApplicationDraft(locationState: unknown) {
 
   const expectedEffects = readText(draft?.expected_effects) || ""
 
-  const draftMessage = [businessNecessity, expectedEffects]
-    .filter(Boolean)
-    .join(" ")
+  const draftMessage = shortenDraftPreviewText(
+    [businessNecessity, expectedEffects].filter(Boolean).join(" "),
+    "DB 초안 생성 후 표시됩니다.",
+  )
 
   const requiredDocuments = asStringList(draft?.required_documents)
 

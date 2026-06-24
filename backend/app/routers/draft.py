@@ -1,4 +1,6 @@
 from datetime import datetime
+import json
+import re
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -298,13 +300,152 @@ def _merge_policy(matched_policy: dict, policy_detail: dict) -> dict:
     }
 
 
+def _strip_markdown_text(value: str) -> str:
+    text = str(value or "").strip()
+    text = re.sub(r"```(?:json)?|```", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"<br\s*/?>", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"[*_`>#]", " ", text)
+    text = re.sub(r"\|[-:\s|]+\|", " ", text)
+    text = text.replace("|", " ")
+    text = re.sub(r"-{3,}", " ", text)
+    text = re.sub(r"\[[^\]]*]", " ", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
+def _try_parse_draft_json(value: str) -> dict:
+    text = str(value or "").strip()
+    if not text:
+        return {}
+
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?", "", text, flags=re.IGNORECASE).strip()
+        text = re.sub(r"```$", "", text).strip()
+
+    start = text.find("{")
+    end = text.rfind("}")
+    if start >= 0 and end > start:
+        text = text[start : end + 1]
+
+    try:
+        parsed = json.loads(text)
+    except Exception:
+        return {}
+
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _first_text_by_keys(source: dict, keys: list[str]) -> str:
+    for key in keys:
+        value = source.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+
+    return ""
+
+
+def _first_list_by_keys(source: dict, keys: list[str]) -> list[str]:
+    for key in keys:
+        value = source.get(key)
+        if isinstance(value, list):
+            items = [str(item).strip() for item in value if str(item).strip()]
+            if items:
+                return items
+
+    return []
+
+
+def _normalize_draft_keys(value: dict) -> dict:
+    nested = value.get("content")
+    source = {**value, **nested} if isinstance(nested, dict) else dict(value)
+
+    application_purpose = _first_text_by_keys(
+        source,
+        ["application_purpose", "application purpose", "신청 목적", "사업 목적"],
+    )
+    business_necessity = _first_text_by_keys(
+        source,
+        ["business_necessity", "business necessity", "necessity", "사업 필요성", "필요성"],
+    )
+    expected_effects = _first_text_by_keys(
+        source,
+        ["expected_effects", "expected effects", "effects", "기대효과", "기대 효과"],
+    )
+
+    normalized = {
+        **source,
+        "company_name": _first_text_by_keys(source, ["company_name", "company name", "companyName"]),
+        "equipment_name": _first_text_by_keys(source, ["equipment_name", "equipment name", "equipmentName"]),
+        "selected_policy": _first_text_by_keys(
+            source,
+            ["selected_policy", "selected policy", "_selected_policy", "policy_title", "policy title"],
+        ),
+        "agency": _first_text_by_keys(source, ["agency", "organization", "provider", "주관사"]),
+        "organization": _first_text_by_keys(source, ["organization", "agency", "provider", "주관사"]),
+        "application_purpose": application_purpose,
+        "business_necessity": business_necessity or application_purpose,
+        "expected_effects": expected_effects,
+    }
+
+    expected_benefits = _first_list_by_keys(
+        source,
+        ["expected_benefits", "expected benefits", "기대효과 목록"],
+    )
+    ai_reasons = _first_list_by_keys(source, ["ai_reasons", "ai reasons", "작성 근거"])
+    required_documents = _first_list_by_keys(
+        source,
+        ["required_documents", "required documents", "제출 서류"],
+    )
+
+    if expected_benefits:
+        normalized["expected_benefits"] = expected_benefits
+    if ai_reasons:
+        normalized["ai_reasons"] = ai_reasons
+    if required_documents:
+        normalized["required_documents"] = required_documents
+
+    return normalized
+
+
+def _extract_draft_section(text: str, labels: list[str]) -> str:
+    for label in labels:
+        pattern = re.compile(
+            rf"(?:^|\s)(?:#+\s*)?(?:\d+\.\s*)?{re.escape(label)}\s*[:：-]?\s*(.+?)(?=\s(?:#+\s*)?(?:\d+\.\s*)?(?:신청\s*목적|사업\s*필요성|추진\s*내용|기대\s*효과|AI\s*작성\s*근거|제출\s*서류|예산\s*계획|세부\s*추진\s*계획)\s*[:：-]?|$)",
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        match = pattern.search(text)
+        if match:
+            return _strip_markdown_text(match.group(1))
+
+    return ""
+
+
 def _coerce_draft_dict(value: Any) -> dict:
     if isinstance(value, dict):
-        return dict(value)
+        return _normalize_draft_keys(value)
 
     if isinstance(value, str) and value.strip():
+        parsed = _try_parse_draft_json(value)
+        if parsed:
+            return _normalize_draft_keys(parsed)
+
+        application_purpose = _extract_draft_section(
+            value,
+            ["신청 목적", "사업 목적", "Application Purpose"],
+        )
+        business_necessity = _extract_draft_section(
+            value,
+            ["사업 필요성", "필요성", "Business Necessity", "necessity"],
+        )
+        expected_effects = _extract_draft_section(
+            value,
+            ["기대 효과", "기대효과", "Expected Effects", "effects"],
+        )
+
         return {
-            "business_necessity": value.strip(),
+            "application_purpose": application_purpose,
+            "business_necessity": business_necessity or _strip_markdown_text(value),
+            "expected_effects": expected_effects,
         }
 
     return {}

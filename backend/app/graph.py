@@ -1,3 +1,4 @@
+# app/graph.py
 from langgraph.graph import StateGraph, END
 from app.state import FactofitState
 from app.agents.guard import guard_node
@@ -22,15 +23,14 @@ def build_graph():
     graph.add_node("equipment_safety_node", equipment_safety_node)
     graph.add_node("response_node", response_node)
 
-
     # 엣지 연결
     graph.set_entry_point("guard_node")
 
     # guard_node → is_safe 여부에 따라 분기
     graph.add_conditional_edges(
-    "guard_node",
-    lambda state: "router_node" if state["is_safe"] else "__end__",
-    {"router_node": "router_node", "__end__": END}
+        "guard_node",
+        lambda state: "router_node" if state["is_safe"] else "__end__",
+        {"router_node": "router_node", "__end__": END}
     )
 
     # router_node → intent에 따라 분기
@@ -41,29 +41,30 @@ def build_graph():
             "roi": "capex_advisor_node",
             "policy": "policy_matching_node",
             "safety": "equipment_safety_node",
-            "calendar": "policy_matching_node",
             "draft": "application_draft_node",
             "info_missing": "info_collector_node",
             "general": "response_node"
         }
     )
 
-    # info_collector_node
+    # info_collector_node → 설비 선택 후 분기
     graph.add_conditional_edges(
-    "info_collector_node",
-    lambda state: state["intent"] if state["final_response"] == "" else "__end__",
-    {
-        "roi": "capex_advisor_node",
-        "policy": "policy_matching_node",
-        "__end__": END
-    }
-)
+        "info_collector_node",
+        lambda state: state["intent"] if state["final_response"] == "" else "__end__",
+        {
+            "roi": "capex_advisor_node",
+            "policy": "policy_matching_node",
+            "safety": "equipment_safety_node",
+            "__end__": END
+        }
+    )
 
     # 각 specialist → response_node
     graph.add_edge("capex_advisor_node", "response_node")
     graph.add_edge("policy_matching_node", "response_node")
     graph.add_edge("application_draft_node", "response_node")
     graph.add_edge("equipment_safety_node", "response_node")
+
     # response_node → END
     graph.add_edge("response_node", END)
 

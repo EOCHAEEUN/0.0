@@ -1,5 +1,4 @@
 # CAPEX -> Capital Expenditure / 설비투자비용
-
 # TODO: Policy Matching 에이전트 연동 후 실제 매칭 지원금으로 대체
 # 현재는 BENCHMARKS default_subsidy 기반 추정치 사용
 

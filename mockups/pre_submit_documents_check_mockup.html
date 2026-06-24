@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>제출 전 확인할 서류 목업</title>
+  <style>
+    :root {
+      --bg: #f6f8fc;
+      --card: #ffffff;
+      --line: #e4eaf3;
+      --text: #0f172a;
+      --sub: #64748b;
+      --blue: #1e40af;
+      --green: #3f8d22;
+      --green-bg: #eef9e7;
+      --green-line: #d9efcf;
+      --red: #ef4444;
+      --red-deep: #9b1c1c;
+      --red-bg: #feeaea;
+      --shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", Roboto, sans-serif;
+      color: var(--text);
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(246, 248, 252, 0.95)),
+        radial-gradient(circle at 15% 10%, rgba(37, 99, 235, 0.08), transparent 28%),
+        radial-gradient(circle at 85% 20%, rgba(34, 197, 94, 0.06), transparent 26%),
+        var(--bg);
+      padding: 28px 18px 64px;
+    }
+
+    .wrap {
+      width: min(1240px, 100%);
+      margin: 0 auto;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 30px 36px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: rgba(255, 255, 255, 0.92);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .section-head h1 {
+      margin: 0 0 10px;
+      font-size: 30px;
+      line-height: 1.2;
+      letter-spacing: -0.04em;
+    }
+
+    .section-head p {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--sub);
+      letter-spacing: -0.02em;
+    }
+
+    .toggle-btn {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      height: 48px;
+      padding: 0 20px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: #fff;
+      color: #334155;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+    }
+
+    .toggle-btn svg {
+      width: 18px;
+      height: 18px;
+      transition: transform 0.2s ease;
+    }
+
+    .is-closed .toggle-btn svg {
+      transform: rotate(180deg);
+    }
+
+    .doc-card {
+      margin-top: 22px;
+      padding: 16px 20px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: rgba(255, 255, 255, 0.95);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .summary-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+      padding: 10px 6px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .summary-bar strong {
+      font-size: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    .summary-bar span {
+      color: var(--sub);
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .summary-count {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      height: 32px;
+      padding: 0 12px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+    }
+
+    .pill.ok {
+      color: var(--green);
+      background: #edf8e7;
+      border: 1px solid #d7efcc;
+    }
+
+    .pill.missing {
+      color: var(--red-deep);
+      background: var(--red-bg);
+      border: 1px solid #f8d6d6;
+    }
+
+    .doc-list {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .doc-row {
+      display: grid;
+      grid-template-columns: 52px 1fr auto;
+      align-items: center;
+      gap: 18px;
+      min-height: 78px;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .doc-row:last-child {
+      border-bottom: 0;
+    }
+
+    .doc-row.ok {
+      margin: 0 -2px;
+      border: 1px solid var(--green-line);
+      background: linear-gradient(90deg, rgba(238, 249, 231, 0.98), rgba(246, 252, 241, 0.92));
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.56);
+    }
+
+    .doc-row.ok + .doc-row.ok {
+      border-top: 0;
+    }
+
+    .status-icon {
+      width: 30px;
+      height: 30px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      border: 1.8px solid currentColor;
+      background: #fff;
+    }
+
+    .status-icon svg {
+      width: 18px;
+      height: 18px;
+      stroke: currentColor;
+      stroke-width: 2.7;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .status-icon.ok {
+      color: var(--green);
+    }
+
+    .status-icon.missing {
+      color: var(--red);
+      border-radius: 50%;
+    }
+
+    .doc-title {
+      margin: 0 0 5px;
+      font-size: 19px;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+    }
+
+    .doc-desc {
+      margin: 0;
+      color: var(--sub);
+      font-size: 15px;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 86px;
+      height: 36px;
+      padding: 0 16px;
+      border-radius: 999px;
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      white-space: nowrap;
+    }
+
+    .badge.ok {
+      color: var(--green);
+      background: #f8fff3;
+      border: 1px solid #d8efcf;
+    }
+
+    .badge.missing {
+      color: var(--red-deep);
+      background: var(--red-bg);
+      border: 1px solid #f8d6d6;
+    }
+
+    .notice {
+      margin-top: 18px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 16px 18px;
+      border: 1px dashed #cbd5e1;
+      border-radius: 16px;
+      background: #f8fafc;
+      color: #475569;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.55;
+      letter-spacing: -0.02em;
+    }
+
+    .notice strong {
+      color: var(--blue);
+    }
+
+    .is-closed .doc-card {
+      display: none;
+    }
+
+    @media (max-width: 720px) {
+      body {
+        padding: 18px 12px 40px;
+      }
+
+      .section-head {
+        padding: 24px 20px;
+        align-items: flex-start;
+      }
+
+      .section-head h1 {
+        font-size: 24px;
+      }
+
+      .toggle-btn {
+        height: 42px;
+        padding: 0 14px;
+      }
+
+      .doc-card {
+        padding: 12px;
+      }
+
+      .summary-bar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .doc-row {
+        grid-template-columns: 40px 1fr;
+        gap: 12px;
+        padding: 14px 10px;
+      }
+
+      .badge {
+        grid-column: 2 / 3;
+        justify-self: flex-start;
+        height: 30px;
+        font-size: 13px;
+      }
+
+      .doc-title {
+        font-size: 17px;
+      }
+
+      .doc-desc {
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap" id="documentCheck">
+    <section class="section-head">
+      <div>
+        <h1>제출 전 확인할 서류</h1>
+        <p>지원처별 필요 서류를 마이페이지 저장 문서와 비교해 확인합니다.</p>
+      </div>
+      <button type="button" class="toggle-btn" id="toggleButton" aria-expanded="true">
+        <span>열기</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M6 15l6-6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </button>
+    </section>
+
+    <section class="doc-card" aria-label="제출 필요 서류 확인 목록">
+      <div class="summary-bar">
+        <div>
+          <strong>요구 서류 8개 중 2개 확인 완료</strong><br />
+          <span>마이페이지에 저장된 문서는 사업자등록증, 중소기업확인서입니다.</span>
+        </div>
+        <div class="summary-count">
+          <span class="pill ok">확인 완료 2</span>
+          <span class="pill missing">미보유 6</span>
+        </div>
+      </div>
+
+      <div class="doc-list">
+        <article class="doc-row missing">
+          <span class="status-icon missing" aria-label="미보유">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17" /></svg>
+          </span>
+          <div>
+            <h2 class="doc-title">사업신청서</h2>
+            <p class="doc-desc">마이페이지에 저장된 파일 없음</p>
+          </div>
+          <span class="badge missing">미보유</span>
+        </article>
+
+        <article class="doc-row missing">
+          <span class="status-icon missing" aria-label="미보유">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17" /></svg>
+          </span>
+          <div>
+            <h2 class="doc-title">사업계획서</h2>
+            <p class="doc-desc">마이페이지에 저장된 파일 없음</p>
+          </div>
+          <span class="badge missing">미보유</span>
+        </article>
+
+        <article class="doc-row ok">
+          <span class="status-icon ok" aria-label="확인 완료">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7" /></svg>
+          </span>
+          <div>
+            <h2 class="doc-title">사업자등록증</h2>
+            <p class="doc-desc">마이페이지 저장 문서와 일치</p>
+          </div>
+          <span class="badge ok">확인 완료</span>
+        </article>
+
+        <article class="doc-row ok">
+          <span class="status-icon ok" aria-label="확인 완료">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7" /></svg>
+          </span>
+          <div>
+            <h2 class="doc-title">중소기업확인서</h2>
+            <p class="doc-desc">저장된 PDF 있음</p>
+          </div>
+          <span class="badge ok">확인 완료</span>
+        </article>
+
+        <article class="doc-row missing">
+          <span class="status-icon missing" aria-label="미보유">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17" /></svg>
+          </span>
+          <div>
+            <h2 class="doc-title">공장등록증</h2>
+            <p class="doc-desc">마이페이지에 저장된 파일 없음</p>
+          </div>
+          <span class="badge missing">미보유</span>
+        </article>
+
+        <article class="doc-row missing">
+          <span class="status-icon missing" aria-label="미보유">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17" /></svg>
+          </span>
+          <div>
+            <h2 class="doc-title">재무제표</h2>
+            <p class="doc-desc">마이페이지에 저장된 파일 없음</p>
+          </div>
+          <span class="badge missing">미보유</span>
+        </article>
+
+        <article class="doc-row missing">
+          <span class="status-icon missing" aria-label="미보유">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17" /></svg>
+          </span>
+          <div>
+            <h2 class="doc-title">국세 납세증명서</h2>
+            <p class="doc-desc">마이페이지에 저장된 파일 없음</p>
+          </div>
+          <span class="badge missing">미보유</span>
+        </article>
+
+        <article class="doc-row missing">
+          <span class="status-icon missing" aria-label="미보유">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17" /></svg>
+          </span>
+          <div>
+            <h2 class="doc-title">지방세 납세증명서</h2>
+            <p class="doc-desc">마이페이지에 저장된 파일 없음</p>
+          </div>
+          <span class="badge missing">미보유</span>
+        </article>
+      </div>
+
+      <div class="notice">
+        <span>※</span>
+        <div><strong>확인 완료</strong>는 마이페이지에 저장된 서류명과 지원처 요구 서류명이 일치한 상태입니다. <strong>미보유</strong> 서류는 마이페이지 첨부파일 화면에서 추가 등록해야 합니다.</div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const root = document.getElementById('documentCheck');
+    const button = document.getElementById('toggleButton');
+    const label = button.querySelector('span');
+
+    button.addEventListener('click', () => {
+      const isClosed = root.classList.toggle('is-closed');
+      button.setAttribute('aria-expanded', String(!isClosed));
+      label.textContent = isClosed ? '열기' : '열기';
+    });
+  </script>
+</body>
+</html>

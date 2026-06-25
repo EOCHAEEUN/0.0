@@ -12,7 +12,10 @@ class FactofitState(TypedDict):
     equipment_id: Optional[str]
     equipments: Optional[list[dict]]
     selected_equipment_id: Optional[str]
+    policy_intent_choice: Optional[str]
+    selected_equipment_for_policy: Optional[str]
     matched_policies: list[MatchedPolicy]    # policy_matching 결과
+    selected_policy: Optional[dict]
     roi_result: Optional[dict]          # capex_advisor 계산 결과
     draft_result: Optional[dict[str, Any]]   # application_draft result JSON
     draft_context: Optional[dict[str, Any]]  # draft-only runtime context

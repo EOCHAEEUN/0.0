@@ -28,7 +28,7 @@ from __future__ import annotations
 from datetime import date
 
 from app.core.database import get_db
-from app.agents.capex import normalize_equipment_category
+from app.tools.equipment_normalizer import normalize_equipment_category
 from app.models.safety import (
     SafetyDashboardItem,
     SafetyDashboardSummary,

@@ -582,6 +582,9 @@ async def generate_draft(
         "equipments": [equipment_data],
         "selected_equipment_id": body.equipment_id,
         "matched_policies": [selected_policy],
+        "selected_policy": selected_policy,
+        "policy_intent_choice": None,
+        "selected_equipment_for_policy": None,
         "roi_result": selected_roi_scenario,
         "draft_result": None,
         "draft_context": {

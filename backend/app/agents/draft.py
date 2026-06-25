@@ -8,13 +8,19 @@ import json
 def application_draft_node(state: FactofitState) -> FactofitState:
     equipment = state.get("equipment")
     company = state.get("company_info")
-    matched_policies = state.get("matched_policies", [])
     roi_result = state.get("roi_result")
     draft_context = state.get("draft_context") or {}
     safety_management = draft_context.get("safety_management")
 
-    # 매칭된 공고 중 첫 번째 선택 (가장 적합한 공고)
-    selected_policy = matched_policies[0] if matched_policies else "선택된 공고 없음"
+    # selected_policy 받기 (chat이든 routers/draft든 있음)
+    selected_policy = state.get("selected_policy")
+    if not selected_policy:
+        selected_policy = "선택된 공고 없음"
+
+    # draft_context에 정보 없으면 roi_result에서 추출
+    if not draft_context.get("scenario_used") and roi_result:
+        draft_context["scenario_used"] = roi_result.get("recommended", "a").lower()
+        draft_context["scenario_label"] = f"{draft_context['scenario_used'].upper()}안 추천"
 
     # 프롬프트 구성
     prompt = APPLICATION_DRAFT_SYSTEM_PROMPT.format(

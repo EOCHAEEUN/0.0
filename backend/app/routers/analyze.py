@@ -918,6 +918,9 @@ async def get_support_projects(
         "equipments": [],                  # ← 추가
         "selected_equipment_id": equipment_id,     # ← 추가
         "matched_policies": [],
+        "policy_intent_choice": None,  # ← 추추가
+        "selected_equipment_for_policy": None, # ← 추추가
+        "selected_policy": None, # ← 추추가
         "roi_result": None,
         "draft_result": None,
         "draft_context": None,             # ← 추가

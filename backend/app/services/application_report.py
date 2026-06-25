@@ -311,8 +311,18 @@ def load_application_report_data(
     if user_id:
         company_query = company_query.eq("user_id", user_id)
     company = _first(company_query.limit(1).execute().data)
+    if not company and user_id:
+        company = _first(
+            db.table("company")
+            .select("*")
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+            .data
+        )
     if not company:
         raise ValueError("기업 정보를 찾을 수 없습니다.")
+    company_id = str(company.get("company_id") or company_id)
 
     equipment = _first(
         db.table("equipment")
@@ -324,7 +334,17 @@ def load_application_report_data(
         .data
     )
     if not equipment:
+        equipment = _first(
+            db.table("equipment")
+            .select("*")
+            .eq("company_id", company_id)
+            .limit(1)
+            .execute()
+            .data
+        )
+    if not equipment:
         raise ValueError("설비 정보를 찾을 수 없습니다.")
+    equipment_id = str(equipment.get("equipment_id") or equipment_id)
 
     roi_output = _first(
         db.table("roi_output")
@@ -337,7 +357,7 @@ def load_application_report_data(
         .data
     )
     if not roi_output:
-        raise ValueError("ROI 분석 결과를 찾을 수 없습니다.")
+        roi_output = {}
 
     matched_query = (
         db.table("matched_policy")
@@ -350,13 +370,26 @@ def load_application_report_data(
     matched_policy = _first(
         matched_query.order("match_score", desc=True).limit(1).execute().data
     )
-    if not matched_policy:
-        raise ValueError("추천 정책 정보를 찾을 수 없습니다.")
 
     policy_id = str(matched_policy.get("policy_id") or policy_id or "")
     policy = _first(
         db.table("policy").select("*").eq("policy_id", policy_id).limit(1).execute().data
     )
+    if not matched_policy:
+        matched_policy = {
+            "policy_id": policy_id,
+            "title": policy.get("title") or "선택 지원사업",
+            "organization": (
+                policy.get("organization")
+                or policy.get("agency")
+                or policy.get("provider")
+                or "주관기관 정보 없음"
+            ),
+            "reason": "추천 캐시가 없어 선택한 공고 정보를 기준으로 PDF를 생성합니다.",
+            "scenario_match": None,
+            "scenario_label": None,
+            "match_score": None,
+        }
     draft = _first(
         db.table("draft_result")
         .select("*")

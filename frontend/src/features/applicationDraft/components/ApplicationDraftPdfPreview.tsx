@@ -33,6 +33,14 @@ const API_BASE_URL = (
   "http://127.0.0.1:8000/api"
 ).replace(/\/$/, "")
 
+function buildApiUrl(path: string) {
+  if (API_BASE_URL.endsWith("/api")) {
+    return `${API_BASE_URL}${path.replace(/^\/api/, "")}`
+  }
+
+  return `${API_BASE_URL}${path}`
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -182,7 +190,7 @@ async function downloadApplicationReportPdf(model: ApplicationDraftModel) {
     headers.Authorization = `Bearer ${token}`
   }
 
-  const response = await fetch(`${API_BASE_URL}/reports/application.pdf`, {
+  const response = await fetch(buildApiUrl("/api/reports/application.pdf"), {
     method: "POST",
     headers,
     body: JSON.stringify({

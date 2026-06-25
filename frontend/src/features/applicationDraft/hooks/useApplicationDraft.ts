@@ -67,6 +67,14 @@ const API_BASE_URL = (
   "http://127.0.0.1:8000/api"
 ).replace(/\/$/, "")
 
+function buildApiUrl(path: string) {
+  if (API_BASE_URL.endsWith("/api")) {
+    return `${API_BASE_URL}${path.replace(/^\/api/, "")}`
+  }
+
+  return `${API_BASE_URL}${path}`
+}
+
 function asDict(value: unknown): Dict | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Dict)
@@ -599,7 +607,7 @@ export function useApplicationDraft(locationState: unknown) {
           headers.Authorization = `Bearer ${token}`
         }
 
-        const response = await fetch(`${API_BASE_URL}/draft`, {
+        const response = await fetch(buildApiUrl("/api/draft"), {
           method: "POST",
           headers,
           body: JSON.stringify({

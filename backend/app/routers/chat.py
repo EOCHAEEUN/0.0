@@ -16,6 +16,7 @@ class ChatRequest(BaseModel):
     message: str
     chat_history: list[dict] = []
     selected_equipment_id: str = ""
+    policy_intent_choice: str = ""
 
 
 @router.post("/chat")
@@ -148,6 +149,8 @@ async def chat(req: ChatRequest):
             "final_response": "",
             "unsupported_equipment": False,
             "chat_id": None,
+            "options": None,
+            "policy_intent_choice": req.policy_intent_choice or None,
         }
 
         result = await factofit_graph.ainvoke(initial_state)
@@ -178,9 +181,12 @@ async def chat(req: ChatRequest):
                     ]
                 }
             ]
-            
+
         elif intent == "response": 
-            cards = []
+            cards = [{
+                "type": "intent_confirmation",
+                "data": result.get("options", [])
+            }]
         elif intent == "general": 
             cards = []
         else:

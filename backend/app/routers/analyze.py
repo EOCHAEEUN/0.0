@@ -928,7 +928,8 @@ async def get_support_projects(
         "final_response": "",
         "unsupported_equipment": False,
         "chat_id": None,
-        "safety_dashboard": None          # ← 추가
+        "safety_dashboard": None,          # ← 추가
+        "options": None # ← 추추추가
     }
 
     try:

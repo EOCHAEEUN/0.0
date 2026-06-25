@@ -857,6 +857,7 @@ def policy_chat_node(state: FactofitState) -> FactofitState:
     if not policy_intent_choice:
         intent_result = ask_policy_intent(user_query)
         state["final_response"] = intent_result["message"]
+        state["options"] = intent_result["options"]
         state["intent"] = "response"
         return state
     

@@ -598,6 +598,7 @@ async def generate_draft(
         "unsupported_equipment": False,
         "chat_id": None,
         "safety_dashboard": None,
+        "options": None # ← 추추추가
     }
 
     try:

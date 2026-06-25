@@ -857,12 +857,14 @@ def policy_chat_node(state: FactofitState) -> FactofitState:
     if not policy_intent_choice:
         intent_result = ask_policy_intent(user_query)
         state["final_response"] = intent_result["message"]
+        state["intent"] = "response"
         return state
     
     # 상태 2: equipment 선택 + 설비 미선택
     elif policy_intent_choice == "equipment" and not selected_equipment:
         equipments = get_user_equipment_list(company_id)
         state["final_response"] = "어떤 설비의 정책 정보를 원하시나요?"
+        state["intent"] = "response"
         return state
     
     # 상태 3: equipment + 설비 선택 + 첫 조회
@@ -870,6 +872,7 @@ def policy_chat_node(state: FactofitState) -> FactofitState:
         policies = get_equipment_policies(company_id, selected_equipment)
         state["matched_policies"] = policies
         state["final_response"] = "선택하신 설비의 적합한 정책들입니다. 더 궁금한 점이 있으신가요?"
+        state["intent"] = "response"
         return state
     
     # 상태 4: general + 첫 검색
@@ -879,6 +882,7 @@ def policy_chat_node(state: FactofitState) -> FactofitState:
         policies = search_general_policies(user_query, industry_code, region, n_results=5)
         state["matched_policies"] = policies
         state["final_response"] = "찾은 정책들입니다. 더 궁금한 점이 있으신가요?"
+        state["intent"] = "response"
         return state
     
     # 상태 5: 후속질문
@@ -900,9 +904,11 @@ def policy_chat_node(state: FactofitState) -> FactofitState:
             )
             state["matched_policies"] = sorted_policies
             state["final_response"] = f"{criteria} 기준으로 정렬했습니다."
+            state["intent"] = "policy"
         
         elif intent == "more":
             state["final_response"] = "모든 정책을 보여드립니다."
+            state["intent"] = "policy"
         
         elif intent == "filter":
             criteria = followup_info.get("criteria")  # region / eligible_company_types
@@ -915,6 +921,7 @@ def policy_chat_node(state: FactofitState) -> FactofitState:
             
             state["matched_policies"] = filtered
             state["final_response"] = f"{filter_value} 관련 정책들만 필터링했습니다."
+            state["intent"] = "policy"
         
         elif intent == "compare":
             indices = followup_info.get("policy_indices", [0, 1])  # 비교할 정책 인덱스들
@@ -933,7 +940,8 @@ def policy_chat_node(state: FactofitState) -> FactofitState:
                 마감: {policy_b.get('metadata', {}).get('deadline')}
                 """
                 state["final_response"] = comparison
-        
+                state["intent"] = "policy"
+            
         elif intent == "detail":
             policy_index = followup_info.get("policy_index", 0)
             if 0 <= policy_index < len(matched_policies):
@@ -946,7 +954,8 @@ def policy_chat_node(state: FactofitState) -> FactofitState:
                     state["selected_policy"] = selected_policy
                 else:
                     state["final_response"] = f"정책명: {selected_policy.get('title')}\n상세 정보: {selected_policy}"
-        
+                    state["intent"] = "policy"
+
         return state
     
     return state

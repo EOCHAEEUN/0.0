@@ -62,14 +62,15 @@ def build_graph():
     # 각 specialist → response_node
     graph.add_edge("capex_advisor_node", "response_node")
     graph.add_conditional_edges(
-    "policy_chat_node",
-    lambda state: state["intent"],
-    {
-        "policy": "policy_chat_node",
-        "draft": "application_draft_node",
-        "general": "response_node"
-    }
-)
+        "policy_chat_node",
+        lambda state: state["intent"],
+        {
+            "policy": "policy_chat_node",
+            "draft": "application_draft_node",
+            "general": "response_node",
+            "response": "response_node"
+        }
+    )
     graph.add_edge("application_draft_node", "response_node")
     graph.add_edge("equipment_safety_node", "response_node")
 

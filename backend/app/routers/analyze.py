@@ -1,5 +1,5 @@
 from typing import Any, Optional
-from datetime import datetime
+from datetime import date, datetime
 import asyncio
 
 from fastapi import APIRouter, Depends, Query
@@ -389,11 +389,17 @@ async def analyze(
     eq = equipment_data.data[0]
     equipment_id = eq.get("equipment_id")
 
+    # energy_cost_annual: null(미입력)과 실제 0을 구분한다.
+    # EquipmentInput은 int 타입을 요구하므로 미입력 시 0을 넘기되,
+    # energy_provided 플래그를 roi_calc에 함께 전달해 벤치마크 fallback을 제어한다.
+    raw_energy = eq.get("energy_cost_annual")
+    energy_provided = raw_energy is not None
+
     equipment = EquipmentInput(
         name=eq.get("name", ""),
         category=eq.get("category", ""),
         age_years=eq.get("age_years", 0),
-        energy_cost_annual=eq.get("energy_cost_annual", 0),
+        energy_cost_annual=raw_energy if energy_provided else 0,
         defect_rate=eq.get("defect_rate"),
         maintenance_cost_annual=eq.get("maintenance_cost_annual"),
         current_capacity_value=eq.get("current_capacity_value"),
@@ -404,13 +410,34 @@ async def analyze(
         scenario_b_investment_manwon=eq.get("scenario_b_investment_manwon"),
     )
 
+    print("[analyze] equipment_input:", equipment.model_dump(), "energy_provided:", energy_provided)
+
     # ------------------------------------------------------------------
     # 3. ROI 계산
     # ------------------------------------------------------------------
     try:
-        roi_result = calculate_roi(equipment)
+        roi_result = calculate_roi(equipment, energy_provided=energy_provided)
     except ValueError as exc:
         return {"success": False, "message": str(exc)}
+
+    print(
+        "[analyze] roi_result summary:",
+        {
+            "recommended": roi_result.get("recommended"),
+            "scenario_a": {
+                "roi_pct": roi_result.get("scenario_a", {}).get("roi_pct"),
+                "payback_years": roi_result.get("scenario_a", {}).get("payback_years"),
+                "annual_net_benefit_manwon": roi_result.get("scenario_a", {}).get("annual_net_benefit_manwon"),
+                "net_investment_manwon": roi_result.get("scenario_a", {}).get("net_investment_manwon"),
+            },
+            "scenario_b": {
+                "roi_pct": roi_result.get("scenario_b", {}).get("roi_pct"),
+                "payback_years": roi_result.get("scenario_b", {}).get("payback_years"),
+                "annual_net_benefit_manwon": roi_result.get("scenario_b", {}).get("annual_net_benefit_manwon"),
+                "net_investment_manwon": roi_result.get("scenario_b", {}).get("net_investment_manwon"),
+            },
+        },
+    )
 
     # ------------------------------------------------------------------
     # 4. 정책 후보/추천
@@ -928,7 +955,8 @@ async def get_support_projects(
         "final_response": "",
         "unsupported_equipment": False,
         "chat_id": None,
-        "safety_dashboard": None          # ← 추가
+        "safety_dashboard": None,          # ← 추가
+        "options": None # ← 추추추가
     }
 
     try:
@@ -1014,5 +1042,105 @@ async def get_support_projects(
             "total": len(matched),
             "saved_count": saved_count,
             "source": "policy_matching_node",
+        },
+    }
+
+
+def _count_rows(query) -> int:
+    result = query.execute()
+    count = getattr(result, "count", None)
+    if isinstance(count, int):
+        return count
+
+    data = getattr(result, "data", None)
+    return len(data) if isinstance(data, list) else 0
+
+
+def _is_active_policy(row: dict, today: date) -> bool:
+    metadata = _as_dict(row.get("metadata"))
+    raw_deadline = _first_value(
+        row.get("deadline"),
+        row.get("deadline_display"),
+        row.get("end_date"),
+        row.get("application_end_date"),
+        row.get("reception_end_date"),
+        row.get("close_date"),
+        row.get("deadline_date"),
+        metadata.get("deadline"),
+        metadata.get("deadline_display"),
+        metadata.get("end_date"),
+        metadata.get("application_end_date"),
+        metadata.get("reception_end_date"),
+        metadata.get("close_date"),
+        metadata.get("deadline_date"),
+    )
+
+    if raw_deadline is None or str(raw_deadline).strip() in {"", "None", "마감일 미정"}:
+        return True
+
+    try:
+        deadline_date = date.fromisoformat(str(raw_deadline).strip()[:10])
+    except ValueError:
+        return True
+
+    return deadline_date >= today
+
+
+@router.get("/analyze/policy-summary")
+async def get_policy_summary(
+    company_id: str = Query(...),
+    equipment_id: Optional[str] = None,
+):
+    db = get_db()
+    today = date.today()
+
+    try:
+        total_policy_count = _count_rows(
+            db.table("policy").select("*", count="exact")
+        )
+    except Exception as exc:
+        print(f"policy 전체 count 조회 실패: {exc}")
+        total_policy_count = 0
+
+    try:
+        active_result = (
+            db.table("policy")
+            .select("*")
+            .execute()
+        )
+        active_rows = getattr(active_result, "data", []) or []
+        active_policy_count = sum(
+            1 for row in active_rows if isinstance(row, dict) and _is_active_policy(row, today)
+        )
+    except Exception as exc:
+        print(f"policy active count 조회 실패: {exc}")
+        active_policy_count = 0
+
+    try:
+        matched_query = (
+            db.table("matched_policy")
+            .select("policy_id", count="exact")
+            .eq("company_id", company_id)
+        )
+        if equipment_id:
+            matched_query = matched_query.eq("equipment_id", equipment_id)
+
+        matched_policy_count = _count_rows(matched_query)
+    except Exception as exc:
+        print(f"matched_policy count 조회 실패: {exc}")
+        matched_policy_count = 0
+
+    return {
+        "success": True,
+        "data": {
+            "totalPolicyCount": total_policy_count,
+            "activePolicyCount": active_policy_count,
+            "matchedPolicyCount": matched_policy_count,
+            "priorityPolicyCount": 1 if matched_policy_count > 0 else 0,
+            "updatedAt": datetime.now().isoformat(),
+            "matchScope": {
+                "company_id": company_id,
+                "equipment_id": equipment_id,
+            },
         },
     }

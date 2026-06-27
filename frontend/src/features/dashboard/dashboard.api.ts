@@ -63,11 +63,32 @@ export async function fetchDashboardOnboarding() {
   })
 
   const responseText = await response.text()
-  const responseData = safeJsonParse<DashboardOnboardingMeResponse>(responseText)
 
   if (!response.ok) {
+    console.error("[Dashboard company context] fetch failed", {
+      status: response.status,
+      hasToken: Boolean(accessToken),
+      response: responseText.slice(0, 300),
+    })
     throw new Error(`마이페이지 온보딩 조회에 실패했습니다. (${response.status})`)
   }
 
-  return responseData
+  const raw = safeJsonParse<{ success: boolean; data: DashboardOnboardingMeResponse }>(responseText)
+
+  if (!raw?.data) {
+    console.error("[Dashboard company context] unexpected response shape", {
+      keys: Object.keys(raw ?? {}),
+      snippet: responseText.slice(0, 200),
+    })
+    return null
+  }
+
+  const onboarding = raw.data
+  console.debug("[Dashboard company context] loaded", {
+    hasCompany: Boolean(onboarding.company),
+    companyName: onboarding.company?.company_name ?? null,
+    equipmentCount: onboarding.equipments?.length ?? 0,
+  })
+
+  return onboarding
 }

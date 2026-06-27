@@ -40,7 +40,7 @@ export default function EquipmentStatusList({
           return (
             <div
               key={item.name}
-              onClick={() => navigate("/roi")}
+              onClick={() => navigate("/analysis/new")}
               className="flex cursor-pointer items-center justify-between p-5 transition hover:bg-slate-50"
             >
               <div>

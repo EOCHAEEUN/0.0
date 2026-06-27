@@ -6,8 +6,8 @@ from pydantic import BaseModel, Field
 class EquipmentInput(BaseModel):
     name: str                                                                    # 설비명 (예: 프레스 1호기)
     category: str                                                                # 설비 카테고리 (press/cnc/injection)
-    age_years: int = Field(ge=0)                                                 # 설비 사용연수 (년)
-    energy_cost_annual: int = Field(ge=0)                                        # 연간 에너지 비용 (만원)
+    age_years: int = Field(default=0, ge=0)                                      # 설비 사용연수 (년)
+    energy_cost_annual: Optional[int] = Field(default=None, ge=0)               # 연간 에너지 비용 (만원)
     defect_rate: Optional[float] = Field(default=None, ge=0, le=100)            # 불량률 (%)
     maintenance_cost_annual: Optional[int] = Field(default=None, ge=0)          # 연간 유지보수 비용 (만원)
     current_capacity_value: Optional[float] = Field(default=None, ge=0)         # 설비 용량 규격 값

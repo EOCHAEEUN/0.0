@@ -1,17 +1,16 @@
-import { useRef, useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useEffect, useRef, useState } from "react"
+import { useNavigate, useSearchParams } from "react-router-dom"
 
 import { requestRoiSimulation } from "./roi.api"
+import { getAnalysisResult } from "../onboarding/onboardingState"
 import { colors } from "./roi.constants"
 import {
   EvidenceSection,
   FloatingModalNotice,
   InputPanel,
-  InvestmentEstimateSection,
   PageHero,
-  ResultAndAiSection,
-  ScenarioCompareSection,
 } from "./components/RoiPageSections"
+import { ExpectedBenefits, PolicyCta, RoiHero, RoiScenarioCards } from "./components/RoiResultSections"
 import {
   buildLocalScenarios,
   buildPayload,
@@ -20,12 +19,10 @@ import {
   findIndustryCodeByName,
   findIndustryNameByCode,
   getDefaultEquipmentName,
-  getDescription,
   getErrorMessage,
   getInitialFormFromMyPage,
   getMissingRequiredInputLabels,
   getRecommendedScenarioId,
-  getStatusLabel,
   hasConflictingEquipmentName,
   isDefaultEquipmentName,
   mergeApiScenarios,
@@ -37,9 +34,11 @@ import type { ApiStatus, RoiFormState, ScenarioCard } from "./roi.contract"
 
 export default function RoiFeature() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
   const inputSectionRef = useRef<HTMLDivElement | null>(null)
   const resultSectionRef = useRef<HTMLDivElement | null>(null)
+  const savedResultLoaded = useRef(false)
 
   const initialLoadedForm = useRef<RoiFormState>(getInitialFormFromMyPage()).current
   const [form, setForm] = useState<RoiFormState>(initialLoadedForm)
@@ -53,6 +52,80 @@ export default function RoiFeature() {
   const [requiredNoticeOpen, setRequiredNoticeOpen] = useState(false)
   const [costOpen, setCostOpen] = useState(false)
   const [benchmarkOpen, setBenchmarkOpen] = useState(false)
+
+  // 온보딩 분석 완료 후 `/roi?analysisId=xxx`로 진입했을 때
+  // 저장된 백엔드 결과를 자동으로 불러와 재분석 없이 결과를 표시한다.
+  useEffect(() => {
+    if (savedResultLoaded.current) return
+    savedResultLoaded.current = true
+
+    const analysisId = searchParams.get("analysisId") ?? undefined
+    const saved = getAnalysisResult(analysisId)
+
+    if (import.meta.env.DEV) {
+      console.debug("[RoiPage] auto-load: raw roiResult from storage", {
+        analysisId,
+        hasSnapshot: !!saved,
+        hasRoiResult: !!saved?.roiResult,
+        roiResult: saved?.roiResult,
+      })
+    }
+
+    if (!saved?.roiResult) return
+
+    const apiData = normalizeApiData(saved.roiResult)
+
+    if (import.meta.env.DEV) {
+      console.debug("[RoiPage] auto-load: normalized apiData", {
+        success: !!apiData,
+        scenario_a: apiData?.scenario_a,
+        scenario_b: apiData?.scenario_b,
+        recommended: apiData?.recommended,
+      })
+    }
+
+    if (!apiData) return
+
+    const localScenarios = buildLocalScenarios(initialLoadedForm)
+    const merged = mergeApiScenarios(localScenarios, apiData)
+    const nextRecommendedId = getRecommendedScenarioId(
+      initialLoadedForm,
+      merged.scenarios,
+      merged.apiRecommended,
+    )
+
+    setScenarios(merged.scenarios)
+    setRecommendedScenarioId(nextRecommendedId)
+    setSelectedScenarioId(nextRecommendedId)
+    setApiStatus("success")
+
+    if (import.meta.env.DEV) {
+      const scenA = merged.scenarios.find((s) => s.id === "A")
+      const scenB = merged.scenarios.find((s) => s.id === "B")
+      console.debug("[RoiPage] auto-load: final view-model", {
+        analysisId,
+        recommended: nextRecommendedId,
+        scenario_a: scenA
+          ? {
+              roiPct: scenA.roiPct,
+              paybackYears: scenA.paybackYears,
+              annualNetBenefitManwon: scenA.annualNetBenefitManwon,
+              netInvestmentManwon: scenA.netInvestmentManwon,
+              investmentManwon: scenA.investmentManwon,
+              subsidyManwon: scenA.subsidyManwon,
+            }
+          : null,
+        scenario_b: scenB
+          ? {
+              roiPct: scenB.roiPct,
+              paybackYears: scenB.paybackYears,
+              annualNetBenefitManwon: scenB.annualNetBenefitManwon,
+              netInvestmentManwon: scenB.netInvestmentManwon,
+            }
+          : null,
+      })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFieldChange = (key: keyof RoiFormState, value: string) => {
     setForm((prev) => {
@@ -112,11 +185,6 @@ export default function RoiFeature() {
     scenarios.find((scenario) => scenario.id === recommendedScenarioId) ?? scenarios[0]
 
   const selectedScores = buildScores(form, selectedScenario)
-  const selectedStatusLabel = getStatusLabel(selectedScores)
-  const selectedDescription = getDescription(form, selectedScenario, selectedScores)
-
-  const summaryAccent = selectedScenario.id === "A" ? colors.green : colors.blue2
-  const summarySoft = selectedScenario.id === "A" ? colors.greenSoft : "#EEF0FF"
 
   const currentEnergyCost = toNumber(form.annualEnergyCostManwon, 4500)
   const currentMaintenanceCost = toNumber(form.annualMaintenanceCostManwon, 1200)
@@ -239,6 +307,42 @@ export default function RoiFeature() {
         onClose={() => setRequiredNoticeOpen(false)}
       />
 
+      {/* 새 분석 흐름 안내 배너 */}
+      <div
+        style={{
+          background: "#eef2ff",
+          borderBottom: "1px solid #c7d2fe",
+          padding: "12px 24px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "16px",
+          flexWrap: "wrap",
+        }}
+      >
+        <span style={{ color: "#344ba0", fontSize: "13px", fontWeight: 900 }}>
+          새로운 투자 분석 흐름이 준비됐습니다. 기업 정보·설비 조건 입력부터 지원사업 추천까지 한 번에 확인하세요.
+        </span>
+        <button
+          type="button"
+          onClick={() => navigate("/analysis/new")}
+          style={{
+            height: "36px",
+            padding: "0 16px",
+            borderRadius: "8px",
+            border: "1px solid #344ba0",
+            background: "#344ba0",
+            color: "#ffffff",
+            fontSize: "13px",
+            fontWeight: 950,
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+          }}
+        >
+          새 투자 분석 시작하기 →
+        </button>
+      </div>
+
       <section className="section white">
         <div
           className="container"
@@ -279,57 +383,49 @@ export default function RoiFeature() {
             onCalculate={handleCalculate}
           />
 
-          <section
-            ref={resultSectionRef}
-            style={{
-              marginTop: "34px",
-            }}
-          >
-            <ResultAndAiSection
-              form={form}
-              selectedScenario={selectedScenario}
-              recommendedScenario={recommendedScenario}
-              recommendedScenarioId={recommendedScenarioId}
-              selectedScenarioId={selectedScenarioId}
-              selectedScores={selectedScores}
-              selectedStatusLabel={selectedStatusLabel}
-              selectedDescription={selectedDescription}
-              summaryAccent={summaryAccent}
-              summarySoft={summarySoft}
-              onReset={handleReset}
-              onNavigateSupport={() => navigate("/support-projects")}
-            />
+          {apiStatus !== "idle" && (
+            <section
+              ref={resultSectionRef}
+              style={{ marginTop: "34px" }}
+            >
+              <RoiHero
+                form={form}
+                recommendedScenario={recommendedScenario}
+                recommendedScenarioId={recommendedScenarioId}
+                onReset={handleReset}
+                onNavigateSupport={() => navigate("/analysis/new")}
+              />
 
-            <ScenarioCompareSection
-              scenarios={scenarios}
-              recommendedScenarioId={recommendedScenarioId}
-              selectedScenarioId={selectedScenarioId}
-              onSelect={setSelectedScenarioId}
-            />
+              <ExpectedBenefits scenarioId={recommendedScenarioId} />
 
-            <InvestmentEstimateSection
-              scenarios={scenarios}
-              selectedScenarioId={selectedScenarioId}
-            />
+              <RoiScenarioCards
+                scenarios={scenarios}
+                recommendedScenarioId={recommendedScenarioId}
+                selectedScenarioId={selectedScenarioId}
+                onSelect={setSelectedScenarioId}
+              />
 
-            <EvidenceSection
-              costOpen={costOpen}
-              benchmarkOpen={benchmarkOpen}
-              onToggleCost={() => setCostOpen((prev) => !prev)}
-              onToggleBenchmark={() => setBenchmarkOpen((prev) => !prev)}
-              currentEnergyCost={currentEnergyCost}
-              currentMaintenanceCost={currentMaintenanceCost}
-              currentDefectLoss={currentDefectLoss}
-              selectedEnergyAfter={selectedEnergyAfter}
-              selectedMaintenanceAfter={selectedMaintenanceAfter}
-              selectedDefectAfter={selectedDefectAfter}
-              costMax={costMax}
-              toBarWidth={toBarWidth}
-              benchmarkIndustryName={benchmarkIndustryName}
-              form={form}
-              selectedScores={selectedScores}
-            />
-          </section>
+              <PolicyCta onNavigateSupport={() => navigate("/analysis/new")} />
+
+              <EvidenceSection
+                costOpen={costOpen}
+                benchmarkOpen={benchmarkOpen}
+                onToggleCost={() => setCostOpen((prev) => !prev)}
+                onToggleBenchmark={() => setBenchmarkOpen((prev) => !prev)}
+                currentEnergyCost={currentEnergyCost}
+                currentMaintenanceCost={currentMaintenanceCost}
+                currentDefectLoss={currentDefectLoss}
+                selectedEnergyAfter={selectedEnergyAfter}
+                selectedMaintenanceAfter={selectedMaintenanceAfter}
+                selectedDefectAfter={selectedDefectAfter}
+                costMax={costMax}
+                toBarWidth={toBarWidth}
+                benchmarkIndustryName={benchmarkIndustryName}
+                form={form}
+                selectedScores={selectedScores}
+              />
+            </section>
+          )}
         </div>
       </section>
     </main>

@@ -1,6 +1,4 @@
 from datetime import datetime
-import json
-import re
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -300,152 +298,13 @@ def _merge_policy(matched_policy: dict, policy_detail: dict) -> dict:
     }
 
 
-def _strip_markdown_text(value: str) -> str:
-    text = str(value or "").strip()
-    text = re.sub(r"```(?:json)?|```", " ", text, flags=re.IGNORECASE)
-    text = re.sub(r"<br\s*/?>", " ", text, flags=re.IGNORECASE)
-    text = re.sub(r"[*_`>#]", " ", text)
-    text = re.sub(r"\|[-:\s|]+\|", " ", text)
-    text = text.replace("|", " ")
-    text = re.sub(r"-{3,}", " ", text)
-    text = re.sub(r"\[[^\]]*]", " ", text)
-    text = re.sub(r"\s+", " ", text)
-    return text.strip()
-
-
-def _try_parse_draft_json(value: str) -> dict:
-    text = str(value or "").strip()
-    if not text:
-        return {}
-
-    if text.startswith("```"):
-        text = re.sub(r"^```(?:json)?", "", text, flags=re.IGNORECASE).strip()
-        text = re.sub(r"```$", "", text).strip()
-
-    start = text.find("{")
-    end = text.rfind("}")
-    if start >= 0 and end > start:
-        text = text[start : end + 1]
-
-    try:
-        parsed = json.loads(text)
-    except Exception:
-        return {}
-
-    return parsed if isinstance(parsed, dict) else {}
-
-
-def _first_text_by_keys(source: dict, keys: list[str]) -> str:
-    for key in keys:
-        value = source.get(key)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-
-    return ""
-
-
-def _first_list_by_keys(source: dict, keys: list[str]) -> list[str]:
-    for key in keys:
-        value = source.get(key)
-        if isinstance(value, list):
-            items = [str(item).strip() for item in value if str(item).strip()]
-            if items:
-                return items
-
-    return []
-
-
-def _normalize_draft_keys(value: dict) -> dict:
-    nested = value.get("content")
-    source = {**value, **nested} if isinstance(nested, dict) else dict(value)
-
-    application_purpose = _first_text_by_keys(
-        source,
-        ["application_purpose", "application purpose", "신청 목적", "사업 목적"],
-    )
-    business_necessity = _first_text_by_keys(
-        source,
-        ["business_necessity", "business necessity", "necessity", "사업 필요성", "필요성"],
-    )
-    expected_effects = _first_text_by_keys(
-        source,
-        ["expected_effects", "expected effects", "effects", "기대효과", "기대 효과"],
-    )
-
-    normalized = {
-        **source,
-        "company_name": _first_text_by_keys(source, ["company_name", "company name", "companyName"]),
-        "equipment_name": _first_text_by_keys(source, ["equipment_name", "equipment name", "equipmentName"]),
-        "selected_policy": _first_text_by_keys(
-            source,
-            ["selected_policy", "selected policy", "_selected_policy", "policy_title", "policy title"],
-        ),
-        "agency": _first_text_by_keys(source, ["agency", "organization", "provider", "주관사"]),
-        "organization": _first_text_by_keys(source, ["organization", "agency", "provider", "주관사"]),
-        "application_purpose": application_purpose,
-        "business_necessity": business_necessity or application_purpose,
-        "expected_effects": expected_effects,
-    }
-
-    expected_benefits = _first_list_by_keys(
-        source,
-        ["expected_benefits", "expected benefits", "기대효과 목록"],
-    )
-    ai_reasons = _first_list_by_keys(source, ["ai_reasons", "ai reasons", "작성 근거"])
-    required_documents = _first_list_by_keys(
-        source,
-        ["required_documents", "required documents", "제출 서류"],
-    )
-
-    if expected_benefits:
-        normalized["expected_benefits"] = expected_benefits
-    if ai_reasons:
-        normalized["ai_reasons"] = ai_reasons
-    if required_documents:
-        normalized["required_documents"] = required_documents
-
-    return normalized
-
-
-def _extract_draft_section(text: str, labels: list[str]) -> str:
-    for label in labels:
-        pattern = re.compile(
-            rf"(?:^|\s)(?:#+\s*)?(?:\d+\.\s*)?{re.escape(label)}\s*[:：-]?\s*(.+?)(?=\s(?:#+\s*)?(?:\d+\.\s*)?(?:신청\s*목적|사업\s*필요성|추진\s*내용|기대\s*효과|AI\s*작성\s*근거|제출\s*서류|예산\s*계획|세부\s*추진\s*계획)\s*[:：-]?|$)",
-            flags=re.IGNORECASE | re.DOTALL,
-        )
-        match = pattern.search(text)
-        if match:
-            return _strip_markdown_text(match.group(1))
-
-    return ""
-
-
 def _coerce_draft_dict(value: Any) -> dict:
     if isinstance(value, dict):
-        return _normalize_draft_keys(value)
+        return dict(value)
 
     if isinstance(value, str) and value.strip():
-        parsed = _try_parse_draft_json(value)
-        if parsed:
-            return _normalize_draft_keys(parsed)
-
-        application_purpose = _extract_draft_section(
-            value,
-            ["신청 목적", "사업 목적", "Application Purpose"],
-        )
-        business_necessity = _extract_draft_section(
-            value,
-            ["사업 필요성", "필요성", "Business Necessity", "necessity"],
-        )
-        expected_effects = _extract_draft_section(
-            value,
-            ["기대 효과", "기대효과", "Expected Effects", "effects"],
-        )
-
         return {
-            "application_purpose": application_purpose,
-            "business_necessity": business_necessity or _strip_markdown_text(value),
-            "expected_effects": expected_effects,
+            "business_necessity": value.strip(),
         }
 
     return {}
@@ -610,19 +469,9 @@ async def generate_draft(
     )
 
     if not company_result.data:
-        company_result = (
-            db.table("company")
-            .select("*")
-            .eq("user_id", current_user.id)
-            .limit(1)
-            .execute()
-        )
-
-    if not company_result.data:
         raise HTTPException(status_code=404, detail="기업 정보를 찾을 수 없습니다.")
 
     company_data = company_result.data[0]
-    company_id = _safe_text(company_data.get("company_id"), body.company_id)
 
     company = CompanyContext(
         company_id=company_data.get("company_id"),
@@ -644,25 +493,15 @@ async def generate_draft(
     equipment_result = (
         db.table("equipment")
         .select("*")
-        .eq("company_id", company_id)
+        .eq("company_id", body.company_id)
         .eq("equipment_id", body.equipment_id)
         .execute()
     )
 
     if not equipment_result.data:
-        equipment_result = (
-            db.table("equipment")
-            .select("*")
-            .eq("company_id", company_id)
-            .limit(1)
-            .execute()
-        )
-
-    if not equipment_result.data:
         raise HTTPException(status_code=404, detail="설비 정보를 찾을 수 없습니다.")
 
     equipment_data = equipment_result.data[0]
-    equipment_id = _safe_text(equipment_data.get("equipment_id"), body.equipment_id)
 
     equipment = EquipmentInput(
         name=equipment_data.get("name", ""),
@@ -682,22 +521,23 @@ async def generate_draft(
     roi_result = (
         db.table("roi_output")
         .select("*")
-        .eq("company_id", company_id)
-        .eq("equipment_id", equipment_id)
+        .eq("company_id", body.company_id)
+        .eq("equipment_id", body.equipment_id)
         .order("created_at", desc=True)
         .limit(1)
         .execute()
     )
 
-    roi_data = roi_result.data[0].get("roi_data") if roi_result.data else {}
-    if not isinstance(roi_data, dict):
-        roi_data = {}
+    if not roi_result.data:
+        raise HTTPException(status_code=404, detail="ROI 분석 결과를 찾을 수 없습니다.")
+
+    roi_data = roi_result.data[0].get("roi_data") or {}
 
     top_policy_result = (
         db.table("matched_policy")
         .select("*")
-        .eq("company_id", company_id)
-        .eq("equipment_id", equipment_id)
+        .eq("company_id", body.company_id)
+        .eq("equipment_id", body.equipment_id)
         .order("match_score", desc=True)
         .limit(5)
         .execute()
@@ -713,27 +553,13 @@ async def generate_draft(
         None,
     )
 
-    policy_detail = _fetch_policy_detail_by_id(db, body.policy_id)
     if not selected_matched_policy:
-        selected_matched_policy = {
-            "policy_id": body.policy_id,
-            "title": _safe_text(
-                policy_detail.get("title"),
-                policy_detail.get("name"),
-                default="선택 지원사업",
-            ),
-            "organization": _safe_text(
-                policy_detail.get("organization"),
-                policy_detail.get("agency"),
-                policy_detail.get("provider"),
-                default="주관기관 정보 없음",
-            ),
-            "reason": "추천 캐시가 없어 선택한 공고 정보를 기준으로 신청서 초안을 생성합니다.",
-            "scenario_match": None,
-            "scenario_label": None,
-            "match_score": None,
-        }
+        raise HTTPException(
+            status_code=400,
+            detail="신청서 초안은 추천 TOP 5 정책에 대해서만 생성할 수 있습니다.",
+        )
 
+    policy_detail = _fetch_policy_detail_by_id(db, body.policy_id)
     selected_policy = _merge_policy(selected_matched_policy, policy_detail)
 
     scenario_used, selected_roi_scenario = _resolve_draft_scenario(
@@ -752,9 +578,9 @@ async def generate_draft(
         "is_safe": True,
         "company_info": company,
         "equipment": equipment,
-        "equipment_id": equipment_id,
+        "equipment_id": body.equipment_id,
         "equipments": [equipment_data],
-        "selected_equipment_id": equipment_id,
+        "selected_equipment_id": body.equipment_id,
         "matched_policies": [selected_policy],
         "selected_policy": selected_policy,
         "policy_intent_choice": None,
@@ -772,6 +598,7 @@ async def generate_draft(
         "unsupported_equipment": False,
         "chat_id": None,
         "safety_dashboard": None,
+        "options": None # ← 추추추가
     }
 
     try:
@@ -796,12 +623,10 @@ async def generate_draft(
         scenario_used=scenario_used,
         scenario_label=scenario_label,
     )
-    draft_content["company_id"] = company_id
-    draft_content["equipment_id"] = equipment_id
 
     draft_payload = {
-        "company_id": company_id,
-        "equipment_id": equipment_id,
+        "company_id": body.company_id,
+        "equipment_id": body.equipment_id,
         "policy_id": body.policy_id,
         "draft_content": draft_content,
         "created_at": datetime.now().isoformat(),
@@ -810,10 +635,10 @@ async def generate_draft(
     # Keep only one latest draft for the same company/equipment/policy.
     db.table("draft_result").delete().eq(
         "company_id",
-        company_id,
+        body.company_id,
     ).eq(
         "equipment_id",
-        equipment_id,
+        body.equipment_id,
     ).eq(
         "policy_id",
         body.policy_id,
@@ -830,8 +655,8 @@ async def generate_draft(
                 else None
             ),
             "policy_id": body.policy_id,
-            "company_id": company_id,
-            "equipment_id": equipment_id,
+            "company_id": body.company_id,
+            "equipment_id": body.equipment_id,
             "scenario_used": scenario_used,
             "scenario_label": scenario_label,
             "draft_result": draft_content,

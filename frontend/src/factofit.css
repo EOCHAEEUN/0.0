@@ -14,3 +14,5 @@
 @import "./styles/factofit/07-contract-ready-polish.css";
 @import "./styles/factofit/08-final-alignment-pass.css";
 @import "./styles/factofit/09-mypage-equipment-tooltip.css";
+@import "./features/dashboard/dashboard.workspace.css";
+@import "./features/onboarding/onboarding.css";

@@ -6,12 +6,18 @@ import {
   type KeyboardEvent,
   type MouseEvent,
 } from "react"
+import { useNavigate } from "react-router-dom"
 
 import "./SignupModal.css"
 import AccountSection from "./signup/components/AccountSection"
 import AgreementBox from "./signup/components/AgreementBox"
 import CompanyInfoSection from "./signup/components/CompanyInfoSection"
 import UserInfoSection from "./signup/components/UserInfoSection"
+import {
+  markJustSignedUp,
+  resolvePostLoginPath,
+  updateUserOnboardingState,
+} from "../../features/onboarding/onboardingState"
 import { COMPANY_TYPE_PLACEHOLDER } from "./signup/signup.constants"
 import type { SignupModalProps } from "./signup/signup.types"
 import { useSignupForm } from "./signup/useSignupForm"
@@ -216,7 +222,22 @@ export default function SignupModal({
   onClose,
   onLoginClick,
 }: SignupModalProps) {
-  const form = useSignupForm({ onClose })
+  const navigate = useNavigate()
+
+  const handleSignupComplete = () => {
+    markJustSignedUp()
+    updateUserOnboardingState({
+      companyProfileStatus: "not_started",
+      welcomeDismissed: false,
+      analysisDraftId: undefined,
+      analysisDraftStatus: undefined,
+      analysisCount: 0,
+    })
+    onClose()
+    navigate(resolvePostLoginPath(), { replace: true })
+  }
+
+  const form = useSignupForm({ onClose, onSignupComplete: handleSignupComplete })
 
   const [signupNotice, setSignupNotice] = useState<SignupNotice | null>(null)
   const [isLockNoticeDismissed, setIsLockNoticeDismissed] = useState(false)

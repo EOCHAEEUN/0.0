@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react"
 import type {
   PolicyCounters,
+  PolicySummary,
   PolicyState,
   SupportProject,
 } from "../supportProjects.contract"
-import { fetchPolicyCards, getStoredCompanyId } from "../supportProjects.api"
+import { fetchPolicyCards, fetchPolicySummary, getStoredCompanyId } from "../supportProjects.api"
 import {
   buildPolicyCounters,
   getAnalysisFingerprint,
@@ -14,6 +15,13 @@ import {
 } from "../supportProjects.utils"
 
 const FINAL_RECOMMENDED_LIMIT = 5
+const EMPTY_POLICY_SUMMARY: PolicySummary = {
+  totalPolicyCount: 0,
+  activePolicyCount: 0,
+  matchedPolicyCount: 0,
+  priorityPolicyCount: 0,
+  updatedAt: "",
+}
 
 function normalizeProjectIds(projects: SupportProject[]) {
   return projects.map((project, index) => ({
@@ -29,6 +37,7 @@ export function useSupportProjects() {
   const [policyCounters, setPolicyCounters] = useState<PolicyCounters>(() =>
     buildPolicyCounters([]),
   )
+  const [policySummary, setPolicySummary] = useState<PolicySummary>(EMPTY_POLICY_SUMMARY)
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null)
   const [detailProject, setDetailProject] = useState<SupportProject | null>(null)
 
@@ -64,9 +73,10 @@ export function useSupportProjects() {
   useEffect(() => {
     let ignore = false
 
-    function applyEmptyState() {
+    function applyEmptyState(summary: PolicySummary = EMPTY_POLICY_SUMMARY) {
       setPolicyCards([])
       setPolicyCounters(buildPolicyCounters([]))
+      setPolicySummary(summary)
       setSelectedProjectId(null)
       setDetailProject(null)
       setPolicyState("empty")
@@ -75,6 +85,7 @@ export function useSupportProjects() {
     function applyErrorState() {
       setPolicyCards([])
       setPolicyCounters(buildPolicyCounters([]))
+      setPolicySummary(EMPTY_POLICY_SUMMARY)
       setSelectedProjectId(null)
       setDetailProject(null)
       setPolicyState("error")
@@ -89,12 +100,15 @@ export function useSupportProjects() {
       try {
         setPolicyState("loading")
 
-        const result = await fetchPolicyCards(companyId, equipmentId, analysisFingerprint)
+        const [result, summary] = await Promise.all([
+          fetchPolicyCards(companyId, equipmentId, analysisFingerprint),
+          fetchPolicySummary(companyId, equipmentId),
+        ])
 
         if (ignore) return
 
         if (!result.cards || result.cards.length === 0) {
-          applyEmptyState()
+          applyEmptyState(summary)
           return
         }
 
@@ -106,6 +120,11 @@ export function useSupportProjects() {
         )
 
         setPolicyCards(rankedCards)
+        setPolicySummary({
+          ...summary,
+          matchedPolicyCount: summary.matchedPolicyCount || rankedCards.length,
+          priorityPolicyCount: summary.priorityPolicyCount || (rankedCards.length > 0 ? 1 : 0),
+        })
         setPolicyCounters(
           buildPolicyCounters(rankedCards, {
             ...result.counters,
@@ -165,6 +184,7 @@ export function useSupportProjects() {
     finalRecommendedProjects,
     otherMatchedProjects,
     policyCounters,
+    policySummary,
     selectedProject,
     selectedProjectId,
     detailProject,

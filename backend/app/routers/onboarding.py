@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
+import traceback
 
 from app.core.database import get_db
 from app.core.auth import get_current_user
@@ -24,10 +25,27 @@ async def register_company(
     }
 
     try:
-        result = db.table("company").upsert(
-            company_payload,
-            on_conflict="user_id"
-        ).execute()
+        existing = (
+            db.table("company")
+            .select("company_id")
+            .eq("user_id", current_user.id)
+            .limit(1)
+            .execute()
+        )
+
+        existing_company = existing.data[0] if existing.data else None
+
+        if existing_company:
+            company_id = existing_company.get("company_id")
+            result = (
+                db.table("company")
+                .update(company_payload)
+                .eq("company_id", company_id)
+                .eq("user_id", current_user.id)
+                .execute()
+            )
+        else:
+            result = db.table("company").insert(company_payload).execute()
 
         if not result.data:
             return JSONResponse(
@@ -49,6 +67,9 @@ async def register_company(
         }
 
     except Exception as e:
+        print("[onboarding] Failed to save company payload:", company_payload)
+        print("[onboarding] Exception:", repr(e))
+        traceback.print_exc()
         return JSONResponse(
             status_code=500,
             content={
@@ -213,15 +234,21 @@ async def register_equipment(
     db = get_db()
 
     # 소유권 검증
-    company_result = (
-        db.table("company")
-        .select("company_id")
-        .eq("company_id", company_id)
-        .eq("user_id", current_user.id)
-        .single()
-        .execute()
-    )
-    if not company_result.data:
+    try:
+        company_result = (
+            db.table("company")
+            .select("company_id")
+            .eq("company_id", company_id)
+            .eq("user_id", current_user.id)
+            .limit(1)
+            .execute()
+        )
+        company_found = bool(company_result.data)
+    except Exception as e:
+        print(f"[equipment] company check failed: {e}")
+        company_found = False
+
+    if not company_found:
         return JSONResponse(
             status_code=404,
             content={
@@ -230,10 +257,12 @@ async def register_equipment(
             },
         )
     
-    equipment_payload = {
-        "company_id": company_id,
-        **body.model_dump(exclude_none=True)
-    }
+    body_dict = body.model_dump(exclude_none=True)
+    # DB NOT NULL 컬럼은 null 대신 기본값 0 삽입
+    if "energy_cost_annual" not in body_dict:
+        body_dict["energy_cost_annual"] = 0
+
+    equipment_payload = {"company_id": company_id, **body_dict}
     equipment_payload["category"] = normalize_equipment_category(
         body.category,
         body.name,
@@ -263,14 +292,18 @@ async def register_equipment(
         }
 
     except Exception as e:
+        import traceback
+        print("[equipment] insert failed. payload:", equipment_payload)
+        traceback.print_exc()
         return JSONResponse(
             status_code=500,
             content={
                 "success": False,
-                "message": "Failed to save equipment.",
+                "message": f"Failed to save equipment: {str(e)}",
                 "error": str(e),
             },
         )
+
 @router.patch("/equipment/{equipment_id}")
 async def update_equipment(
     equipment_id: str,

@@ -29,4 +29,5 @@ export type NormalizedIndustry = {
 
 export type UseSignupFormParams = {
   onClose: () => void
+  onSignupComplete?: () => void
 }

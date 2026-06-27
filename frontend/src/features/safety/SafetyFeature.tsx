@@ -171,28 +171,7 @@ function EmptyState({ text }: { text: string }) {
   return <div className="ff-safety-empty">{text}</div>
 }
 
-function TopNavigation() {
-  const navItems = ["대시보드", "ROI 분석", "지원사업", "신청서 생성", "안전점검", "AI Advisor"]
-
-  return (
-    <nav className="ff-safety-topnav">
-      <a className="ff-safety-logo" href="/">F</a>
-
-      <div className="ff-safety-navlinks">
-        {navItems.map((item) => (
-          <a key={item} className={item === "안전점검" ? "active" : ""} href="#">
-            {item}
-          </a>
-        ))}
-      </div>
-
-      <div className="ff-safety-nav-actions">
-        <a href="#">고객문의</a>
-        <a className="white" href="/mypage">마이페이지</a>
-      </div>
-    </nav>
-  )
-}
+// TopNavigation은 GlobalHeader로 대체됨 (AuthenticatedLayout)
 
 function PenaltyBanner({ count, onClick }: { count: number; onClick: () => void }) {
   return (
@@ -743,8 +722,6 @@ export function SafetyFeature() {
 
   return (
     <main className="ff-safety-app-page">
-      <TopNavigation />
-
       <div className="ff-safety-shell">
         <PenaltyBanner count={totalPenaltyCount} onClick={() => setIsPenaltyOpen(true)} />
 

@@ -1,4 +1,4 @@
-import botIcon from "../../../assets/aiAdvisor/factofit-ai-bot.png"
+import botIcon from "../../../assets/advisor/engi-bot-transparent.png"
 
 export function AdvisorFloatingButton({
   open,
@@ -14,6 +14,11 @@ export function AdvisorFloatingButton({
       onClick={onClick}
       aria-label={open ? "AI Advisor 닫기" : "AI Advisor 열기"}
     >
+      {!open && (
+        <span className="ff-advisor-floating-label" aria-hidden="true">
+          Engi AI Advisor
+        </span>
+      )}
       <span className="ff-advisor-floating-ring">
         <img src={botIcon} alt="" />
       </span>

@@ -1,4 +1,10 @@
-import type { PolicyApiItem, PolicyApiResponse, PolicyCounters, SupportProject } from "./supportProjects.contract"
+import type {
+  PolicyApiItem,
+  PolicyApiResponse,
+  PolicyCounters,
+  PolicySummary,
+  SupportProject,
+} from "./supportProjects.contract"
 import { buildPolicyCounters, mapPolicyToProject, rankProjects, toNumberOrNull } from "./supportProjects.utils"
 
 const COMPANY_ID_STORAGE_KEY = "factofit_company_id"
@@ -7,6 +13,8 @@ const POLICY_FETCH_LIMIT = 40
 
 const policyCardsMemoryCache = new Map<string, { cards: SupportProject[]; counters: PolicyCounters }>()
 const policyCardsInFlightCache = new Map<string, Promise<{ cards: SupportProject[]; counters: PolicyCounters }>>()
+const policySummaryMemoryCache = new Map<string, PolicySummary>()
+const policySummaryInFlightCache = new Map<string, Promise<PolicySummary>>()
 
 function getApiBase() {
   const envBase = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api"
@@ -29,6 +37,21 @@ export function getStoredCompanyId() {
 
 export function getStoredAccessToken() {
   return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || ""
+}
+
+function normalizePolicySummary(value: unknown): PolicySummary {
+  const record =
+    value && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {}
+
+  return {
+    totalPolicyCount: toNumberOrNull(record.totalPolicyCount as number | string | null) ?? 0,
+    activePolicyCount: toNumberOrNull(record.activePolicyCount as number | string | null) ?? 0,
+    matchedPolicyCount: toNumberOrNull(record.matchedPolicyCount as number | string | null) ?? 0,
+    priorityPolicyCount: toNumberOrNull(record.priorityPolicyCount as number | string | null) ?? 0,
+    updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : "",
+  }
 }
 
 function getPolicyListFromResponse(json: PolicyApiResponse) {
@@ -157,5 +180,53 @@ export async function fetchPolicyCards(
 
   policyCardsInFlightCache.set(cacheKey, requestPromise)
 
+  return requestPromise
+}
+
+export async function fetchPolicySummary(
+  companyId: string,
+  equipmentId: string,
+): Promise<PolicySummary> {
+  const cacheKey = `policy-summary:${companyId}:${equipmentId || "all"}`
+  const cached = policySummaryMemoryCache.get(cacheKey)
+  if (cached) return cached
+
+  const inFlight = policySummaryInFlightCache.get(cacheKey)
+  if (inFlight) return inFlight
+
+  const token = getStoredAccessToken()
+  const query = new URLSearchParams({ company_id: companyId })
+  if (equipmentId) query.set("equipment_id", equipmentId)
+
+  const requestPromise = fetch(buildApiUrl(`/api/analyze/policy-summary?${query.toString()}`), {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  })
+    .then(async (response) => {
+      const json = (await response.json().catch(() => ({}))) as {
+        success?: boolean
+        data?: unknown
+        message?: string
+        error?: string
+      }
+
+      if (!response.ok || json.success === false) {
+        throw new Error(json.message || json.error || `Policy summary API failed: ${response.status}`)
+      }
+
+      return normalizePolicySummary(json.data)
+    })
+    .then((summary) => {
+      policySummaryMemoryCache.set(cacheKey, summary)
+      return summary
+    })
+    .finally(() => {
+      policySummaryInFlightCache.delete(cacheKey)
+    })
+
+  policySummaryInFlightCache.set(cacheKey, requestPromise)
   return requestPromise
 }

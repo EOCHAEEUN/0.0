@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 
 import { submitLogin } from "../login.api"
 import type { LoginModalType } from "../login.contract"
+import { resolvePostLoginPath } from "../../../onboarding/onboardingState"
 
 export function useLoginForm() {
   const navigate = useNavigate()
@@ -29,7 +30,7 @@ export function useLoginForm() {
 
   const handleContinue = () => {
     setModalType(null)
-    navigate("/")
+    navigate(resolvePostLoginPath(), { replace: true })
   }
 
   const handleBackToMain = () => {

@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { requestAdvisorAnswer, buildLocalAdvisorResponse } from "../aiAdvisor.api"
+import {
+  requestAdvisorAnswer,
+  buildLocalAdvisorResponse,
+  toAdvisorChatHistory,
+} from "../aiAdvisor.api"
 import type { AdvisorMessage, AdvisorQuickActionId } from "../aiAdvisor.contract"
 import {
   ADVISOR_QUICK_ACTIONS,
   ADVISOR_STAGE_CARDS,
 } from "../aiAdvisor.constants"
-import botIcon from "../../../assets/aiAdvisor/factofit-ai-bot.png"
+import botIcon from "../../../assets/advisor/factofit-ai-bot.png"
 
 const QUICK_ACTION_PROMPT: Record<AdvisorQuickActionId, string> = {
   roi: "ROI 분석이 궁금해요. 현재 설비 투자 판단을 쉽게 설명해줘.",
@@ -63,7 +67,10 @@ export function AdvisorAgentPanel({
     setIsSending(true)
 
     try {
-      const answer = await requestAdvisorAnswer(trimmed)
+      const answer = await requestAdvisorAnswer(
+        trimmed,
+        toAdvisorChatHistory(messages),
+      )
       setMessages((prev) => [
         ...prev,
         {

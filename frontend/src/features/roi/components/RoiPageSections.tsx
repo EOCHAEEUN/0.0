@@ -635,6 +635,36 @@ export function ResultAndAiSection({
               />
             ))}
           </div>
+
+          {selectedScenario.assumptions?.energyCostSource && (
+            <div
+              style={{
+                marginTop: "14px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "6px 14px",
+                borderRadius: "999px",
+                background:
+                  selectedScenario.assumptions.energyCostSource === "industry_benchmark"
+                    ? "#FFF8E6"
+                    : "#EEF5FF",
+                border: `1px solid ${selectedScenario.assumptions.energyCostSource === "industry_benchmark" ? "#F0D070" : "#BDD5FF"}`,
+                fontSize: "12px",
+                fontWeight: 900,
+                color:
+                  selectedScenario.assumptions.energyCostSource === "industry_benchmark"
+                    ? "#7A5C00"
+                    : "#1E4A9E",
+              }}
+            >
+              <span>
+                {selectedScenario.assumptions.energyCostSource === "industry_benchmark"
+                  ? "⚠ 업종 평균 에너지비용 기준 추정치입니다."
+                  : "✓ 기업 입력값 기준 분석 결과입니다."}
+              </span>
+            </div>
+          )}
         </section>
 
         <aside

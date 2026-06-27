@@ -1,23 +1,26 @@
 :root{
   --navy:#061B34;
   --navy-2:#0A2240;
+  --navy-header:#0B1F42;
   --blue:#0047A0;
-  --blue-soft:#EEF6FF;
+  --blue-brand:#344BA0;
+  --blue-soft:#EEF3FF;
   --green:#0B7A53;
   --green-soft:#E8F5EF;
   --orange:#E65F00;
   --orange-soft:#FFF2DF;
   --red:#CD2E3A;
   --red-soft:#FDE8E9;
-  --ink:#172033;
+  --ink:#0B1F3A;
   --text:#334155;
   --muted:#667085;
   --line:#E2E8F0;
   --line-dark:#CBD5E1;
-  --bg:#F6F8FB;
+  --bg:#F5F7FB;
+  --bg-sub:#EEF3FF;
   --card:#FFFFFF;
-  --shadow:0 10px 25px rgba(0,0,0,0.05);
-  --shadow-deep:0 24px 64px rgba(6,27,52,.16);
+  --shadow:0 4px 16px rgba(6,27,52,0.06);
+  --shadow-deep:0 16px 48px rgba(6,27,52,.13);
   --radius:28px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -31,7 +34,7 @@ body{
 a{text-decoration:none;color:inherit}
 button,input,select{font-family:inherit}
 button{border:0;cursor:pointer}
-.page{min-height:100vh;background:linear-gradient(180deg,#FFFFFF 0%,#F7FAFD 38%,#F3F6FA 100%)}
+.page{min-height:100vh;background:var(--bg)}
 .nav{
   height:76px;
   position:fixed;

@@ -139,6 +139,7 @@ def _build_scenario(
     bench: dict,
     scenario_key: str,
     investment_override: Optional[int],
+    energy_provided: bool = True,
 ) -> dict:
     category = normalize_equipment_category(
         equipment.category,
@@ -149,14 +150,24 @@ def _build_scenario(
     s = bench[scenario_key]
 
     # 에너지 절감
-    energy_saving = int(equipment.energy_cost_annual * s["energy_reduction_rate"])
-    energy_method = "비용 기반 폴백"
+    # energy_provided=False → 사용자 미입력, 업종 평균으로 추정
+    # energy_provided=True  → 사용자 입력값(0 포함) 그대로 사용
+    if not energy_provided:
+        energy_cost = bench["avg_energy_cost_manwon"]
+        energy_cost_source = "industry_benchmark"
+        energy_method = "업종 평균 기준 추정"
+    else:
+        energy_cost = equipment.energy_cost_annual
+        energy_cost_source = "user_input"
+        energy_method = "비용 기반 계산"
+
+    energy_saving = int(energy_cost * s["energy_reduction_rate"])
 
     # 유지보수비 절감 (실입력 우선, 없으면 에너지비 비율로 추정)
     if equipment.maintenance_cost_annual is not None:
         maint_saving = int(equipment.maintenance_cost_annual * s["maintenance_reduction_rate"])
     else:
-        est_maint = int(equipment.energy_cost_annual * bench["maintenance_ratio"])
+        est_maint = int(energy_cost * bench["maintenance_ratio"])
         maint_saving = int(est_maint * s["maintenance_reduction_rate"])
 
     # 불량비용 절감
@@ -226,6 +237,10 @@ def _build_scenario(
         "annual_net_benefit_manwon": annual_net,
         "payback_years": payback,
         "roi_pct": roi_pct,
+        "assumptions": {
+            "energy_cost_annual_used": energy_cost,
+            "energy_cost_source": energy_cost_source,
+        },
     }
     if inv_estimation:
         result["investment_estimation"] = inv_estimation
@@ -450,7 +465,7 @@ def _calc_ai_recommendation(
 
 
 # ==================== 5. 메인 계산 ====================
-def calculate_roi(equipment: EquipmentInput) -> dict:
+def calculate_roi(equipment: EquipmentInput, energy_provided: bool = True) -> dict:
 
     category = normalize_equipment_category(
         equipment.category,
@@ -466,10 +481,12 @@ def calculate_roi(equipment: EquipmentInput) -> dict:
     scenario_a = _build_scenario(
         equipment, bench, "scenario_a",
         equipment.scenario_a_investment_manwon,
+        energy_provided=energy_provided,
     )
     scenario_b = _build_scenario(
         equipment, bench, "scenario_b",
         equipment.scenario_b_investment_manwon,
+        energy_provided=energy_provided,
     )
 
     equipment_status = {
@@ -479,11 +496,13 @@ def calculate_roi(equipment: EquipmentInput) -> dict:
 
     data_quality = _calc_data_quality(equipment)
 
+    # energy_provided=False이면 실제 입력값이 없으므로 벤치마크 기준으로 비율 표시
+    energy_for_stats = bench["avg_energy_cost_manwon"] if not energy_provided else equipment.energy_cost_annual
     benchmark = {
         "avg_energy_cost_manwon": bench["avg_energy_cost_manwon"],
         "avg_defect_rate_pct": bench["avg_defect_rate_pct"],
         "avg_replacement_cycle_yr": bench["avg_replacement_cycle_yr"],
-        "energy_vs_avg": round(equipment.energy_cost_annual / bench["avg_energy_cost_manwon"], 2),
+        "energy_vs_avg": round(energy_for_stats / bench["avg_energy_cost_manwon"], 2) if bench["avg_energy_cost_manwon"] else 0,
         "sources": bench["sources"],
     }
 

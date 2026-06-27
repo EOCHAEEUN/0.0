@@ -44,6 +44,14 @@ export type PolicyCounters = {
   otherMatchedCount: number
 }
 
+export type PolicySummary = {
+  totalPolicyCount: number
+  activePolicyCount: number
+  matchedPolicyCount: number
+  priorityPolicyCount: number
+  updatedAt: string
+}
+
 export type PolicyApiItem = {
   id?: string | number
   policy_id?: string | number

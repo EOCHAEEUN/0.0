@@ -28,6 +28,11 @@ export type RoiApiScenarioBreakdown = {
   defect_saving_method?: string
 }
 
+export type RoiApiScenarioAssumptions = {
+  energy_cost_annual_used?: number | null
+  energy_cost_source?: "user_input" | "industry_benchmark"
+}
+
 export type RoiApiScenario = {
   label?: string
   investment_manwon?: number
@@ -37,6 +42,7 @@ export type RoiApiScenario = {
   payback_years?: number
   roi_pct?: number
   breakdown?: RoiApiScenarioBreakdown | null
+  assumptions?: RoiApiScenarioAssumptions | null
 }
 
 export type RoiApiData = {
@@ -65,6 +71,11 @@ export type RoiApiResponse = {
   roi_data?: RoiApiData | null
 }
 
+export type ScenarioCardAssumptions = {
+  energyCostAnnualUsed: number | null
+  energyCostSource: "user_input" | "industry_benchmark" | null
+}
+
 export type ScenarioCard = {
   id: "A" | "B"
   badge: string
@@ -81,6 +92,7 @@ export type ScenarioCard = {
   roiPct: number
   estimateRangeText: string
   estimateBasisText: string
+  assumptions: ScenarioCardAssumptions | null
 }
 
 export type ScoreSummary = {

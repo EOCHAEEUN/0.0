@@ -1,0 +1,670 @@
+.ff-policy-page {
+  min-height: 100vh;
+  background: var(--bg, #F5F7FB);
+  padding: 32px 0 80px;
+}
+
+.ff-policy-shell {
+  width: min(1180px, calc(100% - 44px));
+  margin: 0 auto;
+}
+
+.ff-policy-back {
+  height: 42px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #061b34;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(6, 27, 52, 0.06);
+}
+
+/* ── 다크 히어로 ── */
+.ff-policy-hero {
+  margin-top: 24px;
+  background: #061b34;
+  border-radius: 12px;
+  padding: 34px 38px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 30px;
+  align-items: center;
+}
+
+.ff-policy-hero-left {
+  min-width: 0;
+}
+
+.ff-policy-hero-label {
+  display: inline-block;
+  color: #8ba3e8;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 18px;
+}
+
+.ff-policy-hero h1 {
+  margin: 0 0 18px;
+  color: #ffffff;
+  font-size: 34px;
+  line-height: 1.22;
+  font-weight: 950;
+  letter-spacing: -0.5px;
+}
+
+.ff-policy-hero > .ff-policy-hero-left > p {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 14px;
+  line-height: 1.75;
+  font-weight: 800;
+}
+
+.ff-policy-hero-right {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.ff-policy-bot {
+  width: 118px;
+  height: 86px;
+  object-fit: contain;
+  filter: drop-shadow(0 14px 18px rgba(6, 27, 52, 0.16));
+}
+
+.ff-hero-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 136px);
+  gap: 8px;
+}
+
+.ff-hero-stat {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 13px 14px;
+}
+
+.ff-hero-stat span {
+  display: block;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.ff-hero-stat strong {
+  display: block;
+  margin-top: 6px;
+  color: #ffffff;
+  font-size: 17px;
+  font-weight: 950;
+}
+
+/* ── 메타 그리드 (상세 페이지용) ── */
+.ff-policy-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.ff-policy-meta-card {
+  min-height: 96px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 18px;
+  box-shadow: 0 10px 25px rgba(6, 27, 52, 0.04);
+}
+
+.ff-policy-meta-card span {
+  display: block;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ff-policy-meta-card strong {
+  display: block;
+  margin-top: 10px;
+  color: #061b34;
+  font-size: 18px;
+  line-height: 1.35;
+  font-weight: 950;
+}
+
+/* ── 카드 공통 ── */
+.ff-priority-card,
+.ff-policy-section-card,
+.ff-policy-empty,
+.ff-policy-detail-card {
+  margin-top: 22px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 26px;
+  box-shadow: 0 16px 38px rgba(6, 27, 52, 0.06);
+}
+
+.ff-priority-card {
+  border-left: 6px solid #344ba0;
+}
+
+/* ── 배지 ── */
+.ff-policy-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #eaf7f0;
+  color: #0b7a53;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.ff-policy-badge.blue {
+  background: #eef2ff;
+  color: #344ba0;
+}
+
+.ff-policy-badge.gray {
+  background: #f1f5f9;
+  color: #475467;
+}
+
+.ff-priority-card h2 {
+  margin: 12px 0 0;
+  color: #061b34;
+  font-size: 30px;
+  line-height: 1.28;
+  font-weight: 950;
+  letter-spacing: -0.5px;
+}
+
+.ff-policy-subline {
+  margin-top: 10px;
+  color: #667085;
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.ff-policy-next-hint {
+  margin-top: 12px;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.6;
+}
+
+.ff-priority-final-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 35%);
+  gap: 28px;
+  align-items: start;
+}
+
+.ff-priority-final-main {
+  min-width: 0;
+}
+
+.ff-priority-final-side {
+  border-left: 1px solid #e2e8f0;
+  padding-left: 24px;
+}
+
+.ff-fit-score-panel {
+  text-align: left;
+}
+
+.ff-fit-score-panel > span {
+  display: block;
+  color: #667085;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.ff-fit-score-panel > strong {
+  display: block;
+  margin-top: 6px;
+  color: #344ba0;
+  font-family: "DM Mono", monospace;
+  font-size: 42px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.ff-fit-score-panel > strong em {
+  font-style: normal;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: #94a3b8;
+  margin-left: 3px;
+}
+
+.ff-reason-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.ff-short-reason {
+  margin-top: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fbff;
+  padding: 14px 16px;
+}
+
+.ff-short-reason strong {
+  display: block;
+  color: #061b34;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.ff-short-reason p {
+  margin: 6px 0 0;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.55;
+  font-weight: 850;
+}
+
+.ff-side-check-block {
+  margin-top: 22px;
+}
+
+.ff-side-check-block h3 {
+  margin: 0 0 10px;
+  color: #061b34;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.ff-side-check-block ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.ff-side-check-block li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: #475467;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.ff-side-check-block b {
+  color: #344ba0;
+  font-weight: 950;
+}
+
+.ff-side-check-block.warn b {
+  color: #ea580c;
+}
+
+.ff-reason-chip-row span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  border: 1px solid #cdd8f6;
+  border-radius: 999px;
+  background: #f5f7ff;
+  color: #344ba0;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.ff-policy-checkline {
+  margin-top: 14px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 14px;
+  color: #475467;
+  font-size: 13px;
+  line-height: 1.55;
+  font-weight: 850;
+}
+
+.ff-policy-checkline strong {
+  color: #061b34;
+}
+
+.ff-policy-checkline small {
+  display: block;
+  margin-top: 4px;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+/* ── 버튼 ── */
+.ff-policy-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+.ff-policy-primary,
+.ff-policy-secondary {
+  min-height: 48px;
+  border-radius: 8px;
+  padding: 0 18px;
+  font-size: 14px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.ff-policy-primary {
+  border: 1px solid #344ba0;
+  background: #344ba0;
+  color: #ffffff;
+}
+
+.ff-policy-secondary {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #061b34;
+}
+
+/* ── 섹션 타이틀 ── */
+.ff-policy-section-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: end;
+  margin-bottom: 14px;
+}
+
+.ff-policy-section-title h2 {
+  margin: 0;
+  color: #061b34;
+  font-size: 24px;
+  font-weight: 950;
+}
+
+.ff-policy-section-title p {
+  margin-top: 6px;
+  color: #667085;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+/* ── 정책 목록 ── */
+.ff-policy-list {
+  display: grid;
+  gap: 10px;
+}
+
+.ff-policy-table-row {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) 180px 112px 110px;
+  gap: 14px;
+  align-items: center;
+  min-height: 68px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 14px 16px;
+  cursor: pointer;
+}
+
+.ff-policy-row {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) 108px;
+  gap: 14px;
+  align-items: center;
+  min-height: 66px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fbfdff;
+  padding: 13px 16px;
+  cursor: pointer;
+}
+
+.ff-policy-row:hover,
+.ff-policy-table-row:hover {
+  background: #f8fbff;
+}
+
+.ff-policy-rank {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: #eef2ff;
+  color: #344ba0;
+  font-family: "DM Mono", monospace;
+  font-weight: 700;
+}
+
+.ff-policy-row strong,
+.ff-policy-table-row strong {
+  display: block;
+  color: #061b34;
+  font-size: 15px;
+  font-weight: 950;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ff-policy-row small,
+.ff-policy-table-row small {
+  display: block;
+  margin-top: 5px;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ff-policy-table-head {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) 180px 112px 110px;
+  gap: 14px;
+  padding: 0 16px 10px;
+  color: #667085;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.ff-policy-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.ff-policy-tabs button {
+  min-height: 42px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #061b34;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.ff-policy-tabs button.active {
+  border-color: #344ba0;
+  background: #eef2ff;
+  color: #344ba0;
+}
+
+.ff-policy-more {
+  margin-top: 12px;
+  text-align: center;
+}
+
+/* ── 빈 상태 ── */
+.ff-policy-empty {
+  text-align: left;
+  background: #fff7ed;
+  border-color: #fdba74;
+}
+
+.ff-policy-empty h2 {
+  margin: 14px 0 0;
+  color: #061b34;
+  font-size: 28px;
+  line-height: 1.35;
+  font-weight: 950;
+}
+
+.ff-policy-empty p {
+  margin-top: 12px;
+  color: #667085;
+  font-size: 15px;
+  line-height: 1.75;
+  font-weight: 800;
+}
+
+/* ── 상세 페이지 카드 ── */
+.ff-policy-detail-card h1 {
+  margin: 16px 0 0;
+  color: #061b34;
+  font-size: 30px;
+  line-height: 1.28;
+  font-weight: 950;
+  letter-spacing: -0.5px;
+}
+
+.ff-policy-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.ff-policy-info-box {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 18px;
+}
+
+.ff-policy-info-box h3 {
+  margin: 0 0 12px;
+  color: #061b34;
+  font-size: 16px;
+  font-weight: 950;
+}
+
+.ff-policy-info-box p,
+.ff-policy-info-box li {
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.65;
+  font-weight: 800;
+}
+
+.ff-policy-info-box ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+@media (max-width: 900px) {
+  .ff-policy-hero {
+    grid-template-columns: 1fr;
+    padding: 36px 28px;
+  }
+
+  .ff-policy-hero-right {
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .ff-hero-stats {
+    grid-template-columns: repeat(2, 1fr);
+    width: auto;
+    flex: 1;
+  }
+
+  .ff-priority-final-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ff-priority-final-side {
+    border-left: none;
+    border-top: 1px solid #e2e8f0;
+    padding-left: 0;
+    padding-top: 22px;
+  }
+
+  .ff-policy-two-col {
+    grid-template-columns: 1fr;
+  }
+
+  .ff-policy-meta-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ff-policy-row,
+  .ff-policy-table-row,
+  .ff-policy-table-head {
+    grid-template-columns: 42px minmax(0, 1fr);
+  }
+
+  .ff-policy-row > span:nth-child(n + 3),
+  .ff-policy-table-row > span:nth-child(n + 3),
+  .ff-policy-table-head > span:nth-child(n + 3) {
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .ff-policy-page {
+    padding-top: 80px;
+  }
+
+  .ff-policy-shell {
+    width: min(100% - 28px, 1180px);
+  }
+
+  .ff-policy-hero {
+    padding: 28px 20px;
+  }
+
+  .ff-policy-hero h1 {
+    font-size: 28px;
+  }
+
+  .ff-policy-hero-right {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .ff-hero-stats {
+    width: 100%;
+    grid-template-columns: 1fr;
+  }
+
+  .ff-policy-meta-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -27,12 +27,22 @@ function buildHeaders() {
   return headers
 }
 
-export async function requestAdvisorAnswer(message: string) {
+export function toAdvisorChatHistory(
+  messages: AdvisorMessage[],
+): { role: string; content: string }[] {
+  return messages.map((m) => ({ role: m.role, content: m.text }))
+}
+
+export async function requestAdvisorAnswer(
+  message: string,
+  history?: { role: string; content: string }[],
+) {
   const response = await fetch(`${API_BASE_URL}/chat`, {
     method: "POST",
     headers: buildHeaders(),
     body: JSON.stringify({
       message,
+      history: history ?? [],
       source: "global_ai_advisor",
     }),
   })

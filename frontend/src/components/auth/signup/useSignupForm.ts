@@ -24,7 +24,10 @@ import {
 
 const DEFAULT_PURPOSE = ""
 
-export function useSignupForm({ onClose }: UseSignupFormParams) {
+export function useSignupForm({
+  onClose,
+  onSignupComplete,
+}: UseSignupFormParams) {
   const [email, setEmail] = useState("")
   const [emailCode, setEmailCode] = useState("")
   const [isCodeSent, setIsCodeSent] = useState(false)
@@ -424,7 +427,11 @@ export function useSignupForm({ onClose }: UseSignupFormParams) {
       }
 
       alert("회원가입이 완료되었습니다.")
-      onClose()
+      if (onSignupComplete) {
+        onSignupComplete()
+      } else {
+        onClose()
+      }
     } catch (error) {
       alert(error instanceof Error ? error.message : "회원가입에 실패했습니다.")
     } finally {

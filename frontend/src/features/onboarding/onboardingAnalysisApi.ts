@@ -1,0 +1,499 @@
+import type {
+  AnalysisConditionDraft,
+  AnalysisResultSnapshot,
+  CompanyProfileDraft,
+} from "./onboardingState"
+import { ANALYSIS_RESULT_SCHEMA_VERSION } from "./onboardingState"
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000/api"
+
+const COMPANY_ID_STORAGE_KEY = "factofit_company_id"
+const EQUIPMENT_ID_STORAGE_KEY = "factofit_equipment_id"
+const SELECTED_EQUIPMENT_ID_STORAGE_KEY = "factofit_selected_equipment_id"
+const AUTH_SESSION_STORAGE_KEY = "factofit_auth_session"
+
+type ApiRecord = Record<string, unknown>
+
+function buildApiUrl(path: string) {
+  const base = String(API_BASE_URL).replace(/\/$/, "")
+  return base.endsWith("/api") ? `${base}${path.replace(/^\/api/, "")}` : `${base}${path}`
+}
+
+function safeJsonParse<T = unknown>(value: string | null): T | null {
+  if (!value) return null
+
+  try {
+    return JSON.parse(value) as T
+  } catch {
+    return null
+  }
+}
+
+function getTextValue(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim()
+  }
+  return ""
+}
+
+function getSupabaseStorageToken() {
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index)
+    if (!key?.startsWith("sb-") || !key.endsWith("-auth-token")) continue
+
+    const stored = safeJsonParse<ApiRecord>(window.localStorage.getItem(key))
+    const currentSession = asRecord(stored?.currentSession)
+    const session = asRecord(stored?.session)
+
+    const token = getTextValue(
+      stored?.access_token,
+      currentSession.access_token,
+      session.access_token,
+    )
+
+    if (token) return token
+  }
+
+  return ""
+}
+
+function getAccessToken() {
+  const session = safeJsonParse<ApiRecord>(
+    window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY),
+  )
+  const sessionData = asRecord(session?.data)
+  const nestedSession = asRecord(session?.session)
+
+  return getTextValue(
+    window.localStorage.getItem("factofit_access_token"),
+    window.localStorage.getItem("access_token"),
+    window.localStorage.getItem("token"),
+    session?.access_token,
+    sessionData.access_token,
+    nestedSession.access_token,
+    getSupabaseStorageToken(),
+  )
+}
+
+function getHeaders(token = getAccessToken()) {
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  }
+}
+
+async function requestJson(path: string, init: RequestInit) {
+  const token = getAccessToken()
+
+  if (!token) {
+    console.warn("[onboarding-analysis] Missing access token", {
+      path,
+      hasFactofitSession: Boolean(window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY)),
+      localStorageKeys: Object.keys(window.localStorage),
+    })
+    throw new Error("로그인 정보가 만료되었습니다. 다시 로그인해주세요.")
+  }
+
+  const response = await fetch(buildApiUrl(path), {
+    ...init,
+    headers: {
+      ...getHeaders(token),
+      ...(init.headers ?? {}),
+    },
+  })
+  const json = await response.json().catch(() => null)
+
+  if (!response.ok || json?.success === false) {
+    console.error("[onboarding-analysis] API error", {
+      path,
+      status: response.status,
+      body: json,
+      hasAuthorizationHeader: Boolean(token),
+    })
+
+    if (response.status === 401) {
+      throw new Error("로그인 정보가 만료되었습니다. 다시 로그인해주세요.")
+    }
+
+    const message =
+      json?.message ??
+      json?.detail ??
+      json?.error ??
+      `API 요청에 실패했습니다. (${response.status})`
+    throw new Error(typeof message === "string" ? message : JSON.stringify(message))
+  }
+
+  return json
+}
+
+function toNumber(value: unknown, fallback = 0) {
+  if (value === null || value === undefined || value === "") return fallback
+  const numeric = Number(String(value).replace(/[^\d.-]/g, ""))
+  return Number.isFinite(numeric) ? numeric : fallback
+}
+
+function toOptionalNumber(value: unknown) {
+  if (value === null || value === undefined || value === "") return null
+  const numeric = Number(String(value).replace(/[^\d.-]/g, ""))
+  return Number.isFinite(numeric) ? numeric : null
+}
+
+function toFirstNumber(value: unknown) {
+  const match = String(value ?? "").match(/\d[\d,]*(?:\.\d+)?/)
+  if (!match) return null
+  const numeric = Number(match[0].replace(/,/g, ""))
+  return Number.isFinite(numeric) ? numeric : null
+}
+
+function toAnnualManwonFromMonthly(value: unknown) {
+  const monthly = toOptionalNumber(value)
+  return monthly === null ? null : Math.round(monthly * 12)
+}
+
+function splitIndustryCodes(value: string) {
+  const codes = value
+    .split(",")
+    .map((code) => code.trim())
+    .filter(Boolean)
+  return codes.length > 0 ? codes : ["C"]
+}
+
+function parseEmployeeCount(value: string) {
+  const numeric = toFirstNumber(value)
+  return numeric === null ? null : numeric
+}
+
+function asRecord(value: unknown): ApiRecord {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as ApiRecord)
+    : {}
+}
+
+function getFirstRecord(...values: unknown[]): ApiRecord {
+  for (const value of values) {
+    const record = asRecord(value)
+    if (Object.keys(record).length > 0) return record
+  }
+  return {}
+}
+
+function getFirstArray(...values: unknown[]) {
+  for (const value of values) {
+    if (Array.isArray(value)) return value
+  }
+  return []
+}
+
+function getText(record: ApiRecord, ...keys: string[]) {
+  for (const key of keys) {
+    const value = record[key]
+    if (typeof value === "string" && value.trim()) return value.trim()
+  }
+  return ""
+}
+
+function getNumber(record: ApiRecord, ...keys: string[]) {
+  for (const key of keys) {
+    const value = record[key]
+    if (typeof value === "number" && Number.isFinite(value)) return value
+    const parsed = toOptionalNumber(value)
+    if (parsed !== null) return parsed
+  }
+  return null
+}
+
+function findRecordWithKeys(value: unknown, keys: string[]): ApiRecord {
+  const record = asRecord(value)
+  if (Object.keys(record).length === 0) return {}
+
+  if (keys.some((key) => record[key] !== undefined)) return record
+
+  for (const child of Object.values(record)) {
+    if (Array.isArray(child)) {
+      for (const item of child) {
+        const found = findRecordWithKeys(item, keys)
+        if (Object.keys(found).length > 0) return found
+      }
+      continue
+    }
+
+    const found = findRecordWithKeys(child, keys)
+    if (Object.keys(found).length > 0) return found
+  }
+
+  return {}
+}
+
+function findRoiResult(analyzeResponse: ApiRecord) {
+  const data = getFirstRecord(analyzeResponse.data, analyzeResponse)
+  const analysis = asRecord(data.analysis)
+  const recommendation = asRecord(data.recommendation)
+  const direct = getFirstRecord(
+    data.roi_result,
+    data.roi_data,
+    data.roi,
+    analysis.roi_result,
+    analysis.roi_data,
+    analysis.roi,
+    recommendation.roi_result,
+    recommendation.roi,
+    analyzeResponse.roi_result,
+    analyzeResponse.roi_data,
+    analyzeResponse.roi,
+  )
+
+  if (Object.keys(direct).length > 0) return direct
+
+  return findRecordWithKeys(analyzeResponse, [
+    "scenario_a",
+    "scenario_b",
+    "scenarioA",
+    "scenarioB",
+    "scenarios",
+  ])
+}
+
+function normalizeRecommended(value: unknown) {
+  const text = String(value ?? "").trim().toLowerCase()
+  const compact = text.replace(/[\s_-]/g, "")
+  if (
+    compact === "b" ||
+    compact === "scenariob" ||
+    compact.startsWith("b안") ||
+    compact.startsWith("b案")
+  ) {
+    return "B"
+  }
+  return "A"
+}
+
+function scenarioHasMetric(record: ApiRecord) {
+  return (
+    getNumber(record, "roi_pct", "roi_percent", "roiPercent", "roi") !== null ||
+    getNumber(record, "payback_years", "paybackYears", "payback", "payback_period_years") !== null
+  )
+}
+
+function getScenario(roiResult: ApiRecord) {
+  const recommended = normalizeRecommended(roiResult.recommended)
+  const scenarioA = getFirstRecord(roiResult.scenario_a, roiResult.scenarioA)
+  const scenarioB = getFirstRecord(roiResult.scenario_b, roiResult.scenarioB)
+  const scenarios = getFirstArray(roiResult.scenarios, roiResult.scenario_results)
+    .map(asRecord)
+    .filter((record) => Object.keys(record).length > 0)
+  const selected = recommended === "B" ? scenarioB : scenarioA
+
+  if (scenarioHasMetric(selected)) {
+    return { recommended, selected, source: `roi_result.scenario_${recommended.toLowerCase()}` }
+  }
+
+  const fallbackScenario = [scenarioA, scenarioB, ...scenarios].find(scenarioHasMetric)
+  if (fallbackScenario) {
+    return { recommended, selected: fallbackScenario, source: "roi_result.scenario fallback" }
+  }
+
+  return { recommended, selected: {}, source: "" }
+}
+
+function getPolicyTitle(policy: unknown) {
+  const record = asRecord(policy)
+  const metadata = asRecord(record.metadata)
+  return (
+    getText(record, "title", "policy_title", "name") ||
+    getText(metadata, "title", "policy_title", "name")
+  )
+}
+
+function getRecommendationDetail(roiResult: ApiRecord) {
+  const ai = asRecord(roiResult.ai_recommendation)
+  return getText(ai, "summary") || getText(roiResult, "summary", "message", "recommendation")
+}
+
+function getRecommendationTitle(policyCount: number) {
+  void policyCount
+  return "현재 조건에서 투자 검토를 권장합니다."
+}
+
+function buildSnapshot(
+  id: string,
+  condition: AnalysisConditionDraft,
+  companyId: string,
+  equipmentId: string,
+  analyzeResponse: ApiRecord,
+): AnalysisResultSnapshot {
+  const data = getFirstRecord(analyzeResponse.data, analyzeResponse)
+  const roiResult = findRoiResult(analyzeResponse)
+  const policies = getFirstArray(data.matched_policies, data.policies)
+  const { recommended, selected, source } = getScenario(roiResult)
+  const roiPct = getNumber(selected, "roi_pct", "roi_percent", "roiPercent", "roi")
+  const paybackYears = getNumber(
+    selected,
+    "payback_years",
+    "paybackYears",
+    "payback",
+    "payback_period_years",
+  )
+  const priorityPolicyName = getPolicyTitle(policies[0])
+
+  console.debug("[onboarding-analysis] raw roi_result", {
+    recommended: roiResult.recommended,
+    scenario_a: roiResult.scenario_a ?? roiResult.scenarioA,
+    scenario_b: roiResult.scenario_b ?? roiResult.scenarioB,
+  })
+
+  console.debug("[onboarding-analysis] selected ROI scenario", {
+    roiSource: source,
+    rawRecommended: roiResult.recommended,
+    recommendedScenario: recommended,
+    selectedScenario: selected,
+    roiPct,
+    paybackYears,
+    policyCount: policies.length,
+  })
+
+  return {
+    schemaVersion: ANALYSIS_RESULT_SCHEMA_VERSION,
+    id,
+    equipmentName: condition.equipmentName || "검토 설비",
+    recommendation: getRecommendationTitle(policies.length),
+    recommendationDetail: getRecommendationDetail(roiResult),
+    roiPct,
+    roiPercent: roiPct,
+    paybackYears,
+    matchedPolicies: policies.length,
+    priorityPolicies: priorityPolicyName ? 1 : 0,
+    priorityPolicyName,
+    recommendedScenario: recommended,
+    companyId,
+    equipmentId,
+    roiResult,
+    policies,
+    policyStatus: typeof data.policy_status === "string" ? data.policy_status : undefined,
+    policyError: typeof data.policy_error === "string" ? data.policy_error : null,
+    createdAt: new Date().toISOString(),
+  }
+}
+
+function buildCompanyPayload(profile: CompanyProfileDraft, condition: AnalysisConditionDraft) {
+  const region = [profile.regionSido, profile.regionSigungu]
+    .filter((value) => value.trim())
+    .join(" ")
+
+  return {
+    company_name: profile.companyName || "미입력 기업",
+    business_registration_no: null,
+    industry_name: profile.industry || null,
+    industry_code: splitIndustryCodes(profile.industryCode),
+    region: region || "지역 미입력",
+    company_type: "제조업",
+    primary_purpose: condition.purpose ? [condition.purpose] : [],
+    employee_count: parseEmployeeCount(profile.employeeRange),
+    annual_revenue: 0,
+  }
+}
+
+function buildEquipmentPayload(condition: AnalysisConditionDraft) {
+  const investmentA = toOptionalNumber(condition.investmentAmount || condition.investmentRange)
+  const investmentB = toOptionalNumber(condition.scenarioBInvestmentManwon)
+  const capacity = toOptionalNumber(condition.equipmentCapacity)
+
+  const payload = {
+    name: condition.equipmentName || "검토 설비",
+    category: condition.equipmentCategory || "press",
+    process: condition.purpose || null,
+    age_years: toNumber(condition.ageYears, 0),
+    energy_cost_annual: toOptionalNumber(condition.energyCostAnnual),
+    defect_rate: null,
+    maintenance_cost_annual: toAnnualManwonFromMonthly(condition.monthlyMaintenanceCost),
+    current_capacity_value: capacity,
+    production_qty:
+      toFirstNumber(condition.monthlyProduction) === null
+        ? null
+        : Math.round((toFirstNumber(condition.monthlyProduction) ?? 0) * 12),
+    contribution_margin_won: null,
+    scenario_a_investment_manwon: investmentA,
+    scenario_b_investment_manwon: investmentB,
+  }
+
+  console.debug("[onboarding-analysis] equipment payload", payload)
+
+  return payload
+}
+
+function findCompanyId(json: ApiRecord) {
+  const data = asRecord(json.data)
+  const company = getFirstRecord(data.company, json.company)
+  return String(data.company_id ?? company.company_id ?? json.company_id ?? "")
+}
+
+function findEquipmentId(json: ApiRecord) {
+  const data = asRecord(json.data)
+  const equipment = getFirstRecord(data.equipment, json.equipment)
+  return String(data.equipment_id ?? equipment.equipment_id ?? json.equipment_id ?? "")
+}
+
+export async function runOnboardingAnalysis(
+  id: string,
+  profile: CompanyProfileDraft,
+  condition: AnalysisConditionDraft,
+) {
+  const companyPayload = buildCompanyPayload(profile, condition)
+  let companyId = window.localStorage.getItem(COMPANY_ID_STORAGE_KEY) || ""
+
+  if (companyId) {
+    try {
+      await requestJson(`/api/onboarding/company/${encodeURIComponent(companyId)}`, {
+        method: "PATCH",
+        body: JSON.stringify(companyPayload),
+      })
+    } catch (error) {
+      console.warn(
+        "[onboarding-analysis] Existing company update failed; continuing with stored company_id.",
+        error,
+      )
+    }
+  } else {
+    try {
+      const companyJson = (await requestJson("/api/onboarding", {
+        method: "POST",
+        body: JSON.stringify(companyPayload),
+      })) as ApiRecord
+      companyId = findCompanyId(companyJson)
+    } catch {
+      throw new Error("기업 정보 저장 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.")
+    }
+  }
+
+  if (!companyId) {
+    throw new Error("기업 정보 저장 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.")
+  }
+
+  window.localStorage.setItem(COMPANY_ID_STORAGE_KEY, companyId)
+
+  const equipmentJson = (await requestJson(
+    `/api/onboarding/${encodeURIComponent(companyId)}/equipment`,
+    {
+      method: "POST",
+      body: JSON.stringify(buildEquipmentPayload(condition)),
+    },
+  )) as ApiRecord
+  const equipmentId = findEquipmentId(equipmentJson)
+
+  if (!equipmentId) {
+    throw new Error("설비 정보 저장 응답에서 equipment_id를 찾지 못했습니다.")
+  }
+
+  window.localStorage.setItem(EQUIPMENT_ID_STORAGE_KEY, equipmentId)
+  window.localStorage.setItem(SELECTED_EQUIPMENT_ID_STORAGE_KEY, equipmentId)
+
+  const query = new URLSearchParams({
+    company_id: companyId,
+    equipment_id: equipmentId,
+  })
+  const analyzeJson = (await requestJson(`/api/analyze?${query.toString()}`, {
+    method: "POST",
+  })) as ApiRecord
+
+  return buildSnapshot(id, condition, companyId, equipmentId, analyzeJson)
+}

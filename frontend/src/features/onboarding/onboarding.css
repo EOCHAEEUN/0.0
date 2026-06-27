@@ -1,0 +1,934 @@
+.ff-onboarding-page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #ffffff 0%, #f6f8fb 100%);
+  color: var(--ink);
+}
+
+.ff-onboarding-logo,
+.ff-logo-button {
+  color: var(--navy);
+  font-family: "DM Sans", "Noto Sans KR", system-ui, sans-serif;
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.ff-logo-button {
+  background: transparent;
+}
+
+.ff-onboarding-eyebrow {
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 2px;
+}
+
+.ff-welcome-hero,
+.ff-setup-shell,
+.ff-analysis-shell {
+  width: min(1180px, calc(100% - 44px));
+  margin: 0 auto;
+}
+
+.ff-welcome-hero {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 430px);
+  gap: 56px;
+  align-items: center;
+  padding: 96px 0;
+}
+
+.ff-welcome-copy h1,
+.ff-setup-intro h1,
+.ff-analysis-copy h1,
+.ff-review-panel h1,
+.ff-result-panel h1 {
+  margin-top: 14px;
+  color: var(--navy);
+  font-size: 48px;
+  line-height: 1.16;
+  font-weight: 900;
+}
+
+.ff-welcome-copy p,
+.ff-setup-intro p,
+.ff-analysis-copy p,
+.ff-review-panel p,
+.ff-result-panel p {
+  margin-top: 18px;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1.75;
+  font-weight: 800;
+}
+
+.ff-welcome-actions,
+.ff-setup-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 28px;
+  flex-wrap: wrap;
+}
+
+.ff-primary-action,
+.ff-secondary-action {
+  min-height: 52px;
+  border-radius: 8px;
+  padding: 0 22px;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.ff-primary-action {
+  background: var(--blue);
+  color: #ffffff;
+}
+
+.ff-secondary-action {
+  background: #ffffff;
+  color: var(--navy);
+  border: 1px solid var(--line-dark);
+}
+
+.ff-ghost-action {
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  min-height: 52px;
+  border-radius: 8px;
+  padding: 0 22px;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.ff-welcome-panel,
+.ff-setup-form,
+.ff-analysis-panel,
+.ff-review-panel,
+.ff-result-panel {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.ff-welcome-panel {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  background: var(--line);
+}
+
+.ff-welcome-panel article {
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  gap: 16px;
+  align-items: center;
+  padding: 24px;
+  background: #ffffff;
+}
+
+.ff-welcome-panel span,
+.ff-review-list span {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ff-welcome-panel strong,
+.ff-review-list strong {
+  color: var(--navy);
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.ff-welcome-panel em,
+.ff-review-list em {
+  color: var(--green);
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.ff-setup-header {
+  height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 clamp(22px, 5vw, 76px);
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.9);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(10px);
+}
+
+.ff-save-status {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.ff-save-status.saving {
+  color: var(--orange);
+}
+
+.ff-save-status.saved {
+  color: var(--green);
+}
+
+.ff-save-status.failed {
+  color: var(--red);
+}
+
+.ff-setup-shell,
+.ff-analysis-shell {
+  padding: 38px 0 88px;
+}
+
+.ff-onboarding-stepper {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 28px;
+  list-style: none;
+}
+
+.ff-onboarding-step {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #ffffff;
+  color: var(--muted);
+}
+
+.ff-onboarding-step span {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #eef2f7;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ff-onboarding-step strong {
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.ff-onboarding-step.done {
+  color: var(--green);
+  border-color: #b7ddcc;
+}
+
+.ff-onboarding-step.active {
+  color: var(--navy);
+  border-color: #9fc1ee;
+  background: #f7fbff;
+}
+
+.ff-onboarding-step.active span {
+  background: var(--navy);
+  color: #ffffff;
+}
+
+.ff-onboarding-step.done span {
+  background: var(--green-soft);
+  color: var(--green);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ff-setup-grid,
+.ff-analysis-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(520px, 1.2fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.ff-setup-note {
+  margin-top: 28px;
+  padding: 20px;
+  border-radius: 8px;
+  background: var(--blue-soft);
+  color: var(--navy);
+}
+
+.ff-setup-note strong,
+.ff-setup-note span {
+  display: block;
+}
+
+.ff-setup-note span {
+  margin-top: 8px;
+  color: var(--text);
+  line-height: 1.65;
+  font-weight: 800;
+}
+
+.ff-setup-form,
+.ff-analysis-panel,
+.ff-review-panel,
+.ff-result-panel {
+  padding: 28px;
+}
+
+.ff-setup-form label,
+.ff-placeholder-form label {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.ff-setup-form label span,
+.ff-placeholder-form label span {
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.ff-setup-form input,
+.ff-setup-form select,
+.ff-placeholder-form input,
+.ff-placeholder-form select {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid var(--line-dark);
+  border-radius: 8px;
+  padding: 0 14px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 800;
+  background: #ffffff;
+}
+
+.ff-setup-form input:focus,
+.ff-setup-form select:focus,
+.ff-placeholder-form input:focus,
+.ff-placeholder-form select:focus {
+  outline: 3px solid rgba(0, 71, 160, 0.14);
+  border-color: var(--blue);
+}
+
+.ff-setup-form em,
+.ff-field-error {
+  color: var(--red);
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ff-field-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ff-onboarding-industry {
+  position: relative;
+  margin-bottom: 18px;
+}
+
+.ff-optional-fields {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 18px;
+}
+
+.ff-optional-fields summary {
+  color: var(--navy);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.ff-optional-fields summary::after {
+  display: none;
+}
+
+.ff-optional-fields[open] summary {
+  margin-bottom: 16px;
+}
+
+.ff-setup-hint {
+  margin-top: 6px;
+  margin-bottom: 18px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+  font-weight: 800;
+}
+
+.ff-setup-helper {
+  margin-top: 18px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+  font-weight: 800;
+}
+
+.ff-placeholder-form .ff-setup-helper {
+  margin-top: 2px;
+  margin-bottom: 0;
+}
+
+.ff-placeholder-form small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ff-analysis-summary,
+.ff-result-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.ff-analysis-summary span,
+.ff-result-metrics span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ff-analysis-summary strong,
+.ff-result-metrics strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--navy);
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.ff-review-panel,
+.ff-result-panel {
+  width: min(760px, 100%);
+  margin: 0 auto;
+}
+
+.ff-review-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 28px;
+}
+
+.ff-review-list article {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.ff-result-metrics {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 28px;
+}
+
+.ff-result-metrics article {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdff;
+}
+
+.ff-analysis-loading {
+  display: grid;
+  gap: 8px;
+  margin-top: 22px;
+  padding: 18px;
+  border: 1px solid #cddcf2;
+  border-radius: 8px;
+  background: #f7fbff;
+}
+
+.ff-analysis-loading strong {
+  color: var(--navy);
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.ff-analysis-loading span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.ff-result-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 28px;
+  flex-wrap: wrap;
+}
+
+.ff-result-summary {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ff-priority-policy {
+  margin-top: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.ff-priority-policy span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ff-priority-policy strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--navy);
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.ff-dashboard-onboarding-banner {
+  width: min(1180px, calc(100% - 44px));
+  margin: 104px auto 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 22px;
+  align-items: center;
+  padding: 22px;
+  border: 1px solid #cddcf2;
+  border-radius: 8px;
+  background: #f7fbff;
+}
+
+.ff-dashboard-onboarding-banner h2 {
+  color: var(--navy);
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.ff-dashboard-onboarding-banner p {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+  font-weight: 800;
+}
+
+.ff-dashboard-completed-banner {
+  border-color: #b7ddcc;
+  background: #f4fbf7;
+}
+
+.ff-dashboard-locked {
+  opacity: 0.58;
+}
+
+@media (max-width: 920px) {
+  .ff-welcome-hero,
+  .ff-setup-grid,
+  .ff-analysis-grid,
+  .ff-dashboard-onboarding-banner {
+    grid-template-columns: 1fr;
+  }
+
+  .ff-welcome-hero {
+    gap: 26px;
+    padding: 84px 0 54px;
+  }
+
+  .ff-welcome-copy h1,
+  .ff-setup-intro h1,
+  .ff-analysis-copy h1,
+  .ff-review-panel h1,
+  .ff-result-panel h1 {
+    font-size: 34px;
+  }
+
+  .ff-onboarding-stepper,
+  .ff-field-row,
+  .ff-analysis-summary,
+  .ff-result-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .ff-dashboard-onboarding-banner {
+    display: grid;
+    margin-top: 92px;
+  }
+
+  .ff-purpose-chips {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ── AnalysisNewPage 전용 추가 규칙 ── */
+
+/* 필수 표시 */
+.ff-required-mark {
+  font-style: normal;
+  color: var(--blue);
+  margin-left: 2px;
+}
+
+/* 단위 붙은 입력 */
+.ff-input-with-unit {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.ff-input-with-unit input {
+  flex: 1;
+  padding-right: 52px;
+}
+
+.ff-input-unit {
+  position: absolute;
+  right: 14px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 900;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* 주요 목적 칩 */
+.ff-purpose-field {
+  margin-bottom: 18px;
+}
+
+.ff-field-label {
+  display: block;
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 900;
+  margin-bottom: 10px;
+}
+
+.ff-purpose-chips {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.ff-purpose-chip {
+  min-height: 44px;
+  border-radius: 8px;
+  border: 1px solid var(--line-dark);
+  background: #ffffff;
+  color: var(--navy);
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.ff-purpose-chip:hover {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+}
+
+.ff-purpose-chip.selected {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: #ffffff;
+}
+
+/* 선택 입력 접힘 영역 (analysis) — 글로벌 summary::after 열기/닫기 칩 그대로 표시 */
+.ff-analysis-optional {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 18px;
+}
+
+.ff-analysis-optional > summary {
+  color: var(--navy);
+  font-weight: 900;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ff-analysis-optional[open] > summary {
+  margin-bottom: 0;
+}
+
+.ff-optional-inner {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+/* .ff-placeholder-form 안의 label margin 재적용 (inner에서 상속됨) */
+.ff-optional-inner label {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.ff-optional-inner label span {
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+/* 토스트 알림 */
+.ff-toast {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  background: var(--navy);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.55;
+  padding: 14px 22px;
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(6, 27, 52, 0.22);
+  max-width: min(480px, calc(100vw - 44px));
+  text-align: center;
+  animation: ff-toast-in 0.2s ease;
+}
+
+@keyframes ff-toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ── 수정 모드 (분석 조건 조정) ── */
+
+.ff-edit-shell {
+  width: min(800px, calc(100% - 44px));
+  margin: 0 auto;
+  padding: 32px 0 88px;
+}
+
+.ff-edit-nav {
+  margin-bottom: 24px;
+}
+
+.ff-edit-back-link {
+  background: transparent;
+  border: none;
+  color: var(--blue);
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ff-edit-back-link:hover {
+  text-decoration: underline;
+}
+
+.ff-edit-header {
+  margin-bottom: 24px;
+}
+
+.ff-edit-title {
+  margin-top: 8px;
+  color: var(--navy);
+  font-size: 30px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.ff-edit-desc {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.65;
+}
+
+.ff-edit-company-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--blue-soft);
+  margin-bottom: 24px;
+}
+
+.ff-edit-company-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ff-edit-company-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ff-edit-company-line {
+  color: var(--navy);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.ff-edit-company-edit-btn {
+  background: #ffffff;
+  border: 1px solid var(--line-dark);
+  border-radius: 6px;
+  padding: 7px 14px;
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.ff-edit-company-edit-btn:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.ff-edit-form-panel {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 28px;
+}
+
+.ff-edit-section-title {
+  color: var(--navy);
+  font-size: 15px;
+  font-weight: 900;
+  margin-bottom: 16px;
+}
+
+.ff-edit-divider {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 24px 0;
+}
+
+.ff-edit-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.ff-edit-cancel {
+  background: #ffffff;
+  border: 1px solid var(--line-dark);
+  border-radius: 8px;
+  padding: 0 22px;
+  min-height: 52px;
+  color: var(--navy);
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ff-edit-cancel:hover:not(:disabled) {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.ff-edit-cancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ff-edit-submit {
+  flex: 1;
+  background: var(--navy);
+  border: none;
+  border-radius: 8px;
+  padding: 0 22px;
+  min-height: 52px;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.ff-edit-submit:hover:not(:disabled) {
+  background: #0d2a4e;
+}
+
+.ff-edit-submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .ff-edit-company-summary {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .ff-edit-title {
+    font-size: 24px;
+  }
+
+  .ff-edit-actions {
+    flex-direction: column-reverse;
+  }
+
+  .ff-edit-cancel {
+    width: 100%;
+  }
+}
+
+/* ── Review 화면 데이터 바인딩 보조 ── */
+
+/* 번호 원형과 뱃지를 다중 줄 article에서 상단 정렬 */
+.ff-review-list article > span,
+.ff-review-list article > em {
+  align-self: start;
+  margin-top: 2px;
+}
+
+/* 기업 정보 / 투자 조건 세부 텍스트 */
+.ff-review-detail {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.65;
+}

@@ -389,6 +389,7 @@ export function buildLocalScenarios(form: RoiFormState): ScenarioCard[] {
       roiPct: scenarioARoi,
       estimateRangeText: getDefaultEstimateRangeTextA(form.equipmentType),
       estimateBasisText: "설비 용량 기준",
+      assumptions: null,
     },
     {
       id: "B",
@@ -406,6 +407,7 @@ export function buildLocalScenarios(form: RoiFormState): ScenarioCard[] {
       roiPct: scenarioBRoi,
       estimateRangeText: getDefaultEstimateRangeTextB(form.equipmentType),
       estimateBasisText: "핵심 부품 기준",
+      assumptions: null,
     },
   ]
 }
@@ -475,8 +477,24 @@ export function mergeApiScenarios(localScenarios: ScenarioCard[], apiData: RoiAp
       api.annual_net_benefit_manwon,
       local.annualNetBenefitManwon,
     )
-    const paybackYears = toNumber(api.payback_years, 0)
-    const roiPct = toNumber(api.roi_pct, local.roiPct)
+
+    // payback_years: API null/0 = 유효한 회수기간 없음 → null(→'-') 그대로 사용.
+    // API 시나리오가 존재할 때 로컬 fallback을 쓰면 "ROI=0% + 회수기간=3년" 같은
+    // 논리 모순이 생기므로 fallback을 제거한다.
+    const apiPayback =
+      typeof api.payback_years === "number" && api.payback_years > 0
+        ? roundTo(api.payback_years, 1)
+        : null
+
+    // roi_pct: 0.0은 유효한 백엔드 값(절감 없음 → ROI 0%)이므로 그대로 표시한다.
+    // 필드가 완전히 없을 때(undefined/null)만 로컬 추정치로 fallback.
+    const apiRoiRaw =
+      api.roi_pct !== undefined && api.roi_pct !== null ? Number(api.roi_pct) : null
+    const roiPct =
+      apiRoiRaw !== null && Number.isFinite(apiRoiRaw) && apiRoiRaw >= 0 && apiRoiRaw < 10000
+        ? roundTo(apiRoiRaw, 1)
+        : local.roiPct
+
     const breakdown = api.breakdown ?? null
     const energySaving = toNumber(
       breakdown?.energy_saving_manwon,
@@ -491,6 +509,28 @@ export function mergeApiScenarios(localScenarios: ScenarioCard[], apiData: RoiAp
       local.defectSavingManwon,
     )
 
+    if (import.meta.env.DEV) {
+      console.debug("[mergeApiScenarios] scenario", local.id, {
+        api_investment_manwon: api.investment_manwon,
+        api_subsidy_manwon: api.subsidy_manwon,
+        api_net_investment_manwon: api.net_investment_manwon,
+        api_annual_net_benefit_manwon: api.annual_net_benefit_manwon,
+        api_payback_years: api.payback_years,
+        api_roi_pct: api.roi_pct,
+        mapped_paybackYears: apiPayback,
+        mapped_roiPct: roiPct,
+        mapped_annualNetBenefit: annualNetBenefit,
+        mapped_netInvestment: Math.max(netInvestment, 0),
+      })
+    }
+
+    const apiAssumptions = api.assumptions
+      ? {
+          energyCostAnnualUsed: api.assumptions.energy_cost_annual_used ?? null,
+          energyCostSource: api.assumptions.energy_cost_source ?? null,
+        }
+      : null
+
     return {
       ...local,
       title: typeof api.label === "string" && api.label.trim() ? api.label.trim() : local.title,
@@ -501,8 +541,9 @@ export function mergeApiScenarios(localScenarios: ScenarioCard[], apiData: RoiAp
       maintenanceSavingManwon: Math.max(maintenanceSaving, 0),
       defectSavingManwon: Math.max(defectSaving, 0),
       annualNetBenefitManwon: annualNetBenefit,
-      paybackYears: paybackYears > 0 ? roundTo(paybackYears, 1) : local.paybackYears,
-      roiPct: roiPct > 0 && roiPct < 10000 ? roundTo(roiPct, 1) : local.roiPct,
+      paybackYears: apiPayback,
+      roiPct,
+      assumptions: apiAssumptions,
     }
   }
 

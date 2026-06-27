@@ -36,6 +36,7 @@ async def chat(req: ChatRequest):
         equipment_info = None
         equipment_id = None
         equipments = []
+        selected_equipment_for_policy = None
 
         supabase = get_db()
 
@@ -112,6 +113,7 @@ async def chat(req: ChatRequest):
                     scenario_a_investment_manwon=selected.get("scenario_a_investment_manwon"),
                     scenario_b_investment_manwon=selected.get("scenario_b_investment_manwon"),
                 )
+                selected_equipment_for_policy = selected.get("name")
 
         elif len(equipments) == 1:
             from app.models.equipment import EquipmentInput
@@ -127,6 +129,7 @@ async def chat(req: ChatRequest):
                 scenario_a_investment_manwon=eq.get("scenario_a_investment_manwon"),
                 scenario_b_investment_manwon=eq.get("scenario_b_investment_manwon"),
             )
+            selected_equipment_for_policy = eq.get("name")
 
         initial_state: FactofitState = {
             "user_query": req.message,
@@ -139,9 +142,8 @@ async def chat(req: ChatRequest):
             "selected_equipment_id": req.selected_equipment_id or None,
             "safety_dashboard": None,
             "matched_policies": [],
-            "policy_intent_choice": None,  
-            "selected_policy": None,           
-            "selected_equipment_for_policy": None, 
+            "selected_policy": None,
+            "selected_equipment_for_policy": selected_equipment_for_policy or None, 
             "roi_result": None,
             "draft_result": None,
             "draft_context": None,
@@ -181,12 +183,30 @@ async def chat(req: ChatRequest):
                     ]
                 }
             ]
+        elif intent == "response":
+            # options가 있으면 intent_confirmation (버튼)
+            if result.get("options"):
+                cards = [{
+                    "type": "intent_confirmation",
+                    "data": result.get("options", [])
+                }]
+            # matched_policies가 있으면 정책 카드
+            elif result.get("matched_policies"):
+                cards = [
+                    {
+                        "type": "policy_card",
+                        "data": {
+                            "policy_id": p.get("id"),
+                            "title": p.get("metadata", {}).get("title", "제목 없음"),
+                            "organization": p.get("metadata", {}).get("organization", ""),
+                            "deadline": p.get("metadata", {}).get("deadline", "마감일 미정")
+                        }
+                    }
+                    for p in result.get("matched_policies", [])
+                ]
+            else:
+                cards = []
 
-        elif intent == "response": 
-            cards = [{
-                "type": "intent_confirmation",
-                "data": result.get("options", [])
-            }]
         elif intent == "general": 
             cards = []
         else:
@@ -196,6 +216,8 @@ async def chat(req: ChatRequest):
             "intent": result["intent"],
             "response": result["final_response"],
             "cards": cards,
+            "matched_policies": result.get("matched_policies", []),
+            "selected_equipment_for_policy": result.get("selected_equipment_for_policy"),
             "next_questions": [],
             "chat_id": result.get("chat_id", ""),
         }

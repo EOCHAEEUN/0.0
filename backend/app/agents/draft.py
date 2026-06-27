@@ -6,6 +6,12 @@ import json
 
 
 def application_draft_node(state: FactofitState) -> FactofitState:
+
+    if not state.get("selected_equipment_for_policy"):
+        state["final_response"] = "초안서 작성에는 등록된 설비 정보가 필요합니다. 설비를 등록해주세요."
+        state["intent"] = "response"
+        return state
+    
     equipment = state.get("equipment")
     company = state.get("company_info")
     roi_result = state.get("roi_result")

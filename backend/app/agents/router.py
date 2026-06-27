@@ -6,7 +6,19 @@ from app.core.llm import llm
 
 VALID_INTENTS = ["roi", "policy", "draft", "safety", "info_missing", "general"]
 
+def _equipment_name(equipment) -> str:
+    if not equipment:
+        return "정보 없음"
+    nested = getattr(equipment, "equipment", None)
+    if nested is not None:
+        return getattr(nested, "name", "정보 없음")
+    return getattr(equipment, "name", "정보 없음")
+
 def router_node(state: FactofitState) -> FactofitState:
+    if state.get("policy_intent_choice"):
+        state["intent"] = "policy"
+        return state
+    
     company = state.get("company_info")
     equipment = state.get("equipment")
     equipments = state.get("equipments", [])
@@ -14,7 +26,7 @@ def router_node(state: FactofitState) -> FactofitState:
 
     industry_codes = company.industry_code if company else "정보 없음"
     region = company.region if company else "정보 없음"
-    equipment_info = equipment.name if equipment else "정보 없음"
+    equipment_info = _equipment_name(equipment)
 
     # 설비가 이미 선택된 상태면 equipment_count를 1로 표시
     # → router가 "설비 특정됨"으로 판단해서 info_missing으로 안 빠짐

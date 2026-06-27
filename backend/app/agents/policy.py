@@ -795,23 +795,24 @@ def search_general_policies(
     region: str = None,
     n_results: int = 5
 ) -> list[dict]:
-    """
-    일반 정책 검색
-    - user_query와 유사도 비교
-    - industry_code 필터링 (선택)
-    - region 필터링 (선택)
-    """
-    where = None
-    if company_industry_code or region:
-        where = {}
-        if company_industry_code:
-            where["industry_code"] = {"$contains": company_industry_code}
-        if region:
-            where["region"] = {"$contains": region}
+    # 더 많이 검색 (20 → 50)
+    results = search_policies(user_query, n_results=50, where=None)
     
-    results = search_policies(user_query, n_results=n_results, where=where)
-    return results
-
+    filtered = results
+    
+    if company_industry_code:
+        filtered = [p for p in filtered 
+                   if company_industry_code in p.get("metadata", {}).get("industry_code", "")]
+    
+    if region:
+        filtered = [p for p in filtered 
+                   if region in p.get("metadata", {}).get("region", "")]
+    
+    # 필터 후 비어있으면 원래 결과 반환
+    if not filtered:
+        filtered = results
+    
+    return filtered[:n_results]
 
 # ────────────────────────────────────────────────────────────────
 # FOR CHAT - 상태 5 보조
@@ -865,12 +866,20 @@ def policy_chat_node(state: FactofitState) -> FactofitState:
     elif policy_intent_choice == "equipment" and not selected_equipment:
         equipments = get_user_equipment_list(company_id)
         state["final_response"] = "어떤 설비의 정책 정보를 원하시나요?"
+        state["options"] = [
+            {
+                "id": eq.get("equipment_id"),
+                "label": eq.get("name")
+            }
+            for eq in equipments
+        ]
         state["intent"] = "response"
         return state
     
     # 상태 3: equipment + 설비 선택 + 첫 조회
     elif policy_intent_choice == "equipment" and selected_equipment and not matched_policies:
-        policies = get_equipment_policies(company_id, selected_equipment)
+        equipment_id = state.get("equipment_id")  # ← id 가져오기!
+        policies = get_equipment_policies(company_id, equipment_id)
         state["matched_policies"] = policies
         state["final_response"] = "선택하신 설비의 적합한 정책들입니다. 더 궁금한 점이 있으신가요?"
         state["intent"] = "response"

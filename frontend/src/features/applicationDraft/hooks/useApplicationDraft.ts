@@ -261,6 +261,17 @@ function readJsonLocalStorage(key: string): Dict | null {
   }
 }
 
+function getCurrentUserIdLocal(): string {
+  try {
+    const raw = window.localStorage.getItem("factofit_auth_session")
+    if (!raw) return ""
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    return String(parsed?.userId ?? parsed?.user_id ?? "").trim()
+  } catch {
+    return ""
+  }
+}
+
 function pickText(source: Dict | null | undefined, keys: string[]) {
   if (!source) return ""
 
@@ -287,9 +298,15 @@ function getToken() {
 }
 
 function getStoredAnalysisData() {
+  const currentUserId = getCurrentUserIdLocal()
   const raw =
     readJsonLocalStorage("factofit_analysis_result") ??
     readJsonLocalStorage("analysis_result")
+
+  // 다른 사용자의 분석 데이터는 반환하지 않음
+  if (raw && currentUserId && raw.ownerId && String(raw.ownerId) !== currentUserId) {
+    return { company: null, equipment: null, roi_result: null, matched_policies: [], draft_result: null }
+  }
 
   const data = asDict(raw?.data) ?? raw
 

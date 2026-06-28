@@ -512,6 +512,11 @@ export default function MyPage() {
               firstRemoteEquipment.equipmentId,
             );
           }
+        } else {
+          // API에서 설비 없음 → 이전 사용자의 localStorage 캐시를 덮어씀
+          setEquipmentList([createEmptyEquipment(1)]);
+          window.localStorage.removeItem(EQUIPMENT_ID_STORAGE_KEY);
+          window.localStorage.removeItem(SELECTED_EQUIPMENT_ID_STORAGE_KEY);
         }
 
         if (companyId) {
@@ -877,6 +882,7 @@ export default function MyPage() {
       window.localStorage.removeItem(SELECTED_EQUIPMENT_ID_STORAGE_KEY);
     }
 
+    const currentUserIdForStorage = window.localStorage.getItem(USER_ID_STORAGE_KEY)?.trim() ?? "";
     const storageData: MyPageStorageData = {
       basicInfo,
       companyInfo,
@@ -884,6 +890,7 @@ export default function MyPage() {
       selectedAnalysisEquipmentId: nextSelectedAnalysisEquipmentId,
       profileCompleted,
       savedAt: new Date().toISOString(),
+      ...(currentUserIdForStorage ? { ownerId: currentUserIdForStorage } : {}),
     };
 
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(storageData));
@@ -1105,10 +1112,8 @@ export default function MyPage() {
     try {
       setSaving(true);
 
-      console.log("온보딩 user 요청 payload:", userPayload);
       await submitUserPayload(userPayload);
 
-      console.log("온보딩 company 요청 payload:", companyPayload);
       const { responseData: companyResponseData, companyId } =
         await submitCompanyPayload(companyPayload);
 
@@ -1116,15 +1121,6 @@ export default function MyPage() {
       const equipmentResponses = [];
 
       for (const item of equipmentPayloads) {
-        console.log("온보딩 equipment 요청 payload:", {
-          companyId,
-          equipmentPayload: item.payload,
-        });
-        console.log(
-          "온보딩 equipment 최종 payload JSON:",
-          JSON.stringify(item.payload, null, 2),
-        );
-
         const equipmentResponse = await submitEquipmentPayload(
           companyId,
           item.payload,
@@ -1172,6 +1168,7 @@ export default function MyPage() {
         selectedAnalysisEquipmentId,
         profileCompleted: savedProfileCompleted,
         savedAt: new Date().toISOString(),
+        ...(userId ? { ownerId: userId } : {}),
       };
 
       const savedOnboarding = await fetchSavedOnboarding();
@@ -1184,15 +1181,6 @@ export default function MyPage() {
       }
 
       window.localStorage.setItem(COMPANY_ID_STORAGE_KEY, companyId);
-
-      console.log(
-        "저장된 user_id:",
-        userId ?? "auth session에서 user_id 미확인",
-      );
-      console.log("저장된 company_id:", companyId);
-      console.log("company 저장 응답:", companyResponseData);
-      console.log("equipment 저장 응답:", equipmentResponses);
-      console.log("온보딩 조회 응답:", savedOnboarding);
 
       setSaved(true);
       setProfileCompleted(savedProfileCompleted);
@@ -1296,7 +1284,6 @@ export default function MyPage() {
         }),
       );
 
-      console.log("분석 결과:", analysisResult);
       window.location.assign("/dashboard");
     } catch (error) {
       window.alert(getErrorMessage(error));

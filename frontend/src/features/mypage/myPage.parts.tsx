@@ -81,6 +81,7 @@ export type MyPageStorageData = {
   selectedAnalysisEquipmentId: number | null;
   profileCompleted: boolean;
   savedAt: string;
+  ownerId?: string;
 };
 
 export type UserProfilePayload = {
@@ -259,6 +260,19 @@ export function loadStoredMyPageData(): MyPageStorageData | null {
     const parsed = JSON.parse(raw) as Partial<MyPageStorageData>;
     if (!parsed.basicInfo || !parsed.companyInfo || !parsed.equipmentList) {
       return null;
+    }
+
+    // ownerId가 저장된 경우 현재 사용자와 다르면 반환하지 않음 (다른 사용자의 캐시)
+    if (parsed.ownerId) {
+      try {
+        const authRaw = window.localStorage.getItem("factofit_auth_session");
+        const currentUserId = authRaw
+          ? String((JSON.parse(authRaw) as Record<string, unknown>)?.userId ?? "")
+          : "";
+        if (currentUserId && parsed.ownerId !== currentUserId) return null;
+      } catch {
+        // auth session 파싱 실패 시 계속 진행
+      }
     }
 
     const rawCompanyInfo = parsed.companyInfo as Partial<CompanyInfo> & {

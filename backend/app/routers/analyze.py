@@ -361,7 +361,10 @@ async def analyze(
     equipment_id = equipment_row.get("equipment_id")
 
     raw_energy = equipment_row.get("energy_cost_annual")
-    energy_provided = raw_energy is not None
+    try:
+        energy_provided = raw_energy is not None and float(raw_energy) > 0
+    except (TypeError, ValueError):
+        energy_provided = False
 
     equipment = EquipmentInput(
         name=equipment_row.get("name", ""),
@@ -380,6 +383,16 @@ async def analyze(
 
     # 3. 기초 시나리오 계산: 정책 지원금 0원 기준
     # 정책 검색 키워드를 만들기 위한 계산이며, 프론트 최종 결과로 쓰지 않는다.
+    print(
+        "[ROI_UNIT_CHECK]",
+        {
+            "equipment_id": equipment_id,
+            "energy_cost_annual_manwon": equipment.energy_cost_annual,
+            "maintenance_cost_annual_manwon": equipment.maintenance_cost_annual,
+            "scenario_a_investment_manwon": equipment.scenario_a_investment_manwon,
+            "scenario_b_investment_manwon": equipment.scenario_b_investment_manwon,
+        },
+    )
     try:
         base_roi_result = calculate_roi(
             equipment,

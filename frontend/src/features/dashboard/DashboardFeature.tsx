@@ -212,7 +212,17 @@ export default function DashboardFeature() {
             </div>
           </header>
 
-          {isEmpty ? (
+          {isEmpty && !workspace.companyName ? (
+            <div className="ff-empty-action">
+              <div>
+                <h2>기업 정보를 등록하면 맞춤 분석을 시작할 수 있습니다.</h2>
+                <p>업종과 기업 규모, 설비 정보를 입력하면 ROI 분석과 지원사업 추천을 더 정확하게 받을 수 있습니다.</p>
+              </div>
+              <ActionButton onClick={() => navigate("/setup/company")}>
+                기업 정보 입력하기
+              </ActionButton>
+            </div>
+          ) : isEmpty ? (
             <div className="ff-empty-action">
               <div>
                 <h2>{workspace.actionMessage}</h2>

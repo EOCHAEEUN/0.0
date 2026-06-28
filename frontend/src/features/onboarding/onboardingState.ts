@@ -1,3 +1,5 @@
+import { getCurrentUserId } from "../../services/auth"
+
 export type CompanyProfileStatus = "not_started" | "in_progress" | "completed"
 export type AnalysisDraftStatus = "in_progress" | "ready_for_review" | "completed"
 
@@ -104,37 +106,70 @@ const defaultOnboardingState: UserOnboardingState = {
   analysisCount: 0,
 }
 
-function readJson<T>(key: string): T | null {
+// ── 사용자별 소유권 검증 읽기/쓰기 ─────────────────────────────────────────────
+
+function readJsonOwnedByCurrentUser<T>(key: string): T | null {
   try {
     const raw = window.localStorage.getItem(key)
-    return raw ? (JSON.parse(raw) as T) : null
+    if (!raw) return null
+
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    const currentUserId = getCurrentUserId()
+
+    if (!currentUserId) {
+      // 세션 없음 → 어떤 데이터도 반환하지 않음
+      return null
+    }
+
+    if (!parsed.ownerId) {
+      // ownerId 없는 레거시 데이터 → 제거 후 거부
+      window.localStorage.removeItem(key)
+      console.warn("[ONBOARDING DEBUG] legacy data without ownerId removed:", key)
+      return null
+    }
+
+    if (parsed.ownerId !== currentUserId) {
+      // 다른 사용자 데이터 → 거부
+      console.warn("[ONBOARDING DEBUG] ownerId mismatch — ignoring:", key, { stored: parsed.ownerId, current: currentUserId })
+      return null
+    }
+
+    return parsed as T
   } catch {
     return null
   }
 }
 
-function writeJson(key: string, value: unknown) {
-  window.localStorage.setItem(key, JSON.stringify(value))
+function writeJsonWithOwner(key: string, value: unknown) {
+  const currentUserId = getCurrentUserId()
+  const stored = currentUserId
+    ? { ...(value as object), ownerId: currentUserId }
+    : value
+  window.localStorage.setItem(key, JSON.stringify(stored))
 }
 
+// ── 공개 읽기 함수 ─────────────────────────────────────────────────────────────
+
 export function getCompanyProfileDraft(): CompanyProfileDraft {
+  const stored = readJsonOwnedByCurrentUser<Partial<CompanyProfileDraft>>(COMPANY_PROFILE_DRAFT_KEY) ?? {}
   return {
     ...emptyCompanyProfileDraft,
-    ...(readJson<Partial<CompanyProfileDraft>>(COMPANY_PROFILE_DRAFT_KEY) ?? {}),
+    ...stored,
   }
 }
 
 export function getAnalysisConditionDraft(): AnalysisConditionDraft {
+  const stored = readJsonOwnedByCurrentUser<Partial<AnalysisConditionDraft>>(ANALYSIS_CONDITION_DRAFT_KEY) ?? {}
   return {
     ...emptyAnalysisConditionDraft,
-    ...(readJson<Partial<AnalysisConditionDraft>>(ANALYSIS_CONDITION_DRAFT_KEY) ?? {}),
+    ...stored,
   }
 }
 
 export function saveAnalysisConditionDraft(
   draft: AnalysisConditionDraft,
 ): AnalysisConditionDraft {
-  writeJson(ANALYSIS_CONDITION_DRAFT_KEY, draft)
+  writeJsonWithOwner(ANALYSIS_CONDITION_DRAFT_KEY, draft)
   return draft
 }
 
@@ -143,18 +178,18 @@ function getAnalysisResultByIdKey(id: string) {
 }
 
 function isCurrentAnalysisResult(
-  result: AnalysisResultSnapshot | null,
+  result: AnalysisResultSnapshot | null | undefined,
 ): result is AnalysisResultSnapshot {
   return result?.schemaVersion === ANALYSIS_RESULT_SCHEMA_VERSION
 }
 
 export function getAnalysisResult(id?: string): AnalysisResultSnapshot | null {
   if (id) {
-    const scoped = readJson<AnalysisResultSnapshot>(getAnalysisResultByIdKey(id))
+    const scoped = readJsonOwnedByCurrentUser<AnalysisResultSnapshot>(getAnalysisResultByIdKey(id))
     return isCurrentAnalysisResult(scoped) ? scoped : null
   }
 
-  const latest = readJson<AnalysisResultSnapshot>(ANALYSIS_RESULT_KEY)
+  const latest = readJsonOwnedByCurrentUser<AnalysisResultSnapshot>(ANALYSIS_RESULT_KEY)
   return isCurrentAnalysisResult(latest) ? latest : null
 }
 
@@ -177,8 +212,8 @@ export function saveAnalysisResult(
     priorityPolicies: next.priorityPolicies,
   })
 
-  writeJson(ANALYSIS_RESULT_KEY, next)
-  writeJson(getAnalysisResultByIdKey(next.id), next)
+  writeJsonWithOwner(ANALYSIS_RESULT_KEY, next)
+  writeJsonWithOwner(getAnalysisResultByIdKey(next.id), next)
   updateUserOnboardingState({
     analysisDraftId: next.id,
     analysisDraftStatus: "completed",
@@ -194,16 +229,16 @@ export function saveCompanyProfileDraft(
     ...draft,
     updatedAt: new Date().toISOString(),
   }
-  writeJson(COMPANY_PROFILE_DRAFT_KEY, next)
+  writeJsonWithOwner(COMPANY_PROFILE_DRAFT_KEY, next)
   updateUserOnboardingState({ companyProfileStatus: next.status })
   return next
 }
 
 export function getUserOnboardingState(): UserOnboardingState {
   const stored =
-    readJson<Partial<UserOnboardingState>>(USER_ONBOARDING_STATE_KEY) ?? {}
+    readJsonOwnedByCurrentUser<Partial<UserOnboardingState>>(USER_ONBOARDING_STATE_KEY) ?? {}
   const draft = getCompanyProfileDraft()
-  const analysis = readJson<Record<string, unknown>>(ANALYSIS_RESULT_KEY)
+  const analysis = readJsonOwnedByCurrentUser<Record<string, unknown>>(ANALYSIS_RESULT_KEY)
   const analysisCount =
     typeof stored.analysisCount === "number"
       ? stored.analysisCount
@@ -227,9 +262,31 @@ export function updateUserOnboardingState(
     ...getUserOnboardingState(),
     ...patch,
   }
-  writeJson(USER_ONBOARDING_STATE_KEY, next)
+  writeJsonWithOwner(USER_ONBOARDING_STATE_KEY, next)
   return next
 }
+
+// ── 신규 가입/로그아웃 시 데이터 초기화 ────────────────────────────────────────
+
+export function clearUserOnboardingData() {
+  window.localStorage.removeItem(COMPANY_PROFILE_DRAFT_KEY)
+  window.localStorage.removeItem(USER_ONBOARDING_STATE_KEY)
+  window.localStorage.removeItem(ANALYSIS_CONDITION_DRAFT_KEY)
+  window.localStorage.removeItem(ANALYSIS_RESULT_KEY)
+  // 사용자별 캐시 — 전 사용자의 데이터가 신규 사용자에게 노출되지 않도록 전체 초기화
+  window.localStorage.removeItem("factofit_mypage_profile")
+  window.localStorage.removeItem("factofit_company_id")
+  window.localStorage.removeItem("factofit_equipment_id")
+  window.localStorage.removeItem("factofit_selected_equipment_id")
+  window.localStorage.removeItem("factofit_selected_project")
+  window.localStorage.removeItem("factofit_selected_policy")
+  window.localStorage.removeItem("factofit_selected_policy_id")
+  window.localStorage.removeItem("factofit_policy_id")
+  window.localStorage.removeItem("factofit_application_policy")
+  window.localStorage.removeItem("factofit_selected_support_project")
+}
+
+// ── 가입 직후 플래그 ────────────────────────────────────────────────────────────
 
 export function markJustSignedUp() {
   window.localStorage.setItem(JUST_SIGNED_UP_KEY, "1")
@@ -250,6 +307,7 @@ export function resolvePostLoginPath(isJustSignedUp = consumeJustSignedUp()) {
 
   if (state.companyProfileStatus === "completed" && state.analysisDraftId) {
     const draftStatus = state.analysisDraftStatus ?? "in_progress"
+    if (draftStatus === "completed") return "/dashboard"
     if (draftStatus === "ready_for_review") {
       return `/analysis/review?draftId=${state.analysisDraftId}`
     }

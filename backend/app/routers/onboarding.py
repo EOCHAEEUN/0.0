@@ -87,7 +87,6 @@ async def get_my_company(
     db = get_db()
 
     try:
-        # user_profile 조회 추가
         profile_result = (
             db.table("user_profile")
             .select("*")
@@ -103,30 +102,57 @@ async def get_my_company(
             .execute()
         )
 
-        company_id = company_result.data[0].get("company_id") if company_result.data else None
+        company = company_result.data[0] if company_result.data else None
+        company_id = company.get("company_id") if company else None
 
-        equipment_result = (
-            db.table("equipment")
-            .select("*")
-            .eq("company_id", company_id)
-            .execute()
-        )
+        # 기업 정보가 없는 신규 사용자는 설비 조회 없이 빈 배열 반환 (company_id=None 쿼리 방지)
+        if company_id:
+            equipment_result = (
+                db.table("equipment")
+                .select("*")
+                .eq("company_id", company_id)
+                .execute()
+            )
+            equipments = equipment_result.data
+        else:
+            equipments = []
+
+        # 가장 최근 ROI 분석 결과 조회 (재로그인 후 화면 복원용)
+        latest_roi_output = None
+        if equipments:
+            equipment_ids = [e.get("equipment_id") for e in equipments if e.get("equipment_id")]
+            if equipment_ids:
+                try:
+                    roi_query = (
+                        db.table("roi_output")
+                        .select("*")
+                        .in_("equipment_id", equipment_ids)
+                        .order("created_at", desc=True)
+                        .limit(1)
+                        .execute()
+                    )
+                    latest_roi_output = roi_query.data[0] if roi_query.data else None
+                except Exception as roi_exc:
+                    print(f"[onboarding/me] roi_output 조회 실패: {roi_exc}")
 
         return {
             "success": True,
             "data": {
-                "user_profile": profile_result.data,  # 추가
-                "company": company_result.data[0] if company_result.data else None,
-                "equipments": equipment_result.data,
+                "user_profile": profile_result.data,
+                "company": company,
+                "equipments": equipments,
+                "latest_roi_output": latest_roi_output,
             },
         }
 
     except Exception as exc:
+        print("[onboarding/me] Unexpected error:", repr(exc))
+        traceback.print_exc()
         return JSONResponse(
-            status_code=404,
+            status_code=500,
             content={
                 "success": False,
-                "message": "Company not found.",
+                "message": "서버 오류가 발생했습니다.",
                 "error": str(exc),
             },
         )

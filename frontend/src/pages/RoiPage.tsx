@@ -16,6 +16,15 @@ function getNum(rec: Record<string, unknown>, ...keys: string[]): number | null 
   return null
 }
 
+// 0도 유효한 숫자로 처리 (지원금 0원 = "지원 없음"을 명시적으로 구분)
+function getNumAllowZero(rec: Record<string, unknown>, ...keys: string[]): number | null {
+  for (const k of keys) {
+    const v = rec[k]
+    if (typeof v === "number" && Number.isFinite(v) && v >= 0) return v
+  }
+  return null
+}
+
 function fmtPct(v: number | null): string {
   return v !== null ? `${v.toFixed(1)}%` : "-"
 }
@@ -30,26 +39,42 @@ function getScenario(r: Record<string, unknown>, k: "a" | "b") {
   return asRecord(r[`scenario_${k}`] ?? r[`scenario${k.toUpperCase()}`])
 }
 
-function normalizeRec(val: unknown): "a" | "b" {
+function normalizeRec(val: unknown): "a" | "b" | null {
   const s = String(val ?? "").trim().toUpperCase().replace(/[\s_-]/g, "")
-  return s === "B" || s === "SCENARIOB" ? "b" : "a"
+  if (s === "A" || s === "SCENARIOA") return "a"
+  if (s === "B" || s === "SCENARIOB") return "b"
+  return null
 }
 
 interface ScenarioMetrics {
   investment: number | null
   subsidy: number | null
+  subsidyRaw: number | null   // 0 포함 실제 지원금
+  subsidyStatus: string | null
   net: number | null
   saving: number | null
   roi: number | null
   payback: number | null
 }
 
+function getPolicyApplication(rec: Record<string, unknown>): { status: string | null; amount: number | null } {
+  const pa = rec.policy_application
+  if (!pa || typeof pa !== "object" || Array.isArray(pa)) return { status: null, amount: null }
+  const paRec = pa as Record<string, unknown>
+  const status = typeof paRec.status === "string" ? paRec.status : null
+  const amount = getNumAllowZero(paRec, "applied_support_manwon")
+  return { status, amount }
+}
+
 function buildMetrics(rec: Record<string, unknown>): ScenarioMetrics {
+  const pa = getPolicyApplication(rec)
   return {
     investment: getNum(rec, "investment_manwon"),
     subsidy: getNum(rec, "subsidy_manwon"),
+    subsidyRaw: getNumAllowZero(rec, "subsidy_manwon"),
+    subsidyStatus: pa.status,
     net: getNum(rec, "net_investment_manwon", "net_cost_manwon"),
-    saving: getNum(rec, "annual_saving_manwon", "saving_manwon"),
+    saving: getNum(rec, "annual_net_benefit_manwon", "annual_saving_manwon", "saving_manwon"),
     roi: getNum(rec, "roi_pct", "roi_percent"),
     payback: getNum(rec, "payback_years", "paybackYears"),
   }
@@ -60,6 +85,80 @@ function extractPriorityPolicyId(policies: unknown): string | null {
   const first = policies[0] as Record<string, unknown>
   const id = first.policyId ?? first.policy_id ?? first.policyID ?? first.id
   return id ? String(id) : null
+}
+
+function formatSubsidyDisplay(m: ScenarioMetrics): string {
+  const s = m.subsidyStatus
+  if (s === "applied" || s === "estimated") {
+    if (m.subsidyRaw !== null && m.subsidyRaw > 0) {
+      return `${Math.round(m.subsidyRaw).toLocaleString("ko-KR")}만원`
+    }
+    return "지원금 미반영"
+  }
+  if (s === "terms_missing") return "지원율 확인 필요"
+  if (s === "no_policy") return "매칭 정책 없음"
+  if (s === "invalid_investment") return "투자금 확인 필요"
+  if (m.subsidyRaw !== null && m.subsidyRaw > 0) {
+    return `${Math.round(m.subsidyRaw).toLocaleString("ko-KR")}만원`
+  }
+  return "지원금 미반영"
+}
+
+function getHeroText(
+  recLabel: string,
+  subsidyStatus: string | null,
+  subsidyRaw: number | null,
+  hasRecommendation: boolean,
+): { main: string; sub: string | null } {
+  if (!hasRecommendation) {
+    return {
+      main: "정책 조건 및 운영비 입력 후 최종 투자안을 산정할 수 있습니다.",
+      sub: "A/B안의 투자금, 실투자금, 연간 순편익 조건을 확인하면 ROI와 회수기간을 계산할 수 있습니다.",
+    }
+  }
+  if ((subsidyStatus === "applied" || subsidyStatus === "estimated") && subsidyRaw !== null && subsidyRaw > 0) {
+    return { main: `지원사업 반영 시, ${recLabel}을 우선 검토하세요.`, sub: null }
+  }
+  if (subsidyStatus === "terms_missing") {
+    return {
+      main: `정책 조건 확인 후, ${recLabel}을 우선 검토하세요.`,
+      sub: "매칭 정책의 지원율 확인 후 최종 ROI가 다시 계산됩니다.",
+    }
+  }
+  return {
+    main: `현재 입력 기준, ${recLabel}을 우선 검토하세요.`,
+    sub: "현재 ROI는 지원금 미반영 기준입니다.",
+  }
+}
+
+function getAiSummary(
+  roiResult: Record<string, unknown>,
+  rec: "a" | "b" | null,
+): { summary: string; bullets: string[] } {
+  if (rec === null) {
+    return {
+      summary: "정책 지원율 또는 투자 조건을 확인한 뒤 최종 추천안을 산정할 수 있습니다.",
+      bullets: [],
+    }
+  }
+  const ai = roiResult.ai_recommendation
+  if (ai && typeof ai === "object" && !Array.isArray(ai)) {
+    const aiRec = ai as Record<string, unknown>
+    const summary = typeof aiRec.summary === "string" && aiRec.summary.trim() ? aiRec.summary.trim() : null
+    const bullets = Array.isArray(aiRec.reason_bullets)
+      ? (aiRec.reason_bullets as unknown[])
+          .filter((b): b is string => typeof b === "string" && b.trim().length > 0)
+          .slice(0, 3)
+      : []
+    if (summary) return { summary, bullets }
+  }
+  return {
+    summary:
+      rec === "a"
+        ? "A안은 설비 노후도와 연간 총 절감 효과를 고려한 우선 검토안입니다."
+        : "B안은 초기 투자 부담과 회수기간을 고려한 우선 검토안입니다.",
+    bullets: [],
+  }
 }
 
 type JudgmentLevel = "높음" | "보통" | "낮음"
@@ -143,26 +242,28 @@ export default function RoiPage() {
   const hasB = Object.keys(scenarioB).length > 0
   const mA = buildMetrics(scenarioA)
   const mB = buildMetrics(scenarioB)
-  const mRec = rec === "b" ? mB : mA
+  const hasRecommendation = rec !== null
+  const mRec = rec === "b" ? mB : rec === "a" ? mA : null
+  const mRecFallback = mRec ?? mA
 
-  const roi = mRec.roi ?? (result as Record<string, unknown>).roiPct as number ?? null
-  const payback = mRec.payback ?? (result as Record<string, unknown>).paybackYears as number ?? null
+  const roi = mRec?.roi ?? (result as Record<string, unknown>).roiPct as number ?? null
+  const payback = mRec?.payback ?? (result as Record<string, unknown>).paybackYears as number ?? null
   const draftId = analysisId || (result as Record<string, unknown>).id || "latest"
 
-  const recLabel = rec === "b" ? "B안 · 부분 교체" : "A안 · 전체 교체"
-  const recShort = rec === "b" ? "B안" : "A안"
+  const recLabel = rec === "b" ? "B안 · 부분 교체" : rec === "a" ? "A안 · 전체 교체" : "A/B안"
+  const recShort = rec === "b" ? "B안" : rec === "a" ? "A안" : "투자안"
   const aIsRec = rec === "a"
   const bIsRec = rec === "b"
 
   const priorityPolicyId = extractPriorityPolicyId((result as Record<string, unknown>).policies)
 
   const subsidyRatio =
-    mRec.subsidy !== null && mRec.investment !== null && mRec.investment > 0
-      ? mRec.subsidy / mRec.investment
+    mRecFallback.subsidy !== null && mRecFallback.investment !== null && mRecFallback.investment > 0
+      ? mRecFallback.subsidy / mRecFallback.investment
       : null
   const savingRatio =
-    mRec.saving !== null && mRec.investment !== null && mRec.investment > 0
-      ? mRec.saving / mRec.investment
+    mRecFallback.saving !== null && mRecFallback.investment !== null && mRecFallback.investment > 0
+      ? mRecFallback.saving / mRecFallback.investment
       : null
 
   const subsidyLevel: JudgmentLevel =
@@ -186,7 +287,8 @@ export default function RoiPage() {
     mA.payback !== null && mB.payback !== null
       ? Math.abs(mA.payback - mB.payback).toFixed(1)
       : null
-  const higherRoiIsA = mA.roi !== null && mB.roi !== null && mA.roi >= mB.roi
+  const heroText = getHeroText(recLabel, mRecFallback.subsidyStatus, mRecFallback.subsidyRaw, hasRecommendation)
+  const aiSummary = getAiSummary(roiResult, rec)
 
   return (
     <main className="page">
@@ -300,23 +402,25 @@ export default function RoiPage() {
                     fontSize: "clamp(14px,1.5vw,17px)",
                     fontWeight: 900,
                     lineHeight: 1.45,
-                    marginBottom: "10px",
+                    marginBottom: heroText.sub ? "10px" : "22px",
                   }}
                 >
-                  지원사업 반영 시, <strong style={{ color: "#bfdbfe" }}>{recLabel}</strong>을 우선 검토하세요.
+                  {heroText.main}
                 </p>
-                <p
-                  style={{
-                    color: "rgba(255,255,255,0.5)",
-                    fontSize: "14px",
-                    lineHeight: 1.7,
-                    fontWeight: 800,
-                    maxWidth: "400px",
-                    marginBottom: "22px",
-                  }}
-                >
-                  지원금 반영 효과와 설비 개선 범위를 함께 고려했을 때 현재 조건에서는 {recShort}이 더 적합합니다.
-                </p>
+                {heroText.sub && (
+                  <p
+                    style={{
+                      color: "rgba(255,255,255,0.5)",
+                      fontSize: "14px",
+                      lineHeight: 1.7,
+                      fontWeight: 800,
+                      maxWidth: "400px",
+                      marginBottom: "22px",
+                    }}
+                  >
+                    {heroText.sub}
+                  </p>
+                )}
                 <button
                   type="button"
                   onClick={() => navigate(`/analysis/${draftId}/policies`)}
@@ -349,10 +453,10 @@ export default function RoiPage() {
                 }}
               >
                 {[
-                  { label: "예상 ROI", value: fmtPct(roi), accent: "#93c5fd" },
-                  { label: "예상 회수기간", value: fmtYrs(payback), accent: "#93c5fd" },
-                  { label: "실부담금", value: fmtWon(mRec.net), sub: "지원금 차감 후" },
-                  { label: "적용 가능 지원금", value: fmtWon(mRec.subsidy), accent: "#86efac" },
+                  { label: "예상 ROI", value: hasRecommendation ? fmtPct(roi) : "산정 보류", accent: "#93c5fd" },
+                  { label: "예상 회수기간", value: hasRecommendation ? fmtYrs(payback) : "산정 보류", accent: "#93c5fd" },
+                  { label: "실부담금", value: hasRecommendation ? fmtWon(mRec?.net ?? null) : "조건 확인 필요", sub: "지원금 차감 후" },
+                  { label: "적용 가능 지원금", value: formatSubsidyDisplay(mRecFallback), accent: "#86efac" },
                 ].map((kpi) => (
                   <div
                     key={kpi.label}
@@ -524,7 +628,9 @@ export default function RoiPage() {
                   const isActive = activeScen === sId
                   const m = sId === "a" ? mA : mB
                   const label = sId === "a" ? "A안 · 전체 교체" : "B안 · 부분 교체"
-                  const subLabel = isRec ? "우선 검토" : "초기 비용 대안"
+                  const subLabel = hasRecommendation
+                    ? (isRec ? "우선 검토" : "초기 비용 대안")
+                    : (sId === "a" ? "전체 교체안" : "부분 교체안")
 
                   return (
                     <button
@@ -602,7 +708,7 @@ export default function RoiPage() {
                       >
                         {[
                           { label: "총 투자금", value: fmtWon(m.investment) },
-                          { label: "적용 가능 지원금", value: fmtWon(m.subsidy), color: C.green },
+                          { label: "적용 가능 지원금", value: formatSubsidyDisplay(m), color: C.green },
                           { label: "실부담금", value: fmtWon(m.net) },
                           { label: "연간 순편익", value: fmtWon(m.saving) },
                         ].map((row) => (
@@ -673,6 +779,11 @@ export default function RoiPage() {
                           </p>
                         </div>
                       </div>
+                      {!hasRecommendation && (
+                        <p style={{ color: C.muted, fontSize: "11px", fontWeight: 800, textAlign: "center", marginTop: "10px" }}>
+                          운영비 또는 정책 지원조건 확인 후 계산됩니다.
+                        </p>
+                      )}
                     </button>
                   )
                 })}
@@ -695,7 +806,7 @@ export default function RoiPage() {
                       marginBottom: "10px",
                     }}
                   >
-                    핵심 요약
+                    {hasRecommendation ? "핵심 요약" : "계산 조건 확인 필요"}
                   </p>
                   <p
                     style={{
@@ -703,13 +814,31 @@ export default function RoiPage() {
                       fontSize: "14px",
                       fontWeight: 800,
                       lineHeight: 1.6,
-                      marginBottom: "18px",
+                      marginBottom: aiSummary.bullets.length > 0 ? "10px" : "18px",
                     }}
                   >
-                    {higherRoiIsA
-                      ? "A안은 지원금 증가를 통해 초기 부담을 낮추고 장기 수익성도 더 높습니다."
-                      : "B안은 초기 투자 부담을 낮추고 단기 회수에 유리한 선택지입니다."}
+                    {aiSummary.summary}
                   </p>
+                  {aiSummary.bullets.length > 0 && (
+                    <ul
+                      style={{
+                        paddingLeft: "16px",
+                        margin: "0 0 18px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "4px",
+                      }}
+                    >
+                      {aiSummary.bullets.map((bullet) => (
+                        <li
+                          key={bullet}
+                          style={{ color: C.muted, fontSize: "12px", fontWeight: 800, lineHeight: 1.55 }}
+                        >
+                          {bullet}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
 
                   <div
                     style={{
@@ -720,6 +849,11 @@ export default function RoiPage() {
                       gap: "14px",
                     }}
                   >
+                    {!hasRecommendation && (
+                      <p style={{ color: C.muted, fontSize: "12px", fontWeight: 800, lineHeight: 1.6 }}>
+                        A/B안의 투자금·실투자금·연간 순편익이 모두 확인되면 ROI 비교가 가능합니다.
+                      </p>
+                    )}
                     {roiDiff && (
                       <div>
                         <p
@@ -919,10 +1053,10 @@ export default function RoiPage() {
             <Accordion title="비용 산정 기준 보기">
               <div style={{ display: "flex", flexDirection: "column" }}>
                 {[
-                  { label: "총 투자금 (추천 시나리오)", value: fmtWon(mRec.investment) },
-                  { label: "적용 가능 지원금", value: fmtWon(mRec.subsidy) },
-                  { label: "실부담금 (지원금 차감)", value: fmtWon(mRec.net) },
-                  { label: "연간 순편익 (절감 기준)", value: fmtWon(mRec.saving) },
+                  { label: "총 투자금 (추천 시나리오)", value: fmtWon(mRecFallback.investment) },
+                  { label: "적용 가능 지원금", value: formatSubsidyDisplay(mRecFallback) },
+                  { label: "실부담금 (지원금 차감)", value: fmtWon(mRecFallback.net) },
+                  { label: "연간 순편익 (절감 기준)", value: fmtWon(mRecFallback.saving) },
                   { label: "예상 ROI", value: fmtPct(roi) },
                   { label: "예상 회수기간", value: fmtYrs(payback) },
                 ].map((row) => (

@@ -216,19 +216,24 @@ def _build_scenario(
     )
     scenario = bench[scenario_key]
 
-    # 에너지 절감: 실제 입력 우선, 미입력 시 업종 평균
+    # 에너지 절감: 실제 입력 우선, 미입력 시 업종 평균 (단위: 만원)
     if not energy_provided:
         energy_cost = bench["avg_energy_cost_manwon"]
         energy_cost_source = "industry_benchmark"
         energy_method = "업종 평균 기준 추정"
     else:
-        energy_cost = equipment.energy_cost_annual
+        energy_cost = _to_nonnegative_number(equipment.energy_cost_annual)
         energy_cost_source = "user_input"
         energy_method = "비용 기반 계산"
+        if 0 < energy_cost < 1:
+            print(
+                "[ROI_UNIT_WARNING] energy_cost_annual appears too small for manwon unit:",
+                energy_cost,
+            )
 
-    energy_saving = int(_to_nonnegative_number(energy_cost) * scenario["energy_reduction_rate"])
+    energy_saving = int(energy_cost * scenario["energy_reduction_rate"])
 
-    # 유지보수 절감: 실입력 우선, 없으면 에너지비 비율로 추정
+    # 유지보수 절감: 실입력 우선, 없으면 에너지비 비율로 추정 (단위: 만원)
     if equipment.maintenance_cost_annual is not None:
         maintenance_saving = int(
             _to_nonnegative_number(equipment.maintenance_cost_annual)
@@ -283,8 +288,28 @@ def _build_scenario(
             else:
                 investment = None
 
-    # 정책 매칭 결과를 받아 실제 적용 지원금만 반영한다.
-    support = _clean_policy_application(policy_application)
+    # 지원금 산정
+    # - policy_application 있음: 정책 매칭 결과의 실제 적용 지원금 사용
+    # - policy_application 없음: 업종 벤치마크 지원율로 추정 (화면 표시용 추정치)
+    if policy_application is not None:
+        support = _clean_policy_application(policy_application)
+    else:
+        est_rate = scenario.get("est_support_rate", 0.0)
+        est_max = scenario.get("est_max_support_manwon", 0)
+        eligible = 0
+        if investment is not None and est_rate > 0:
+            eligible = round(investment * est_rate)
+            estimated = int(min(eligible, est_max, investment))
+        else:
+            estimated = 0
+        support = {
+            "status": "estimated",
+            "applied_support_manwon": float(estimated),
+            "message": "정책 매칭 전 업종 평균 지원율 기반 추정치입니다.",
+        }
+        print(f"[ROI DEBUG] {scenario_key} 추정 지원금: investment={investment}, "
+              f"rate={est_rate}, max={est_max}, eligible={eligible}, estimated={estimated}")
+
     requested_support = support["applied_support_manwon"]
     support_capped = False
 
@@ -523,10 +548,10 @@ def _calc_ai_recommendation(
             }
         )
 
-    if _to_nonnegative_number(equipment.energy_cost_annual) > bench["avg_energy_cost_manwon"]:
+    energy_cost_manwon = _to_nonnegative_number(equipment.energy_cost_annual)
+    if energy_cost_manwon > bench["avg_energy_cost_manwon"]:
         ratio = round(
-            _to_nonnegative_number(equipment.energy_cost_annual)
-            / bench["avg_energy_cost_manwon"],
+            energy_cost_manwon / bench["avg_energy_cost_manwon"],
             2,
         )
         top_reasons.append(
@@ -672,7 +697,7 @@ def calculate_roi(
     energy_for_stats = (
         bench["avg_energy_cost_manwon"]
         if not energy_provided
-        else equipment.energy_cost_annual
+        else _to_nonnegative_number(equipment.energy_cost_annual)
     )
     benchmark = {
         "avg_energy_cost_manwon": bench["avg_energy_cost_manwon"],

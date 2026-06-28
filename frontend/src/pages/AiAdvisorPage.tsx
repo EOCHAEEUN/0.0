@@ -1,6 +1,22 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 
+function getAnalysisDataForCurrentUser(): Record<string, unknown> | null {
+  try {
+    const authRaw = window.localStorage.getItem("factofit_auth_session")
+    const userId = authRaw
+      ? String((JSON.parse(authRaw) as Record<string, unknown>)?.userId ?? "")
+      : ""
+    const raw = window.localStorage.getItem("factofit_analysis_result")
+    if (!raw) return null
+    const data = JSON.parse(raw) as Record<string, unknown>
+    if (userId && data.ownerId && String(data.ownerId) !== userId) return null
+    return data
+  } catch {
+    return null
+  }
+}
+
 type AdvisorMessage = {
   role: "user" | "ai"
   content: string
@@ -160,6 +176,7 @@ function createAdvisorAnswer(input: string) {
 
 export default function AiAdvisorPage() {
   const navigate = useNavigate()
+  const hasAnalysisData = Boolean(getAnalysisDataForCurrentUser())
 
   const [input, setInput] = useState("")
   const [messages, setMessages] = useState<AdvisorMessage[]>([
@@ -192,6 +209,74 @@ export default function AiAdvisorPage() {
     ])
 
     setInput("")
+  }
+
+  if (!hasAnalysisData) {
+    return (
+      <main className="page">
+        <section className="section white">
+          <div className="container">
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              style={{
+                marginBottom: "28px",
+                height: "44px",
+                padding: "0 18px",
+                borderRadius: "999px",
+                border: "1px solid #CBD5E1",
+                background: "#FFFFFF",
+                color: "#061B34",
+                fontWeight: 900,
+                cursor: "pointer",
+                boxShadow: "0 8px 20px rgba(6,27,52,.06)",
+              }}
+            >
+              ← 대시보드로 돌아가기
+            </button>
+
+            <div className="section-head">
+              <div>
+                <div className="screen-tag">Engi AI Advisor</div>
+                <div className="label">AI DECISION ASSISTANT</div>
+                <h2>
+                  맞춤 투자 조언을 <br />
+                  준비하고 있습니다.
+                </h2>
+              </div>
+              <p className="section-desc">
+                기업과 설비 정보를 입력하면 ROI, 지원사업, 안전 리스크를 종합해
+                다음 행동을 안내해드립니다.
+              </p>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                gap: "12px",
+                marginTop: "8px",
+                marginBottom: "48px",
+              }}
+            >
+              <button
+                type="button"
+                className="btn blue"
+                onClick={() => navigate("/setup/company")}
+              >
+                기업 정보 입력하기
+              </button>
+              <button
+                type="button"
+                className="btn dark"
+                onClick={() => navigate("/company")}
+              >
+                설비 정보 등록하기
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
+    )
   }
 
   return (

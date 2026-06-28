@@ -105,3 +105,21 @@ export async function createCompanyOnboarding(payload: unknown) {
     { authenticated: true },
   )
 }
+
+export function getCurrentUserId(): string | null {
+  try {
+    const raw = localStorage.getItem("factofit_auth_session")
+    if (!raw) return null
+    const session = JSON.parse(raw) as { user?: { id?: string | null } }
+    return session?.user?.id ?? null
+  } catch {
+    return null
+  }
+}
+
+export function clearAuthSession() {
+  localStorage.removeItem("factofit_access_token")
+  localStorage.removeItem("factofit_refresh_token")
+  localStorage.removeItem("factofit_company_id")
+  localStorage.removeItem("factofit_auth_session")
+}

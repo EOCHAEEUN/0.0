@@ -1,5 +1,5 @@
 .ff-signup-header {
-  margin-bottom: 34px;
+  margin-bottom: 28px;
   padding-right: 72px;
 }
 
@@ -7,7 +7,7 @@
   font-size: 48px;
   font-weight: 900;
   letter-spacing: -0.07em;
-  margin: 0 0 14px;
+  margin: 0 0 12px;
 }
 
 .ff-signup-header p {
@@ -19,27 +19,52 @@
   word-break: keep-all;
 }
 
-.ff-signup-guide {
-  margin-top: 18px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+.ff-signup-header-sub {
+  color: #94a3b8 !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  margin-top: 6px !important;
+  line-height: 1.6 !important;
 }
 
-.ff-signup-guide span {
-  min-height: 34px;
-  border-radius: 999px;
-  background: #f8fafc;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  color: #64748b;
-  padding: 0 14px;
+/* 가입 가치 배지 */
+.ff-signup-badges {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  margin-top: 16px;
+  margin-bottom: 4px;
+}
+
+@media (max-width: 480px) {
+  .ff-signup-badges {
+    flex-wrap: wrap;
+  }
+}
+
+.ff-signup-badge {
   display: inline-flex;
   align-items: center;
-  font-size: 13px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  font-size: 12px;
   font-weight: 900;
+  letter-spacing: -0.2px;
+  white-space: nowrap;
 }
 
-.ff-signup-guide b {
-  color: #ef4444;
-  margin-right: 4px;
+.ff-signup-badge--required {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+
+.ff-signup-badge--muted {
+  background: #f8fafc;
+  border-color: rgba(15, 23, 42, 0.1);
+  color: #64748b;
 }

@@ -2,6 +2,7 @@ import type {
   DashboardAnalysisStorage,
   DashboardOnboardingMeResponse,
 } from "./dashboard.contract"
+import { getCurrentUserId } from "../../services/auth"
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000"
 const ACCESS_TOKEN_STORAGE_KEY = "factofit_access_token"
@@ -45,9 +46,26 @@ export function getDashboardAccessToken() {
 export function getStoredDashboardAnalysisResult() {
   if (typeof window === "undefined") return null
 
-  return safeJsonParse<DashboardAnalysisStorage>(
-    window.localStorage.getItem(ANALYSIS_RESULT_STORAGE_KEY),
-  )
+  const raw = window.localStorage.getItem(ANALYSIS_RESULT_STORAGE_KEY)
+  if (!raw) return null
+
+  const parsed = safeJsonParse<DashboardAnalysisStorage & { ownerId?: string | null }>(raw)
+  if (!parsed) return null
+
+  const currentUserId = getCurrentUserId()
+
+  if (currentUserId && !parsed.ownerId) {
+    // 레거시 데이터 (ownerId 없음) → 제거 후 거부
+    window.localStorage.removeItem(ANALYSIS_RESULT_STORAGE_KEY)
+    return null
+  }
+
+  if (currentUserId && parsed.ownerId && parsed.ownerId !== currentUserId) {
+    // 다른 사용자 데이터 → 거부
+    return null
+  }
+
+  return parsed
 }
 
 export async function fetchDashboardOnboarding() {
@@ -84,11 +102,6 @@ export async function fetchDashboardOnboarding() {
   }
 
   const onboarding = raw.data
-  console.debug("[Dashboard company context] loaded", {
-    hasCompany: Boolean(onboarding.company),
-    companyName: onboarding.company?.company_name ?? null,
-    equipmentCount: onboarding.equipments?.length ?? 0,
-  })
 
   return onboarding
 }

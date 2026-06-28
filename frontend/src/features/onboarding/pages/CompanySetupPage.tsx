@@ -163,7 +163,7 @@ export default function CompanySetupPage() {
 
         <div className="ff-setup-grid">
           <aside className="ff-setup-intro">
-            <p className="ff-onboarding-eyebrow">COMPANY PROFILE</p>
+            <p className="ff-onboarding-eyebrow">1단계 · 기업 정보</p>
             <h1>기업 정보를 알려주세요.</h1>
             <p>
               입력한 정보는 지원사업 자격, 예상 지원금, ROI 분석 기준을 잡는 데

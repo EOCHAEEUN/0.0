@@ -48,7 +48,7 @@ export function RoiHero({
   const kpis: { label: string; value: string; sub?: string; accent?: string }[] = [
     {
       label: "예상 ROI",
-      value: `${recommendedScenario.roiPct}%`,
+      value: recommendedScenario.roiPct > 0 ? `${recommendedScenario.roiPct}%` : "-",
       accent: "#93c5fd",
     },
     {
@@ -595,7 +595,7 @@ export function RoiScenarioCards({
                 letterSpacing: "-0.04em",
               }}
             >
-              {sn.roiPct}%
+              {sn.roiPct > 0 ? `${sn.roiPct}%` : "-"}
             </p>
           </div>
           <div style={{ textAlign: "center" }}>
@@ -697,10 +697,13 @@ export function RoiScenarioCards({
                   marginBottom: "2px",
                 }}
               >
-                ROI {roiDiff}배 ↑
+                {scenA.roiPct > 0 || scenB.roiPct > 0
+                  ? `ROI +${roiDiff}%p`
+                  : "ROI 계산 결과 없음"}
               </p>
               <p style={{ color: C.muted, fontSize: "12px", fontWeight: 800 }}>
-                A안 {scenA.roiPct}% vs B안 {scenB.roiPct}%
+                A안 {scenA.roiPct > 0 ? `${scenA.roiPct}%` : "-"} vs B안{" "}
+                {scenB.roiPct > 0 ? `${scenB.roiPct}%` : "-"}
               </p>
             </div>
             {paybackDiff && (

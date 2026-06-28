@@ -206,9 +206,7 @@ async def chat(req: ChatRequest):
                 ]
             else:
                 cards = []
-
-        elif intent == "general": 
-            cards = []
+                
         else:
             cards = []
 

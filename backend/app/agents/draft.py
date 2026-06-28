@@ -8,9 +8,15 @@ import json
 def application_draft_node(state: FactofitState) -> FactofitState:
 
     if not state.get("selected_equipment_for_policy"):
-        state["final_response"] = "초안서 작성에는 등록된 설비 정보가 필요합니다. 설비를 등록해주세요."
+        state["final_response"] = "계획서 초안 작성에는 등록된 설비 정보가 필요합니다. 설비를 등록해주세요."
         state["intent"] = "response"
         return state
+    
+    # 추가 텍스트 가공
+    additional_text = state.get("additional_text_for_draft")
+    if additional_text:
+        refined_text = refine_additional_text(additional_text)
+        state["additional_text_for_draft"] = refined_text
     
     equipment = state.get("equipment")
     company = state.get("company_info")
@@ -63,3 +69,24 @@ def application_draft_node(state: FactofitState) -> FactofitState:
         state["final_response"] = response.content
 
     return state
+
+def refine_additional_text(raw_text: str) -> str:
+    """
+    사용자 입력 문장을 신청서에 적합하도록 가공
+    """
+    prompt = f"""
+    사용자가 다음 문장을 신청서에 추가하고 싶어합니다:
+    "{raw_text}"
+    
+    이 문장을 신청서에 적합하도록 다듬어주세요.
+    - 자연스러운 한국어
+    - 존댓말 유지
+    - 핵심 의도 보존
+    - 200자 이내
+    
+    다듬은 문장만 반환하세요.
+    """
+
+    from langchain_core.messages import SystemMessage
+    response = llm.invoke([SystemMessage(content=prompt)])
+    return response.content

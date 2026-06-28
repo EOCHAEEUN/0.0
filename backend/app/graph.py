@@ -42,8 +42,7 @@ def build_graph():
             "policy": "policy_chat_node",
             "safety": "equipment_safety_node",
             "draft": "application_draft_node",
-            "info_missing": "info_collector_node",
-            "general": "response_node"
+            "info_missing": "info_collector_node"
         }
     )
 
@@ -67,7 +66,6 @@ def build_graph():
         {
             "policy": "policy_chat_node",
             "draft": "application_draft_node",
-            "general": "response_node",
             "response": "response_node"
         }
     )

@@ -25,13 +25,12 @@ graph TD;
 	info_collector_node -. &nbsp;safety&nbsp; .-> equipment_safety_node;
 	info_collector_node -. &nbsp;policy&nbsp; .-> policy_chat_node;
 	policy_chat_node -. &nbsp;draft&nbsp; .-> application_draft_node;
-	policy_chat_node -. &nbsp;general&nbsp; .-> response_node;
+	policy_chat_node -. &nbsp;response&nbsp; .-> response_node;
 	router_node -. &nbsp;draft&nbsp; .-> application_draft_node;
 	router_node -. &nbsp;roi&nbsp; .-> capex_advisor_node;
 	router_node -. &nbsp;safety&nbsp; .-> equipment_safety_node;
 	router_node -. &nbsp;info_missing&nbsp; .-> info_collector_node;
 	router_node -. &nbsp;policy&nbsp; .-> policy_chat_node;
-	router_node -. &nbsp;general&nbsp; .-> response_node;
 	response_node --> __end__;
 	policy_chat_node -. &nbsp;policy&nbsp; .-> policy_chat_node;
 	classDef default fill:#f2f0ff,line-height:1.2

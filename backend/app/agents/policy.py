@@ -9,6 +9,14 @@ from app.core.llm import llm
 from app.tools.query_builder import _get_impact_keywords
 from datetime import date
 from app.core.database import get_db
+from app.agents.capex import (
+    format_roi_result,
+    show_roi_detail,
+    compare_scenarios,
+    compare_roi_results,
+    analyze_roi_followup
+)
+from app.tools.roi_calc_tool import calculate_equipment_roi
 
 
 UNKNOWN_DEADLINE_VALUES = {"", "none", "null", "nan", "마감일 미정", "상시"}
@@ -727,23 +735,6 @@ def rank_candidates_by_query(
     )[:limit]
 
 # ────────────────────────────────────────────────────────────────
-# FOR CHAT - 상태 1
-# ────────────────────────────────────────────────────────────────
-def ask_policy_intent(user_query: str) -> dict:
-    """
-    사용자의 정책 질문 의도를 확인합니다.
-    등록한 설비에 관한 정책인지, 일반 정책인지 사용자에게 묻습니다.
-    """
-    return {
-        "type": "intent_confirmation",
-        "message": "당신이 등록한 설비에 관한 정책 정보를 원하시나요? 아니면 일반 정책을 알고 싶으신가요?",
-        "options": [
-            {"id": "equipment", "label": "등록한 설비 관련"},
-            {"id": "general", "label": "일반 정책"}
-        ]
-    }
-
-# ────────────────────────────────────────────────────────────────
 # FOR CHAT - 상태 2
 # ────────────────────────────────────────────────────────────────
 def get_user_equipment_list(company_id: str) -> list[dict]:
@@ -787,34 +778,6 @@ def get_equipment_policies(company_id: str, equipment_id: str) -> list[dict]:
     return sorted_policies[:5]
 
 # ────────────────────────────────────────────────────────────────
-# FOR CHAT - 상태 4
-# ────────────────────────────────────────────────────────────────
-def search_general_policies(
-    user_query: str, 
-    company_industry_code: str = None,
-    region: str = None,
-    n_results: int = 5
-) -> list[dict]:
-    # 더 많이 검색 (20 → 50)
-    results = search_policies(user_query, n_results=50, where=None)
-    
-    filtered = results
-    
-    if company_industry_code:
-        filtered = [p for p in filtered 
-                   if company_industry_code in p.get("metadata", {}).get("industry_code", "")]
-    
-    if region:
-        filtered = [p for p in filtered 
-                   if region in p.get("metadata", {}).get("region", "")]
-    
-    # 필터 후 비어있으면 원래 결과 반환
-    if not filtered:
-        filtered = results
-    
-    return filtered[:n_results]
-
-# ────────────────────────────────────────────────────────────────
 # FOR CHAT - 상태 5 보조
 # ────────────────────────────────────────────────────────────────
 def analyze_followup_query(user_query: str, matched_policies: list) -> dict:
@@ -832,7 +795,7 @@ def analyze_followup_query(user_query: str, matched_policies: list) -> dict:
     정책 목록: {json.dumps(policy_list, ensure_ascii=False)}
     
     의도 + 정책 번호 추출
-    JSON: {"intent": "sort/more/filter/compare/detail/general", "policy_index": 0~4}
+    JSON: {"intent": "sort/more/filter/compare/detail", "policy_index": 0~4}
     """
     
     response = llm.invoke([SystemMessage(content=prompt)])
@@ -854,18 +817,28 @@ def policy_chat_node(state: FactofitState) -> FactofitState:
     company_id = company_info.company_id if company_info else None
     user_query = state.get("user_query", "")
     
-    # 상태 1: 의도 미확인
-    if not policy_intent_choice:
-        intent_result = ask_policy_intent(user_query)
-        state["final_response"] = intent_result["message"]
-        state["options"] = intent_result["options"]
-        state["intent"] = "response"
-        return state
-    
     # 상태 2: equipment 선택 + 설비 미선택
-    elif policy_intent_choice == "equipment" and not selected_equipment:
+    if policy_intent_choice == "equipment" and not selected_equipment:
         equipments = get_user_equipment_list(company_id)
-        state["final_response"] = "어떤 설비의 정책 정보를 원하시나요?"
+
+        state["final_response"] = """
+    등록된 장비를 기반으로:
+
+    📊 ROI 비교분석
+    → 현재 설비 vs 신규 설비의 수익성 비교
+
+    🔄 투자금 시나리오 비교
+    → 예상 투자금 변경에 따른 ROI 실시간 비교
+
+    💼 맞춤 정책 추천
+    → ROI 결과에 따른 최적의 정책 5개
+
+    📄 계획서 초안 작성
+    → 선택하신 정책으로 계획서 초안 자동 작성
+
+    어떤 설비에 대해 분석해드릴까요?
+    """
+        
         state["options"] = [
             {
                 "id": eq.get("equipment_id"),
@@ -878,33 +851,85 @@ def policy_chat_node(state: FactofitState) -> FactofitState:
     
     # 상태 3: equipment + 설비 선택 + 첫 조회
     elif policy_intent_choice == "equipment" and selected_equipment and not matched_policies:
-        equipment_id = state.get("equipment_id")  # ← id 가져오기!
-        policies = get_equipment_policies(company_id, equipment_id)
-        state["matched_policies"] = policies
-        state["final_response"] = "선택하신 설비의 적합한 정책들입니다. 더 궁금한 점이 있으신가요?"
-        state["intent"] = "response"
+        equipment_id = state.get("equipment_id")
+        roi_result = state.get("roi_result")
+        
+        # ROI 결과가 없으면 DB에서 조회
+        if not roi_result:
+            db = get_db()
+            roi_output = db.table("roi_output").select("*").eq(
+                "company_id", company_id
+            ).eq(
+                "equipment_id", equipment_id
+            ).execute()
+            
+            if roi_output.data:
+                roi_result = roi_output.data[0].get("roi_data", {})
+                state["roi_result"] = roi_result
+        
+        # ROI 있으면 표시
+        if roi_result:
+            roi_text = format_roi_result(roi_result)
+            state["final_response"] = roi_text
+            state["options"] = [
+                {"id": "detail", "label": "상세 설명"},
+                {"id": "compare", "label": "비교"},
+                {"id": "simulate", "label": "시뮬레이션"},
+                {"id": "policy", "label": "정책 추천 보기"},
+                {"id": "draft", "label": "계획서 초안 작성"}
+            ]
+            state["intent"] = "response"
+        else:
+            # 분석 데이터 없음
+            state["final_response"] = "아직 분석 데이터가 없습니다. 분석하기를 진행하고 궁금한 걸 물어보세요."
+            state["options"] = [{"id": "analyze", "label": "분석하기"}]
+            state["intent"] = "response"
+        
         return state
     
-    # 상태 4: general + 첫 검색
-    elif policy_intent_choice == "general" and not matched_policies:
-        region = company_info.region if company_info else None
-        industry_code = company_info.industry_code[0] if company_info and company_info.industry_code else None
-        policies = search_general_policies(user_query, industry_code, region, n_results=5)
-        state["matched_policies"] = policies
-        state["final_response"] = "찾은 정책들입니다. 더 궁금한 점이 있으신가요?"
-        state["intent"] = "response"
+        # 상태 3.5: ROI 후속질문 (버튼 클릭)
+    elif policy_intent_choice == "equipment" and selected_equipment and roi_result and not matched_policies:
+        equipment = state.get("equipment")
+        followup_info = analyze_roi_followup(user_query, roi_result)
+        intent = followup_info.get("intent")
+        
+        if intent == "detail":
+            state["final_response"] = show_roi_detail(roi_result, user_query)
+            state["intent"] = "response"
+        
+        elif intent == "compare":
+            state["final_response"] = compare_scenarios(roi_result)
+            state["intent"] = "response"
+        
+        elif intent == "simulate":
+            new_investment = followup_info.get("new_investment")
+            equipment.scenario_a_investment_manwon = new_investment
+            new_roi = calculate_equipment_roi(equipment)
+            state["final_response"] = compare_roi_results(roi_result, new_roi)
+            state["intent"] = "response"
+        
+        elif intent == "policy":
+            # 정책 조회!
+            policies = get_equipment_policies(company_id, equipment_id)
+            state["matched_policies"] = policies
+            state["final_response"] = "선택하신 설비의 적합한 정책들입니다."
+            state["intent"] = "response"
+
+        elif intent == "draft":
+            # 바로 계획서 작성 (정책 선택 필요)
+            policies = get_equipment_policies(company_id, equipment_id)
+            state["matched_policies"] = policies
+            state["final_response"] = "어떤 정책에 대해 계획서 초안을 작성해드릴까요?"
+            state["intent"] = "response"
+        
         return state
-    
+        
     # 상태 5: 후속질문
     elif matched_policies:
         followup_info = analyze_followup_query(user_query, matched_policies)
         intent = followup_info.get("intent")
         
-        if intent == "general":
-            state["intent"] = "general"
-            return state
-        
-        elif intent == "sort":
+        if intent == "sort":
             criteria = followup_info.get("criteria", "match_score")
             order = followup_info.get("order", "desc")
             sorted_policies = sorted(

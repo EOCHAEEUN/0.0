@@ -6,19 +6,6 @@ from app.core.database import get_db
 from app.state import FactofitState
 
 def response_node(state: FactofitState) -> FactofitState:
-    if state.get("intent") == "general" and not state.get("final_response"):
-        from app.core.llm import llm
-        from langchain_core.messages import SystemMessage
-        
-        user_query = state.get("user_query", "")
-        
-        prompt = f"""
-        사용자의 일반 질문에 답변해주세요.
-        질문: {user_query}
-        """
-        
-        response = llm.invoke([SystemMessage(content=prompt)])
-        state["final_response"] = response.content
     # Chat용: chat_history만 저장
     supabase = get_db()
     company = state.get("company_info")

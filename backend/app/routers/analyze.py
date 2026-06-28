@@ -1,25 +1,28 @@
-from typing import Any, Optional
+from __future__ import annotations
+
 from datetime import date, datetime
+from typing import Any, Optional
 import asyncio
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
+from app.agents.policy import (
+    evaluate_and_rerank_with_llm,
+    format_raw_policy_candidate,
+    get_policy_raw_candidates,
+    merge_policy_candidates,
+    policy_matching_node,
+    rank_candidates_by_query,
+    rerank_policies_with_roi,
+    resolve_scenario_policy_support,
+)
 from app.core.auth import get_current_user
 from app.core.database import get_db
 from app.models.auth import CurrentUser
 from app.models.company import CompanyContext
 from app.models.equipment import EquipmentInput
 from app.state import FactofitState
-from app.agents.policy import (
-    evaluate_and_rerank_with_llm,
-    format_raw_policy_candidate,
-    policy_matching_node,
-    get_policy_raw_candidates,
-    merge_policy_candidates,
-    rank_candidates_by_query,
-    rerank_policies_with_roi,
-)
 from app.tools.query_builder import build_policy_queries_from_roi
 from app.tools.roi_calc import calculate_roi
 
@@ -27,13 +30,15 @@ from app.tools.roi_calc import calculate_roi
 router = APIRouter()
 
 
-def _as_dict(value):
-    """Return a safe dictionary for policy/metadata objects."""
+# ============================================================================
+# 공통 형식 유틸리티
+# ============================================================================
+
+def _as_dict(value: Any) -> dict:
     return value if isinstance(value, dict) else {}
 
 
-def _first_value(*values):
-    """Return the first non-empty value without changing its original type."""
+def _first_value(*values: Any) -> Any:
     for value in values:
         if value is None:
             continue
@@ -43,25 +48,23 @@ def _first_value(*values):
     return None
 
 
-def _first_text(*values) -> str:
-    """Return the first non-empty value as text."""
+def _first_text(*values: Any) -> str:
     value = _first_value(*values)
     return "" if value is None else str(value)
 
 
-def _policy_value(policy: dict, key: str, default=None):
-    """Read a policy field from top-level first, then metadata."""
-    if key in policy and policy.get(key) is not None:
+def _policy_value(policy: dict, key: str, default: Any = None) -> Any:
+    if policy.get(key) is not None:
         return policy.get(key)
 
     metadata = _as_dict(policy.get("metadata"))
-    if key in metadata and metadata.get(key) is not None:
+    if metadata.get(key) is not None:
         return metadata.get(key)
 
     return default
 
 
-def _policy_id(policy: dict):
+def _policy_id(policy: dict) -> Any:
     metadata = _as_dict(policy.get("metadata"))
     return _first_value(
         policy.get("policy_id"),
@@ -76,23 +79,7 @@ def _policy_id(policy: dict):
 
 
 def _format_policy_for_frontend(policy: dict) -> dict:
-    """
-    Normalize policy rows/re-ranked policy objects for frontend display.
-
-    DB public.policy has:
-      - url
-      - summary
-      - raw_text
-      - created_at
-
-    Frontend/detail dialog can read:
-      - url/source_url/policy_url
-      - summary/description/content/support_content
-      - posted_date/created_at
-
-    This function keeps the original policy object and adds aliases so the
-    support page can render actual detail content without changing its UI.
-    """
+    """DB row/re-ranked policy를 프론트 공통 형태로 정규화한다."""
     metadata = dict(_as_dict(policy.get("metadata")))
 
     policy_id = _policy_id(policy)
@@ -191,7 +178,6 @@ def _format_policy_for_frontend(policy: dict) -> dict:
         metadata.get("policy_subcategory"),
         metadata.get("subcategory"),
     )
-
     reason = _first_text(
         policy.get("reason"),
         metadata.get("reason"),
@@ -287,19 +273,11 @@ def _format_policy_for_frontend(policy: dict) -> dict:
 
 
 def _format_raw_policy_candidate_for_frontend(policy: dict) -> dict:
-    """Keep existing raw-candidate shape and add detail fields for the support page."""
     formatted = format_raw_policy_candidate(policy)
-    merged = {**policy, **formatted}
-    return _format_policy_for_frontend(merged)
+    return _format_policy_for_frontend({**policy, **formatted})
 
 
 def _score_to_percent(policy: dict) -> int:
-    """
-    Convert policy score to 0~100 integer for matched_policy storage.
-
-    hybrid_score/final_score/distance are usually 0~1 scale.
-    If a score already looks like 0~100, keep it as percent.
-    """
     value = policy.get(
         "hybrid_score",
         policy.get(
@@ -307,17 +285,19 @@ def _score_to_percent(policy: dict) -> int:
             round(1 - policy.get("distance", 1), 3),
         ),
     )
-
     try:
         numeric = float(value)
     except (TypeError, ValueError):
         numeric = 0
-
     if numeric <= 1:
         numeric *= 100
-
     return int(max(0, min(100, round(numeric))))
 
+
+# ============================================================================
+# ROI 분석 + 정책 매칭 + 정책 반영 최종 ROI
+# LangGraph는 사용하거나 수정하지 않는다.
+# ============================================================================
 
 @router.post("/analyze")
 async def analyze(
@@ -327,40 +307,35 @@ async def analyze(
 ):
     db = get_db()
 
-    # ------------------------------------------------------------------
-    # 1. Company 조회
-    # ------------------------------------------------------------------
-    company_data = (
+    # 1. 현재 로그인 사용자가 소유한 기업 조회
+    company_result = (
         db.table("company")
         .select("*")
         .eq("company_id", company_id)
         .eq("user_id", current_user.id)
         .execute()
     )
-
-    if not company_data.data:
+    if not company_result.data:
         return {"success": False, "message": "기업 정보를 찾을 수 없습니다."}
 
-    data = company_data.data[0]
-
-    if isinstance(data.get("industry_code"), str):
-        data["industry_code"] = [
+    company_row = company_result.data[0]
+    if isinstance(company_row.get("industry_code"), str):
+        company_row["industry_code"] = [
             code.strip()
-            for code in data["industry_code"].split(",")
+            for code in company_row["industry_code"].split(",")
             if code.strip()
         ]
 
     company = CompanyContext(
-        company_id=data.get("company_id"),
-        company_name=data.get("company_name", ""),
-        industry_code=data.get("industry_code", []),
-        region=data.get("region", ""),
-        company_type=data.get("company_type"),
-        employee_count=data.get("employee_count"),
-        annual_revenue=data.get("annual_revenue"),
-        energy_cost_annual=data.get("energy_cost_annual"),
+        company_id=company_row.get("company_id"),
+        company_name=company_row.get("company_name", ""),
+        industry_code=company_row.get("industry_code", []),
+        region=company_row.get("region", ""),
+        company_type=company_row.get("company_type"),
+        employee_count=company_row.get("employee_count"),
+        annual_revenue=company_row.get("annual_revenue"),
+        energy_cost_annual=company_row.get("energy_cost_annual"),
     )
-
     company_context = {
         "industry_code": company.industry_code or [],
         "region": company.region or "",
@@ -369,95 +344,59 @@ async def analyze(
         "annual_revenue": company.annual_revenue,
     }
 
-    # ------------------------------------------------------------------
-    # 2. Equipment 조회
-    # ------------------------------------------------------------------
+    # 2. 설비 조회
     equipment_query = (
         db.table("equipment")
         .select("*")
         .eq("company_id", company_id)
     )
-
     if equipment_id:
         equipment_query = equipment_query.eq("equipment_id", equipment_id)
 
-    equipment_data = equipment_query.execute()
-
-    if not equipment_data.data:
+    equipment_result = equipment_query.execute()
+    if not equipment_result.data:
         return {"success": False, "message": "설비 정보를 찾을 수 없습니다."}
 
-    eq = equipment_data.data[0]
-    equipment_id = eq.get("equipment_id")
+    equipment_row = equipment_result.data[0]
+    equipment_id = equipment_row.get("equipment_id")
 
-    # energy_cost_annual: null(미입력)과 실제 0을 구분한다.
-    # EquipmentInput은 int 타입을 요구하므로 미입력 시 0을 넘기되,
-    # energy_provided 플래그를 roi_calc에 함께 전달해 벤치마크 fallback을 제어한다.
-    raw_energy = eq.get("energy_cost_annual")
+    raw_energy = equipment_row.get("energy_cost_annual")
     energy_provided = raw_energy is not None
 
     equipment = EquipmentInput(
-        name=eq.get("name", ""),
-        category=eq.get("category", ""),
-        age_years=eq.get("age_years", 0),
+        name=equipment_row.get("name", ""),
+        category=equipment_row.get("category", ""),
+        age_years=equipment_row.get("age_years", 0),
         energy_cost_annual=raw_energy if energy_provided else 0,
-        defect_rate=eq.get("defect_rate"),
-        maintenance_cost_annual=eq.get("maintenance_cost_annual"),
-        current_capacity_value=eq.get("current_capacity_value"),
-        production_qty=eq.get("production_qty"),
-        process=eq.get("process"),
-        contribution_margin_won=eq.get("contribution_margin_won"),
-        scenario_a_investment_manwon=eq.get("scenario_a_investment_manwon"),
-        scenario_b_investment_manwon=eq.get("scenario_b_investment_manwon"),
+        defect_rate=equipment_row.get("defect_rate"),
+        maintenance_cost_annual=equipment_row.get("maintenance_cost_annual"),
+        current_capacity_value=equipment_row.get("current_capacity_value"),
+        production_qty=equipment_row.get("production_qty"),
+        process=equipment_row.get("process"),
+        contribution_margin_won=equipment_row.get("contribution_margin_won"),
+        scenario_a_investment_manwon=equipment_row.get("scenario_a_investment_manwon"),
+        scenario_b_investment_manwon=equipment_row.get("scenario_b_investment_manwon"),
     )
 
-    print("[analyze] equipment_input:", equipment.model_dump(), "energy_provided:", energy_provided)
-
-    # ------------------------------------------------------------------
-    # 3. ROI 계산
-    # ------------------------------------------------------------------
+    # 3. 기초 시나리오 계산: 정책 지원금 0원 기준
+    # 정책 검색 키워드를 만들기 위한 계산이며, 프론트 최종 결과로 쓰지 않는다.
     try:
-        roi_result = calculate_roi(equipment, energy_provided=energy_provided)
+        base_roi_result = calculate_roi(
+            equipment,
+            energy_provided=energy_provided,
+            policy_applications=None,
+        )
     except ValueError as exc:
         return {"success": False, "message": str(exc)}
 
-    print(
-        "[analyze] roi_result summary:",
-        {
-            "recommended": roi_result.get("recommended"),
-            "scenario_a": {
-                "roi_pct": roi_result.get("scenario_a", {}).get("roi_pct"),
-                "payback_years": roi_result.get("scenario_a", {}).get("payback_years"),
-                "annual_net_benefit_manwon": roi_result.get("scenario_a", {}).get("annual_net_benefit_manwon"),
-                "net_investment_manwon": roi_result.get("scenario_a", {}).get("net_investment_manwon"),
-            },
-            "scenario_b": {
-                "roi_pct": roi_result.get("scenario_b", {}).get("roi_pct"),
-                "payback_years": roi_result.get("scenario_b", {}).get("payback_years"),
-                "annual_net_benefit_manwon": roi_result.get("scenario_b", {}).get("annual_net_benefit_manwon"),
-                "net_investment_manwon": roi_result.get("scenario_b", {}).get("net_investment_manwon"),
-            },
-        },
-    )
-
-    # ------------------------------------------------------------------
-    # 4. 정책 후보/추천
-    #
-    # 기존 코드 문제:
-    # - 정책 오케스트레이션 실패 시 except에서 에러를 삼키고 success:true로 응답
-    # - raw_candidates가 몇 개인지, 어느 단계에서 실패했는지 프론트에서 확인 불가
-    #
-    # 수정:
-    # - 단계별 count/debug 응답 추가
-    # - raw_candidates 조회 성공 후 이후 단계가 실패해도 raw_candidates는 응답에 유지
-    # - matched_policy DB 삭제는 추천 결과 유무와 상관없이 실행
-    # ------------------------------------------------------------------
-    raw_candidates = []
-    matched_policies = []
+    # 4. 기존 정책 후보/랭킹 로직 유지
+    raw_candidates: list[dict] = []
+    matched_policies: list[dict] = []
     queries = {"a": "", "b": ""}
-    a_candidates = []
-    b_candidates = []
-    merged = []
-    ranked = []
+    a_candidates: list[dict] = []
+    b_candidates: list[dict] = []
+    merged: list[dict] = []
+    ranked: list[dict] = []
 
     policy_status = "success"
     policy_error = None
@@ -466,12 +405,9 @@ async def analyze(
     try:
         policy_stage = "raw_candidates"
         raw_candidates = get_policy_raw_candidates(company_context)
-        print("[analyze] company_context:", company_context)
-        print("[analyze] raw_candidates count:", len(raw_candidates))
 
         policy_stage = "query_builder"
-        queries = build_policy_queries_from_roi(equipment, roi_result)
-        print("[analyze] policy queries:", queries)
+        queries = build_policy_queries_from_roi(equipment, base_roi_result)
 
         policy_stage = "rank_a"
         a_candidates = rank_candidates_by_query(
@@ -479,7 +415,6 @@ async def analyze(
             queries.get("a", ""),
             limit=10,
         )
-        print("[analyze] a_candidates count:", len(a_candidates))
 
         policy_stage = "rank_b"
         b_candidates = rank_candidates_by_query(
@@ -487,36 +422,69 @@ async def analyze(
             queries.get("b", ""),
             limit=10,
         )
-        print("[analyze] b_candidates count:", len(b_candidates))
 
         policy_stage = "merge"
         merged = merge_policy_candidates(a_candidates, b_candidates)
-        print("[analyze] merged count:", len(merged))
 
         policy_stage = "rerank"
-        ranked = rerank_policies_with_roi(merged, roi_result)
-        print("[analyze] ranked count:", len(ranked))
+        ranked = rerank_policies_with_roi(merged, base_roi_result)
 
         policy_stage = "llm_evaluate"
         matched_policies = evaluate_and_rerank_with_llm(
             ranked[:10],
             company_context,
             equipment.name,
-            roi_result,
+            base_roi_result,
         )
-        print("[analyze] matched_policies count:", len(matched_policies))
 
-        if len(raw_candidates) == 0:
+        if not raw_candidates:
             policy_status = "empty"
-            policy_error = "정책 DB에서 기업 조건에 맞는 1차 후보(raw_candidates)가 없습니다."
-        elif len(matched_policies) == 0:
+            policy_error = "정책 DB에서 기업 조건에 맞는 1차 후보가 없습니다."
+        elif not matched_policies:
             policy_status = "empty"
-            policy_error = "1차 후보는 있으나 최종 추천 정책(matched_policies)이 없습니다."
+            policy_error = "정책 후보는 있으나 최종 추천 결과가 없습니다."
 
     except Exception as exc:
         policy_status = "error"
         policy_error = f"{policy_stage}: {str(exc)}"
         print(f"정책 오케스트레이션 실패[{policy_stage}]: {exc}")
+
+    # 5. A/B별 단 하나의 정책만 실제 지원금으로 반영
+    # LLM 실패 시에도 deterministic ranked 후보를 사용해 계산 가능하게 한다.
+    policy_pool_for_support = matched_policies or ranked
+    policy_applications = {
+        "scenario_a": resolve_scenario_policy_support(
+            scenario="a",
+            investment_manwon=base_roi_result.get("scenario_a", {}).get(
+                "investment_manwon"
+            ),
+            policies=policy_pool_for_support,
+            company_context=company_context,
+        ),
+        "scenario_b": resolve_scenario_policy_support(
+            scenario="b",
+            investment_manwon=base_roi_result.get("scenario_b", {}).get(
+                "investment_manwon"
+            ),
+            policies=policy_pool_for_support,
+            company_context=company_context,
+        ),
+    }
+
+    # 6. 최종 ROI 계산: 실제 적용 지원금 반영
+    roi_result = calculate_roi(
+        equipment,
+        energy_provided=energy_provided,
+        policy_applications=policy_applications,
+    )
+    roi_result["analysis_metadata"] = {
+        "base_recommended": base_roi_result.get("recommended"),
+        "final_recommended": roi_result.get("recommended"),
+        "policy_application_status": {
+            "scenario_a": policy_applications["scenario_a"].get("status"),
+            "scenario_b": policy_applications["scenario_b"].get("status"),
+        },
+    }
 
     frontend_matched_policies = [
         _format_policy_for_frontend(policy)
@@ -527,66 +495,74 @@ async def analyze(
         for policy in raw_candidates
     ]
 
-    # ------------------------------------------------------------------
-    # 5. 결과 저장
-    # ------------------------------------------------------------------
+    # 7. 기존 분석·초안·매칭을 정리하고 final ROI 저장
     try:
-        # 같은 company/equipment 기준 기존 결과는 항상 먼저 정리합니다.
-        db.table("roi_output").delete().eq("company_id", company_id).eq(
-            "equipment_id",
-            equipment_id,
-        ).execute()
-
-        db.table("draft_result").delete().eq("company_id", company_id).eq(
-            "equipment_id",
-            equipment_id,
-        ).execute()
-
-        db.table("matched_policy").delete().eq("company_id", company_id).eq(
-            "equipment_id",
-            equipment_id,
-        ).execute()
-
-        db.table("roi_output").insert(
-            {
-                "company_id": company_id,
-                "equipment_id": equipment_id,
-                "roi_data": roi_result,
-                "created_at": datetime.now().isoformat(),
-            }
-        ).execute()
-
+        (
+            db.table("roi_output")
+            .delete()
+            .eq("company_id", company_id)
+            .eq("equipment_id", equipment_id)
+            .execute()
+        )
+        (
+            db.table("draft_result")
+            .delete()
+            .eq("company_id", company_id)
+            .eq("equipment_id", equipment_id)
+            .execute()
+        )
+        (
+            db.table("matched_policy")
+            .delete()
+            .eq("company_id", company_id)
+            .eq("equipment_id", equipment_id)
+            .execute()
+        )
+        (
+            db.table("roi_output")
+            .insert(
+                {
+                    "company_id": company_id,
+                    "equipment_id": equipment_id,
+                    "roi_data": roi_result,
+                    "created_at": datetime.now().isoformat(),
+                }
+            )
+            .execute()
+        )
     except Exception as exc:
         print(f"분석 결과 초기화/roi_output 저장 실패: {exc}")
 
     if frontend_matched_policies:
         try:
             for policy in frontend_matched_policies:
-                policy_id = policy.get("id") or policy.get("policy_id") or None
-
+                policy_id = policy.get("id") or policy.get("policy_id")
                 if not policy_id:
                     continue
 
-                db.table("matched_policy").insert(
-                    {
-                        "company_id": company_id,
-                        "equipment_id": equipment_id,
-                        "policy_id": policy_id,
-                        "title": policy.get("metadata", {}).get("title", ""),
-                        "match_score": _score_to_percent(policy),
-                        "eligible": policy.get("eligible", True),
-                        "reason": (
-                            policy.get("reason")
-                            or policy.get("scenario_label")
-                            or "RAG 매칭"
-                        ),
-                        "llm_score": policy.get("llm_score", ""),
-                        "scenario_match": policy.get("scenario_match"),
-                        "scenario_label": policy.get("scenario_label"),
-                        "created_at": datetime.now().isoformat(),
-                    }
-                ).execute()
-
+                (
+                    db.table("matched_policy")
+                    .insert(
+                        {
+                            "company_id": company_id,
+                            "equipment_id": equipment_id,
+                            "policy_id": policy_id,
+                            "title": policy.get("metadata", {}).get("title", ""),
+                            "match_score": _score_to_percent(policy),
+                            "eligible": policy.get("eligible", True),
+                            "reason": (
+                                policy.get("reason")
+                                or policy.get("scenario_label")
+                                or "RAG 매칭"
+                            ),
+                            "llm_score": policy.get("llm_score", ""),
+                            "scenario_match": policy.get("scenario_match"),
+                            "scenario_label": policy.get("scenario_label"),
+                            "created_at": datetime.now().isoformat(),
+                        }
+                    )
+                    .execute()
+                )
         except Exception as exc:
             print(f"matched_policy 저장 실패: {exc}")
 
@@ -600,7 +576,9 @@ async def analyze(
     return {
         "success": True,
         "data": {
+            # 프론트가 사용하는 값은 항상 정책 반영 final ROI
             "roi_result": roi_result,
+            "policy_applications": roi_result.get("policy_applications", {}),
             "matched_policies": frontend_matched_policies,
             "policies": frontend_matched_policies,
             "raw_candidates": frontend_raw_candidates,
@@ -617,58 +595,48 @@ async def analyze(
                 "merged_count": len(merged),
                 "ranked_count": len(ranked),
                 "matched_policies_count": len(matched_policies),
+                "base_recommended": base_roi_result.get("recommended"),
+                "final_recommended": roi_result.get("recommended"),
+                "policy_applications": roi_result.get("policy_applications", {}),
             },
             "response": response_message,
         },
     }
 
-# ------------------------------------------------------------------
-# /api/analyze/support-projects - 지원사업 화면 DB 조회 라우터
-# NOTE: backend/app/routers/policies.py 파일은 사용하지 않습니다.
-#       main.py는 analyze.router만 include하고, 프론트는 이 주소를 호출합니다.
-# ------------------------------------------------------------------
+
+# ============================================================================
+# 지원사업 화면 DB 조회 라우터
+# ============================================================================
 
 def normalize_list(value: Any) -> list[str]:
     if value is None:
         return []
-
     if isinstance(value, list):
-        return [str(v).strip() for v in value if str(v).strip()]
-
+        return [str(item).strip() for item in value if str(item).strip()]
     if isinstance(value, str):
         value = value.strip()
-
         if not value:
             return []
-
         if value.startswith("{") and value.endswith("}"):
             value = value[1:-1]
-
         return [
             item.strip().strip('"').strip("'")
             for item in value.split(",")
             if item.strip()
         ]
-
     return []
 
 
-def get_first_row(result: Any):
+def get_first_row(result: Any) -> Optional[dict]:
     data = getattr(result, "data", None)
-
     if isinstance(data, list) and data:
         return data[0]
-
-    if isinstance(data, dict):
-        return data
-
-    return None
+    return data if isinstance(data, dict) else None
 
 
 def get_policy_id(policy: dict) -> str:
-    metadata = policy.get("metadata", {}) or {}
-
-    return (
+    metadata = _as_dict(policy.get("metadata"))
+    return str(
         policy.get("policy_id")
         or policy.get("id")
         or metadata.get("policy_id")
@@ -678,9 +646,8 @@ def get_policy_id(policy: dict) -> str:
 
 
 def get_policy_title(policy: dict) -> str:
-    metadata = policy.get("metadata", {}) or {}
-
-    return (
+    metadata = _as_dict(policy.get("metadata"))
+    return str(
         policy.get("title")
         or metadata.get("title")
         or policy.get("name")
@@ -690,43 +657,29 @@ def get_policy_title(policy: dict) -> str:
 
 
 def get_match_score(policy: dict) -> float:
-    if policy.get("match_score") is not None:
-        try:
-            return round(float(policy.get("match_score")), 3)
-        except Exception:
-            return 0.0
-
     try:
+        if policy.get("match_score") is not None:
+            return round(float(policy.get("match_score")), 3)
         return round(1 - float(policy.get("distance", 1)), 3)
-    except Exception:
+    except (TypeError, ValueError):
         return 0.0
 
 
 def normalize_policy_id(value: Any) -> str:
-    if value is None:
-        return ""
-
-    return str(value).strip()
+    return "" if value is None else str(value).strip()
 
 
-def fetch_policy_details_by_ids(db: Any, policy_ids: list[Any]) -> dict[str, dict]:
-    """
-    Fetch public.policy rows and return them by policy_id.
-
-    backend/app/routers/policies.py is intentionally not used.
-    /api/analyze/support-projects reads matched_policy first, then enriches it
-    with the canonical policy table so the frontend never has to show fallback
-    values such as '주관사 미확인' or '지원내용 준비 중' when DB data exists.
-    """
-    unique_ids = []
-    seen = set()
-
+def fetch_policy_details_by_ids(
+    db: Any,
+    policy_ids: list[Any],
+) -> dict[str, dict]:
+    unique_ids: list[str] = []
+    seen: set[str] = set()
     for policy_id in policy_ids:
         normalized = normalize_policy_id(policy_id)
-        if not normalized or normalized in seen:
-            continue
-        unique_ids.append(normalized)
-        seen.add(normalized)
+        if normalized and normalized not in seen:
+            unique_ids.append(normalized)
+            seen.add(normalized)
 
     if not unique_ids:
         return {}
@@ -738,28 +691,21 @@ def fetch_policy_details_by_ids(db: Any, policy_ids: list[Any]) -> dict[str, dic
             .in_("policy_id", unique_ids)
             .execute()
         )
-        rows = getattr(result, "data", []) or []
-
         return {
             normalize_policy_id(row.get("policy_id") or row.get("id")): row
-            for row in rows
+            for row in (result.data or [])
             if isinstance(row, dict)
             and normalize_policy_id(row.get("policy_id") or row.get("id"))
         }
-    except Exception as e:
-        print(f"policy 상세정보 조회 실패: {e}")
+    except Exception as exc:
+        print(f"policy 상세정보 조회 실패: {exc}")
         return {}
 
 
-def saved_policy_to_response(row: dict, policy_detail: Optional[dict] = None) -> dict:
-    """Merge matched_policy cache row with public.policy detail row.
-
-    matched_policy keeps recommendation-specific values:
-      - reason, match_score, llm_score, scenario labels
-
-    policy keeps canonical announcement details:
-      - organization, url, summary, raw_text, created_at, etc.
-    """
+def saved_policy_to_response(
+    row: dict,
+    policy_detail: Optional[dict] = None,
+) -> dict:
     policy_detail = policy_detail or {}
     policy_metadata = dict(_as_dict(policy_detail.get("metadata")))
     row_metadata = dict(_as_dict(row.get("metadata")))
@@ -769,8 +715,16 @@ def saved_policy_to_response(row: dict, policy_detail: Optional[dict] = None) ->
         or policy_detail.get("policy_id")
         or policy_detail.get("id")
     )
-    reason = row.get("reason") or row_metadata.get("reason") or policy_detail.get("reason")
-    llm_score = row.get("llm_score") or row_metadata.get("llm_score") or policy_detail.get("llm_score")
+    reason = (
+        row.get("reason")
+        or row_metadata.get("reason")
+        or policy_detail.get("reason")
+    )
+    llm_score = (
+        row.get("llm_score")
+        or row_metadata.get("llm_score")
+        or policy_detail.get("llm_score")
+    )
     scenario_match = (
         row.get("scenario_match")
         or row_metadata.get("scenario_match")
@@ -793,7 +747,11 @@ def saved_policy_to_response(row: dict, policy_detail: Optional[dict] = None) ->
         **policy_metadata,
         **row_metadata,
         "policy_id": policy_id,
-        "title": row.get("title") or policy_detail.get("title") or policy_metadata.get("title"),
+        "title": (
+            row.get("title")
+            or policy_detail.get("title")
+            or policy_metadata.get("title")
+        ),
         "match_score": match_score,
         "eligible": row.get("eligible", True),
         "reason": reason,
@@ -802,7 +760,6 @@ def saved_policy_to_response(row: dict, policy_detail: Optional[dict] = None) ->
         "scenario_label": scenario_label,
         "matched_policy_created_at": row.get("created_at"),
     }
-
     merged_policy = {
         **policy_detail,
         "id": policy_id,
@@ -817,11 +774,10 @@ def saved_policy_to_response(row: dict, policy_detail: Optional[dict] = None) ->
         "matched_policy_created_at": row.get("created_at"),
         "metadata": merged_metadata,
     }
-
     return _format_policy_for_frontend(merged_policy)
 
 
-async def run_policy_node(state: FactofitState):
+async def run_policy_node(state: FactofitState) -> FactofitState:
     return await asyncio.wait_for(
         asyncio.to_thread(policy_matching_node, state),
         timeout=90,
@@ -837,8 +793,7 @@ async def get_support_projects(
 ):
     db = get_db()
 
-    # 1. 기존 matched_policy 결과가 있으면 먼저 반환
-    # 지원사업 페이지를 다시 열 때마다 LLM/vector search를 매번 돌리지 않기 위함
+    # 1. 캐시 우선 조회
     if not refresh:
         try:
             saved_query = (
@@ -855,21 +810,24 @@ async def get_support_projects(
                 .limit(limit)
                 .execute()
             )
-
             saved_rows = getattr(saved_result, "data", []) or []
-
             if saved_rows:
-                policy_ids = [row.get("policy_id") for row in saved_rows if isinstance(row, dict)]
-                policy_details_by_id = fetch_policy_details_by_ids(db, policy_ids)
+                details = fetch_policy_details_by_ids(
+                    db,
+                    [
+                        row.get("policy_id")
+                        for row in saved_rows
+                        if isinstance(row, dict)
+                    ],
+                )
                 policies = [
                     saved_policy_to_response(
                         row,
-                        policy_details_by_id.get(normalize_policy_id(row.get("policy_id"))),
+                        details.get(normalize_policy_id(row.get("policy_id"))),
                     )
                     for row in saved_rows
                     if isinstance(row, dict)
                 ]
-
                 return {
                     "success": True,
                     "data": {
@@ -878,10 +836,10 @@ async def get_support_projects(
                         "source": "matched_policy_cache",
                     },
                 }
-        except Exception as e:
-            print(f"matched_policy 캐시 조회 실패: {e}")
+        except Exception as exc:
+            print(f"matched_policy 캐시 조회 실패: {exc}")
 
-    # 2. 기업 정보 조회
+    # 2. 기업 조회
     try:
         company_result = (
             db.table("company")
@@ -890,18 +848,17 @@ async def get_support_projects(
             .limit(1)
             .execute()
         )
-    except Exception as e:
+    except Exception as exc:
         return JSONResponse(
             status_code=500,
             content={
                 "success": False,
                 "message": "기업 정보를 조회하지 못했습니다.",
-                "error": str(e),
+                "error": str(exc),
             },
         )
 
     company_row = get_first_row(company_result)
-
     if not company_row:
         return JSONResponse(
             status_code=404,
@@ -911,7 +868,6 @@ async def get_support_projects(
             },
         )
 
-    # 3. CompanyContext 생성
     company = CompanyContext(
         company_id=company_row.get("company_id"),
         company_name=company_row.get("company_name") or "",
@@ -933,37 +889,34 @@ async def get_support_projects(
         updated_at=company_row.get("updated_at"),
     )
 
-    # 4. 기존 policy_matching_node 그대로 호출
-    # 노드 구조 변경 없음
+    # 3. 기존 policy_matching_node 호출. graph.py는 전혀 수정하지 않는다.
     state: FactofitState = {
         "user_query": "제조설비 지원사업",
         "intent": "policy",
         "is_safe": True,
         "company_info": company,
         "equipment": None,
-        "equipment_id": equipment_id,      # ← 추가
-        "equipments": [],                  # ← 추가
-        "selected_equipment_id": equipment_id,     # ← 추가
+        "equipment_id": equipment_id,
+        "equipments": [],
+        "selected_equipment_id": equipment_id,
+        "policy_intent_choice": None,
+        "selected_equipment_for_policy": None,
         "matched_policies": [],
-        "policy_intent_choice": None,  # ← 추추가
-        "selected_equipment_for_policy": None, # ← 추추가
-        "selected_policy": None, # ← 추추가
+        "selected_policy": None,
         "roi_result": None,
         "draft_result": None,
-        "draft_context": None,             # ← 추가
+        "draft_context": None,
         "chat_history": [],
         "final_response": "",
         "unsupported_equipment": False,
         "chat_id": None,
-        "safety_dashboard": None,          # ← 추가
-        "options": None # ← 추추추가
+        "safety_dashboard": None,
+        "options": None,
     }
 
     try:
         result_state = await run_policy_node(state)
-
     except asyncio.TimeoutError:
-        # 504로 터뜨리지 않고 프론트가 정상 처리할 수 있게 빈 결과 반환
         return {
             "success": True,
             "data": {
@@ -974,14 +927,13 @@ async def get_support_projects(
                 "message": "지원사업 추천 처리 시간이 오래 걸려 임시로 빈 결과를 반환했습니다.",
             },
         }
-
-    except Exception as e:
+    except Exception as exc:
         return JSONResponse(
             status_code=500,
             content={
                 "success": False,
                 "message": "지원사업 추천 노드 실행 실패",
-                "error": str(e),
+                "error": str(exc),
             },
         )
 
@@ -992,7 +944,7 @@ async def get_support_projects(
         if isinstance(policy, dict)
     ]
 
-    # 5. 기존 matched_policy 삭제 후 새 결과 저장
+    # 4. 새 검색 결과 캐시 저장
     try:
         delete_query = (
             db.table("matched_policy")
@@ -1002,15 +954,11 @@ async def get_support_projects(
         if equipment_id:
             delete_query = delete_query.eq("equipment_id", equipment_id)
         delete_query.execute()
-    except Exception as e:
-        print(f"기존 matched_policy 삭제 실패: {e}")
+    except Exception as exc:
+        print(f"기존 matched_policy 삭제 실패: {exc}")
 
     saved_count = 0
-
     for policy in limited:
-        if not isinstance(policy, dict):
-            continue
-
         try:
             (
                 db.table("matched_policy")
@@ -1032,8 +980,8 @@ async def get_support_projects(
                 .execute()
             )
             saved_count += 1
-        except Exception as e:
-            print(f"matched_policy 저장 실패: {e}")
+        except Exception as exc:
+            print(f"matched_policy 저장 실패: {exc}")
 
     return {
         "success": True,
@@ -1046,7 +994,11 @@ async def get_support_projects(
     }
 
 
-def _count_rows(query) -> int:
+# ============================================================================
+# 정책 요약 라우터
+# ============================================================================
+
+def _count_rows(query: Any) -> int:
     result = query.execute()
     count = getattr(result, "count", None)
     if isinstance(count, int):
@@ -1075,15 +1027,17 @@ def _is_active_policy(row: dict, today: date) -> bool:
         metadata.get("deadline_date"),
     )
 
-    if raw_deadline is None or str(raw_deadline).strip() in {"", "None", "마감일 미정"}:
+    if raw_deadline is None or str(raw_deadline).strip() in {
+        "",
+        "None",
+        "마감일 미정",
+    }:
         return True
 
     try:
-        deadline_date = date.fromisoformat(str(raw_deadline).strip()[:10])
+        return date.fromisoformat(str(raw_deadline).strip()[:10]) >= today
     except ValueError:
         return True
-
-    return deadline_date >= today
 
 
 @router.get("/analyze/policy-summary")
@@ -1103,14 +1057,11 @@ async def get_policy_summary(
         total_policy_count = 0
 
     try:
-        active_result = (
-            db.table("policy")
-            .select("*")
-            .execute()
-        )
-        active_rows = getattr(active_result, "data", []) or []
+        result = db.table("policy").select("*").execute()
         active_policy_count = sum(
-            1 for row in active_rows if isinstance(row, dict) and _is_active_policy(row, today)
+            1
+            for row in (result.data or [])
+            if isinstance(row, dict) and _is_active_policy(row, today)
         )
     except Exception as exc:
         print(f"policy active count 조회 실패: {exc}")
@@ -1124,7 +1075,6 @@ async def get_policy_summary(
         )
         if equipment_id:
             matched_query = matched_query.eq("equipment_id", equipment_id)
-
         matched_policy_count = _count_rows(matched_query)
     except Exception as exc:
         print(f"matched_policy count 조회 실패: {exc}")

@@ -19,6 +19,40 @@ SLEEP_SECONDS = 0.5
 
 # 제조업 관련성 최소 점수
 MIN_RELEVANCE_SCORE = 4
+EXCLUDED_COLLECTION_FIELDS = {
+    "max_employee_count",
+    "min_revenue",
+    "max_revenue",
+    "required_documents_count",
+    "relevance_score",
+    "is_selected",
+    "selected_reason",
+}
+POLICY_PAYLOAD_FIELDS = {
+    "policy_id", "title", "organization", "region", "url",
+    "posted_at", "deadline", "deadline_display", "deadline_note",
+    "policy_category", "policy_subcategory",
+    "service_category", "service_subcategory", "support_method",
+    "industry_codes", "hashtags",
+    "max_amount", "max_amount_actual", "max_amount_note",
+    "max_amount_source", "max_amount_evidence", "amount_extraction_status",
+    "max_amount_status", "max_amount_type", "max_amount_numeric_manwon",
+    "required_documents", "required_documents_json", "required_documents_status",
+    "employee_min", "employee_max",
+    "revenue_min_manwon", "revenue_max_manwon", "revenue_rules",
+    "company_age_min", "company_age_max", "eligible_company_types",
+    "eligibility_text", "eligibility_evidence", "eligibility_extraction_status",
+    "summary", "raw_text", "raw_json", "source_name", "source_id",
+    "created_at",
+}
+
+
+def filter_policy_payload(payload: dict) -> dict:
+    return {
+        key: value
+        for key, value in payload.items()
+        if key in POLICY_PAYLOAD_FIELDS and key not in EXCLUDED_COLLECTION_FIELDS
+    }
 
 
 # =========================
@@ -397,11 +431,6 @@ def normalize_bizinfo_item(item: dict) -> dict:
         "url": item.get("pblancUrl") or "",
         "summary": summary,
 
-        # 기업마당 API에는 정형 필드가 없으므로 None
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
-
         # 기업마당 원본 분류
         "policy_category": item.get("pldirSportRealmLclasCodeNm"),
         "policy_subcategory": item.get("pldirSportRealmMlsfcCodeNm"),
@@ -462,15 +491,16 @@ def upsert_policies(rows: list[dict]):
     if not rows:
         print("저장할 데이터가 없습니다.")
         return
+    clean_rows = [filter_policy_payload(row) for row in rows]
 
     result = (
         supabase
         .table("policy")
-        .upsert(rows, on_conflict="policy_id")
+        .upsert(clean_rows, on_conflict="policy_id")
         .execute()
     )
 
-    print(f"Supabase 저장 완료: {len(rows)}건")
+    print(f"Supabase 저장 완료: {len(clean_rows)}건")
     return result
 
 
@@ -528,18 +558,6 @@ def main():
             # 제조업 관련성이 낮은 공고는 제외
             if score < MIN_RELEVANCE_SCORE:
                 continue
-
-            row["relevance_score"] = score
-            row["is_selected"] = True
-            row["selected_reason"] = "CAPEX 키워드 + 제조업 업종코드 기준 통과"
-
-            # LLM 금액 추출 (실패해도 저장은 계속)
-            amount = extract_amount_with_llm(row.get("summary", ""))
-            if amount is not None:
-                row["max_amount"] = amount
-                row["amount_extraction_status"] = "extracted"
-                row["max_amount_source"] = "llm_summary"
-                print(f"  → LLM 금액 추출: {amount}만원 ({policy_id})")
 
             page_rows.append(row)
 

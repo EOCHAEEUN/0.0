@@ -35,6 +35,38 @@ SUPABASE_SERVICE_ROLE_KEY = (
 DEFAULT_SOURCE_TABLE = os.getenv("POLICY_VALIDATION_TARGET_TABLE", "policy_validation_new").strip()
 DEFAULT_TARGET_TABLE = os.getenv("POLICY_SYNC_TARGET_TABLE", "policy").strip()
 DEFAULT_BATCH_SIZE = int(os.getenv("POLICY_SYNC_BATCH_SIZE", "100"))
+EXCLUDED_COLLECTION_FIELDS = {
+    "max_employee_count",
+    "min_revenue",
+    "max_revenue",
+    "required_documents_count",
+    "relevance_score",
+    "is_selected",
+    "selected_reason",
+}
+POLICY_PAYLOAD_FIELDS = {
+    "policy_id", "title", "organization", "region", "url",
+    "posted_at", "deadline", "deadline_display", "deadline_note",
+    "policy_category", "policy_subcategory",
+    "service_category", "service_subcategory", "support_method",
+    "industry_codes", "hashtags",
+    "max_amount", "max_amount_actual", "max_amount_note",
+    "max_amount_source", "max_amount_evidence", "amount_extraction_status",
+    "max_amount_status", "max_amount_type", "max_amount_numeric_manwon",
+    "required_documents", "required_documents_json", "required_documents_status",
+    "employee_min", "employee_max",
+    "revenue_min_manwon", "revenue_max_manwon", "revenue_rules",
+    "company_age_min", "company_age_max", "eligible_company_types",
+    "eligibility_text", "eligibility_evidence", "eligibility_extraction_status",
+    "summary", "raw_text", "raw_json", "temp_extraction_json",
+    "source_name", "source_id",
+    "support_primary_category", "support_categories", "support_items",
+    "policy_primary_nature", "safety_justification_usable",
+    "safety_justification_strength", "recommended_safety_viewpoints",
+    "application_reflection_recommendation", "safety_justification_reason",
+    "safety_justification_synced_at",
+    "created_at",
+}
 
 AMOUNT_STATUS_CONFIRMED = "\ud655\uc815"
 AMOUNT_STATUS_RATIO_ONLY = "\ube44\uc728 \ud655\uc778"
@@ -59,6 +91,18 @@ def clean_list(value: Any) -> list[str]:
         return [part.strip() for part in value.split(",") if part.strip()]
     text = str(value).strip()
     return [text] if text else []
+
+
+def filter_policy_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: value
+        for key, value in payload.items()
+        if (
+            value is not None
+            and key in POLICY_PAYLOAD_FIELDS
+            and key not in EXCLUDED_COLLECTION_FIELDS
+        )
+    }
 
 
 def numeric_or_none(value: Any) -> int | None:
@@ -131,14 +175,41 @@ def build_deadline_note(row: dict[str, Any]) -> str | None:
     return " / ".join(parts) if parts else None
 
 
-def build_policy_payload(row: dict[str, Any]) -> dict[str, Any] | None:
+def build_policy_payload(
+    row: dict[str, Any],
+    source_table: str = DEFAULT_SOURCE_TABLE,
+) -> dict[str, Any] | None:
     policy_id = clean_text(row.get("policy_id"))
     title = clean_text(row.get("title"))
     organization = clean_text(row.get("organization")) or "기관 미상"
     if not policy_id or not title:
         return None
 
-    max_amount = numeric_or_none(row.get("max_amount_numeric_manwon"))
+    max_amount_type = clean_text(row.get("max_amount_type")).lower()
+    temp_extraction = row.get("temp_extraction_json")
+    roi_direct = (
+        temp_extraction.get("ROI직접차감가능")
+        if isinstance(temp_extraction, dict)
+        else None
+    )
+    is_non_cash = (
+        max_amount_type
+        in {
+            "loan",
+            "non_cash",
+            "융자",
+            "이차보전",
+            "보증",
+            "현물서비스",
+            "공동장비",
+        }
+        or roi_direct is False
+    )
+    max_amount = (
+        None
+        if is_non_cash
+        else numeric_or_none(row.get("max_amount_numeric_manwon"))
+    )
 
     payload: dict[str, Any] = {
         "policy_id": policy_id,
@@ -149,10 +220,14 @@ def build_policy_payload(row: dict[str, Any]) -> dict[str, Any] | None:
         "service_category": row.get("service_category"),
         "service_subcategory": row.get("service_subcategory"),
         "max_amount": max_amount,
-        "max_amount_actual": row.get("max_amount_actual"),
+        "max_amount_actual": (
+            None if is_non_cash else row.get("max_amount_actual")
+        ),
         "max_amount_note": row.get("max_amount_note"),
-        "max_amount_source": "policy_validation_new",
-        "max_amount_evidence": row.get("max_amount_evidence"),
+        "max_amount_source": source_table,
+        "max_amount_evidence": (
+            None if is_non_cash else row.get("max_amount_evidence")
+        ),
         "amount_extraction_status": normalize_amount_status(row.get("max_amount_status"), max_amount),
         "posted_at": date_or_none(row.get("posted_at")),
         "deadline": date_or_none(row.get("deadline")),
@@ -161,7 +236,6 @@ def build_policy_payload(row: dict[str, Any]) -> dict[str, Any] | None:
         "required_documents": row.get("required_documents"),
         "required_documents_json": row.get("required_documents_json"),
         "required_documents_status": row.get("required_documents_status"),
-        "required_documents_count": numeric_or_none(row.get("required_documents_count")),
         "industry_codes": clean_list(row.get("industry_codes")),
         "region": row.get("region"),
         "employee_min": numeric_or_none(row.get("employee_min")),
@@ -177,18 +251,36 @@ def build_policy_payload(row: dict[str, Any]) -> dict[str, Any] | None:
         "eligibility_evidence": row.get("eligibility_evidence"),
         "url": build_policy_url(row),
         "summary": row.get("summary"),
+        "support_primary_category": row.get("support_primary_category"),
+        "support_categories": clean_list(row.get("support_categories")),
+        "support_items": (
+            row.get("support_items")
+            if isinstance(row.get("support_items"), list)
+            else []
+        ),
+        "policy_primary_nature": row.get("policy_primary_nature"),
+        "safety_justification_usable": row.get("safety_justification_usable"),
+        "safety_justification_strength": row.get("safety_justification_strength"),
+        "recommended_safety_viewpoints": row.get("recommended_safety_viewpoints"),
+        "application_reflection_recommendation": row.get("application_reflection_recommendation"),
+        "safety_justification_reason": row.get("safety_justification_reason"),
+        "safety_justification_synced_at": row.get("safety_justification_synced_at"),
         "source_name": row.get("source_name") or "bizinfo",
-        "source_id": policy_id,
+        "source_id": row.get("source_id") or policy_id,
+        "raw_json": row.get("source_api_json"),
+        "temp_extraction_json": (
+            row.get("temp_extraction_json")
+            if isinstance(row.get("temp_extraction_json"), dict)
+            else {}
+        ),
+        "raw_text": row.get("raw_text"),
         "hashtags": clean_list(row.get("hashtags")),
-        "relevance_score": numeric_or_none(row.get("relevance_score")),
-        "is_selected": row.get("is_selected"),
-        "selected_reason": row.get("selected_reason"),
     }
 
     if "support_method" in row:
         payload["support_method"] = row.get("support_method")
 
-    return {key: value for key, value in payload.items() if value is not None}
+    return filter_policy_payload(payload)
 
 
 def fetch_rows(
@@ -226,7 +318,10 @@ def fetch_rows(
 
 def resolve_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Sync policy_validation_new rows into the service policy table."
+        description=(
+            "Promote rows from policy_validation_new or "
+            "policy_external_collected directly into the service policy table."
+        )
     )
     parser.add_argument("--source-table", default=DEFAULT_SOURCE_TABLE)
     parser.add_argument("--target-table", default=DEFAULT_TARGET_TABLE)
@@ -261,7 +356,16 @@ def main() -> None:
         selected_only=args.selected_only,
         limit=args.limit,
     )
-    payloads = [payload for row in rows if (payload := build_policy_payload(row))]
+    payloads = [
+        payload
+        for row in rows
+        if (
+            payload := build_policy_payload(
+                row,
+                source_table=args.source_table,
+            )
+        )
+    ]
 
     print(f"Fetched rows: {len(rows)}")
     print(f"Mapped payloads: {len(payloads)}")
@@ -272,8 +376,7 @@ def main() -> None:
             f"{payload.get('policy_id')} | "
             f"amount={payload.get('max_amount')} | "
             f"status={payload.get('amount_extraction_status')} | "
-            f"deadline={payload.get('deadline') or '-'} | "
-            f"selected={payload.get('is_selected')}"
+            f"deadline={payload.get('deadline') or '-'}"
         )
 
     if not args.execute:

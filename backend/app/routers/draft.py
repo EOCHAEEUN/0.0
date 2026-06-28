@@ -10,6 +10,7 @@ from app.core.database import get_db
 from app.models.auth import CurrentUser
 from app.models.company import CompanyContext
 from app.models.equipment import EquipmentInput
+from app.services.safety_preview import create_safety_preview, get_safety_preview
 from app.state import FactofitState
 
 
@@ -20,6 +21,8 @@ class DraftRequest(BaseModel):
     company_id: str
     equipment_id: str
     policy_id: str
+    analysis_id: str | None = None
+    investment_plan_id: str | None = None
 
 
 def _normalize_industry_code(value: Any) -> list[str]:
@@ -365,6 +368,145 @@ def _build_required_documents(draft_content: dict) -> list[str]:
     ]
 
 
+def _normalize_safety_improvement(preview: dict | None) -> dict:
+    if not preview or preview.get("can_run_safety_logic") is not True:
+        return {
+            "source": "none",
+            "items": [],
+        }
+
+    items = preview.get("safety_preview_items")
+    if not isinstance(items, list):
+        items = []
+
+    return {
+        "source": "safety_viewer_policy",
+        "safety_viewer_policy_id": preview.get("id"),
+        "equipment_name": preview.get("equipment_name"),
+        "equipment_type": preview.get("equipment_type"),
+        "generation_source": preview.get("generation_source"),
+        "usage_status": preview.get("usage_status"),
+        "items": items,
+    }
+
+
+def _find_latest_safety_preview(
+    db: Any,
+    *,
+    policy_id: str,
+    equipment_id: str,
+    investment_plan_id: str | None = None,
+) -> dict | None:
+    query = (
+        db.table("safety_viewer_policy")
+        .select("*")
+        .eq("policy_id", policy_id)
+        .eq("equipment_id", equipment_id)
+        .eq("investment_plan_id", investment_plan_id or "")
+        .order("updated_at", desc=True)
+        .limit(1)
+    )
+    rows = getattr(query.execute(), "data", []) or []
+    return rows[0] if rows else None
+
+
+def _resolve_analysis_id(body: DraftRequest, roi_row: dict | None) -> str:
+    if body.analysis_id:
+        return body.analysis_id
+
+    if roi_row:
+        direct = _safe_text(roi_row.get("analysis_id"))
+        if direct:
+            return direct
+
+        created_at = _safe_text(roi_row.get("created_at"))
+        if created_at:
+            return f"draft-{body.company_id}-{body.equipment_id}-{created_at}"
+
+    return f"draft-{body.company_id}-{body.equipment_id}"
+
+
+def _policy_can_run_safety(policy: dict) -> bool:
+    if policy.get("can_run_safety_logic") is True:
+        return True
+
+    status = _safe_text(policy.get("safety_justification_usable")).lower()
+    return status in {"사용 가능", "조건부 사용 가능", "available", "conditional", "true"}
+
+
+def _load_or_create_safety_improvement(
+    db: Any,
+    *,
+    body: DraftRequest,
+    policy: dict,
+    equipment_data: dict,
+    selected_roi_scenario: dict,
+    roi_row: dict | None,
+    scenario_label: str,
+) -> dict:
+    if not _policy_can_run_safety(policy):
+        return _normalize_safety_improvement(None)
+
+    analysis_id = _resolve_analysis_id(body, roi_row)
+    investment_plan_id = body.investment_plan_id or ""
+
+    preview = None
+    if body.analysis_id:
+        preview = get_safety_preview(
+            analysis_id=analysis_id,
+            policy_id=body.policy_id,
+            equipment_id=body.equipment_id,
+            investment_plan_id=investment_plan_id,
+        )
+
+    if not preview:
+        preview = _find_latest_safety_preview(
+            db,
+            policy_id=body.policy_id,
+            equipment_id=body.equipment_id,
+            investment_plan_id=investment_plan_id,
+        )
+
+    if not preview:
+        preview = create_safety_preview(
+            analysis_id=analysis_id,
+            policy_id=body.policy_id,
+            equipment_id=body.equipment_id,
+            investment_plan_id=investment_plan_id,
+            body={
+                "policy": policy,
+                "equipment": {
+                    "name": equipment_data.get("name"),
+                    "category": equipment_data.get("category"),
+                    "process": equipment_data.get("process"),
+                },
+                "equipment_name": equipment_data.get("name"),
+                "equipment_type": equipment_data.get("category") or equipment_data.get("process"),
+                "roi_context": {
+                    "scenario_label": scenario_label,
+                    "investment_manwon": selected_roi_scenario.get("investment_manwon"),
+                    "subsidy_manwon": selected_roi_scenario.get("subsidy_manwon"),
+                    "payback_years": selected_roi_scenario.get("payback_years"),
+                },
+            },
+        )
+
+    preview_id = preview.get("id") if isinstance(preview, dict) else None
+    if preview_id:
+        try:
+            db.table("safety_viewer_policy").update(
+                {
+                    "usage_status": "draft_used",
+                    "used_in_draft_at": datetime.now().isoformat(),
+                }
+            ).eq("id", preview_id).execute()
+            preview = {**preview, "usage_status": "draft_used"}
+        except Exception as exc:
+            print(f"safety_viewer_policy draft usage update failed: {exc}")
+
+    return _normalize_safety_improvement(preview)
+
+
 def _enrich_draft_content(
     draft_content: Any,
     *,
@@ -375,6 +517,7 @@ def _enrich_draft_content(
     selected_roi_scenario: dict,
     scenario_used: str,
     scenario_label: str,
+    safety_improvement: dict | None = None,
 ) -> dict:
     """
     LLM writes the sentences, but DB is the source of truth for IDs,
@@ -447,6 +590,7 @@ def _enrich_draft_content(
         "business_necessity": business_necessity,
         "expected_effects": expected_effects,
         "required_documents": _build_required_documents(content),
+        "safety_improvement": safety_improvement or _normalize_safety_improvement(None),
         "scenario_used": scenario_used,
         "scenario_label": scenario_label,
         "created_at": datetime.now().isoformat(),
@@ -531,7 +675,8 @@ async def generate_draft(
     if not roi_result.data:
         raise HTTPException(status_code=404, detail="ROI 분석 결과를 찾을 수 없습니다.")
 
-    roi_data = roi_result.data[0].get("roi_data") or {}
+    roi_row = roi_result.data[0]
+    roi_data = roi_row.get("roi_data") or {}
 
     top_policy_result = (
         db.table("matched_policy")
@@ -572,6 +717,16 @@ async def generate_draft(
         "A안 전체교체 적합" if scenario_used == "a" else "B안 부분개선 적합",
     )
 
+    safety_improvement = _load_or_create_safety_improvement(
+        db,
+        body=body,
+        policy=selected_policy,
+        equipment_data=equipment_data,
+        selected_roi_scenario=selected_roi_scenario,
+        roi_row=roi_row,
+        scenario_label=scenario_label,
+    )
+
     state: FactofitState = {
         "user_query": f"{equipment.name} {selected_policy.get('title', '')} 신청서 초안 작성",
         "intent": "draft",
@@ -592,6 +747,8 @@ async def generate_draft(
             "scenario_label": scenario_label,
             "policy": selected_policy,
             "roi_recommended": roi_data.get("recommended"),
+            "safety_improvement": safety_improvement,
+            "safety_management": safety_improvement,
         },
         "chat_history": [],
         "final_response": "",
@@ -622,6 +779,7 @@ async def generate_draft(
         selected_roi_scenario=selected_roi_scenario,
         scenario_used=scenario_used,
         scenario_label=scenario_label,
+        safety_improvement=safety_improvement,
     )
 
     draft_payload = {

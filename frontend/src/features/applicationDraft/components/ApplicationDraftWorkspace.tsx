@@ -1,3 +1,4 @@
+import type { RequiredEvidence } from "../applicationDraft.contract"
 import type { ApplicationDraftModel } from "../hooks/useApplicationDraft"
 import {
   formatManwon,
@@ -8,6 +9,11 @@ import {
   ScenarioToggle,
   StatusBadge,
 } from "./ApplicationDraftShared"
+
+function getEvidenceLabel(evidence: RequiredEvidence): string {
+  if (typeof evidence === "string") return evidence
+  return evidence.label || evidence.base_label || "준비자료 확인 필요"
+}
 
 export function ApplicationDraftWorkspace({
   model,
@@ -103,6 +109,43 @@ export function ApplicationDraftWorkspace({
               ))}
             </ul>
           </div>
+
+          {model.safetyImprovement?.items?.length ? (
+            <div className="ff-card ff-draft-safety-card">
+              <div className="ff-card-head compact">
+                <div>
+                  <span className="ff-mini-label">안전개선 준비 항목</span>
+                  <h3>신청서 활용 안전개선 항목</h3>
+                  <p>
+                    공고 상세 화면에서 생성된 안전개선 준비 항목을 신청서 작성에 활용합니다.
+                  </p>
+                </div>
+              </div>
+
+              <div className="ff-draft-safety-list">
+                {model.safetyImprovement.items.map((item, index) => (
+                  <article className="ff-draft-safety-item" key={`${item.viewpoint_key || "safety"}-${index}`}>
+                    <div>
+                      <strong>{item.viewpoint_title || "안전개선 관점"}</strong>
+                      <span>{item.current_judgement || "검토 필요"}</span>
+                    </div>
+                    <p>{item.description || "선택한 정책과 설비 기준의 안전개선 준비 항목입니다."}</p>
+                    <ul>
+                      {(item.required_evidences || []).slice(0, 4).map((evidence, evidenceIndex) => (
+                        <li key={`${getEvidenceLabel(evidence)}-${evidenceIndex}`}>
+                          {getEvidenceLabel(evidence)}
+                        </li>
+                      ))}
+                    </ul>
+                  </article>
+                ))}
+              </div>
+
+              <p className="ff-draft-safety-note">
+                증빙 업로드 기능은 이후 신청서 첨부 단계에서 연결합니다.
+              </p>
+            </div>
+          ) : null}
         </div>
 
         <div className="ff-card ff-draft-preview-card">

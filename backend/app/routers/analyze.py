@@ -61,6 +61,46 @@ def _policy_value(policy: dict, key: str, default=None):
     return default
 
 
+def _resolve_can_run_safety_logic(status: Any) -> bool:
+    if isinstance(status, bool):
+        return status
+    if status is None:
+        return False
+
+    normalized = str(status).strip().lower()
+    return normalized in {
+        "사용 가능",
+        "조건부 사용 가능",
+        "available",
+        "conditional",
+        "true",
+        "1",
+        "yes",
+        "y",
+    }
+
+
+def _resolve_policy_safety_logic(policy: dict) -> bool:
+    metadata = _as_dict(policy.get("metadata"))
+    status = _first_value(
+        policy.get("safety_justification_usable"),
+        policy.get("usage_status"),
+        policy.get("availability"),
+        policy.get("display_status"),
+        policy.get("policy_status"),
+        policy.get("classification"),
+        metadata.get("safety_justification_usable"),
+        metadata.get("usage_status"),
+        metadata.get("availability"),
+        metadata.get("display_status"),
+        metadata.get("policy_status"),
+        metadata.get("classification"),
+        policy.get("can_run_safety_logic"),
+        metadata.get("can_run_safety_logic"),
+    )
+    return _resolve_can_run_safety_logic(status)
+
+
 def _policy_id(policy: dict):
     metadata = _as_dict(policy.get("metadata"))
     return _first_value(
@@ -212,6 +252,11 @@ def _format_policy_for_frontend(policy: dict) -> dict:
         policy.get("scenario_label"),
         metadata.get("scenario_label"),
     )
+    safety_justification_usable = _first_value(
+        policy.get("safety_justification_usable"),
+        metadata.get("safety_justification_usable"),
+    )
+    can_run_safety_logic = _resolve_policy_safety_logic(policy)
     match_score = _first_value(
         policy.get("match_score"),
         policy.get("hybrid_score"),
@@ -251,6 +296,8 @@ def _format_policy_for_frontend(policy: dict) -> dict:
         "llm_score": llm_score,
         "scenario_match": scenario_match,
         "scenario_label": scenario_label,
+        "safety_justification_usable": safety_justification_usable,
+        "can_run_safety_logic": can_run_safety_logic,
         "match_score": match_score,
         "hybrid_score": hybrid_score,
         "final_score": final_score,
@@ -279,6 +326,8 @@ def _format_policy_for_frontend(policy: dict) -> dict:
         "llm_score": llm_score,
         "scenario_match": scenario_match,
         "scenario_label": scenario_label,
+        "safety_justification_usable": safety_justification_usable,
+        "can_run_safety_logic": can_run_safety_logic,
         "match_score": match_score,
         "hybrid_score": hybrid_score,
         "final_score": final_score,
@@ -781,12 +830,26 @@ def saved_policy_to_response(row: dict, policy_detail: Optional[dict] = None) ->
         or row_metadata.get("scenario_label")
         or policy_detail.get("scenario_label")
     )
+    safety_justification_usable = _first_value(
+        policy_detail.get("safety_justification_usable"),
+        policy_metadata.get("safety_justification_usable"),
+        row.get("safety_justification_usable"),
+        row_metadata.get("safety_justification_usable"),
+    )
     match_score = (
         row.get("match_score")
         if row.get("match_score") is not None
         else row_metadata.get("match_score")
         if row_metadata.get("match_score") is not None
         else policy_detail.get("match_score")
+    )
+    can_run_safety_logic = _resolve_policy_safety_logic(
+        {
+            **policy_detail,
+            **row,
+            "safety_justification_usable": safety_justification_usable,
+            "metadata": {**policy_metadata, **row_metadata},
+        }
     )
 
     merged_metadata = {
@@ -800,6 +863,8 @@ def saved_policy_to_response(row: dict, policy_detail: Optional[dict] = None) ->
         "llm_score": llm_score,
         "scenario_match": scenario_match,
         "scenario_label": scenario_label,
+        "safety_justification_usable": safety_justification_usable,
+        "can_run_safety_logic": can_run_safety_logic,
         "matched_policy_created_at": row.get("created_at"),
     }
 
@@ -814,6 +879,8 @@ def saved_policy_to_response(row: dict, policy_detail: Optional[dict] = None) ->
         "llm_score": llm_score,
         "scenario_match": scenario_match,
         "scenario_label": scenario_label,
+        "safety_justification_usable": safety_justification_usable,
+        "can_run_safety_logic": can_run_safety_logic,
         "matched_policy_created_at": row.get("created_at"),
         "metadata": merged_metadata,
     }

@@ -586,7 +586,252 @@
   padding-left: 18px;
 }
 
+.ff-policy-safety-preview {
+  margin-top: 16px;
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(6, 27, 52, 0.05);
+}
+
+.ff-policy-safety-preview-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+.ff-safety-status-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #e8f5ef;
+  color: #0b7a53;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.ff-policy-safety-preview h3 {
+  margin: 12px 0 6px;
+  color: #061b34;
+  font-size: 18px;
+  line-height: 1.35;
+  font-weight: 950;
+}
+
+.ff-policy-safety-preview p {
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.65;
+  font-weight: 800;
+}
+
+.ff-policy-safety-table-wrap {
+  width: 100%;
+  overflow: visible;
+}
+
+.ff-policy-safety-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: visible;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.ff-policy-safety-table th,
+.ff-policy-safety-table td {
+  padding: 13px 14px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+  vertical-align: top;
+}
+
+.ff-policy-safety-table th {
+  background: #f8fafc;
+  color: #475467;
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 950;
+}
+
+.ff-policy-safety-table td {
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.65;
+  font-weight: 800;
+}
+
+.ff-policy-safety-table tr:last-child td {
+  border-bottom: none;
+}
+
+.ff-policy-safety-table th:nth-child(1),
+.ff-policy-safety-table td:nth-child(1) {
+  width: 64px;
+  color: #061b34;
+  font-weight: 950;
+}
+
+.ff-policy-safety-table th:nth-child(2),
+.ff-policy-safety-table td:nth-child(2) {
+  width: 220px;
+  color: #061b34;
+  font-weight: 950;
+}
+
+.ff-policy-safety-table-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  white-space: nowrap;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.ff-policy-safety-table-badge.needs-improvement {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #e65f00;
+}
+
+.ff-policy-safety-table-badge.planned {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #0047a0;
+}
+
+.ff-policy-safety-table-badge.missing {
+  border-color: #fbcfe8;
+  background: #fdf2f8;
+  color: #be185d;
+}
+
+.ff-policy-safety-table-badge.partial {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #a16207;
+}
+
+.ff-policy-safety-evidence-popover {
+  position: relative;
+  display: inline-flex;
+  width: fit-content;
+  z-index: 30;
+}
+
+.ff-policy-safety-evidence-count {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 26px;
+  align-items: center;
+  white-space: nowrap;
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #0047a0;
+  padding: 0 9px;
+  font-size: 11px;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.ff-policy-safety-description {
+  max-width: 520px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.5 !important;
+}
+
+.ff-policy-safety-evidence-tooltip {
+  position: absolute;
+  z-index: 80;
+  left: 0;
+  top: calc(100% + 8px);
+  display: none;
+  min-width: 220px;
+  max-width: 320px;
+  padding: 12px 14px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.16);
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.ff-policy-safety-evidence-tooltip strong {
+  display: block;
+  margin-bottom: 7px;
+  color: #061b34;
+  font-size: 12px;
+  font-weight: 950;
+}
+
+.ff-policy-safety-evidence-tooltip ul {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.ff-policy-safety-evidence-tooltip li {
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.55;
+  font-weight: 800;
+}
+
+.ff-policy-safety-evidence-popover:hover .ff-policy-safety-evidence-tooltip,
+.ff-policy-safety-evidence-popover:focus-within .ff-policy-safety-evidence-tooltip {
+  display: block;
+}
+
+.ff-policy-safety-table tr:hover {
+  position: relative;
+  z-index: 40;
+}
+
+.ff-policy-safety-preview-note {
+  margin-top: 14px !important;
+  padding: 12px 14px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #0047a0 !important;
+}
+
+.ff-policy-safety-preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+
 @media (max-width: 900px) {
+  .ff-policy-safety-table-wrap {
+    overflow-x: auto;
+    overflow-y: visible;
+  }
+
+  .ff-policy-safety-table {
+    overflow: visible;
+  }
+
   .ff-policy-hero {
     grid-template-columns: 1fr;
     padding: 36px 28px;

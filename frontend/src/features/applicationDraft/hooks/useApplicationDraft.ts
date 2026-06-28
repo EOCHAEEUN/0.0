@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from "react"
 import type {
   ChecklistItem,
   DraftStatus,
+  RequiredEvidence,
+  SafetyImprovement,
+  SafetyImprovementItem,
   ScenarioKey,
   StatusTone,
 } from "../applicationDraft.contract"
@@ -24,6 +27,7 @@ type DraftContent = {
   business_necessity?: string | null
   expected_effects?: string | null
   required_documents?: string[] | null
+  safety_improvement?: SafetyImprovement | null
   scenario_used?: string | null
   scenario_label?: string | null
   policy_id?: string | null
@@ -50,6 +54,8 @@ type DraftParams = {
   companyId: string
   equipmentId: string
   policyId: string
+  analysisId?: string
+  investmentPlanId?: string
 }
 
 type ReadinessPart = {
@@ -123,6 +129,66 @@ function readListFromAliases(source: Dict, aliases: string[]): string[] {
   return []
 }
 
+function normalizeRequiredEvidences(value: unknown): RequiredEvidence[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((item): RequiredEvidence | null => {
+      if (typeof item === "string") return item.trim()
+      const record = asDict(item)
+      if (!record) return null
+      return {
+        label: readText(record.label),
+        base_label: readText(record.base_label),
+        context: readText(record.context),
+        safety_rule_id: readText(record.safety_rule_id),
+        safety_rule_title: readText(record.safety_rule_title),
+        evidence_type: readText(record.evidence_type),
+      }
+    })
+    .filter((item): item is RequiredEvidence => {
+      if (item === null) return false
+      if (typeof item === "string") return item.length > 0
+      return Boolean(item.label || item.base_label)
+    })
+}
+
+function normalizeSafetyImprovementItem(value: unknown): SafetyImprovementItem | null {
+  const item = asDict(value)
+  if (!item) return null
+
+  return {
+    no: readNumber(item.no),
+    viewpoint_key: readText(item.viewpoint_key),
+    viewpoint_title: readText(item.viewpoint_title),
+    current_judgement: readText(item.current_judgement),
+    required_evidence_count: readNumber(item.required_evidence_count),
+    required_evidences: normalizeRequiredEvidences(item.required_evidences),
+    matched_safety_rule_ids: asStringList(item.matched_safety_rule_ids),
+    matched_rule_titles: asStringList(item.matched_rule_titles),
+    description: readText(item.description),
+  }
+}
+
+function normalizeSafetyImprovement(value: unknown): SafetyImprovement | null {
+  const source = asDict(value)
+  if (!source) return null
+
+  const rawItems = Array.isArray(source.items) ? source.items : []
+  const items = rawItems
+    .map(normalizeSafetyImprovementItem)
+    .filter((item): item is SafetyImprovementItem => Boolean(item))
+
+  return {
+    source: readText(source.source),
+    safety_viewer_policy_id: readText(source.safety_viewer_policy_id),
+    equipment_name: readText(source.equipment_name),
+    equipment_type: readText(source.equipment_type),
+    generation_source: readText(source.generation_source),
+    usage_status: readText(source.usage_status),
+    items,
+  }
+}
+
 function normalizeDraftObject(source: Dict): DraftContent {
   const nested = asDict(source.content)
   const merged = nested ? { ...source, ...nested } : source
@@ -179,6 +245,7 @@ function normalizeDraftObject(source: Dict): DraftContent {
       "required documents",
       "제출 서류",
     ]),
+    safety_improvement: normalizeSafetyImprovement(merged.safety_improvement),
   } as DraftContent
 }
 
@@ -372,12 +439,29 @@ function resolveDraftParams(locationState: unknown): DraftParams | null {
     readLocalStorage("selected_policy_id") ||
     readLocalStorage("policy_id")
 
+  const analysisId =
+    pickText(state, ["analysisId", "analysis_id"]) ||
+    pickText(selectedProjectFromState, ["analysisId", "analysis_id"]) ||
+    pickText(selectedProjectFromStorage, ["analysisId", "analysis_id"]) ||
+    pickText(analysisData, ["analysisId", "analysis_id"]) ||
+    readLocalStorage("factofit_analysis_id") ||
+    readLocalStorage("analysis_id")
+
+  const investmentPlanId =
+    pickText(state, ["investmentPlanId", "investment_plan_id"]) ||
+    pickText(selectedProjectFromState, ["investmentPlanId", "investment_plan_id"]) ||
+    pickText(selectedProjectFromStorage, ["investmentPlanId", "investment_plan_id"]) ||
+    readLocalStorage("factofit_investment_plan_id") ||
+    readLocalStorage("investment_plan_id")
+
   if (!companyId || !equipmentId || !policyId) return null
 
   return {
     companyId,
     equipmentId,
     policyId,
+    analysisId,
+    investmentPlanId,
   }
 }
 
@@ -614,6 +698,8 @@ export function useApplicationDraft(locationState: unknown) {
             company_id: params.companyId,
             equipment_id: params.equipmentId,
             policy_id: params.policyId,
+            analysis_id: params.analysisId || undefined,
+            investment_plan_id: params.investmentPlanId || undefined,
           }),
         })
 
@@ -713,6 +799,9 @@ export function useApplicationDraft(locationState: unknown) {
   )
 
   const requiredDocuments = asStringList(draft?.required_documents)
+  const safetyImprovement =
+    normalizeSafetyImprovement(draft?.safety_improvement) ??
+    normalizeSafetyImprovement(apiData?.draft_result && asDict(apiData.draft_result)?.safety_improvement)
 
   const aiReasons = asStringList(draft?.ai_reasons)
 
@@ -816,6 +905,7 @@ export function useApplicationDraft(locationState: unknown) {
     readinessScore,
     aiReasons,
     requiredDocuments,
+    safetyImprovement,
     checklistItems,
     industryText,
     roiText,

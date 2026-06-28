@@ -28,9 +28,6 @@ POLICIES = [
         "region": None,
         "url": COMMON_URL,
         "summary": "국내 중소·중견 제조기업의 제조공정 최적화를 위해 스마트공장 솔루션, 자동화장비, 제어기, 센서 구축을 지원. 최대 2억원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "mss-2026-002",
@@ -43,9 +40,6 @@ POLICIES = [
         "region": None,
         "url": COMMON_URL,
         "summary": "국가 전략산업 및 산업안전 분야 중소·중견 제조기업을 대상으로 스마트공장 구축과 R&D, 인증, 판로, 컨설팅 등을 연계 지원. 최대 2억원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "mss-2026-003",
@@ -58,9 +52,6 @@ POLICIES = [
         "region": "지역특화형 사업 참여 지자체 소재 제조기업",
         "url": COMMON_URL,
         "summary": "지역 특화산업 육성과 지역 현안 해결을 위해 지자체와 정부가 매칭하여 스마트공장 구축을 지원. 고도화 기준 최대 2억원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "mss-2026-004",
@@ -73,9 +64,6 @@ POLICIES = [
         "region": "지역특화 프로젝트 레전드50+ 선정기업",
         "url": COMMON_URL,
         "summary": "지역특화 프로젝트 레전드50+에 선정된 제조기업을 대상으로 고도화 수준의 스마트공장 구축을 지원. 최대 5억원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "mss-2026-005",
@@ -88,9 +76,6 @@ POLICIES = [
         "region": None,
         "url": COMMON_URL,
         "summary": "도약 프로그램 선정 중소 제조기업의 스마트공장 구축을 지원하여 제조혁신과 글로벌 경쟁력 확보를 지원. 최대 5억원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "mss-2026-006",
@@ -103,9 +88,6 @@ POLICIES = [
         "region": None,
         "url": COMMON_URL,
         "summary": "AI·디지털트윈 기반 실시간 관제, 분석, 예측 등 작업자 개입을 최소화하는 자율형공장 구축을 지원. 최대 2년, 최대 6억원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "mss-2026-007",
@@ -118,9 +100,6 @@ POLICIES = [
         "region": None,
         "url": COMMON_URL,
         "summary": "AI에이전트, 온디바이스AI 등을 활용해 공정최적화와 예측유지보수를 지원하는 AI 스마트공장 구축 지원. 최대 2억원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "mss-2026-008",
@@ -133,9 +112,6 @@ POLICIES = [
         "region": None,
         "url": COMMON_URL,
         "summary": "대기업·중견기업·공공기관 등과 중소·중견기업이 협력하여 스마트공장을 구축할 경우 정부가 구축비 일부를 지원. 최대 1.2억원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "mss-2026-009",
@@ -148,9 +124,6 @@ POLICIES = [
         "region": None,
         "url": COMMON_URL,
         "summary": "민관 협업을 통해 중소·중견 제조기업의 AI 기반 스마트공장 구축을 지원. 최대 5억원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "mss-2026-010",
@@ -163,9 +136,6 @@ POLICIES = [
         "region": None,
         "url": COMMON_URL,
         "summary": "5개 이상 중소·중견 제조기업 컨소시엄을 대상으로 공장 간 데이터 기반 협업 시스템과 개별 스마트공장 구축을 지원. 컨소시엄당 최대 10억원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "mss-2026-011",
@@ -178,9 +148,6 @@ POLICIES = [
         "region": None,
         "url": COMMON_URL,
         "summary": "R&D로 개발된 공급기술을 활용하여 중소·중견 제조기업의 고도화 스마트공장 구축과 로봇 등 도입을 지원. 최대 5억원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "mss-2026-012",
@@ -193,9 +160,6 @@ POLICIES = [
         "region": None,
         "url": COMMON_URL,
         "summary": "제조기업의 생산성 향상과 제조경쟁력 강화를 위해 로봇 도입, 공정설계 컨설팅, 안전 컨설팅 등을 패키지로 지원. 최대 2.5억원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "mss-2026-013",
@@ -208,9 +172,6 @@ POLICIES = [
         "region": None,
         "url": COMMON_URL,
         "summary": "제조기업의 생산성 제고와 인력 부족 해소를 위해 노동부하가 높은 수작업 공정을 대상으로 자동화설비 구축을 지원. 최대 9,500만원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "mss-2026-014",
@@ -223,9 +184,6 @@ POLICIES = [
         "region": None,
         "url": COMMON_URL,
         "summary": "중소·중견 제조기업의 스마트화 수준진단을 지원하고 수준확인서와 진단보고서를 제공. 수준확인 비용 전액 지원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "mss-2026-015",
@@ -238,9 +196,6 @@ POLICIES = [
         "region": None,
         "url": COMMON_URL,
         "summary": "제조솔루션 공급기업의 클라우드 전환 및 다수 제조솔루션 통합형 클라우드 패키지 개발을 지원. 통합형 기준 최대 8억원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "mss-2026-016",
@@ -253,9 +208,6 @@ POLICIES = [
         "region": None,
         "url": COMMON_URL,
         "summary": "제조혁신 전문가를 활용해 스마트공장 사전기획, 구축지도, AX기획, 사후관리 등 전주기 컨설팅과 유지보수를 지원. 사후관리 기준 최대 1,900만원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "mss-2026-017",
@@ -268,9 +220,6 @@ POLICIES = [
         "region": None,
         "url": COMMON_URL,
         "summary": "중소 제조현장의 AI 전환을 촉진하기 위해 공정혁신형, 지역주력산업형, 수요형 AI 제품·서비스 상용화를 지원. 최대 30억원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "mss-2026-018",
@@ -283,9 +232,6 @@ POLICIES = [
         "region": None,
         "url": COMMON_URL,
         "summary": "중소·중견 제조기업이 보유한 제조데이터를 AI·빅데이터 분석용으로 가공, 품질검증, 상품등록할 수 있도록 지원. 최대 5,000만원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "mss-2026-019",
@@ -298,9 +244,6 @@ POLICIES = [
         "region": None,
         "url": COMMON_URL,
         "summary": "중소 제조업의 공정·품질 최적화를 위한 Multi AI Agent 기술개발 PoC를 지원. 2026년 PoC 기준 최대 3억원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "mss-2026-020",
@@ -313,9 +256,6 @@ POLICIES = [
         "region": None,
         "url": COMMON_URL,
         "summary": "중소기업의 제조공정 애로 해결을 위해 제조현장진단과 공정최적화·고도화 R&D를 지원. R&D 기준 최대 10억원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
 ]
 
@@ -331,9 +271,6 @@ ENERGY_POLICIES = [
         "region": None,
         "url": "https://www.energy.or.kr/front/conts/105002004002000.do",
         "summary": "중소·중견기업 사업장을 대상으로 고효율 설비·시스템 설치와 절감량 성과 계측을 지원. 최대 3억원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "energy-2026-002",
@@ -346,9 +283,6 @@ ENERGY_POLICIES = [
         "region": None,
         "url": "https://www.energy.or.kr/front/conts/105002001002000.do",
         "summary": "연간 에너지사용량 500toe 이상 산업계 중소·중견사업장을 대상으로 공정 설비의 에너지관리시스템(EMS) 보급과 효율개선을 지원. 최대 2억원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "energy-2026-003",
@@ -361,9 +295,6 @@ ENERGY_POLICIES = [
         "region": None,
         "url": "https://www.energy.or.kr/front/board/View2.do?boardMngNo=2&boardNo=24349",
         "summary": "연간 에너지사용량 300toe 이상 중소·중견기업을 대상으로 에너지진단을 무상 지원하고 보조사업·자금지원 인센티브를 제공.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "energy-2026-004",
@@ -376,9 +307,6 @@ ENERGY_POLICIES = [
         "region": None,
         "url": "https://www.welfarehello.com/policy/c53b93d3-94d2-41fa-ac77-da17932398e8",
         "summary": "유압·하이브리드 사출성형기 보유 사업장을 대상으로 전동식 사출성형기 교체를 지원. 플라스틱 성형업과 직접 관련성이 높음.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
 ]
 
@@ -396,9 +324,6 @@ RELIABILITY_POLICIES = [
         "region": None,
         "url": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000120908",
         "summary": "국내 중소·중견 소재·부품·장비 기업을 대상으로 신뢰성 평가, 고장분석, 평가기반 개발, 물성·성능 분석, 소재 공정 테스트베드 등 연구개발기관의 서비스를 바우처 방식으로 지원. 수시형 1차 기준 기업당 최대 2,000만원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "pyeongtaek-testcert-2026-001",
@@ -413,9 +338,6 @@ RELIABILITY_POLICIES = [
         "region": "경기도 평택시",
         "url": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000119460",
         "summary": "평택 관내 중소 제조기업을 대상으로 제품 시험·분석, 성능·품질 검사·평가 및 인증 취득에 소요되는 비용을 지원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "daegu-motor-testbed-2026-001",
@@ -430,9 +352,6 @@ RELIABILITY_POLICIES = [
         "region": "대구 지역 내·외 모빌리티 모터 유관 소부장 기업",
         "url": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000119718",
         "summary": "모빌리티 모터 유관 소재·부품·장비 분야 중소·중견기업을 대상으로 시제품 제작, 성능평가인증, 전문가 활용 애로기술지도를 지원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
 ]
 
@@ -450,9 +369,6 @@ MASS_PRODUCTION_POLICIES = [
         "region": None,
         "url": "https://www.iris.go.kr/contents/retrieveBsnsAncmView.do?ancmId=018004&bsnsAncmSn=1&bsnsYyDetail=2026",
         "summary": "국내 소재·부품·장비 공급기업 또는 수요기업을 대상으로 기술개발이 완료된 소재·부품·장비를 실제 양산라인 등에서 평가·검증하도록 지원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "gyeonggi-fabless-massprod-2026-001",
@@ -467,9 +383,6 @@ MASS_PRODUCTION_POLICIES = [
         "region": "경기도 소재 팹리스 기업",
         "url": "https://thevc.kr/grants/77b4c48e49f55bea2721b261",
         "summary": "경기도 소재 팹리스 기업을 주관기관으로 하여 양산성능 평가·검증, 인증 획득, 수율 개선, 공정 최적화 등 사업화 연계 비용을 지원. 과제당 최대 3억원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "hwaseong-semicon-demo-2026-001",
@@ -484,9 +397,6 @@ MASS_PRODUCTION_POLICIES = [
         "region": "경기도 화성시",
         "url": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000120002",
         "summary": "화성시 관내 반도체 소재·부품·장비 중소·중견기업을 대상으로 시제품 개발 및 제작에 필요한 인건비, 재료비, 시험·평가비, 전문가 활용비 등을 지원. 기업당 최대 4,000만원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "hwaseong-supplychain-rnd-2026-001",
@@ -501,9 +411,6 @@ MASS_PRODUCTION_POLICIES = [
         "region": "경기도 화성시",
         "url": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000118624",
         "summary": "화성시 관내 제조업 중소기업을 대상으로 공급망 안정화를 위한 기술개발 및 사업화 비용을 지원. 재료비, 시험·평가비, 전문가 활용비 등을 포함.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
 ]
 
@@ -521,9 +428,6 @@ EQUIPMENT_POLICIES = [
         "region": None,
         "url": "https://www.follaw.co.kr/subsidy/B41000200018?content=eligibility",
         "summary": "유압·하이브리드식 사출성형기를 전동식 사출성형기로 교체하는 고객 또는 사업자를 대상으로 고효율 기기 교체 지원금을 지급.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "root-seoul-automation-2026-001",
@@ -538,9 +442,6 @@ EQUIPMENT_POLICIES = [
         "region": "서울특별시",
         "url": "https://www.bizinfo.go.kr/cmm/fms/fileDown.do?atchFileId=FILE_000000000747260&fileSn=0",
         "summary": "서울시 뿌리기업과 기계금속 소공인의 노후화된 제조환경에 자동화 공정을 지원하여 생산성 향상을 돕는 사업.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "gyeongbuk-root-autonomous-2026-001",
@@ -555,9 +456,6 @@ EQUIPMENT_POLICIES = [
         "region": "경상북도",
         "url": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000120537",
         "summary": "경북지역 중소·중견 뿌리업종 기업을 대상으로 연구인력, 첨단연구장비, 지식재산권 등 연구자원을 활용해 제조공정 자율제조 전환과 애로기술 해결을 지원.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
     {
         "policy_id": "press-safety-2026-001",
@@ -572,9 +470,6 @@ EQUIPMENT_POLICIES = [
         "region": None,
         "url": "https://bizinfo.go.kr/cmm/fms/fileDown.do?atchFileId=FILE_000000000754015&fileSn=2",
         "summary": "고위험 산업 사업장의 사고위험 개선을 지원하는 사업으로, 뿌리산업 지원품목 예시에 프레스 및 전단기 방호장치, 사출성형기 안전장치 및 자동화 설비가 포함됨.",
-        "max_employee_count": None,
-        "min_revenue": None,
-        "max_revenue": None,
     },
 ]
 #각 리스트 따로 실행 혹은 리스트 + 리스트 실행가능

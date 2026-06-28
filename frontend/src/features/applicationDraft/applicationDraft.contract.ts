@@ -23,6 +23,40 @@ export type DraftResult = {
   business_necessity?: string | null
   expected_effects?: string | null
   required_documents?: string[] | null
+  safety_improvement?: SafetyImprovement | null
+}
+
+export type SafetyImprovementItem = {
+  no?: number | null
+  viewpoint_key?: string | null
+  viewpoint_title?: string | null
+  current_judgement?: string | null
+  required_evidence_count?: number | null
+  required_evidences?: RequiredEvidence[] | null
+  matched_safety_rule_ids?: string[] | null
+  matched_rule_titles?: string[] | null
+  description?: string | null
+}
+
+export type RequiredEvidence =
+  | string
+  | {
+      label?: string | null
+      base_label?: string | null
+      context?: string | null
+      safety_rule_id?: string | null
+      safety_rule_title?: string | null
+      evidence_type?: string | null
+    }
+
+export type SafetyImprovement = {
+  source?: string | null
+  safety_viewer_policy_id?: string | null
+  equipment_name?: string | null
+  equipment_type?: string | null
+  generation_source?: string | null
+  usage_status?: string | null
+  items?: SafetyImprovementItem[] | null
 }
 
 export type CompanyInfo = {

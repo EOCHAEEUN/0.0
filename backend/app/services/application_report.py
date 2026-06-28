@@ -294,6 +294,79 @@ def _draft_sections(draft_content: Any) -> dict:
     return nested if isinstance(nested, dict) else draft_content
 
 
+def _normalize_safety_improvement_for_report(value: Any) -> dict:
+    if not isinstance(value, dict):
+        return {"source": "none", "items": []}
+
+    items: list[dict] = []
+    for raw_item in value.get("items") or []:
+        if not isinstance(raw_item, dict):
+            continue
+        evidences = raw_item.get("required_evidences") or []
+        if not isinstance(evidences, list):
+            evidences = []
+        rules = raw_item.get("matched_rules") or []
+        if not isinstance(rules, list):
+            rules = []
+        normalized_evidences: list[Any] = []
+        for evidence in evidences:
+            if isinstance(evidence, dict):
+                normalized_evidences.append(evidence)
+            elif evidence:
+                normalized_evidences.append(str(evidence))
+
+        items.append(
+            {
+                "no": raw_item.get("no"),
+                "viewpoint_key": raw_item.get("viewpoint_key") or "",
+                "viewpoint_title": raw_item.get("viewpoint_title") or raw_item.get("title") or "",
+                "current_judgement": raw_item.get("current_judgement") or raw_item.get("status") or "",
+                "description": raw_item.get("description") or raw_item.get("reason") or "",
+                "required_evidences": normalized_evidences,
+                "matched_rules": [rule for rule in rules if isinstance(rule, dict)],
+            }
+        )
+
+    return {
+        "source": value.get("source") or "draft_result",
+        "safety_viewer_policy_id": value.get("safety_viewer_policy_id"),
+        "can_run_safety_logic": bool(value.get("can_run_safety_logic")),
+        "items": items,
+    }
+
+
+def _load_safety_improvement_fallback(
+    db: Any,
+    *,
+    policy_id: str,
+    equipment_id: str,
+) -> dict:
+    if not policy_id or not equipment_id:
+        return {"source": "none", "items": []}
+
+    preview = _first(
+        db.table("safety_viewer_policy")
+        .select("*")
+        .eq("policy_id", policy_id)
+        .eq("equipment_id", equipment_id)
+        .order("updated_at", desc=True)
+        .limit(1)
+        .execute()
+        .data
+    )
+    if not preview:
+        return {"source": "none", "items": []}
+
+    return _normalize_safety_improvement_for_report(
+        {
+            "source": "safety_viewer_policy",
+            "safety_viewer_policy_id": preview.get("id"),
+            "can_run_safety_logic": preview.get("can_run_safety_logic"),
+            "items": preview.get("safety_preview_items") or [],
+        }
+    )
+
+
 def load_application_report_data(
     company_id: str,
     equipment_id: str,
@@ -408,6 +481,15 @@ def load_application_report_data(
     breakdown = scenario.get("breakdown") or {}
     benchmark = roi_data.get("benchmark") or {}
     draft_sections = _draft_sections(draft.get("draft_content"))
+    safety_improvement = _normalize_safety_improvement_for_report(
+        draft_sections.get("safety_improvement")
+    )
+    if not safety_improvement.get("items"):
+        safety_improvement = _load_safety_improvement_fallback(
+            db,
+            policy_id=policy_id,
+            equipment_id=equipment_id,
+        )
 
     investment = _number(scenario.get("investment_manwon"))
     subsidy = _number(scenario.get("subsidy_manwon"))
@@ -872,6 +954,7 @@ def load_application_report_data(
         "breakdown": breakdown,
         "benchmark": benchmark,
         "draft": draft,
+        "safety_improvement": safety_improvement,
         "summary": {
             "company_name": company_name,
             "equipment_name": equipment_name,
@@ -1400,6 +1483,66 @@ def build_application_report_pdf(data: dict) -> bytes:
         story += [
             _paragraph("성과관리 운영체계", subheading),
             _paragraph(summary["performance_governance"], body),
+        ]
+
+    safety_improvement = data.get("safety_improvement") or {}
+    safety_items = safety_improvement.get("items") or []
+    if safety_items:
+        safety_rows = [
+            [
+                _paragraph("안전개선 관점", small),
+                _paragraph("현재 판단", small),
+                _paragraph("준비할 자료", small),
+                _paragraph("설명/근거", small),
+            ]
+        ]
+        for item in safety_items[:6]:
+            evidences = item.get("required_evidences") or []
+            evidence_labels = [
+                (
+                    str(
+                        evidence.get("label")
+                        or evidence.get("base_label")
+                        or evidence.get("title")
+                        or evidence.get("evidence_type")
+                        or ""
+                    ).strip()
+                    if isinstance(evidence, dict)
+                    else str(evidence).strip()
+                )
+                for evidence in evidences
+                if evidence
+            ]
+            safety_rows.append(
+                [
+                    _paragraph(item.get("viewpoint_title") or item.get("viewpoint_key") or "-", body),
+                    _paragraph(item.get("current_judgement") or "-", body),
+                    _paragraph(", ".join([label for label in evidence_labels if label][:4]) or "-", body),
+                    _paragraph(item.get("description") or "-", body),
+                ]
+            )
+        safety_table = Table(
+            safety_rows,
+            colWidths=[36 * mm, 27 * mm, 43 * mm, 64 * mm],
+            repeatRows=1,
+        )
+        safety_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F3F7FA")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#0B1F3A")),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#D9E2EA")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#D9E2EA")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("TOPPADDING", (0, 0), (-1, -1), 7),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ]))
+        story += [
+            _paragraph("안전개선 준비 항목", subheading),
+            _paragraph(
+                "선택 설비와 투자안 기준으로 생성된 안전개선 준비 항목입니다. 실제 증빙 파일 업로드는 이후 신청서 첨부 단계에서 연결합니다.",
+                body,
+            ),
+            safety_table,
+            Spacer(1, 3 * mm),
         ]
 
     budget = [

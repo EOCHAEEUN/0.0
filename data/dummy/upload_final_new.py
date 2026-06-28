@@ -63,7 +63,60 @@ DEFAULT_MAX_PAGES = int(os.getenv("BIZINFO_MAX_PAGES", "10"))
 DEFAULT_MAX_POLICIES = int(os.getenv("MAX_POLICIES", "0"))  # 0 = all
 DEFAULT_DRY_RUN = os.getenv("DRY_RUN", "1").strip() != "0"
 DEFAULT_SLEEP_SECONDS = float(os.getenv("BIZINFO_SLEEP_SECONDS", "0.4"))
-DEFAULT_SEARCH_LCLAS_IDS = os.getenv("BIZINFO_SEARCH_LCLAS_IDS", "01,02,03,07,09")
+EXCLUDED_COLLECTION_FIELDS = {
+    "max_employee_count",
+    "min_revenue",
+    "max_revenue",
+    "required_documents_count",
+    "relevance_score",
+    "is_selected",
+    "selected_reason",
+}
+VALIDATION_PAYLOAD_FIELDS = {
+    "policy_id", "title", "organization", "region", "url",
+    "posted_at", "posted_date_status",
+    "deadline_start_date", "deadline", "deadline_type", "deadline_display",
+    "deadline_status", "is_early_close_possible",
+    "policy_category", "policy_subcategory",
+    "service_category", "service_subcategory", "support_method",
+    "industry_codes", "hashtags",
+    "max_amount_actual", "max_amount_status", "max_amount_type",
+    "max_amount_numeric_manwon", "max_amount_evidence", "max_amount_note",
+    "required_documents", "required_documents_json", "required_documents_status",
+    "employee_min", "employee_max",
+    "revenue_min_manwon", "revenue_max_manwon", "revenue_rules",
+    "company_age_min", "company_age_max", "eligible_company_types",
+    "eligibility_text", "eligibility_evidence", "eligibility_extraction_status",
+    "source_name", "source_id", "source_api_json",
+    "detail_text", "attachment_text", "attachment_files", "raw_text",
+    "summary", "temp_extraction_json",
+    "collection_status", "extraction_status", "error_message",
+    "collected_at", "created_at", "updated_at",
+    "has_capex_keyword", "has_manufacturing_code",
+}
+NON_CASH_AMOUNT_KEYWORDS = {
+    "융자": "융자한도",
+    "대출": "대출한도",
+    "이차보전": "이차보전",
+    "이자지원": "이자지원",
+    "운전자금": "운전자금 한도",
+    "시설자금": "시설자금 한도",
+}
+NON_CASH_SERVICE_KEYWORDS = [
+    "컨설팅 지원", "진단 지원", "에너지진단",
+    "공동장비", "공동활용", "장비 활용", "장비활용",
+    "시험분석", "시험·분석", "현물지원",
+]
+CASH_SUPPORT_KEYWORDS = [
+    "현금지원", "보조금", "지원금 지급", "정부지원금",
+    "국비 지원", "사업비 지원", "비용을 지원", "바우처",
+]
+AMOUNT_LLM_CACHE_PATH = Path(
+    os.getenv(
+        "AMOUNT_LLM_CACHE_PATH",
+        str(SCRIPT_DIR.parent / "cache" / "policy_amount_llm_cache.json"),
+    )
+)
 
 if not SUPABASE_URL:
     raise ValueError("SUPABASE_URL is missing from .env files.")
@@ -210,14 +263,6 @@ REGIONS = [
     "경기", "강원", "충북", "충남", "전북", "전남", "경북", "경남", "제주",
 ]
 
-BIZINFO_SEARCH_LCLAS_NAMES = {
-    "01": "금융",
-    "02": "기술",
-    "03": "인력",
-    "07": "경영",
-    "09": "기타",
-}
-
 INDUSTRY_CODE_MAP = {
     "제조": ["C"],
     "스마트공장": ["C"],
@@ -249,9 +294,7 @@ MANUFACTURING_KEYWORDS = [
     "제조데이터", "제조AI", "제조로봇", "로봇", "자동화",
     "설비", "장비", "기자재",
     "기술개발", "R&D", "사업화", "시제품", "실증",
-    "제품고급화", "제품고도화", "제품화", "인증", "시험", "신뢰성", "성능평가",
-    "공동장비", "장비활용", "금형", "설계", "가공", "생산기술",
-    "제조인력", "전문인력", "제조데이터", "양산",
+    "제품고급화", "인증", "시험", "신뢰성", "성능평가",
     "에너지효율", "고효율", "탄소중립", "온실가스", "에너지절감",
     "금속", "플라스틱", "사출", "프레스", "CNC",
     "기계", "부품", "소부장", "뿌리",
@@ -268,18 +311,6 @@ CAPEX_KEYWORDS = [
     "자동화설비", "로봇자동화", "노후", "교체",
     "에너지효율", "에너지절감", "고효율", "CAPEX",
 ]
-
-SUPPORT_METHOD_KEYWORDS = {
-    "현금지원": ["보조금", "지원금", "국비 지원", "바우처", "사업비 지원"],
-    "공동장비": ["공동장비", "공동활용", "장비 활용", "시설 이용", "공동연구실"],
-    "컨설팅멘토링": ["컨설팅", "멘토링", "자문", "전문가 매칭", "코칭"],
-    "기술개발": ["R&D", "기술개발", "시제품", "실증", "사업화"],
-    "시험인증": ["시험", "인증", "신뢰성", "성능평가", "검증"],
-    "교육": ["교육", "연수", "세미나", "워크숍"],
-    "판로수출": ["판로", "수출", "해외 마케팅", "바이어", "해외진출"],
-    "에너지효율": ["에너지효율", "에너지절감", "고효율", "탄소중립", "온실가스"],
-    "스마트공장": ["스마트공장", "스마트제조"],
-}
 
 POSTED_DATE_KEYS = [
     "pblancRegistDt",
@@ -1607,7 +1638,7 @@ def refine_required_documents_with_llm(
 # -----------------------------------------------------------------------------
 # Bizinfo API and detail page
 # -----------------------------------------------------------------------------
-def fetch_bizinfo(page_index: int, page_unit: int, search_lclas_id: str) -> list[dict[str, Any]]:
+def fetch_bizinfo(page_index: int, page_unit: int) -> list[dict[str, Any]]:
     url = "https://www.bizinfo.go.kr/uss/rss/bizinfoApi.do"
     params = {
         "crtfcKey": BIZINFO_API_KEY,
@@ -1615,12 +1646,11 @@ def fetch_bizinfo(page_index: int, page_unit: int, search_lclas_id: str) -> list
         "searchCnt": page_unit,
         "pageUnit": page_unit,
         "pageIndex": page_index,
-        "searchLclasId": search_lclas_id,
+        "searchLclasId": "02",
     }
 
     response = requests.get(url, params=params, headers=HEADERS, timeout=30)
-    category_name = BIZINFO_SEARCH_LCLAS_NAMES.get(search_lclas_id, search_lclas_id)
-    print(f"[기업마당 API] category={search_lclas_id}({category_name}) page={page_index} status={response.status_code}")
+    print(f"[기업마당 API] page={page_index} status={response.status_code}")
     response.raise_for_status()
 
     data = response.json()
@@ -1947,11 +1977,8 @@ def split_hashtags(raw: Any) -> list[str]:
 def infer_industry_codes(text: str) -> list[str]:
     codes: set[str] = set()
     for keyword, mapped_codes in INDUSTRY_CODE_MAP.items():
-        if keyword not in text:
-            continue
-        if keyword in BROAD_INDUSTRY_KEYWORDS and not has_industry_context(text, keyword):
-            continue
-        codes.update(mapped_codes)
+        if keyword in text:
+            codes.update(mapped_codes)
     return sorted(codes)
 
 
@@ -1973,89 +2000,22 @@ def extract_region(text: str, title: str = "", organization: str = "") -> str | 
     return None
 
 
-def classify_support_method_rule_based(text: str) -> list[str]:
-    return [
-        category
-        for category, keywords in SUPPORT_METHOD_KEYWORDS.items()
-        if any(keyword in text for keyword in keywords)
-    ]
-
-
-def extract_support_method_with_llm(source: str) -> list[str] | None:
-    if not llm or not HumanMessage or not SystemMessage:
-        return None
-
-    prompt = f"""
-아래 정부지원사업 원문을 읽고, 이 공고가 실제로 제공하는 지원방식을 아래 9개 중에서 모두 골라주세요(해당 없으면 빈 배열).
-
-카테고리: 현금지원, 공동장비, 컨설팅멘토링, 기술개발, 시험인증, 교육, 판로수출, 에너지효율, 스마트공장
-
-규칙:
-- 원문에 근거가 있는 카테고리만 선택하세요.
-- 여러 개 해당되면 전부 포함하세요.
-- JSON 객체 하나만 출력하세요.
-
-출력 형식:
-{{"support_method": ["현금지원", "기술개발"]}}
-
-원문:
-{source[:8000]}
-"""
-    try:
-        response = llm.invoke(
-            [
-                SystemMessage(
-                    content=(
-                        "당신은 정부지원사업 지원방식을 분류하는 데이터 검수자입니다. "
-                        "원문 근거가 없으면 빈 배열로 두고 JSON만 출력합니다."
-                    )
-                ),
-                HumanMessage(content=prompt),
-            ]
-        )
-        parsed = extract_json_object(response.content)
-        if not parsed:
-            return None
-        result = parsed.get("support_method")
-        if not isinstance(result, list):
-            return None
-        return [category for category in result if category in SUPPORT_METHOD_KEYWORDS]
-    except Exception as exc:
-        print(f"  - support_method LLM extraction failed: {exc}")
-        return None
-
-
-def extract_support_method(search_text: str, use_llm: bool = True) -> list[str]:
-    matched = classify_support_method_rule_based(search_text)
-    if matched:
-        return matched
-    if use_llm:
-        llm_result = extract_support_method_with_llm(search_text[:8000])
-        if llm_result:
-            return llm_result
-    return []
-
-
 def classify_service_category(text: str) -> tuple[str, str | None]:
     if any(k in text for k in ["스마트공장", "스마트제조", "제조데이터", "제조AI", "AI융합"]):
         return "스마트공장", "제조 디지털화"
     if any(k in text for k in ["제조로봇", "로봇자동화", "로봇", "자동화"]):
         return "설비/자동화", "로봇·자동화"
-    if any(k in text for k in ["공동장비", "공동활용", "장비 활용", "장비활용", "시설 이용", "시설이용"]):
-        return "공동장비", "장비·시설 활용"
     if any(k in text for k in ["공정개선", "공정", "생산성", "제품고급화", "품질개선"]):
         return "공정개선", "생산성·품질개선"
     if any(k in text for k in ["에너지효율", "고효율", "탄소중립", "온실가스", "에너지절감", "에너지"]):
         return "에너지효율", "탄소중립·효율화"
     if any(k in text for k in ["시험", "인증", "신뢰성", "성능평가", "검증"]):
         return "시험/인증", "성능·신뢰성"
-    if any(k in text for k in ["R&D", "기술개발", "공동기술개발", "시제품", "실증", "사업화", "제품고도화", "제품화", "생산기술"]):
+    if any(k in text for k in ["R&D", "기술개발", "공동기술개발", "시제품", "실증", "사업화"]):
         return "R&D/사업화", "기술개발·실증"
-    if any(k in text for k in ["제조인력", "전문인력", "생산인력", "인력양성", "현장인력"]):
-        return "인력지원", "제조 전문인력"
     if any(k in text for k in ["설비", "장비", "기자재"]):
         return "설비/장비", "장비도입·활용"
-    if any(k in text for k in ["제조", "금형", "설계", "가공", "금속", "플라스틱", "사출", "프레스", "CNC", "기계", "부품", "소부장", "뿌리"]):
+    if any(k in text for k in ["제조", "금속", "플라스틱", "사출", "프레스", "CNC", "기계", "부품", "소부장", "뿌리"]):
         return "제조지원", "제조업 일반"
     return "기술지원", None
 
@@ -2242,7 +2202,6 @@ def build_service_fields(
     item: dict[str, Any],
     raw_fields: dict[str, Any],
     source_fields: dict[str, Any],
-    use_llm: bool = True,
 ) -> dict[str, Any]:
     summary = clean_text(source_fields.get("_original_summary"), 4000)
     hashtags_raw = clean_text(item.get("hashtags") or item.get("hashTags"))
@@ -2266,7 +2225,6 @@ def build_service_fields(
     )
     policy_category, policy_subcategory = normalize_policy_category(item)
     service_category, service_subcategory = classify_service_category(search_text)
-    support_method = extract_support_method(search_text, use_llm=use_llm)
     relevance_score = calculate_relevance_score({
         "title": source_fields.get("title"),
         "summary": summary,
@@ -2286,18 +2244,12 @@ def build_service_fields(
         "policy_subcategory": policy_subcategory,
         "service_category": service_category,
         "service_subcategory": service_subcategory,
-        "support_method": support_method,
         "industry_codes": industry_codes,
         "region": region,
         "hashtags": hashtags,
-        "relevance_score": relevance_score,
         "has_capex_keyword": capex,
         "has_manufacturing_code": manufacturing,
-        "is_selected": True,
-        "selected_reason": (
-            f"relevance_score={relevance_score}; "
-            f"has_capex_keyword={capex}; has_manufacturing_code={manufacturing}"
-        ),
+        "_relevance_score": relevance_score,
     }
 
 
@@ -2311,12 +2263,29 @@ def build_extraction_fields(
     detail_text = clean_text(raw_fields.get("raw_text"), 60000)
     summary = clean_text(source_fields.get("_original_summary"), 4000)
     amount_info = extract_amount_info(item, detail_text)
+    non_cash_review = detect_non_cash_amount(
+        detail_text,
+        clean_text(amount_info.get("max_amount_type")),
+    )
+    if non_cash_review:
+        non_cash_review["임시금액_만원"] = amount_info.get(
+            "max_amount_numeric_manwon"
+        )
+        non_cash_review["근거문장"] = amount_info.get("max_amount_evidence")
+        amount_info = {
+            "max_amount_actual": None,
+            "max_amount_status": "확인 필요",
+            "max_amount_type": "non_cash",
+            "max_amount_numeric_manwon": None,
+            "max_amount_evidence": None,
+            "max_amount_note": non_cash_review["검토사유"],
+        }
     required_doc_candidates = extract_required_document_candidates(item, detail_text)
     required_docs = refine_required_documents_with_llm(
         item,
         detail_text,
         required_doc_candidates,
-        use_llm=use_llm_summary,
+        use_llm=False,
     )
     summary_for_db = rewrite_summary_to_five_bullets(
         item=item,
@@ -2327,7 +2296,7 @@ def build_extraction_fields(
         service_category=clean_text(service_fields.get("service_category")),
         service_subcategory=clean_text(service_fields.get("service_subcategory")),
         deadline_display=clean_text(source_fields.get("deadline_display")),
-        use_llm=use_llm_summary,
+        use_llm=False,
     )
 
     return {
@@ -2351,6 +2320,7 @@ def build_extraction_fields(
         "eligibility_text": clean_text(item.get("trgetNm") or detail_text[:1200], 4000),
         "eligibility_evidence": clean_text(item.get("trgetNm") or "", 1200),
         "eligibility_extraction_status": "needs_review",
+        "temp_extraction_json": non_cash_review,
     }
 
 
@@ -2361,7 +2331,7 @@ def build_meta_fields(
     now = datetime.utcnow().isoformat()
     error_message = clean_text(raw_fields.get("_detail_error_message"))
     amount_status = clean_text(extraction_fields.get("max_amount_status"))
-    required_count = int(extraction_fields.get("required_documents_count") or 0)
+    required_count = len(extraction_fields.get("required_documents_json") or [])
     extraction_status = "success"
     if error_message or amount_status == "확인 필요" or required_count == 0:
         extraction_status = "partial"
@@ -2390,12 +2360,7 @@ def build_payload(
         return None
 
     raw_fields = build_raw_content_fields(item, detail_content)
-    service_fields = build_service_fields(
-        item,
-        raw_fields,
-        source_fields,
-        use_llm=use_llm_summary,
-    )
+    service_fields = build_service_fields(item, raw_fields, source_fields)
     extraction_fields = build_extraction_fields(
         item,
         raw_fields,
@@ -2415,7 +2380,7 @@ def build_payload(
     payload.pop("_combined_text", None)
     payload.pop("_detail_error_message", None)
     payload["_filter_context"] = {
-        "relevance_score": payload.get("relevance_score"),
+        "relevance_score": payload.get("_relevance_score"),
         "industry_codes": payload.get("industry_codes"),
         "has_capex_keyword": payload.get("has_capex_keyword"),
         "has_manufacturing_code": payload.get("has_manufacturing_code"),
@@ -2423,50 +2388,20 @@ def build_payload(
     return payload
 
 
-def is_service_candidate(payload: dict[str, Any], min_score: int) -> bool:
-    context = payload.get("_filter_context") or {}
-    if not context.get("has_manufacturing_code"):
-        return False
-    if int(context.get("relevance_score") or 0) < min_score:
-        return False
-
-    policy_track = context.get("policy_track") or "general"
-    if policy_track in {"equipment_core", "energy"}:
-        return bool(context.get("has_capex_keyword"))
-    if policy_track in {
-        "manufacturing_rnd",
-        "quality_support",
-        "equipment_use",
-        "workforce",
-    }:
-        return True
-    return bool(context.get("has_capex_keyword"))
-
-
-def apply_selection_fields(payload: dict[str, Any], include_all: bool, min_score: int) -> None:
-    context = payload.get("_filter_context") or {}
-    selected = True if include_all else is_service_candidate(payload, min_score)
-    payload["is_selected"] = selected
+def should_keep(payload: dict[str, Any], include_all: bool, min_score: int) -> bool:
     if include_all:
-        payload["selected_reason"] = "include_all=true; collected without service-candidate filtering"
-        return
+        return True
 
-    payload["selected_reason"] = (
-        f"relevance_score={context.get('relevance_score')}; "
-        f"has_capex_keyword={context.get('has_capex_keyword')}; "
-        f"has_manufacturing_code={context.get('has_manufacturing_code')}; "
-        f"min_score={min_score}; "
-        f"selected={selected}"
+    context = payload.get("_filter_context") or {}
+    return (
+        context.get("has_capex_keyword")
+        and context.get("has_manufacturing_code")
+        and int(context.get("relevance_score") or 0) >= min_score
     )
 
 
 def strip_internal_fields(payload: dict[str, Any]) -> dict[str, Any]:
     return filter_validation_payload(payload)
-
-
-def parse_search_lclas_ids(raw: str) -> list[str]:
-    ids = [part.strip() for part in (raw or "").split(",") if part.strip()]
-    return ids or ["01", "02", "03", "07", "09"]
 
 
 # -----------------------------------------------------------------------------
@@ -2483,11 +2418,6 @@ def resolve_args() -> argparse.Namespace:
     parser.add_argument("--page-unit", type=int, default=DEFAULT_PAGE_UNIT)
     parser.add_argument("--max-pages", type=int, default=DEFAULT_MAX_PAGES)
     parser.add_argument("--max-policies", type=int, default=DEFAULT_MAX_POLICIES, help="0 means all")
-    parser.add_argument(
-        "--search-lclas-ids",
-        default=DEFAULT_SEARCH_LCLAS_IDS,
-        help="Comma-separated Bizinfo large category ids to collect. Default: 01,02,03,07,09",
-    )
     parser.add_argument("--dry-run", type=int, choices=[0, 1], default=1 if DEFAULT_DRY_RUN else 0)
     parser.add_argument(
         "--mode",
@@ -2497,11 +2427,7 @@ def resolve_args() -> argparse.Namespace:
     )
     parser.add_argument("--sleep", type=float, default=DEFAULT_SLEEP_SECONDS)
     parser.add_argument("--min-score", type=int, default=4)
-    parser.add_argument(
-        "--include-all",
-        action="store_true",
-        help="Mark every collected row as selected. Rows are still collected even without this flag.",
-    )
+    parser.add_argument("--include-all", action="store_true", help="Do not apply CAPEX/manufacturing filters.")
     parser.add_argument("--no-detail", action="store_true", help="Skip detail page fetch and use API response only.")
     parser.add_argument(
         "--no-llm-summary",
@@ -2537,14 +2463,6 @@ def main() -> None:
     print(f"MAX_PAGES: {args.max_pages}")
     print(f"PAGE_UNIT: {args.page_unit}")
     print(f"MAX_POLICIES: {args.max_policies} (0 means all)")
-    search_lclas_ids = parse_search_lclas_ids(args.search_lclas_ids)
-    print(
-        "SEARCH_LCLAS_IDS: "
-        + ", ".join(
-            f"{category_id}({BIZINFO_SEARCH_LCLAS_NAMES.get(category_id, category_id)})"
-            for category_id in search_lclas_ids
-        )
-    )
     print(f"DETAIL_FETCH: {not args.no_detail}")
     print(f"LLM_MODEL: {args.llm_model}")
     print(f"LLM_SUMMARY: {bool(llm) and not args.no_llm_summary}")
@@ -2552,124 +2470,105 @@ def main() -> None:
 
     seen_policy_ids: set[str] = set()
     total_raw = 0
-    total_collected = 0
-    total_selected = 0
+    total_candidates = 0
     success_count = 0
     fail_count = 0
     preview_count = 0
 
-    stop_collecting = False
-    for search_lclas_id in search_lclas_ids:
-        if stop_collecting:
+    for page_index in range(1, args.max_pages + 1):
+        print("\n" + "=" * 80)
+        print(f"[수집] 기업마당 page={page_index}/{args.max_pages}")
+
+        try:
+            items = fetch_bizinfo(page_index=page_index, page_unit=args.page_unit)
+        except Exception as exc:
+            print(f"  [ERROR] API page fetch failed: {exc}")
+            continue
+
+        total_raw += len(items)
+        print(f"  - API rows: {len(items)}")
+
+        if not items:
             break
 
-        category_name = BIZINFO_SEARCH_LCLAS_NAMES.get(search_lclas_id, search_lclas_id)
-        for page_index in range(1, args.max_pages + 1):
-            print("\n" + "=" * 80)
-            print(
-                f"[수집] 기업마당 category={search_lclas_id}({category_name}) "
-                f"page={page_index}/{args.max_pages}"
-            )
+        for item in items:
+            policy_id = clean_text(item.get("pblancId"))
+            if not policy_id or policy_id in seen_policy_ids:
+                continue
+            seen_policy_ids.add(policy_id)
+
+            if args.max_policies > 0 and total_candidates >= args.max_policies:
+                break
 
             try:
-                items = fetch_bizinfo(
-                    page_index=page_index,
-                    page_unit=args.page_unit,
-                    search_lclas_id=search_lclas_id,
+                detail_url = build_detail_url(item)
+                detail_content = (
+                    {
+                        "detail_text": "",
+                        "attachment_text": "",
+                        "attachment_files": [],
+                        "combined_text": "",
+                    }
+                    if args.no_detail
+                    else fetch_detail_content(detail_url)
                 )
-            except Exception as exc:
-                print(f"  [ERROR] API page fetch failed: {exc}")
-                continue
+                payload = build_payload(
+                    item,
+                    detail_content,
+                    use_llm_summary=not args.no_llm_summary,
+                )
 
-            total_raw += len(items)
-            print(f"  - API rows: {len(items)}")
-
-            if not items:
-                break
-
-            for item in items:
-                policy_id = clean_text(item.get("pblancId"))
-                if not policy_id or policy_id in seen_policy_ids:
+                if not payload:
                     continue
-                seen_policy_ids.add(policy_id)
 
-                if args.max_policies > 0 and total_collected >= args.max_policies:
-                    stop_collecting = True
-                    break
+                if not should_keep(payload, include_all=args.include_all, min_score=args.min_score):
+                    continue
 
-                try:
-                    detail_url = build_detail_url(item)
-                    detail_content = (
-                        {
-                            "detail_text": "",
-                            "attachment_text": "",
-                            "attachment_files": [],
-                            "combined_text": "",
-                        }
-                        if args.no_detail
-                        else fetch_detail_content(detail_url)
-                    )
-                    payload = build_payload(
-                        item,
-                        detail_content,
-                        use_llm_summary=not args.no_llm_summary,
-                    )
+                total_candidates += 1
+                context = payload.get("_filter_context") or {}
+                clean_payload = strip_internal_fields(payload)
 
-                    if not payload:
-                        continue
+                print(
+                    f"  [{total_candidates}] {policy_id} | "
+                    f"posted={clean_payload.get('posted_at') or '-'} | "
+                    f"deadline={clean_payload.get('deadline') or clean_payload.get('deadline_display') or '-'} | "
+                    f"score={context.get('relevance_score')}"
+                )
 
-                    apply_selection_fields(payload, include_all=args.include_all, min_score=args.min_score)
+                if dry_run:
+                    preview_count += 1
+                    preview_payload = {
+                        k: v
+                        for k, v in clean_payload.items()
+                        if k not in ("source_api_json", "detail_text", "attachment_text", "raw_text")
+                    }
+                    preview_payload["_raw_lengths"] = {
+                        "detail_text": len(clean_payload.get("detail_text") or ""),
+                        "attachment_text": len(clean_payload.get("attachment_text") or ""),
+                        "raw_text": len(clean_payload.get("raw_text") or ""),
+                    }
+                    print(json.dumps(preview_payload, ensure_ascii=False, indent=2))
+                else:
+                    assert supabase is not None
+                    supabase.table(args.target_table).upsert(
+                        clean_payload,
+                        on_conflict="policy_id",
+                    ).execute()
+                    success_count += 1
 
-                    total_collected += 1
-                    if payload.get("is_selected"):
-                        total_selected += 1
-                    context = payload.get("_filter_context") or {}
-                    clean_payload = strip_internal_fields(payload)
+                time.sleep(args.sleep)
 
-                    print(
-                        f"  [{total_collected}] {policy_id} | "
-                        f"category={search_lclas_id}({category_name}) | "
-                        f"selected={clean_payload.get('is_selected')} | "
-                        f"posted={clean_payload.get('posted_at') or '-'} | "
-                        f"deadline={clean_payload.get('deadline') or clean_payload.get('deadline_display') or '-'} | "
-                        f"score={context.get('relevance_score')}"
-                    )
+            except Exception as exc:
+                fail_count += 1
+                print(f"  [ERROR] {policy_id}: {exc}")
 
-                    if dry_run:
-                        preview_count += 1
-                        preview_payload = {
-                            k: v
-                            for k, v in clean_payload.items()
-                            if k not in ("source_api_json", "detail_text", "attachment_text", "raw_text")
-                        }
-                        preview_payload["_raw_lengths"] = {
-                            "detail_text": len(clean_payload.get("detail_text") or ""),
-                            "attachment_text": len(clean_payload.get("attachment_text") or ""),
-                            "raw_text": len(clean_payload.get("raw_text") or ""),
-                        }
-                        print(json.dumps(preview_payload, ensure_ascii=False, indent=2))
-                    else:
-                        assert supabase is not None
-                        supabase.table(args.target_table).upsert(
-                            clean_payload,
-                            on_conflict="policy_id",
-                        ).execute()
-                        success_count += 1
-
-                    time.sleep(args.sleep)
-
-                except Exception as exc:
-                    fail_count += 1
-                    print(f"  [ERROR] {policy_id}: {exc}")
-
-            if stop_collecting:
-                break
+        if args.max_policies > 0 and total_candidates >= args.max_policies:
+            break
 
     print("\n" + "=" * 80)
     print("Done")
     print(f"Raw API rows: {total_raw}")
-    print(f"Collected rows: {total_collected}")
-    print(f"Selected rows: {total_selected}")
+    print(f"Selected rows: {total_candidates}")
     print(f"Previewed: {preview_count}")
     print(f"Upserted: {success_count}")
     print(f"Failed: {fail_count}")

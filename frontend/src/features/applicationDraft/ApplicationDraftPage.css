@@ -2693,3 +2693,62 @@
   transform: translateY(-1px);
   box-shadow: 0 12px 24px rgba(6,27,52,.09);
 }
+
+.ff-draft-safety-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ff-draft-safety-list {
+  display: grid;
+  gap: 12px;
+}
+
+.ff-draft-safety-item {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.ff-draft-safety-item > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ff-draft-safety-item strong {
+  color: #102033;
+  font-size: 14px;
+}
+
+.ff-draft-safety-item span {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #eaf5ff;
+  color: #115aa3;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ff-draft-safety-item p,
+.ff-draft-safety-note {
+  margin: 0;
+  color: #526174;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.ff-draft-safety-item ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding-left: 18px;
+  color: #334155;
+  font-size: 13px;
+}

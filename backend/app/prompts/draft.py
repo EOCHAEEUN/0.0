@@ -53,4 +53,9 @@ APPLICATION_DRAFT_SYSTEM_PROMPT = """
 
 ## 안전관리 데이터
 {safety_management}
+
+## Safety improvement input rule
+If safety_management contains safety_improvement items, treat them as already generated system facts.
+Do not create new viewpoint_key, required_evidences, or matched rule titles.
+Reflect the provided viewpoint_title, current_judgement, required_evidences, and description naturally in the application purpose, business necessity, expected effects, or required documents.
 """

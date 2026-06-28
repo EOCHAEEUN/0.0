@@ -17,6 +17,40 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 # data/scripts/upload_policies.py 기준
 # data/processed 폴더를 바라봄
 PROCESSED = Path(__file__).parent.parent / "processed"
+EXCLUDED_COLLECTION_FIELDS = {
+    "max_employee_count",
+    "min_revenue",
+    "max_revenue",
+    "required_documents_count",
+    "relevance_score",
+    "is_selected",
+    "selected_reason",
+}
+POLICY_PAYLOAD_FIELDS = {
+    "policy_id", "title", "organization", "region", "url",
+    "posted_at", "deadline", "deadline_display", "deadline_note",
+    "policy_category", "policy_subcategory",
+    "service_category", "service_subcategory", "support_method",
+    "industry_codes", "hashtags",
+    "max_amount", "max_amount_actual", "max_amount_note",
+    "max_amount_source", "max_amount_evidence", "amount_extraction_status",
+    "max_amount_status", "max_amount_type", "max_amount_numeric_manwon",
+    "required_documents", "required_documents_json", "required_documents_status",
+    "employee_min", "employee_max",
+    "revenue_min_manwon", "revenue_max_manwon", "revenue_rules",
+    "company_age_min", "company_age_max", "eligible_company_types",
+    "eligibility_text", "eligibility_evidence", "eligibility_extraction_status",
+    "summary", "raw_text", "raw_json", "source_name", "source_id",
+    "created_at",
+}
+
+
+def filter_policy_payload(payload: dict) -> dict:
+    return {
+        key: value
+        for key, value in payload.items()
+        if key in POLICY_PAYLOAD_FIELDS and key not in EXCLUDED_COLLECTION_FIELDS
+    }
 
 
 def load_policy_files():
@@ -32,7 +66,7 @@ def load_policy_files():
             except json.JSONDecodeError:
                 data["industry_codes"] = [data["industry_codes"]]
 
-        policies.append(data)
+        policies.append(filter_policy_payload(data))
 
     return policies
 

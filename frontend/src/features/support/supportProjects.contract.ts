@@ -24,6 +24,54 @@ export type SupportProject = {
   scenario: ScenarioKey
   scenarioLabel: "전체교체" | "부분교체"
   sourceUrl: string
+  can_run_safety_logic?: boolean
+}
+
+export type SafetyPreviewItem = {
+  no: number
+  viewpoint_key: string
+  viewpoint_title: string
+  current_judgement: string
+  required_evidence_count: number
+  required_evidences: RequiredEvidence[]
+  matched_safety_rule_ids: string[]
+  matched_rule_titles: string[]
+  description: string
+  policy_reason?: string | null
+}
+
+export type RequiredEvidence =
+  | string
+  | {
+      label?: string | null
+      base_label?: string | null
+      context?: string | null
+      safety_rule_id?: string | null
+      safety_rule_title?: string | null
+      evidence_type?: string | null
+    }
+
+export type SafetyPreview = {
+  id?: string
+  analysis_id: string
+  policy_id: string
+  equipment_id?: string | null
+  investment_plan_id?: string | null
+  equipment_name?: string | null
+  equipment_type?: string | null
+  can_run_safety_logic: boolean
+  generated_viewpoints?: Record<string, string>
+  safety_preview_items: SafetyPreviewItem[]
+  required_evidences: RequiredEvidence[]
+  matched_safety_rules: {
+    rule_id?: string
+    title?: string
+    proof_method?: string | null
+  }[]
+  generation_source?: string
+  description_model?: string | null
+  status?: string
+  message?: string
 }
 
 export type ReadinessItem = {
@@ -69,6 +117,13 @@ export type PolicyApiItem = {
   hybrid_score?: number | string
   score?: number | string
   eligible?: boolean
+  can_run_safety_logic?: boolean | string | number | null
+  safety_justification_usable?: string | null
+  usage_status?: string | null
+  availability?: string | null
+  display_status?: string | null
+  policy_status?: string | null
+  classification?: string | null
   scenario_match?: string[] | string | null
   scenario_label?: string | null
   url?: string | null
@@ -134,6 +189,13 @@ export type PolicyApiItem = {
     notice_url?: string | null
     homepage_url?: string | null
     scenario_match?: string[] | string | null
+    can_run_safety_logic?: boolean | string | number | null
+    safety_justification_usable?: string | null
+    usage_status?: string | null
+    availability?: string | null
+    display_status?: string | null
+    policy_status?: string | null
+    classification?: string | null
     scenario_label?: string | null
     reason?: string
     content?: string

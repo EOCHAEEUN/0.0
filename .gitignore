@@ -23,6 +23,8 @@ chroma_db/
 backend/chroma_db/
 backend/backend/chroma_db/
 data/debug_amount_texts/
+data/cache/*.json
+data/cache/*.tmp
 
 # Raw/local artifacts
 data/raw/*.csv

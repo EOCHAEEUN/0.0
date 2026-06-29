@@ -5,7 +5,7 @@ from app.prompts.router import ROUTER_SYSTEM_PROMPT
 from app.state import FactofitState
 
 
-VALID_INTENTS = ["roi", "policy", "draft", "safety", "info_missing", "general"]
+VALID_INTENTS = ["roi", "policy", "draft", "safety", "info_missing"]
 
 
 def _equipment_name(equipment) -> str:

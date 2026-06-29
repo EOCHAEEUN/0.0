@@ -3,6 +3,7 @@ import { Landmark, Zap, Leaf, ShieldCheck, ChevronRight, SlidersHorizontal, Arro
 import type { RoiFormState, ScenarioCard } from "../roi.contract"
 import { colors } from "../roi.constants"
 import { formatMoneyFromManwon, formatPaybackYears } from "../roi.utils"
+import engiBot from "../../../assets/advisor/engi-bot-transparent.png"
 
 // ── design tokens ─────────────────────────────────────────────────────────────
 const C = {
@@ -74,19 +75,40 @@ export function RoiHero({
   return (
     <div
       style={{
-        background: C.navy,
-        borderRadius: "20px",
+        position: "relative",
+        background:
+          "radial-gradient(circle at 86% 20%, rgba(255,255,255,0.16), transparent 23%), linear-gradient(124deg, #0f1d35 0%, #142038 58%, #273348 100%)",
+        borderRadius: "24px",
         overflow: "hidden",
-        marginBottom: "28px",
+        marginBottom: "36px",
+        minHeight: "486px",
+        boxShadow: "0 26px 60px rgba(15,29,53,0.16)",
       }}
     >
+      <img
+        src={engiBot}
+        alt=""
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          top: "72px",
+          right: "56px",
+          width: "min(172px, 18vw)",
+          height: "auto",
+          objectFit: "contain",
+          filter: "drop-shadow(0 18px 28px rgba(0,0,0,0.28))",
+          zIndex: 1,
+        }}
+      />
       {/* top bar */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "18px 32px 0",
+          padding: "25px 40px 0",
+          position: "relative",
+          zIndex: 2,
         }}
       >
         <button
@@ -115,33 +137,51 @@ export function RoiHero({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) minmax(0, 420px)",
-          gap: "48px",
-          padding: "32px 32px 36px",
+          gridTemplateColumns: "minmax(0, 1fr) minmax(360px, 475px)",
+          gap: "56px",
+          padding: "46px 40px 42px",
           alignItems: "center",
+          position: "relative",
+          zIndex: 2,
         }}
       >
         {/* left */}
         <div>
           <p
             style={{
-              color: "rgba(255,255,255,0.38)",
-              fontSize: "11px",
+              display: "inline-flex",
+              alignItems: "center",
+              minHeight: "32px",
+              padding: "0 17px",
+              borderRadius: "999px",
+              border: "1px solid rgba(255,235,174,0.38)",
+              color: "#fff2b6",
+              fontSize: "13px",
               fontWeight: 900,
-              letterSpacing: "0.16em",
-              marginBottom: "14px",
+              letterSpacing: "0.08em",
+              marginBottom: "18px",
             }}
           >
-            ROI ANALYSIS
+            FACTOFIT AI ENGI
+          </p>
+          <p
+            style={{
+              color: "rgba(255,255,255,0.46)",
+              fontSize: "15px",
+              fontWeight: 900,
+              marginBottom: "18px",
+            }}
+          >
+            ROI 분석 결과
           </p>
           <h1
             style={{
               color: "#ffffff",
-              fontSize: "clamp(22px, 2.6vw, 30px)",
-              fontWeight: 900,
-              lineHeight: 1.2,
-              letterSpacing: "-0.03em",
-              marginBottom: "14px",
+              fontSize: "clamp(34px, 4.1vw, 46px)",
+              fontWeight: 950,
+              lineHeight: 1.16,
+              letterSpacing: "-0.05em",
+              marginBottom: "20px",
             }}
           >
             {equipmentName} 투자 검토
@@ -149,10 +189,10 @@ export function RoiHero({
           <p
             style={{
               color: "#93c5fd",
-              fontSize: "clamp(15px, 1.6vw, 18px)",
-              fontWeight: 900,
-              lineHeight: 1.4,
-              marginBottom: "10px",
+              fontSize: "clamp(18px, 2vw, 24px)",
+              fontWeight: 950,
+              lineHeight: 1.45,
+              marginBottom: "14px",
             }}
           >
             지원사업 반영 시, {scenarioLabel}를 우선 검토하세요.
@@ -160,10 +200,10 @@ export function RoiHero({
           <p
             style={{
               color: "rgba(255,255,255,0.55)",
-              fontSize: "14px",
+              fontSize: "clamp(16px, 1.55vw, 19px)",
               lineHeight: 1.7,
-              fontWeight: 800,
-              maxWidth: "440px",
+              fontWeight: 850,
+              maxWidth: "600px",
             }}
           >
             지원금 반영 효과와 설비 개선 범위를 함께 고려했을 때 현재 조건에서는{" "}
@@ -189,7 +229,7 @@ export function RoiHero({
                 gap: "8px",
                 minHeight: "48px",
                 padding: "0 22px",
-                borderRadius: "12px",
+                borderRadius: "10px",
                 border: "0",
                 background: C.blue,
                 color: "#ffffff",
@@ -219,7 +259,7 @@ export function RoiHero({
                 gap: "8px",
                 minHeight: "48px",
                 padding: "0 22px",
-                borderRadius: "12px",
+                borderRadius: "10px",
                 border: "1px solid #F4A340",
                 background: "#F4A340",
                 color: "#16213E",
@@ -239,7 +279,9 @@ export function RoiHero({
           style={{
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
-            gap: "12px",
+            gap: "14px",
+            alignSelf: "end",
+            paddingTop: "120px",
           }}
         >
           {kpis.map((kpi) => (
@@ -248,16 +290,17 @@ export function RoiHero({
               style={{
                 background: "rgba(255,255,255,0.07)",
                 border: "1px solid rgba(255,255,255,0.12)",
-                borderRadius: "14px",
-                padding: "18px 20px",
+                borderRadius: "10px",
+                padding: "22px 20px",
+                minHeight: "96px",
               }}
             >
               <p
                 style={{
                   color: "rgba(255,255,255,0.5)",
-                  fontSize: "12px",
-                  fontWeight: 800,
-                  marginBottom: "8px",
+                  fontSize: "14px",
+                  fontWeight: 900,
+                  marginBottom: "12px",
                 }}
               >
                 {kpi.label}

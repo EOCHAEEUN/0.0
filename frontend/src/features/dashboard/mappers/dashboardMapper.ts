@@ -67,6 +67,9 @@ export type DashboardWorkspace = {
   industryLabel: string
   regionLabel: string
   actionCount: number
+  equipmentCount: number
+  priorityEquipmentCount: number
+  recentAnalysisCount: number
   nearestDeadlineSummary: string
   briefingTitle: string
   recentStatusMessage: string
@@ -746,6 +749,9 @@ function mapWorkspace(
     (item) => item.urgency === "urgent",
   ).length
   const actionCount = urgentActionCount > 0 ? urgentActionCount : status === "empty" ? 0 : 1
+  const equipmentCount = equipments.length
+  const priorityEquipmentCount = status === "empty" ? 0 : equipmentCount
+  const recentAnalysisCount = analysisId ? 1 : 0
   const nearestDeadlineSummary =
     typeof daysRemaining === "number"
       ? `D-${Math.max(0, daysRemaining)} 공고 조건 확인`
@@ -779,6 +785,9 @@ function mapWorkspace(
     industryLabel,
     regionLabel,
     actionCount,
+    equipmentCount,
+    priorityEquipmentCount,
+    recentAnalysisCount,
     nearestDeadlineSummary,
     briefingTitle,
     recentStatusMessage: `${equipmentName} 분석이 완료됐어요.`,

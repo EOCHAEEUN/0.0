@@ -21,10 +21,157 @@
   font-weight: 800;
 }
 
+.ff-dashboard-hero-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.72fr);
+  gap: clamp(32px, 5vw, 72px);
+  min-height: 340px;
+  margin-bottom: 22px;
+  padding: clamp(30px, 4vw, 52px);
+  overflow: hidden;
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 83% 22%, rgba(255, 255, 255, 0.16), transparent 24%),
+    linear-gradient(124deg, #0f1d35 0%, #142038 58%, #273348 100%);
+  color: #ffffff;
+  box-shadow: 0 26px 60px rgba(15, 29, 53, 0.16);
+}
+
+.ff-dashboard-hero-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 90% 8%, rgba(244, 210, 126, 0.18), transparent 18%),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03), transparent 42%);
+}
+
+.ff-dashboard-hero-copy,
+.ff-dashboard-hero-side {
+  position: relative;
+  z-index: 1;
+}
+
+.ff-ai-engi-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  margin-bottom: 22px;
+  padding: 0 17px;
+  border: 1px solid rgba(255, 235, 174, 0.38);
+  border-radius: 999px;
+  color: #fff2b6;
+  font-size: 13px;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+}
+
+.ff-dashboard-hero-eyebrow {
+  margin: 0 0 18px;
+  color: rgba(255, 255, 255, 0.46);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.ff-dashboard-hero-copy h1 {
+  max-width: 720px;
+  margin: 0 0 18px;
+  color: #ffffff;
+  font-size: clamp(32px, 4.2vw, 52px);
+  font-weight: 950;
+  line-height: 1.12;
+  letter-spacing: -0.045em;
+}
+
+.ff-dashboard-hero-copy strong {
+  display: block;
+  margin-bottom: 16px;
+  color: #93c5fd;
+  font-size: clamp(18px, 2vw, 25px);
+  font-weight: 950;
+  line-height: 1.4;
+}
+
+.ff-dashboard-hero-copy p:last-of-type {
+  max-width: 720px;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: clamp(16px, 1.6vw, 19px);
+  font-weight: 850;
+  line-height: 1.75;
+}
+
+.ff-dashboard-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 30px;
+}
+
+.ff-dashboard-hero-actions .ff-workspace-btn {
+  min-height: 48px;
+  padding: 0 22px;
+  border-radius: 10px;
+  font-size: 16px;
+}
+
+.ff-dashboard-hero-actions .ff-workspace-btn.secondary {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+}
+
+.ff-dashboard-hero-side {
+  display: grid;
+  align-content: end;
+  gap: 24px;
+  min-height: 240px;
+}
+
+.ff-dashboard-hero-bot {
+  justify-self: end;
+  width: min(190px, 42vw);
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.28));
+}
+
+.ff-dashboard-hero-kpis {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ff-dashboard-hero-kpi {
+  min-height: 96px;
+  padding: 18px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.075);
+}
+
+.ff-dashboard-hero-kpi span {
+  display: block;
+  margin-bottom: 11px;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.ff-dashboard-hero-kpi strong {
+  color: #ffffff;
+  font-size: clamp(28px, 3vw, 38px);
+  font-weight: 950;
+  line-height: 1;
+  letter-spacing: -0.05em;
+}
+
 .ff-investment-action-card,
 .ff-my-analysis-section {
   border: 1px solid #d9e4f0;
-  border-radius: 8px;
+  border-radius: 14px;
   background: #fff;
   box-shadow: 0 18px 48px rgba(17, 42, 76, 0.08);
 }
@@ -890,9 +1037,23 @@
   }
 
   .ff-action-card-grid,
+  .ff-dashboard-hero-card,
   .ff-engi-strip,
   .ff-analysis-row {
     grid-template-columns: 1fr;
+  }
+
+  .ff-dashboard-hero-card {
+    padding: 28px;
+  }
+
+  .ff-dashboard-hero-side {
+    align-content: start;
+  }
+
+  .ff-dashboard-hero-bot {
+    justify-self: start;
+    width: 132px;
   }
 
   .ff-empty-action,
@@ -944,7 +1105,16 @@
   }
 
   .ff-action-buttons,
+  .ff-dashboard-hero-actions,
   .ff-workspace-btn {
     width: 100%;
+  }
+
+  .ff-dashboard-hero-actions .ff-workspace-btn {
+    justify-content: center;
+  }
+
+  .ff-dashboard-hero-kpis {
+    grid-template-columns: 1fr;
   }
 }

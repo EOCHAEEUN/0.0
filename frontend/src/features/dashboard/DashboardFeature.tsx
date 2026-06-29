@@ -144,6 +144,12 @@ export default function DashboardFeature() {
   const isEmpty = workspace.status === "empty"
   const isDraft = workspace.status === "draft"
   const isCompleted = workspace.status === "completed"
+  const heroKpis = [
+    { label: "관리 설비", value: `${workspace.equipmentCount}대` },
+    { label: "우선 검토 설비", value: `${workspace.priorityEquipmentCount}대` },
+    { label: "지원사업 매칭", value: `${workspace.policySummary.matchedPolicyCount}` },
+    { label: "최근 분석", value: `${workspace.recentAnalysisCount}건` },
+  ]
 
   return (
     <main className="page ff-dashboard-workspace-page">
@@ -154,6 +160,34 @@ export default function DashboardFeature() {
             {error}
           </div>
         )}
+
+        <section className="ff-dashboard-hero-card" aria-label="설비 투자 대시보드 요약">
+          <div className="ff-dashboard-hero-copy">
+            <span className="ff-ai-engi-badge">FACTOFIT AI ENGI</span>
+            <p className="ff-dashboard-hero-eyebrow">설비 투자 대시보드</p>
+            <h1>이번 주, 우선 검토할 설비가 {workspace.actionCount}대 있습니다.</h1>
+            <strong>운영비 · 노후도 · 투자효과를 바탕으로 먼저 확인할 대상을 정리했어요.</strong>
+            <p>
+              {workspace.equipmentName}은(는) 노후도와 유지보수 부담을 기준으로 현재 투자 검토 우선순위가 높습니다.
+            </p>
+            <div className="ff-dashboard-hero-actions">
+              <ActionButton onClick={handleRoiNavigate}>우선 설비 확인하기</ActionButton>
+              <ActionButton variant="secondary" onClick={handleStartAnalysis}>새 ROI 분석하기</ActionButton>
+            </div>
+          </div>
+
+          <div className="ff-dashboard-hero-side">
+            <img className="ff-dashboard-hero-bot" src={engiBot} alt="" aria-hidden="true" />
+            <div className="ff-dashboard-hero-kpis">
+              {heroKpis.map((kpi) => (
+                <div key={kpi.label} className="ff-dashboard-hero-kpi">
+                  <span>{kpi.label}</span>
+                  <strong>{kpi.value}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
 
         <section className={`ff-investment-action-card ${workspace.status}`}>
           <header className="ff-personal-work-header">

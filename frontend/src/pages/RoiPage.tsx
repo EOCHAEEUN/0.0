@@ -4,6 +4,7 @@ import { fetchAnalysisEntryContext } from "../features/onboarding/onboardingAnal
 import { getAnalysisResult } from "../features/onboarding/onboardingState"
 import { hydrateAccountData } from "../services/accountHydration"
 import { Landmark, Zap, Leaf, ShieldCheck, ChevronRight, ArrowLeft, SlidersHorizontal } from "lucide-react"
+import engiBot from "../assets/advisor/engi-bot-transparent.png"
 
 // ── data helpers (unchanged) ──────────────────────────────────────────────────
 function asRecord(v: unknown): Record<string, unknown> {
@@ -364,10 +365,36 @@ export default function RoiPage() {
 
   return (
     <main className="page">
+      <style>{`
+        @media (max-width: 980px) {
+          .roi-result-hero-grid {
+            grid-template-columns: 1fr !important;
+            gap: 28px !important;
+            padding: 36px 28px !important;
+          }
+          .roi-result-hero-bot {
+            position: static !important;
+            width: 128px !important;
+            margin: 18px 28px 0 auto !important;
+            display: block !important;
+          }
+          .roi-result-hero-grid > div:last-child {
+            padding-top: 0 !important;
+          }
+        }
+        @media (max-width: 620px) {
+          .roi-result-hero-grid > div:last-child {
+            grid-template-columns: 1fr !important;
+          }
+          .roi-result-hero-grid button {
+            width: 100%;
+          }
+        }
+      `}</style>
       <section className="section white">
         <div
           style={{
-            width: "min(1080px, calc(100% - 40px))",
+            width: "min(1350px, calc(100% - 44px))",
             margin: "0 auto",
             paddingTop: "28px",
             paddingBottom: "80px",
@@ -376,19 +403,41 @@ export default function RoiPage() {
           {/* ── 1. 네이비 Hero ─────────────────────────────────────────────── */}
           <div
             style={{
-              background: C.navy,
-              borderRadius: "20px",
+              position: "relative",
+              background:
+                "radial-gradient(circle at 86% 20%, rgba(255,255,255,0.16), transparent 23%), linear-gradient(124deg, #0f1d35 0%, #142038 58%, #273348 100%)",
+              borderRadius: "24px",
               overflow: "hidden",
-              marginBottom: "28px",
+              marginBottom: "36px",
+              minHeight: "486px",
+              boxShadow: "0 26px 60px rgba(15,29,53,0.16)",
             }}
           >
+            <img
+              className="roi-result-hero-bot"
+              src={engiBot}
+              alt=""
+              aria-hidden="true"
+              style={{
+                position: "absolute",
+                top: "72px",
+                right: "56px",
+                width: "min(172px, 18vw)",
+                height: "auto",
+                objectFit: "contain",
+                filter: "drop-shadow(0 18px 28px rgba(0,0,0,0.28))",
+                zIndex: 1,
+              }}
+            />
             {/* top bar */}
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                padding: "18px 32px 0",
+                padding: "25px 40px 0",
+                position: "relative",
+                zIndex: 2,
               }}
             >
               <button
@@ -423,35 +472,54 @@ export default function RoiPage() {
 
             {/* hero body */}
             <div
+              className="roi-result-hero-grid"
               style={{
                 display: "grid",
-                gridTemplateColumns: "minmax(0,1fr) minmax(0,380px)",
-                gap: "40px",
-                padding: "28px 32px 36px",
+                gridTemplateColumns: "minmax(0,1fr) minmax(360px,475px)",
+                gap: "56px",
+                padding: "46px 40px 42px",
                 alignItems: "center",
+                position: "relative",
+                zIndex: 2,
               }}
             >
               {/* left */}
               <div>
                 <p
                   style={{
-                    color: "rgba(255,255,255,0.36)",
-                    fontSize: "11px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    minHeight: "32px",
+                    padding: "0 17px",
+                    borderRadius: "999px",
+                    border: "1px solid rgba(255,235,174,0.38)",
+                    color: "#fff2b6",
+                    fontSize: "13px",
                     fontWeight: 900,
-                    letterSpacing: "0.16em",
-                    marginBottom: "14px",
+                    letterSpacing: "0.08em",
+                    marginBottom: "18px",
                   }}
                 >
-                  ROI ANALYSIS
+                  FACTOFIT AI ENGI
+                </p>
+                <p
+                  style={{
+                    color: "rgba(255,255,255,0.46)",
+                    fontSize: "15px",
+                    fontWeight: 900,
+                    marginBottom: "18px",
+                  }}
+                >
+                  ROI 분석 결과
                 </p>
                 <h1
                   style={{
                     color: "#ffffff",
-                    fontSize: "clamp(22px,2.6vw,30px)",
-                    fontWeight: 900,
-                    lineHeight: 1.2,
-                    letterSpacing: "-0.03em",
-                    marginBottom: "14px",
+                    fontSize: "clamp(34px,4.1vw,46px)",
+                    fontWeight: 950,
+                    lineHeight: 1.16,
+                    letterSpacing: "-0.05em",
+                    marginBottom: "20px",
                   }}
                 >
                   {(result as Record<string, unknown>).equipmentName as string || "검토 설비"} 투자 검토
@@ -459,10 +527,10 @@ export default function RoiPage() {
                 <p
                   style={{
                     color: "#93c5fd",
-                    fontSize: "clamp(14px,1.5vw,17px)",
-                    fontWeight: 900,
+                    fontSize: "clamp(18px,2vw,24px)",
+                    fontWeight: 950,
                     lineHeight: 1.45,
-                    marginBottom: heroText.sub ? "10px" : "22px",
+                    marginBottom: heroText.sub ? "14px" : "28px",
                   }}
                 >
                   {heroText.main}
@@ -471,11 +539,11 @@ export default function RoiPage() {
                   <p
                     style={{
                       color: "rgba(255,255,255,0.5)",
-                      fontSize: "14px",
+                      fontSize: "clamp(16px,1.55vw,19px)",
                       lineHeight: 1.7,
-                      fontWeight: 800,
-                      maxWidth: "400px",
-                      marginBottom: "22px",
+                      fontWeight: 850,
+                      maxWidth: "600px",
+                      marginBottom: "26px",
                     }}
                   >
                     {heroText.sub}
@@ -487,27 +555,28 @@ export default function RoiPage() {
                     alignItems: "center",
                     gap: "12px",
                     flexWrap: "wrap",
+                    marginTop: heroText.sub ? 0 : "4px",
                   }}
                 >
                   <button
-                  type="button"
-                  onClick={() => navigate(`/analysis/${draftId}/policies`)}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "8px",
-                    minHeight: "48px",
-                    padding: "0 22px",
-                    borderRadius: "12px",
-                    border: 0,
-                    background: C.blue,
-                    color: "#ffffff",
-                    fontSize: "16px",
-                    fontWeight: 900,
-                    cursor: "pointer",
-                  }}
-                >
+                    type="button"
+                    onClick={() => navigate(`/analysis/${draftId}/policies`)}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      minHeight: "48px",
+                      padding: "0 22px",
+                      borderRadius: "10px",
+                      border: 0,
+                      background: C.blue,
+                      color: "#ffffff",
+                      fontSize: "16px",
+                      fontWeight: 900,
+                      cursor: "pointer",
+                    }}
+                  >
                     지원사업 상세보기
                     <ChevronRight size={16} />
                   </button>
@@ -530,7 +599,7 @@ export default function RoiPage() {
                       gap: "8px",
                       minHeight: "48px",
                       padding: "0 22px",
-                      borderRadius: "12px",
+                      borderRadius: "10px",
                       border: "1px solid #F4A340",
                       background: "#F4A340",
                       color: "#16213E",
@@ -551,7 +620,9 @@ export default function RoiPage() {
                 style={{
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr",
-                  gap: "12px",
+                  gap: "14px",
+                  alignSelf: "end",
+                  paddingTop: "120px",
                 }}
               >
                 {[
@@ -565,16 +636,17 @@ export default function RoiPage() {
                     style={{
                       background: "rgba(255,255,255,0.07)",
                       border: "1px solid rgba(255,255,255,0.12)",
-                      borderRadius: "14px",
-                      padding: "18px 16px",
+                      borderRadius: "10px",
+                      padding: "22px 20px",
+                      minHeight: "96px",
                     }}
                   >
                     <p
                       style={{
                         color: "rgba(255,255,255,0.45)",
-                        fontSize: "12px",
-                        fontWeight: 800,
-                        marginBottom: "8px",
+                        fontSize: "14px",
+                        fontWeight: 900,
+                        marginBottom: "12px",
                       }}
                     >
                       {kpi.label}
@@ -582,9 +654,9 @@ export default function RoiPage() {
                     <p
                       style={{
                         color: kpi.accent ?? "#ffffff",
-                        fontSize: "clamp(18px,2vw,24px)",
-                        fontWeight: 900,
-                        letterSpacing: "-0.03em",
+                        fontSize: "clamp(28px,3vw,34px)",
+                        fontWeight: 950,
+                        letterSpacing: "-0.05em",
                         lineHeight: 1,
                         marginBottom: kpi.sub ? "6px" : 0,
                       }}

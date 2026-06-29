@@ -1,14 +1,91 @@
-import { useLocation, useNavigate } from "react-router-dom"
+import { useMemo } from "react"
+import { useLocation, useNavigate, useParams } from "react-router-dom"
 import { ApplicationDraftChecklistDialog } from "./components/ApplicationDraftChecklistDialog"
 import { ApplicationDraftHero } from "./components/ApplicationDraftHero"
 import { ApplicationDraftPdfPreview } from "./components/ApplicationDraftPdfPreview"
 import { ApplicationDraftWorkspace } from "./components/ApplicationDraftWorkspace"
 import { useApplicationDraft } from "./hooks/useApplicationDraft"
+import { LoadingPolicyState, ErrorPolicyState } from "../support/components/SupportProjectStates"
+import { useSupportProjects } from "../support/hooks/useSupportProjects"
+import type { SupportProject } from "../support/supportProjects.contract"
+
+function findProjectByRouteId(projects: SupportProject[], policyId?: string) {
+  const decodedId = decodeURIComponent(policyId || "")
+  return projects.find((project) => String(project.rawId || project.id) === decodedId) || null
+}
 
 export function ApplicationDraftFeature() {
   const navigate = useNavigate()
   const location = useLocation()
-  const draft = useApplicationDraft(location.state)
+  const { id, policyId } = useParams()
+  const routeAnalysisId = id && id !== "latest" ? id : undefined
+  const support = useSupportProjects({ analysisId: routeAnalysisId })
+  const routeProject = useMemo(
+    () => findProjectByRouteId(support.policyCards, policyId),
+    [policyId, support.policyCards],
+  )
+  const routeState = useMemo(
+    () => ({
+      analysisId: routeAnalysisId,
+      policyId,
+      selectedProject: routeProject,
+    }),
+    [policyId, routeAnalysisId, routeProject],
+  )
+  const draft = useApplicationDraft(location.state, routeState)
+  const isAnalysisPolicyRoute = Boolean(routeAnalysisId && policyId)
+
+  if (isAnalysisPolicyRoute && support.policyState === "loading") {
+    return (
+      <main className="page ff-draft-page">
+        <section className="section white">
+          <div className="container">
+            <LoadingPolicyState />
+          </div>
+        </section>
+      </main>
+    )
+  }
+
+  if (isAnalysisPolicyRoute && support.policyState === "error") {
+    return (
+      <main className="page ff-draft-page">
+        <section className="section white">
+          <div className="container">
+            <ErrorPolicyState onBackToRoi={() => navigate(`/analysis/${id}/policies`)} />
+          </div>
+        </section>
+      </main>
+    )
+  }
+
+  if (isAnalysisPolicyRoute && support.policyState === "success" && !routeProject) {
+    return (
+      <main className="page ff-draft-page">
+        <section className="section white">
+          <div className="container">
+            <button
+              type="button"
+              onClick={() => navigate(`/analysis/${id}/policies`)}
+              className="ff-draft-back-button"
+            >
+              ← 맞춤 지원사업 목록
+            </button>
+            <div className="section-head">
+              <div>
+                <div className="screen-tag">FACTOFIT APPLICATION DRAFT</div>
+                <div className="label">POLICY NOT FOUND</div>
+                <h2>선택한 지원사업 정보를 찾지 못했습니다.</h2>
+              </div>
+              <p className="section-desc">
+                이 분석 이력의 정책 스냅샷에 없는 지원사업입니다. 목록에서 다시 선택해주세요.
+              </p>
+            </div>
+          </div>
+        </section>
+      </main>
+    )
+  }
 
   if (draft.analysisData.draft_params === null && !draft.analysisData.isLoading) {
     return (
@@ -62,10 +139,14 @@ export function ApplicationDraftFeature() {
         <div className="container">
           <button
             type="button"
-            onClick={() => navigate("/support-projects")}
+            onClick={() =>
+              isAnalysisPolicyRoute
+                ? navigate(`/analysis/${id}/policies/${encodeURIComponent(policyId || "")}`)
+                : navigate("/support-projects")
+            }
             className="ff-draft-back-button"
           >
-            ← 지원사업 목록으로 돌아가기
+            {isAnalysisPolicyRoute ? "← 지원사업 상세로 돌아가기" : "← 지원사업 목록으로 돌아가기"}
           </button>
 
           <div className="section-head">

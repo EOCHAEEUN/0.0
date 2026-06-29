@@ -52,6 +52,12 @@ type DraftParams = {
   policyId: string
 }
 
+type RoutePolicyContext = {
+  analysisId?: string
+  policyId?: string
+  selectedProject?: unknown
+}
+
 type ReadinessPart = {
   key: string
   label: string
@@ -338,32 +344,48 @@ function getSelectedProjectFromStorage() {
   )
 }
 
-function resolveDraftParams(locationState: unknown): DraftParams | null {
+function resolveDraftParams(
+  locationState: unknown,
+  routeContext?: RoutePolicyContext,
+): DraftParams | null {
   const state = asDict(locationState)
   const selectedProjectFromState = getSelectedProjectFromState(locationState)
   const selectedProjectFromStorage = getSelectedProjectFromStorage()
   const analysisData = getStoredAnalysisData()
+  const routePolicyId = readText(routeContext?.policyId)
+  const isAnalysisPolicyRoute = Boolean(routeContext?.analysisId && routePolicyId)
+  const routeProject = asDict(routeContext?.selectedProject) ?? selectedProjectFromState ?? null
+
+  if (isAnalysisPolicyRoute && !routeProject) return null
 
   const companyId =
     pickText(state, ["companyId", "company_id"]) ||
+    pickText(routeProject, ["companyId", "company_id"]) ||
     pickText(selectedProjectFromState, ["companyId", "company_id"]) ||
-    pickText(selectedProjectFromStorage, ["companyId", "company_id"]) ||
+    (!isAnalysisPolicyRoute ? pickText(selectedProjectFromStorage, ["companyId", "company_id"]) : "") ||
     pickText(analysisData.company, ["company_id", "companyId"]) ||
     readLocalStorage("factofit_company_id") ||
     readLocalStorage("company_id")
 
   const equipmentId =
     pickText(state, ["equipmentId", "equipment_id", "selectedEquipmentId"]) ||
+    pickText(routeProject, [
+      "equipmentId",
+      "equipment_id",
+      "selectedEquipmentId",
+    ]) ||
     pickText(selectedProjectFromState, [
       "equipmentId",
       "equipment_id",
       "selectedEquipmentId",
     ]) ||
-    pickText(selectedProjectFromStorage, [
-      "equipmentId",
-      "equipment_id",
-      "selectedEquipmentId",
-    ]) ||
+    (!isAnalysisPolicyRoute
+      ? pickText(selectedProjectFromStorage, [
+          "equipmentId",
+          "equipment_id",
+          "selectedEquipmentId",
+        ])
+      : "") ||
     pickText(analysisData.equipment, ["equipment_id", "equipmentId", "id"]) ||
     readLocalStorage("factofit_equipment_id") ||
     readLocalStorage("factofit_selected_equipment_id") ||
@@ -371,19 +393,29 @@ function resolveDraftParams(locationState: unknown): DraftParams | null {
     readLocalStorage("equipment_id")
 
   const policyId =
+    routePolicyId ||
     pickText(state, ["policyId", "policy_id", "id"]) ||
+    pickText(routeProject, [
+      "policyId",
+      "policy_id",
+      "id",
+      "rawId",
+      "matched_policy_id",
+    ]) ||
     pickText(selectedProjectFromState, [
       "policyId",
       "policy_id",
       "id",
       "matched_policy_id",
     ]) ||
-    pickText(selectedProjectFromStorage, [
-      "policyId",
-      "policy_id",
-      "id",
-      "matched_policy_id",
-    ]) ||
+    (!isAnalysisPolicyRoute
+      ? pickText(selectedProjectFromStorage, [
+          "policyId",
+          "policy_id",
+          "id",
+          "matched_policy_id",
+        ])
+      : "") ||
     readLocalStorage("factofit_policy_id") ||
     readLocalStorage("factofit_selected_policy_id") ||
     readLocalStorage("selected_policy_id") ||
@@ -398,10 +430,16 @@ function resolveDraftParams(locationState: unknown): DraftParams | null {
   }
 }
 
-function getRoutePolicyInfo(locationState: unknown) {
+function getRoutePolicyInfo(
+  locationState: unknown,
+  routeContext?: RoutePolicyContext,
+) {
   const projectFromState = getSelectedProjectFromState(locationState)
   const projectFromStorage = getSelectedProjectFromStorage()
-  const project = projectFromState ?? projectFromStorage
+  const project =
+    asDict(routeContext?.selectedProject) ??
+    projectFromState ??
+    (!routeContext?.analysisId ? projectFromStorage : null)
 
   return {
     title: pickText(project, ["title", "name", "policy_title"]),
@@ -585,17 +623,23 @@ function getApiErrorMessage(payload: DraftApiResponse) {
   return "신청서 초안 생성에 실패했습니다."
 }
 
-export function useApplicationDraft(locationState: unknown) {
+export function useApplicationDraft(
+  locationState: unknown,
+  routeContext?: RoutePolicyContext,
+) {
   const [draftStatus, setDraftStatus] = useState<DraftStatus>("idle")
   const [isChecklistOpen, setIsChecklistOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
   const [apiData, setApiData] = useState<DraftApiData | null>(null)
 
-  const params = useMemo(() => resolveDraftParams(locationState), [locationState])
+  const params = useMemo(
+    () => resolveDraftParams(locationState, routeContext),
+    [locationState, routeContext],
+  )
   const routePolicyInfo = useMemo(
-    () => getRoutePolicyInfo(locationState),
-    [locationState],
+    () => getRoutePolicyInfo(locationState, routeContext),
+    [locationState, routeContext],
   )
   const storedAnalysisData = useMemo(() => getStoredAnalysisData(), [])
 

@@ -94,16 +94,6 @@ function getReasonChips({
     .slice(0, 4)
 }
 
-function writeSelectedPolicy(project: SupportProject) {
-  try {
-    window.localStorage.setItem("factofit_selected_policy_id", project.rawId || String(project.id))
-    window.localStorage.setItem("factofit_policy_id", project.rawId || String(project.id))
-    window.localStorage.setItem("factofit_selected_project", JSON.stringify(project))
-  } catch {
-    // 신청서 화면 이동을 막지 않기 위해 무시합니다.
-  }
-}
-
 function PolicyMetaGrid({ project }: { project: SupportProject }) {
   return (
     <div className="ff-policy-meta-grid">
@@ -442,7 +432,6 @@ function PriorityPolicyCard({
               type="button"
               className="ff-policy-primary"
               onClick={() => {
-                writeSelectedPolicy(project)
                 navigate(`/analysis/${analysisId}/policies/${policyRouteId}`)
               }}
             >
@@ -847,9 +836,9 @@ export function AnalysisPolicyDetailPage() {
                 type="button"
                 className="ff-policy-primary"
                 onClick={() => {
-                  writeSelectedPolicy(project)
                   navigate(`/analysis/${id}/policies/${getPolicyRouteId(project)}/application`, {
                     state: {
+                      analysisId: id,
                       policyId: project.rawId || String(project.id),
                       policy_id: project.rawId || String(project.id),
                       selectedProject: project,

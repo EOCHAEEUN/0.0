@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { requestAdvisorAnswer } from "../features/aiAdvisor/aiAdvisor.api"
 
 function getAnalysisDataForCurrentUser(): Record<string, unknown> | null {
   try {
@@ -136,49 +137,13 @@ function getToneSoftColor(tone: "green" | "orange" | "red") {
   return "#FDE8E9"
 }
 
-function createAdvisorAnswer(input: string) {
-  const normalized = input.toLowerCase()
-
-  if (
-    normalized.includes("roi") ||
-    normalized.includes("회수") ||
-    normalized.includes("투자")
-  ) {
-    return "현재 입력값 기준으로 프레스 설비 교체 예상 ROI는 약 85% 수준입니다. 총 투자금 3.2억원, 예상 지원금 1.2억원을 적용하면 실부담금은 약 2.0억원이며, 예상 회수기간은 약 14개월입니다. 투자 회수기간이 짧은 편이므로 지원사업과 함께 검토하기 좋은 상태입니다."
-  }
-
-  if (
-    normalized.includes("지원") ||
-    normalized.includes("사업") ||
-    normalized.includes("정책")
-  ) {
-    return "현재 조건에서는 스마트공장 구축 및 고도화 지원사업이 1순위로 적합합니다. 프레스 설비 교체와 스마트 모니터링 도입 목적이 명확하고, ROI 분석 결과 투자 회수기간도 짧기 때문에 신청서 작성 근거를 만들기 좋습니다."
-  }
-
-  if (
-    normalized.includes("안전") ||
-    normalized.includes("리스크") ||
-    normalized.includes("노후")
-  ) {
-    return "현재 설비 안전 점수는 72/100 수준입니다. 즉시 중단이 필요한 단계는 아니지만, 설비 사용연수 11년, 불량률 5.8%, 유지보수비 증가 흐름을 고려하면 정밀점검과 설비 교체 검토가 필요합니다."
-  }
-
-  if (
-    normalized.includes("신청서") ||
-    normalized.includes("문장") ||
-    normalized.includes("초안")
-  ) {
-    return "신청서에는 ‘노후 프레스 설비 교체를 통해 에너지 비용 절감, 불량률 개선, 생산성 향상을 달성하고자 한다’는 방향으로 작성하는 것이 좋습니다. 특히 ROI 분석 결과, 예상 회수기간, 지원금 적용 후 실부담금 감소를 근거로 넣으면 설득력이 높아집니다."
-  }
-
-  return "현재 FactoFit 분석 결과를 종합하면, 프레스 설비 교체는 ROI, 지원사업 적합도, 안전 리스크 측면에서 검토 가치가 높습니다. 다음 단계로는 견적서와 설비 사진을 준비하고, 스마트공장 고도화 지원사업 신청서 초안을 작성하는 흐름을 추천합니다."
-}
 
 export default function AiAdvisorPage() {
   const navigate = useNavigate()
   const hasAnalysisData = Boolean(getAnalysisDataForCurrentUser())
 
   const [input, setInput] = useState("")
+  const [isSending, setIsSending] = useState(false)
   const [messages, setMessages] = useState<AdvisorMessage[]>([
     {
       role: "ai",
@@ -187,28 +152,37 @@ export default function AiAdvisorPage() {
     },
   ])
 
-  const handleSend = (customPrompt?: string) => {
+  const toChatHistory = (items: AdvisorMessage[]) =>
+    items.map((item) => ({
+      role: item.role === "ai" ? "assistant" : "user",
+      content: item.content,
+    }))
+
+  const handleSend = async (customPrompt?: string) => {
     const userInput = customPrompt ?? input
 
-    if (!userInput.trim()) {
+    if (!userInput.trim() || isSending) {
       return
     }
 
-    const answer = createAdvisorAnswer(userInput)
-
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: "user",
-        content: userInput,
-      },
-      {
-        role: "ai",
-        content: answer,
-      },
-    ])
-
+    setMessages((prev) => [...prev, { role: "user", content: userInput }])
     setInput("")
+    setIsSending(true)
+
+    try {
+      const result = await requestAdvisorAnswer(
+        userInput,
+        toChatHistory(messages),
+      )
+      setMessages((prev) => [...prev, { role: "ai", content: result.text }])
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        { role: "ai", content: "답변을 불러오지 못했습니다. 잠시 후 다시 시도해주세요." },
+      ])
+    } finally {
+      setIsSending(false)
+    }
   }
 
   if (!hasAnalysisData) {
@@ -606,7 +580,8 @@ export default function AiAdvisorPage() {
                     <button
                       key={question.label}
                       type="button"
-                      onClick={() => handleSend(question.prompt)}
+                      disabled={isSending}
+                      onClick={() => void handleSend(question.prompt)}
                       style={{
                         border: "1px solid #BFDBFE",
                         background: "#EFF6FF",
@@ -615,7 +590,8 @@ export default function AiAdvisorPage() {
                         borderRadius: "999px",
                         fontSize: "12px",
                         fontWeight: 900,
-                        cursor: "pointer",
+                        cursor: isSending ? "not-allowed" : "pointer",
+                        opacity: isSending ? 0.5 : 1,
                       }}
                     >
                       {question.label}
@@ -635,7 +611,7 @@ export default function AiAdvisorPage() {
                     onChange={(event) => setInput(event.target.value)}
                     onKeyDown={(event) => {
                       if (event.key === "Enter") {
-                        handleSend()
+                        void handleSend()
                       }
                     }}
                     placeholder="예: 이 설비 교체해도 괜찮을까?"
@@ -654,9 +630,10 @@ export default function AiAdvisorPage() {
                   <button
                     className="btn blue"
                     type="button"
-                    onClick={() => handleSend()}
+                    disabled={isSending}
+                    onClick={() => void handleSend()}
                   >
-                    보내기
+                    {isSending ? "전송 중..." : "보내기"}
                   </button>
                 </div>
               </div>

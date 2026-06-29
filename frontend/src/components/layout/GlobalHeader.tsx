@@ -48,6 +48,19 @@ const NAV_ITEMS: NavItem[] = [
 // ─── active 판별 ─────────────────────────────────────────────────────────────
 
 function isItemActive(item: NavItem, pathname: string): boolean {
+  const isPolicyAnalysisPath = /^\/analysis\/[^/]+\/policies(?:\/.*)?$/.test(pathname)
+  const isRoiAnalysisPath =
+    pathname === "/roi" ||
+    pathname.startsWith("/roi/") ||
+    pathname === "/analysis/new" ||
+    pathname.startsWith("/analysis/new/") ||
+    pathname === "/analysis/review" ||
+    pathname.startsWith("/analysis/review/") ||
+    /^\/analysis\/[^/]+(?:\/result)?$/.test(pathname)
+
+  if (item.label === "지원사업 추천" && isPolicyAnalysisPath) return true
+  if (item.label === "ROI 분석") return isRoiAnalysisPath
+
   return item.matchPrefixes.some((prefix) => {
     if (prefix === "/") return pathname === "/"
     return (

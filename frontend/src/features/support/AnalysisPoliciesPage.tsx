@@ -855,7 +855,7 @@ export function AnalysisPolicyDetailPage() {
                   })
                 }}
               >
-                지원 조건 확인하기
+                신청서 작성하기
               </button>
 
               {project.sourceUrl && (

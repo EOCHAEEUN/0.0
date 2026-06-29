@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { requestAdvisorAnswer } from "../features/aiAdvisor/aiAdvisor.api"
 
@@ -21,6 +21,13 @@ function getAnalysisDataForCurrentUser(): Record<string, unknown> | null {
 type AdvisorMessage = {
   role: "user" | "ai"
   content: string
+}
+
+type EquipmentOption = {
+  equipment_id: string | null
+  name: string
+  category: string
+  age_years: number
 }
 
 type QuickQuestion = {
@@ -144,6 +151,9 @@ export default function AiAdvisorPage() {
 
   const [input, setInput] = useState("")
   const [isSending, setIsSending] = useState(false)
+  const [pendingEquipmentCards, setPendingEquipmentCards] =
+    useState<EquipmentOption[] | null>(null)
+  const lastUserQueryRef = useRef("")
   const [messages, setMessages] = useState<AdvisorMessage[]>([
     {
       role: "ai",
@@ -158,6 +168,13 @@ export default function AiAdvisorPage() {
       content: item.content,
     }))
 
+  const extractEquipmentCards = (cards: unknown[]): EquipmentOption[] | null => {
+    const card = cards.find(
+      (c) => (c as { type?: string }).type === "equipment_selection",
+    ) as { type: string; data: EquipmentOption[] } | undefined
+    return card?.data?.length ? card.data : null
+  }
+
   const handleSend = async (customPrompt?: string) => {
     const userInput = customPrompt ?? input
 
@@ -165,6 +182,8 @@ export default function AiAdvisorPage() {
       return
     }
 
+    lastUserQueryRef.current = userInput
+    setPendingEquipmentCards(null)
     setMessages((prev) => [...prev, { role: "user", content: userInput }])
     setInput("")
     setIsSending(true)
@@ -175,11 +194,44 @@ export default function AiAdvisorPage() {
         toChatHistory(messages),
       )
       setMessages((prev) => [...prev, { role: "ai", content: result.text }])
+      setPendingEquipmentCards(extractEquipmentCards(result.cards))
     } catch {
       setMessages((prev) => [
         ...prev,
         { role: "ai", content: "답변을 불러오지 못했습니다. 잠시 후 다시 시도해주세요." },
       ])
+      setPendingEquipmentCards(null)
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  const handleEquipmentSelect = async (equipment: EquipmentOption) => {
+    if (!equipment.equipment_id) return
+
+    setPendingEquipmentCards(null)
+    const query = lastUserQueryRef.current || "설비 분석해줘"
+
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: `${equipment.name} 기준으로 분석해줘` },
+    ])
+    setIsSending(true)
+
+    try {
+      const result = await requestAdvisorAnswer(
+        query,
+        toChatHistory(messages),
+        { selectedEquipmentId: equipment.equipment_id },
+      )
+      setMessages((prev) => [...prev, { role: "ai", content: result.text }])
+      setPendingEquipmentCards(extractEquipmentCards(result.cards))
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        { role: "ai", content: "답변을 불러오지 못했습니다. 잠시 후 다시 시도해주세요." },
+      ])
+      setPendingEquipmentCards(null)
     } finally {
       setIsSending(false)
     }
@@ -559,6 +611,75 @@ export default function AiAdvisorPage() {
                     </div>
                   </div>
                 ))}
+
+                {pendingEquipmentCards && (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "8px",
+                      marginTop: "12px",
+                      padding: "0 4px",
+                    }}
+                  >
+                    {pendingEquipmentCards.map((equipment) =>
+                      equipment.equipment_id ? (
+                        <button
+                          key={equipment.equipment_id}
+                          type="button"
+                          disabled={isSending}
+                          onClick={() => void handleEquipmentSelect(equipment)}
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "flex-start",
+                            gap: "4px",
+                            padding: "14px 18px",
+                            background: "#FFFFFF",
+                            border: "1px solid #E2E8F0",
+                            borderRadius: "16px",
+                            boxShadow: "0 4px 12px rgba(6,27,52,.06)",
+                            cursor: isSending ? "not-allowed" : "pointer",
+                            opacity: isSending ? 0.5 : 1,
+                            textAlign: "left",
+                            transition: "border-color 0.15s, box-shadow 0.15s",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!isSending) {
+                              ;(e.currentTarget as HTMLButtonElement).style.borderColor = "#5B8BFF"
+                              ;(e.currentTarget as HTMLButtonElement).style.boxShadow =
+                                "0 4px 16px rgba(91,139,255,.18)"
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            ;(e.currentTarget as HTMLButtonElement).style.borderColor = "#E2E8F0"
+                            ;(e.currentTarget as HTMLButtonElement).style.boxShadow =
+                              "0 4px 12px rgba(6,27,52,.06)"
+                          }}
+                        >
+                          <span
+                            style={{
+                              color: "#061B34",
+                              fontSize: "14px",
+                              fontWeight: 900,
+                            }}
+                          >
+                            {equipment.name}
+                          </span>
+                          <span
+                            style={{
+                              color: "#667085",
+                              fontSize: "12px",
+                              fontWeight: 800,
+                            }}
+                          >
+                            {equipment.category} · 사용 {equipment.age_years}년
+                          </span>
+                        </button>
+                      ) : null,
+                    )}
+                  </div>
+                )}
               </div>
 
               <div

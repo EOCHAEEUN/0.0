@@ -627,7 +627,9 @@ function usePolicyPageContext() {
   const analysisResult = getAnalysisResult(id)
   const condition = getAnalysisConditionDraft()
   const profile = getCompanyProfileDraft()
-  const support = useSupportProjects()
+  const support = useSupportProjects({
+    analysisId: id && id !== "latest" ? id : undefined,
+  })
   const equipmentName =
     analysisResult?.equipmentName ||
     support.selectedEquipmentContext.equipmentName ||

@@ -31,7 +31,8 @@ function normalizeProjectIds(projects: SupportProject[]) {
   }))
 }
 
-export function useSupportProjects() {
+export function useSupportProjects(options?: { analysisId?: string }) {
+  const analysisId = options?.analysisId
   const [policyState, setPolicyState] = useState<PolicyState>("loading")
   const [policyCards, setPolicyCards] = useState<SupportProject[]>([])
   const [policyCounters, setPolicyCounters] = useState<PolicyCounters>(() =>
@@ -101,7 +102,7 @@ export function useSupportProjects() {
         setPolicyState("loading")
 
         const [result, summary] = await Promise.all([
-          fetchPolicyCards(companyId, equipmentId, analysisFingerprint),
+          fetchPolicyCards(companyId, equipmentId, analysisFingerprint, analysisId),
           fetchPolicySummary(companyId, equipmentId),
         ])
 
@@ -154,7 +155,7 @@ export function useSupportProjects() {
     return () => {
       ignore = true
     }
-  }, [companyId, equipmentId, analysisFingerprint])
+  }, [companyId, equipmentId, analysisFingerprint, analysisId])
 
   const rankedPolicyCards = useMemo(() => rankProjects(policyCards), [policyCards])
 

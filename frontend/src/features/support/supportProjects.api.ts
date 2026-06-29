@@ -123,8 +123,11 @@ export async function fetchPolicyCards(
   companyId: string,
   equipmentId: string,
   analysisFingerprint: string,
+  analysisId?: string,
 ): Promise<{ cards: SupportProject[]; counters: PolicyCounters }> {
-  const cacheKey = `support-projects:${companyId}:${equipmentId || "all"}:${analysisFingerprint || "latest"}:${POLICY_FETCH_LIMIT}`
+  const cacheKey = analysisId
+    ? `support-projects:${companyId}:${equipmentId || "all"}:analysis:${analysisId}:${POLICY_FETCH_LIMIT}`
+    : `support-projects:${companyId}:${equipmentId || "all"}:${analysisFingerprint || "latest"}:${POLICY_FETCH_LIMIT}`
 
   const cached = policyCardsMemoryCache.get(cacheKey)
   if (cached) return cached
@@ -138,6 +141,9 @@ export async function fetchPolicyCards(
   })
   if (equipmentId) {
     query.set("equipment_id", equipmentId)
+  }
+  if (analysisId) {
+    query.set("analysis_id", analysisId)
   }
   const url = buildApiUrl(`/api/analyze/support-projects?${query.toString()}`)
 

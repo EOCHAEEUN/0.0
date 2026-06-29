@@ -1032,6 +1032,73 @@ def saved_policy_to_response(
     return _format_policy_for_frontend(merged_policy)
 
 
+def _is_empty_policy_snapshot(snapshot: Any) -> bool:
+    if not isinstance(snapshot, dict) or not snapshot:
+        return True
+    if not snapshot.get("snapshot_version"):
+        return True
+    return False
+
+
+def _snapshot_policy_item_to_response(item: dict) -> dict:
+    policy_id = normalize_policy_id(item.get("policy_id"))
+    max_amount = item.get("max_amount_numeric_manwon")
+    if max_amount is None:
+        max_amount = item.get("max_amount_actual")
+
+    metadata = {
+        "policy_id": policy_id,
+        "title": item.get("title"),
+        "organization": item.get("organization"),
+        "match_score": item.get("match_score"),
+        "eligible": item.get("eligible", True),
+        "reason": item.get("reason"),
+        "llm_score": item.get("llm_score"),
+        "scenario_match": item.get("scenario_match"),
+        "scenario_label": item.get("scenario_label"),
+        "summary": item.get("summary"),
+        "deadline": item.get("deadline"),
+        "deadline_display": item.get("deadline_display"),
+        "url": item.get("url"),
+        "policy_category": item.get("policy_category"),
+        "policy_subcategory": item.get("policy_subcategory"),
+        "safety_justification_usable": item.get("safety_justification_usable"),
+        "support_items": _snapshot_json_list(item.get("support_items")),
+        "required_documents_json": _snapshot_json_list(
+            item.get("required_documents_json")
+        ),
+        "source_name": item.get("source_name"),
+        "eligibility_text": item.get("eligibility_text"),
+    }
+    merged_policy = {
+        "id": policy_id,
+        "policy_id": policy_id,
+        "title": item.get("title"),
+        "organization": item.get("organization"),
+        "match_score": item.get("match_score"),
+        "eligible": item.get("eligible", True),
+        "reason": item.get("reason"),
+        "llm_score": item.get("llm_score"),
+        "scenario_match": item.get("scenario_match"),
+        "scenario_label": item.get("scenario_label"),
+        "summary": item.get("summary"),
+        "eligibility_text": item.get("eligibility_text"),
+        "max_amount": max_amount,
+        "max_amount_manwon": item.get("max_amount_numeric_manwon"),
+        "deadline": item.get("deadline"),
+        "deadline_display": item.get("deadline_display"),
+        "url": item.get("url"),
+        "source_url": item.get("url"),
+        "policy_category": item.get("policy_category"),
+        "policy_subcategory": item.get("policy_subcategory"),
+        "safety_justification_usable": item.get("safety_justification_usable"),
+        "support_items": metadata["support_items"],
+        "required_documents_json": metadata["required_documents_json"],
+        "metadata": metadata,
+    }
+    return _format_policy_for_frontend(merged_policy)
+
+
 async def run_policy_node(state: FactofitState) -> FactofitState:
     return await asyncio.wait_for(
         asyncio.to_thread(policy_matching_node, state),
@@ -1043,10 +1110,75 @@ async def run_policy_node(state: FactofitState) -> FactofitState:
 async def get_support_projects(
     company_id: str = Query(...),
     equipment_id: Optional[str] = None,
+    analysis_id: Optional[str] = None,
     limit: int = Query(default=10),
     refresh: bool = Query(default=False),
 ):
     db = get_db()
+
+    if analysis_id:
+        try:
+            roi_result = (
+                db.table("roi_output")
+                .select("id,company_id,equipment_id,policy_snapshot")
+                .eq("id", analysis_id)
+                .limit(1)
+                .execute()
+            )
+        except Exception as exc:
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "success": False,
+                    "message": "분석 결과를 조회하지 못했습니다.",
+                    "error": str(exc),
+                },
+            )
+
+        row = get_first_row(roi_result)
+        if not row:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "success": False,
+                    "message": "분석 결과를 찾을 수 없습니다.",
+                },
+            )
+
+        snapshot = row.get("policy_snapshot")
+        if _is_empty_policy_snapshot(snapshot):
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "success": False,
+                    "message": "이 분석에는 저장된 정책 스냅샷이 없습니다. 해당 시점 정책을 조회할 수 없습니다.",
+                    "error_code": "POLICY_SNAPSHOT_MISSING",
+                },
+            )
+
+        policies_raw = [
+            item
+            for item in (snapshot.get("policies") or [])
+            if isinstance(item, dict) and item.get("policy_id")
+        ]
+        policies_raw.sort(
+            key=lambda item: _snapshot_int(item.get("match_score"), 0),
+            reverse=True,
+        )
+        policies = [
+            _snapshot_policy_item_to_response(item)
+            for item in policies_raw[:limit]
+        ]
+        return {
+            "success": True,
+            "data": {
+                "policies": policies,
+                "total": len(policies_raw),
+                "source": "roi_output_policy_snapshot",
+                "analysis_id": analysis_id,
+                "policy_status": snapshot.get("policy_status"),
+            },
+        }
 
     # 1. 캐시 우선 조회
     if not refresh:

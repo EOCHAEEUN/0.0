@@ -7,6 +7,12 @@ from app.state import FactofitState
 
 VALID_INTENTS = ["roi", "policy", "draft", "safety", "info_missing"]
 
+ROI_ANALYSIS_KEYWORDS = [
+    "roi", "분석", "투자", "교체", "검토",
+    "회수", "절감", "비용", "효율", "수익",
+    "생산성", "노후", "유지보수",
+]
+
 
 def _equipment_name(equipment) -> str:
     if not equipment:
@@ -57,6 +63,18 @@ def router_node(state: FactofitState) -> FactofitState:
 
     if intent not in VALID_INTENTS:
         intent = "info_missing"
+
+    # 선택 설비가 이미 확정된 뒤에는 다중 설비 선택 요청을 반복하지 않도록,
+    # 분석/ROI 계열 질문의 info_missing을 roi로 보정한다.
+    has_selected_equipment = equipment is not None
+    query = (state.get("user_query") or "").lower()
+
+    if (
+        intent == "info_missing"
+        and has_selected_equipment
+        and any(keyword in query for keyword in ROI_ANALYSIS_KEYWORDS)
+    ):
+        intent = "roi"
 
     state["intent"] = intent
     return state

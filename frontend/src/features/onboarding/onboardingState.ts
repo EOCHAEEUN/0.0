@@ -322,7 +322,7 @@ export function resolvePostLoginPath(isJustSignedUp = consumeJustSignedUp()) {
 
   if (state.companyProfileStatus !== "completed") return "/setup/company"
 
-  if (state.equipmentSetupStatus !== "completed") return "/setup/equipment"
+  if (state.equipmentSetupStatus !== "completed") return "/analysis/new?mode=new"
 
   if (state.companyProfileStatus === "completed" && state.analysisDraftId) {
     const draftStatus = state.analysisDraftStatus ?? "in_progress"

@@ -141,7 +141,7 @@ export default function CompanySetupPage() {
         companyProfileStatus: "completed",
         companyId,
       })
-      navigate("/setup/equipment")
+      navigate("/analysis/new?mode=new")
     } catch (reason) {
       setSubmitError(
         reason instanceof Error ? reason.message : "기업 정보를 저장하지 못했습니다.",

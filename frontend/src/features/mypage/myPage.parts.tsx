@@ -146,7 +146,12 @@ export const TWO_YEARS_AGO = CURRENT_YEAR - 2;
 export const THREE_YEARS_AGO = CURRENT_YEAR - 3;
 
 export function buildApiUrl(path: string) {
-  return `${API_BASE_URL}${path}`;
+  const normalizedBase = API_BASE_URL
+    .replace(/\/+$/, "")
+    .replace(/\/api$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+
+  return `${normalizedBase}${normalizedPath}`;
 }
 
 export const emptyBasicInfo: BasicInfo = {

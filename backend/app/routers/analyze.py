@@ -4,7 +4,7 @@ from datetime import date, datetime
 from typing import Any, Optional
 import asyncio
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 
 from app.agents.policy import (
@@ -294,6 +294,198 @@ def _score_to_percent(policy: dict) -> int:
     return int(max(0, min(100, round(numeric))))
 
 
+def _snapshot_optional_text(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _snapshot_int(value: Any, default: int = 0) -> int:
+    try:
+        if value is None or value == "":
+            return default
+        return int(round(float(value)))
+    except (TypeError, ValueError):
+        return default
+
+
+def _snapshot_json_list(value: Any) -> list:
+    return value if isinstance(value, list) else []
+
+
+def _build_snapshot_policy_item(
+    matched_policy: dict,
+    policy_detail: Optional[dict],
+) -> dict:
+    policy_detail = policy_detail or {}
+    policy_id = _first_text(
+        _policy_id(matched_policy),
+        policy_detail.get("policy_id"),
+        policy_detail.get("id"),
+    )
+    required_documents_json = _snapshot_json_list(
+        policy_detail.get("required_documents_json")
+    )
+    support_items = _snapshot_json_list(policy_detail.get("support_items"))
+    max_amount_numeric = _first_value(
+        policy_detail.get("max_amount"),
+        matched_policy.get("max_amount"),
+    )
+
+    return {
+        "policy_id": policy_id,
+        "title": _first_text(
+            matched_policy.get("title"),
+            policy_detail.get("title"),
+        ),
+        "organization": _snapshot_optional_text(
+            _first_value(
+                matched_policy.get("organization"),
+                policy_detail.get("organization"),
+                policy_detail.get("agency"),
+                policy_detail.get("provider"),
+            )
+        ),
+        "match_score": _score_to_percent(matched_policy),
+        "llm_score": _snapshot_optional_text(matched_policy.get("llm_score")),
+        "eligible": matched_policy.get("eligible", True),
+        "reason": _snapshot_optional_text(matched_policy.get("reason")),
+        "scenario_match": matched_policy.get("scenario_match"),
+        "scenario_label": _snapshot_optional_text(
+            matched_policy.get("scenario_label")
+        ),
+        "summary": _snapshot_optional_text(
+            _first_value(
+                matched_policy.get("summary"),
+                policy_detail.get("summary"),
+            )
+        ),
+        "eligibility_text": _snapshot_optional_text(
+            policy_detail.get("eligibility_text")
+        ),
+        "required_documents_json": required_documents_json,
+        "required_documents_count": _snapshot_int(
+            policy_detail.get("required_documents_count"),
+            default=len(required_documents_json),
+        ),
+        "support_items": support_items,
+        "max_amount_actual": _snapshot_optional_text(
+            policy_detail.get("max_amount_actual")
+        ),
+        "max_amount_numeric_manwon": _snapshot_int(max_amount_numeric),
+        "deadline": _snapshot_optional_text(
+            _first_value(
+                matched_policy.get("deadline"),
+                policy_detail.get("deadline"),
+            )
+        ),
+        "deadline_display": _snapshot_optional_text(
+            _first_value(
+                matched_policy.get("deadline_display"),
+                policy_detail.get("deadline_display"),
+            )
+        ),
+        "url": _snapshot_optional_text(
+            _first_value(
+                matched_policy.get("url"),
+                policy_detail.get("url"),
+                policy_detail.get("source_url"),
+            )
+        ),
+        "policy_category": _snapshot_optional_text(
+            _first_value(
+                matched_policy.get("policy_category"),
+                policy_detail.get("policy_category"),
+            )
+        ),
+        "policy_subcategory": _snapshot_optional_text(
+            _first_value(
+                matched_policy.get("policy_subcategory"),
+                policy_detail.get("policy_subcategory"),
+            )
+        ),
+        "source_name": _snapshot_optional_text(policy_detail.get("source_name")),
+        "safety_justification_usable": _snapshot_optional_text(
+            policy_detail.get("safety_justification_usable")
+        ),
+    }
+
+
+def _build_policy_snapshot(
+    *,
+    analysis_id: str,
+    company_id: str,
+    equipment_id: str,
+    matched_policies: list[dict],
+    policy_details: dict[str, dict],
+) -> dict:
+    policies: list[dict] = []
+    for matched_policy in matched_policies:
+        policy_id = _first_text(
+            _policy_id(matched_policy),
+            matched_policy.get("policy_id"),
+            matched_policy.get("id"),
+        )
+        if not policy_id:
+            continue
+        normalized_id = str(policy_id).strip()
+        policy_detail = policy_details.get(normalized_id)
+        policies.append(
+            _build_snapshot_policy_item(matched_policy, policy_detail)
+        )
+
+    return {
+        "snapshot_version": 1,
+        "captured_at": datetime.now().isoformat(),
+        "analysis_id": analysis_id,
+        "company_id": company_id,
+        "equipment_id": equipment_id,
+        "policy_status": "empty" if not policies else "ready",
+        "recommended_policy_id": policies[0]["policy_id"] if policies else None,
+        "counts": {"matched": len(policies)},
+        "policies": policies,
+    }
+
+
+def _fetch_policy_details_for_snapshot(
+    db: Any,
+    policy_ids: list[Any],
+) -> dict[str, dict]:
+    unique_ids: list[str] = []
+    seen: set[str] = set()
+    for policy_id in policy_ids:
+        normalized = "" if policy_id is None else str(policy_id).strip()
+        if normalized and normalized not in seen:
+            unique_ids.append(normalized)
+            seen.add(normalized)
+
+    if not unique_ids:
+        return {}
+
+    try:
+        result = (
+            db.table("policy")
+            .select(
+                "policy_id,title,organization,agency,provider,summary,"
+                "eligibility_text,required_documents_json,required_documents_count,"
+                "support_items,max_amount,max_amount_actual,deadline,deadline_display,"
+                "url,source_url,policy_category,policy_subcategory,source_name,"
+                "safety_justification_usable"
+            )
+            .in_("policy_id", unique_ids)
+            .execute()
+        )
+        return {
+            str(row.get("policy_id")).strip(): row
+            for row in (result.data or [])
+            if isinstance(row, dict) and str(row.get("policy_id") or "").strip()
+        }
+    except Exception as exc:
+        print(f"policy 상세정보 snapshot 조회 실패: {exc}")
+        return {}
+
+
 # ============================================================================
 # ROI 분석 + 정책 매칭 + 정책 반영 최종 ROI
 # LangGraph는 사용하거나 수정하지 않는다.
@@ -540,6 +732,58 @@ async def analyze(
         saved_roi_output = roi_insert_result.data[0] if roi_insert_result.data else None
     except Exception as exc:
         print(f"분석 결과 초기화/roi_output 저장 실패: {exc}")
+        raise HTTPException(
+            status_code=500,
+            detail="ROI 분석 결과 저장에 실패했습니다.",
+        ) from exc
+
+    analysis_id = saved_roi_output.get("id") if saved_roi_output else None
+    if not analysis_id:
+        raise HTTPException(
+            status_code=500,
+            detail="ROI 분석 결과 ID를 확인할 수 없습니다.",
+        )
+    analysis_id = str(analysis_id)
+
+    policy_ids = [
+        policy_id
+        for policy in frontend_matched_policies
+        if (policy_id := _policy_id(policy) or policy.get("policy_id") or policy.get("id"))
+    ]
+    policy_details = _fetch_policy_details_for_snapshot(db, policy_ids)
+    policy_snapshot = _build_policy_snapshot(
+        analysis_id=analysis_id,
+        company_id=company_id,
+        equipment_id=equipment_id,
+        matched_policies=frontend_matched_policies,
+        policy_details=policy_details,
+    )
+
+    try:
+        snapshot_update_result = (
+            db.table("roi_output")
+            .update({"policy_snapshot": policy_snapshot})
+            .eq("id", analysis_id)
+            .select("id,policy_snapshot")
+            .execute()
+        )
+        updated_rows = getattr(snapshot_update_result, "data", None) or []
+        if not updated_rows:
+            raise RuntimeError("policy_snapshot update returned no rows")
+        persisted_snapshot = updated_rows[0].get("policy_snapshot")
+        if not isinstance(persisted_snapshot, dict) or not persisted_snapshot.get(
+            "snapshot_version"
+        ):
+            raise RuntimeError("policy_snapshot was not persisted")
+    except Exception as exc:
+        print(f"roi_output policy_snapshot 저장 실패: {exc}")
+        raise HTTPException(
+            status_code=500,
+            detail="정책 스냅샷 저장에 실패했습니다.",
+        ) from exc
+
+    if isinstance(saved_roi_output, dict):
+        saved_roi_output = {**saved_roi_output, "policy_snapshot": policy_snapshot}
 
     if frontend_matched_policies:
         try:
@@ -554,6 +798,7 @@ async def analyze(
                         {
                             "company_id": company_id,
                             "equipment_id": equipment_id,
+                            "analysis_id": analysis_id,
                             "policy_id": policy_id,
                             "title": policy.get("metadata", {}).get("title", ""),
                             "match_score": _score_to_percent(policy),
@@ -607,7 +852,7 @@ async def analyze(
                 "final_recommended": roi_result.get("recommended"),
                 "policy_applications": roi_result.get("policy_applications", {}),
             },
-            "analysis_id": saved_roi_output.get("id") if saved_roi_output else None,
+            "analysis_id": analysis_id,
             "roi_output": saved_roi_output,
             "response": response_message,
         },

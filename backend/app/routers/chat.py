@@ -17,6 +17,7 @@ class ChatRequest(BaseModel):
     chat_history: list[dict] = []
     selected_equipment_id: str = ""
     policy_intent_choice: str = ""
+    additional_text_for_draft: str = "" 
 
 
 @router.post("/chat")

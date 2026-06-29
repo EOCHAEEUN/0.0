@@ -3,7 +3,7 @@ from app.models.company import CompanyContext
 from app.models.matched_policy import MatchedPolicy
 from app.models.equipment import EquipmentInput
 
-class FactofitState(TypedDict):
+class FactofitState(TypedDict, total=False):
     user_query: str                           # 사용자 원본 입력
     intent: str                               # "roi" / "policy" / "draft" / "info_missing" / "general"
     is_safe: bool                             # guard_node 통과 여부
@@ -25,3 +25,5 @@ class FactofitState(TypedDict):
     chat_id: Optional[str]
     safety_dashboard: Optional[dict]
     options: Optional[list[dict]]
+    additional_text_for_draft: str  # 계획서 초안에 추가할 사용자 문장
+    refined_text_for_draft: str     # 가공된 사용자 문장

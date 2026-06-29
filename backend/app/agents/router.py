@@ -4,7 +4,7 @@ from app.state import FactofitState
 from app.prompts.router import ROUTER_SYSTEM_PROMPT
 from app.core.llm import llm
 
-VALID_INTENTS = ["roi", "policy", "draft", "safety", "info_missing", "general"]
+VALID_INTENTS = ["roi", "policy", "draft", "safety", "info_missing"]
 
 def _equipment_name(equipment) -> str:
     if not equipment:

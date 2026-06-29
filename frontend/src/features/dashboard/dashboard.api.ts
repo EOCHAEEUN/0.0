@@ -10,7 +10,13 @@ const AUTH_SESSION_STORAGE_KEY = "factofit_auth_session"
 const ANALYSIS_RESULT_STORAGE_KEY = "factofit_analysis_result"
 
 function buildApiUrl(path: string) {
-  return `${API_BASE_URL}${path}`
+  const normalizedBase = API_BASE_URL
+    .replace(/\/+$/, "")
+    .replace(/\/api$/, "")
+
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`
+
+  return `${normalizedBase}${normalizedPath}`
 }
 
 export function safeJsonParse<T = unknown>(value: string | null): T | null {

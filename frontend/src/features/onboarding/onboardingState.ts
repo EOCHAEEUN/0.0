@@ -159,6 +159,80 @@ function writeJsonWithOwner(key: string, value: unknown) {
   window.localStorage.setItem(key, JSON.stringify(stored))
 }
 
+function buildPersistedAnalysisResult(result: AnalysisResultSnapshot): AnalysisResultSnapshot {
+  const roiResultRecord =
+    result.roiResult && typeof result.roiResult === "object" && !Array.isArray(result.roiResult)
+      ? (result.roiResult as Record<string, unknown>)
+      : {}
+  const scenarioA =
+    roiResultRecord.scenario_a && typeof roiResultRecord.scenario_a === "object" && !Array.isArray(roiResultRecord.scenario_a)
+      ? (roiResultRecord.scenario_a as Record<string, unknown>)
+      : {}
+  const scenarioB =
+    roiResultRecord.scenario_b && typeof roiResultRecord.scenario_b === "object" && !Array.isArray(roiResultRecord.scenario_b)
+      ? (roiResultRecord.scenario_b as Record<string, unknown>)
+      : {}
+  const aiRecommendation =
+    roiResultRecord.ai_recommendation && typeof roiResultRecord.ai_recommendation === "object" && !Array.isArray(roiResultRecord.ai_recommendation)
+      ? (roiResultRecord.ai_recommendation as Record<string, unknown>)
+      : {}
+
+  return {
+    schemaVersion: ANALYSIS_RESULT_SCHEMA_VERSION,
+    id: result.id,
+    equipmentName: result.equipmentName,
+    recommendation: result.recommendation,
+    recommendationDetail: result.recommendationDetail,
+    roiPct: result.roiPct,
+    roiPercent: result.roiPercent ?? result.roiPct,
+    paybackYears: result.paybackYears,
+    matchedPolicies: result.matchedPolicies,
+    priorityPolicies: result.priorityPolicies,
+    priorityPolicyName: result.priorityPolicyName,
+    recommendedScenario: result.recommendedScenario,
+    companyId: result.companyId,
+    equipmentId: result.equipmentId,
+    roiResult: {
+      recommended:
+        typeof roiResultRecord.recommended === "string"
+          ? roiResultRecord.recommended
+          : result.recommendedScenario,
+      scenario_a: scenarioA,
+      scenario_b: scenarioB,
+      ai_recommendation: {
+        summary:
+          typeof aiRecommendation.summary === "string"
+            ? aiRecommendation.summary
+            : result.recommendationDetail,
+        reason_bullets: Array.isArray(aiRecommendation.reason_bullets)
+          ? aiRecommendation.reason_bullets
+              .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+              .slice(0, 3)
+          : [],
+      },
+    },
+    policyStatus: result.policyStatus,
+    policyError: result.policyError ?? null,
+    createdAt: result.createdAt,
+  }
+}
+
+function pruneAnalysisResultCache(keepId: string) {
+  for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
+    const key = window.localStorage.key(index)
+    if (!key?.startsWith(`${ANALYSIS_RESULT_KEY}:`)) continue
+    if (key === getAnalysisResultByIdKey(keepId)) continue
+    window.localStorage.removeItem(key)
+  }
+}
+
+function isQuotaExceededError(error: unknown) {
+  return (
+    error instanceof DOMException &&
+    (error.name === "QuotaExceededError" || error.name === "NS_ERROR_DOM_QUOTA_REACHED")
+  )
+}
+
 // ── 공개 읽기 함수 ─────────────────────────────────────────────────────────────
 
 export function getCompanyProfileDraft(): CompanyProfileDraft {
@@ -207,11 +281,10 @@ export function getAnalysisResult(id?: string): AnalysisResultSnapshot | null {
 export function saveAnalysisResult(
   result: AnalysisResultSnapshot,
 ): AnalysisResultSnapshot {
-  const next = {
+  const next = buildPersistedAnalysisResult({
     ...result,
-    schemaVersion: ANALYSIS_RESULT_SCHEMA_VERSION,
     roiPercent: result.roiPercent ?? result.roiPct,
-  }
+  })
 
   console.debug("[onboarding-analysis] saving result snapshot", {
     id: next.id,
@@ -223,8 +296,32 @@ export function saveAnalysisResult(
     priorityPolicies: next.priorityPolicies,
   })
 
-  writeJsonWithOwner(ANALYSIS_RESULT_KEY, next)
-  writeJsonWithOwner(getAnalysisResultByIdKey(next.id), next)
+  try {
+    writeJsonWithOwner(ANALYSIS_RESULT_KEY, next)
+    writeJsonWithOwner(getAnalysisResultByIdKey(next.id), next)
+  } catch (error) {
+    if (isQuotaExceededError(error)) {
+      console.warn("[onboarding-analysis] analysis cache quota exceeded; pruning scoped cache.", {
+        id: next.id,
+      })
+      try {
+        pruneAnalysisResultCache(next.id)
+        writeJsonWithOwner(ANALYSIS_RESULT_KEY, next)
+        writeJsonWithOwner(getAnalysisResultByIdKey(next.id), next)
+      } catch (retryError) {
+        if (isQuotaExceededError(retryError)) {
+          console.warn(
+            "[onboarding-analysis] analysis cache write skipped after quota retry; continuing without cache.",
+            { id: next.id },
+          )
+        } else {
+          console.warn("[onboarding-analysis] analysis cache write failed unexpectedly.", retryError)
+        }
+      }
+    } else {
+      console.warn("[onboarding-analysis] analysis cache write failed unexpectedly.", error)
+    }
+  }
   updateUserOnboardingState({
     analysisDraftId: next.id,
     analysisDraftStatus: "completed",

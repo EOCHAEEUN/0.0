@@ -1,5 +1,5 @@
-import { useCallback } from "react"
-import { useNavigate } from "react-router-dom"
+import { useCallback, useEffect, useMemo } from "react"
+import { useNavigate, useSearchParams } from "react-router-dom"
 
 import { useSupportProjects } from "./hooks/useSupportProjects"
 import { PolicyDetailDialog } from "./components/SupportProjectDialogs"
@@ -37,6 +37,14 @@ function writeLocalStorage(key: string, value: string) {
 function writeJsonLocalStorage(key: string, value: unknown) {
   try {
     window.localStorage.setItem(key, JSON.stringify(value))
+  } catch {
+    // localStorage 접근 실패 시 화면 이동만 막지 않기 위해 무시합니다.
+  }
+}
+
+function removeLocalStorage(key: string) {
+  try {
+    window.localStorage.removeItem(key)
   } catch {
     // localStorage 접근 실패 시 화면 이동만 막지 않기 위해 무시합니다.
   }
@@ -116,19 +124,30 @@ function buildSelectedProjectForDraft(
 
 export default function SupportProjectsFeature() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const analysisIdFromQuery = useMemo(() => {
+    const value = searchParams.get("analysisId")
+    return value && value.trim() ? value.trim() : undefined
+  }, [searchParams])
+  const policyIdFromQuery = useMemo(() => {
+    const value = searchParams.get("policyId")
+    return value && value.trim() ? decodeURIComponent(value.trim()) : ""
+  }, [searchParams])
 
   const {
     selectedEquipmentContext,
+    analysisData,
     policyState,
+    policyCards,
     finalRecommendedProjects,
     otherMatchedProjects,
     policyCounters,
+    policySummary,
+    policyErrorCode,
     selectedProject,
-    selectedProjectId,
     detailProject,
-    setSelectedProjectId,
     setDetailProject,
-  } = useSupportProjects()
+  } = useSupportProjects({ analysisId: analysisIdFromQuery })
 
   const topProject = finalRecommendedProjects[0]
   const hasPolicyCards = finalRecommendedProjects.length > 0
@@ -138,6 +157,17 @@ export default function SupportProjectsFeature() {
     Boolean(topProject) &&
     Boolean(selectedProject)
   const shouldShowEmpty = policyState === "empty" && !hasPolicyCards
+  const isSnapshotMissingLegacy =
+    Boolean(analysisIdFromQuery) && policyState === "error" && policyErrorCode === "POLICY_SNAPSHOT_MISSING"
+
+  useEffect(() => {
+    if (!policyIdFromQuery || policyState !== "success") return
+    const selectedByQuery =
+      policyCards.find((project) => String(project.rawId || project.id) === policyIdFromQuery) || null
+    if (selectedByQuery) {
+      setDetailProject(selectedByQuery)
+    }
+  }, [policyCards, policyIdFromQuery, policyState, setDetailProject])
 
   const handleGoDraft = useCallback(
     (project: SupportProject | null | undefined) => {
@@ -146,8 +176,20 @@ export default function SupportProjectsFeature() {
         return
       }
 
-      const companyId = getCompanyId()
-      const equipmentId = getEquipmentId(selectedEquipmentContext)
+      const companyId = analysisIdFromQuery
+        ? pickString(
+            analysisData.company?.company_id,
+            analysisData.equipment?.company_id,
+            getCompanyId(),
+          )
+        : getCompanyId()
+      const equipmentId = analysisIdFromQuery
+        ? pickString(
+            analysisData.equipment?.equipment_id,
+            analysisData.equipment_id,
+            getEquipmentId(selectedEquipmentContext),
+          )
+        : getEquipmentId(selectedEquipmentContext)
       const policyId = getProjectPolicyId(project)
 
       if (!companyId || !equipmentId || !policyId) {
@@ -178,9 +220,19 @@ export default function SupportProjectsFeature() {
       writeLocalStorage("factofit_equipment_id", equipmentId)
       writeLocalStorage("factofit_selected_policy_id", policyId)
       writeLocalStorage("factofit_policy_id", policyId)
+      if (analysisIdFromQuery) {
+        writeLocalStorage("factofit_analysis_id", analysisIdFromQuery)
+      } else {
+        removeLocalStorage("factofit_analysis_id")
+      }
       writeJsonLocalStorage("factofit_selected_project", selectedProjectForDraft)
 
-      navigate("/application-draft", {
+      const draftSearchParams = new URLSearchParams({ policyId })
+      if (analysisIdFromQuery) {
+        draftSearchParams.set("analysisId", analysisIdFromQuery)
+      }
+
+      navigate(`/application-draft?${draftSearchParams.toString()}`, {
         state: {
           companyId,
           company_id: companyId,
@@ -188,56 +240,97 @@ export default function SupportProjectsFeature() {
           equipment_id: equipmentId,
           policyId,
           policy_id: policyId,
-          selectedProject: selectedProjectForDraft,
+          ...(analysisIdFromQuery
+            ? { analysisId: analysisIdFromQuery, analysis_id: analysisIdFromQuery }
+            : {}),
+          selectedProject: {
+            ...selectedProjectForDraft,
+            ...(analysisIdFromQuery
+              ? { analysisId: analysisIdFromQuery, analysis_id: analysisIdFromQuery }
+              : {}),
+          },
         },
       })
     },
-    [navigate, selectedEquipmentContext],
+    [analysisData, analysisIdFromQuery, navigate, selectedEquipmentContext],
   )
+
+  const reanalysisPath =
+    analysisIdFromQuery && getEquipmentId(selectedEquipmentContext)
+      ? `/analysis/new?mode=reanalysis&equipmentId=${encodeURIComponent(getEquipmentId(selectedEquipmentContext))}&parentAnalysisId=${encodeURIComponent(analysisIdFromQuery)}`
+      : "/analysis/new"
 
   return (
     <main className="page">
       <PolicyDetailDialog
         project={detailProject}
         onClose={() => setDetailProject(null)}
+        onCreateDraft={handleGoDraft}
       />
 
       <section className="section white">
         <div className="container">
           <button
             type="button"
-            onClick={() => navigate("/")}
+            onClick={() =>
+              analysisIdFromQuery
+                ? navigate(`/analysis/${analysisIdFromQuery}/result`)
+                : navigate("/")
+            }
             style={backButtonStyle}
           >
-            ← 대시보드로 돌아가기
+            {analysisIdFromQuery ? "← 투자 검토 결과로 돌아가기" : "← 대시보드로 돌아가기"}
           </button>
-
-          <div className="section-head">
-            <div>
-              <div className="screen-tag">FACTOFIT SUPPORT PROJECTS</div>
-              <div className="label">POLICY MATCHING</div>
-              <h2>
-                설비투자 조건에 맞는 <br />
-                지원사업을 추천합니다.
-              </h2>
-            </div>
-
-            <p className="section-desc">
-              선택된 {selectedEquipmentContext.equipmentName}, ROI 분석 결과,
-              설비 유형, 투자 목적, 예상 지원금 규모를 바탕으로 신청 가능성이
-              높은 지원사업을 우선순위로 정리합니다.
-            </p>
-          </div>
 
           <SupportWorkflowHero
             policyCounters={policyCounters}
             equipmentName={selectedEquipmentContext.equipmentName}
+            currentAvailableCount={policySummary.activePolicyCount}
+            hasCurrentAvailableCount={Boolean(policySummary.updatedAt)}
           />
 
           {policyState === "loading" && <LoadingPolicyState />}
 
-          {policyState === "error" && (
+          {policyState === "error" && !isSnapshotMissingLegacy && (
             <ErrorPolicyState onBackToRoi={() => navigate("/roi")} />
+          )}
+
+          {isSnapshotMissingLegacy && (
+            <section
+              style={{
+                marginTop: "28px",
+                marginBottom: "28px",
+                padding: "44px",
+                borderRadius: "30px",
+                border: "1px solid #FDBA74",
+                background: "#FFF7ED",
+                boxShadow: "0 18px 44px rgba(6,27,52,.06)",
+              }}
+            >
+              <span className="badge orange">정책 이력 없음</span>
+              <h2>이 분석은 정책 이력 저장 전 생성되었습니다.</h2>
+              <p>
+                정확한 지원사업 이력을 보려면 투자 조건을 다시 분석해 주세요.
+                <br />
+                새 분석에서는 정책 추천 결과가 함께 저장됩니다.
+              </p>
+              <div style={{ marginTop: "24px", display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className="btn blue"
+                  onClick={() => navigate(reanalysisPath)}
+                >
+                  투자 조건 다시 설정
+                </button>
+                <button
+                  type="button"
+                  className="btn dark"
+                  onClick={() => navigate("/support-projects")}
+                >
+                  최신 지원사업 둘러보기
+                </button>
+              </div>
+            </section>
           )}
 
           {shouldShowEmpty && (
@@ -254,10 +347,8 @@ export default function SupportProjectsFeature() {
                 selectedProject={selectedProject}
                 equipmentContext={selectedEquipmentContext}
                 finalRecommendedProjects={finalRecommendedProjects}
-                selectedProjectId={selectedProjectId}
-                onSelectProject={setSelectedProjectId}
+                policyCounters={policyCounters}
                 onOpenDetail={setDetailProject}
-                onGoDraft={() => handleGoDraft(selectedProject)}
               />
 
               <OtherMatchedPoliciesPanel

@@ -20,6 +20,7 @@ class DraftRequest(BaseModel):
     company_id: str
     equipment_id: str
     policy_id: str
+    analysis_id: str | None = None
 
 
 def _normalize_industry_code(value: Any) -> list[str]:
@@ -117,6 +118,86 @@ def _safe_number(*values: Any) -> float | int | None:
 
 def _as_dict(value: Any) -> dict:
     return value if isinstance(value, dict) else {}
+
+
+def _is_empty_policy_snapshot(snapshot: Any) -> bool:
+    if not isinstance(snapshot, dict) or not snapshot:
+        return True
+    if not snapshot.get("snapshot_version"):
+        return True
+    return False
+
+
+def _snapshot_policy_rows(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for item in snapshot.get("policies") or []:
+        if not isinstance(item, dict):
+            continue
+        policy_id = str(item.get("policy_id") or "").strip()
+        if not policy_id:
+            continue
+        rows.append(item)
+    return rows
+
+
+def _snapshot_policy_by_id(snapshot: dict[str, Any], requested_policy_id: str) -> dict[str, Any] | None:
+    requested = str(requested_policy_id or "").strip()
+    if not requested:
+        return None
+
+    return next(
+        (
+            row
+            for row in _snapshot_policy_rows(snapshot)
+            if str(row.get("policy_id") or "").strip() == requested
+        ),
+        None,
+    )
+
+
+def _matched_policy_from_snapshot(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "policy_id": str(item.get("policy_id") or ""),
+        "title": item.get("title") or "선택 지원사업",
+        "organization": item.get("organization") or "주관기관 정보 없음",
+        "reason": item.get("reason")
+        or "분석 시점에 저장된 정책 스냅샷 기준 추천 결과입니다.",
+        "scenario_match": item.get("scenario_match"),
+        "scenario_label": item.get("scenario_label"),
+        "match_score": item.get("match_score"),
+        "llm_score": item.get("llm_score"),
+        "eligible": item.get("eligible", True),
+    }
+
+
+def _policy_from_snapshot(item: dict[str, Any]) -> dict[str, Any]:
+    support_items = item.get("support_items")
+    if isinstance(support_items, list):
+        support_summary = ", ".join(
+            [str(entry).strip() for entry in support_items if str(entry).strip()]
+        )
+    else:
+        support_summary = ""
+
+    return {
+        "policy_id": str(item.get("policy_id") or ""),
+        "title": item.get("title") or "지원사업명 미확인",
+        "organization": item.get("organization"),
+        "agency": item.get("organization"),
+        "provider": item.get("organization"),
+        "max_amount": item.get("max_amount_numeric_manwon")
+        or item.get("max_amount_actual"),
+        "summary": item.get("summary") or support_summary,
+        "raw_text": item.get("summary") or support_summary,
+        "url": item.get("url"),
+        "source_url": item.get("url"),
+        "policy_url": item.get("url"),
+        "deadline": item.get("deadline"),
+        "deadline_display": item.get("deadline_display"),
+        "policy_category": item.get("policy_category"),
+        "policy_subcategory": item.get("policy_subcategory"),
+        "support_items": support_items if isinstance(support_items, list) else [],
+    }
 
 
 def _resolve_draft_scenario(policy: dict, roi_data: dict) -> tuple[str, dict]:
@@ -472,6 +553,24 @@ async def generate_draft(
         raise HTTPException(status_code=404, detail="기업 정보를 찾을 수 없습니다.")
 
     company_data = company_result.data[0]
+    prefetched_roi_output = None
+
+    if body.analysis_id:
+        roi_row = (
+            db.table("roi_output")
+            .select("*")
+            .eq("id", body.analysis_id)
+            .eq("company_id", body.company_id)
+            .limit(1)
+            .execute()
+        )
+        if not roi_row.data:
+            raise HTTPException(status_code=404, detail="遺꾩꽍 ?대젰??李얠쓣 ???놁뒿?덈떎.")
+
+        prefetched_roi_output = roi_row.data[0]
+        snapshot_equipment_id = str(prefetched_roi_output.get("equipment_id") or "").strip()
+        if snapshot_equipment_id:
+            body = body.model_copy(update={"equipment_id": snapshot_equipment_id})
 
     company = CompanyContext(
         company_id=company_data.get("company_id"),
@@ -518,49 +617,80 @@ async def generate_draft(
         scenario_b_investment_manwon=equipment_data.get("scenario_b_investment_manwon"),
     )
 
-    roi_result = (
-        db.table("roi_output")
-        .select("*")
-        .eq("company_id", body.company_id)
-        .eq("equipment_id", body.equipment_id)
-        .order("created_at", desc=True)
-        .limit(1)
-        .execute()
-    )
+    if body.analysis_id:
+        roi_row = (
+            db.table("roi_output")
+            .select("*")
+            .eq("id", body.analysis_id)
+            .eq("company_id", body.company_id)
+            .limit(1)
+            .execute()
+        )
+        if not roi_row.data:
+            raise HTTPException(status_code=404, detail="분석 이력을 찾을 수 없습니다.")
 
-    if not roi_result.data:
-        raise HTTPException(status_code=404, detail="ROI 분석 결과를 찾을 수 없습니다.")
+        roi_output = roi_row.data[0]
+        snapshot = _as_dict(roi_output.get("policy_snapshot"))
+        if _is_empty_policy_snapshot(snapshot):
+            raise HTTPException(
+                status_code=409,
+                detail="저장된 정책 정보 없음",
+            )
 
-    roi_data = roi_result.data[0].get("roi_data") or {}
+        snapshot_policy = _snapshot_policy_by_id(snapshot, body.policy_id)
+        if not snapshot_policy:
+            raise HTTPException(
+                status_code=409,
+                detail="저장된 정책 정보에서 요청한 정책을 찾을 수 없습니다.",
+            )
 
-    top_policy_result = (
-        db.table("matched_policy")
-        .select("*")
-        .eq("company_id", body.company_id)
-        .eq("equipment_id", body.equipment_id)
-        .order("match_score", desc=True)
-        .limit(5)
-        .execute()
-    )
-
-    top_policies = top_policy_result.data or []
-    selected_matched_policy = next(
-        (
-            policy
-            for policy in top_policies
-            if str(policy.get("policy_id", "")).strip() == body.policy_id
-        ),
-        None,
-    )
-
-    if not selected_matched_policy:
-        raise HTTPException(
-            status_code=400,
-            detail="신청서 초안은 추천 TOP 5 정책에 대해서만 생성할 수 있습니다.",
+        roi_data = _as_dict(roi_output.get("roi_data"))
+        selected_matched_policy = _matched_policy_from_snapshot(snapshot_policy)
+        selected_policy = _policy_from_snapshot(snapshot_policy)
+    else:
+        roi_result = (
+            db.table("roi_output")
+            .select("*")
+            .eq("company_id", body.company_id)
+            .eq("equipment_id", body.equipment_id)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
         )
 
-    policy_detail = _fetch_policy_detail_by_id(db, body.policy_id)
-    selected_policy = _merge_policy(selected_matched_policy, policy_detail)
+        if not roi_result.data:
+            raise HTTPException(status_code=404, detail="ROI 분석 결과를 찾을 수 없습니다.")
+
+        roi_data = roi_result.data[0].get("roi_data") or {}
+
+        top_policy_result = (
+            db.table("matched_policy")
+            .select("*")
+            .eq("company_id", body.company_id)
+            .eq("equipment_id", body.equipment_id)
+            .order("match_score", desc=True)
+            .limit(5)
+            .execute()
+        )
+
+        top_policies = top_policy_result.data or []
+        selected_matched_policy = next(
+            (
+                policy
+                for policy in top_policies
+                if str(policy.get("policy_id", "")).strip() == body.policy_id
+            ),
+            None,
+        )
+
+        if not selected_matched_policy:
+            raise HTTPException(
+                status_code=400,
+                detail="신청서 초안은 추천 TOP 5 정책에 대해서만 생성할 수 있습니다.",
+            )
+
+        policy_detail = _fetch_policy_detail_by_id(db, body.policy_id)
+        selected_policy = _merge_policy(selected_matched_policy, policy_detail)
 
     scenario_used, selected_roi_scenario = _resolve_draft_scenario(
         selected_policy,
@@ -654,6 +784,7 @@ async def generate_draft(
                 if saved_draft.data
                 else None
             ),
+            "analysis_id": body.analysis_id,
             "policy_id": body.policy_id,
             "company_id": body.company_id,
             "equipment_id": body.equipment_id,

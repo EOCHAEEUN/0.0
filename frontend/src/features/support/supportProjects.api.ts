@@ -17,6 +17,18 @@ const policyCardsInFlightCache = new Map<string, Promise<{ cards: SupportProject
 const policySummaryMemoryCache = new Map<string, PolicySummary>()
 const policySummaryInFlightCache = new Map<string, Promise<PolicySummary>>()
 
+export class PolicyCardsApiError extends Error {
+  status: number
+  errorCode: string
+
+  constructor(message: string, status: number, errorCode?: string | null) {
+    super(message)
+    this.name = "PolicyCardsApiError"
+    this.status = status
+    this.errorCode = typeof errorCode === "string" ? errorCode : ""
+  }
+}
+
 function getApiBase() {
   const envBase = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api"
   return String(envBase).replace(/\/$/, "")
@@ -84,7 +96,7 @@ function getCounterValue(...values: unknown[]) {
     if (numberValue !== null) return numberValue
   }
 
-  return 0
+  return null
 }
 
 function extractCounters(json: PolicyApiResponse, cards: SupportProject[]): PolicyCounters {
@@ -95,20 +107,20 @@ function extractCounters(json: PolicyApiResponse, cards: SupportProject[]): Poli
     data.database_total,
     data.total,
     json.total,
-  )
+  ) ?? cards.length
   const industryMatchedCount = getCounterValue(
     data.industry_matched_count,
     data.candidate_count,
     data.raw_candidate_count,
     data.total,
     json.total,
-  )
+  ) ?? cards.length
   const aiRecommendedCount = getCounterValue(
     data.ai_recommended_count,
     data.final_recommended_count,
-  )
+  ) ?? Math.min(cards.length, 5)
   const priorityCount = cards.length > 0 ? 1 : 0
-  const otherMatchedCount = getCounterValue(data.other_matched_count)
+  const otherMatchedCount = getCounterValue(data.other_matched_count) ?? Math.max(cards.length - Math.min(cards.length, 5), 0)
 
   return buildPolicyCounters(cards, {
     totalPolicyCount,
@@ -144,6 +156,10 @@ export async function fetchPolicyCards(
   }
   if (analysisId) {
     query.set("analysis_id", analysisId)
+  } else {
+    // /support-projects 일반 탭은 최신 정책 조회 화면이므로
+    // matched_policy 캐시보다 최신 추천 결과를 우선 조회합니다.
+    query.set("refresh", "true")
   }
   const url = buildApiUrl(`/api/analyze/support-projects?${query.toString()}`)
 
@@ -159,10 +175,12 @@ export async function fetchPolicyCards(
       // DB/API 연동 검증 단계에서는 404/504도 숨기지 않습니다.
       // analyze 라우터가 없거나 실패하면 지원사업 화면이 error 상태로 드러나야 합니다.
       if (!response.ok) {
-        throw new Error(
+        throw new PolicyCardsApiError(
           json?.message ||
             json?.error ||
             `Support projects API failed: ${response.status}`,
+          response.status,
+          (json as { error_code?: string })?.error_code ?? null,
         )
       }
 

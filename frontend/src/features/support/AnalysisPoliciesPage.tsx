@@ -4,9 +4,9 @@ import factoFitAiCharacter from "./assets/factofit-ai-character.png"
 import {
   getAnalysisConditionDraft,
   getAnalysisResult,
-  getCompanyProfileDraft,
 } from "../onboarding/onboardingState"
 import { LoadingPolicyState, ErrorPolicyState } from "./components/SupportProjectStates"
+import { PolicyDetailDialog } from "./components/SupportProjectDialogs"
 import { useSupportProjects } from "./hooks/useSupportProjects"
 import { fetchSafetyPreview, generateSafetyPreview } from "./supportProjects.api"
 import type { RequiredEvidence, SafetyPreview, SupportProject } from "./supportProjects.contract"
@@ -17,14 +17,18 @@ function getPolicyRouteId(project: SupportProject) {
   return encodeURIComponent(project.rawId || String(project.id))
 }
 
+function pickText(...values: unknown[]) {
+  for (const value of values) {
+    if (value === null || value === undefined) continue
+    const text = String(value).trim()
+    if (text) return text
+  }
+  return ""
+}
+
 function findProjectByRouteId(projects: SupportProject[], policyId?: string) {
   const decodedId = decodeURIComponent(policyId || "")
   return projects.find((project) => String(project.rawId || project.id) === decodedId) || null
-}
-
-function formatInvestment(raw?: string) {
-  const digits = String(raw ?? "").replace(/\D/g, "")
-  return digits ? `${Number(digits).toLocaleString("ko-KR")}만원` : "입력값 없음"
 }
 
 function formatAmount(project: SupportProject) {
@@ -56,6 +60,53 @@ function getPolicyReasons(project: SupportProject) {
     .slice(0, 4)
 }
 
+function getSnapshotTags(project: SupportProject) {
+  return project.tags
+    .map((tag) => String(tag || "").trim())
+    .filter(Boolean)
+    .filter((tag) => !["지원사업", "주관사 미확인", "입력값 없음"].includes(tag))
+    .filter((tag, index, list) => list.indexOf(tag) === index)
+    .slice(0, 4)
+}
+
+function formatCount(value: number) {
+  return `${Math.max(0, value).toLocaleString("ko-KR")}건`
+}
+
+function formatSnapshotCapturedAt(analysisResult: unknown, analysisData: unknown) {
+  const resultRecord =
+    analysisResult && typeof analysisResult === "object" && !Array.isArray(analysisResult)
+      ? (analysisResult as Record<string, unknown>)
+      : {}
+  const dataRecord =
+    analysisData && typeof analysisData === "object" && !Array.isArray(analysisData)
+      ? (analysisData as Record<string, unknown>)
+      : {}
+  const rawDate = pickText(
+    resultRecord.createdAt,
+    resultRecord.created_at,
+    resultRecord.analyzedAt,
+    resultRecord.analyzed_at,
+    resultRecord.analysisAt,
+    resultRecord.analysis_at,
+    dataRecord.createdAt,
+    dataRecord.created_at,
+    dataRecord.analyzedAt,
+    dataRecord.analyzed_at,
+  )
+  if (!rawDate) return ""
+
+  const date = new Date(rawDate)
+  if (Number.isNaN(date.getTime())) return rawDate.slice(0, 10)
+  return date.toLocaleString("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+}
+
 function getReviewItems(project: SupportProject) {
   const text = `${project.supportContent || ""}\n${project.description || ""}`
   const items: string[] = []
@@ -66,32 +117,6 @@ function getReviewItems(project: SupportProject) {
   if (/수혜|중복|기지원/.test(text)) items.push("최근 유사 사업 수혜 이력")
 
   return items.slice(0, 3)
-}
-
-function getReasonChips({
-  project,
-  equipmentName,
-  conditionPurpose,
-}: {
-  project: SupportProject
-  equipmentName: string
-  conditionPurpose: string
-}) {
-  const chipCandidates = [
-    project.policyCategory,
-    project.category,
-    project.scenarioLabel,
-    equipmentName,
-    conditionPurpose,
-    ...project.tags,
-  ]
-
-  return chipCandidates
-    .map((chip) => String(chip || "").trim())
-    .filter(Boolean)
-    .filter((chip) => !["지원사업", "주관사 미확인", "입력값 없음"].includes(chip))
-    .filter((chip, index, list) => list.indexOf(chip) === index)
-    .slice(0, 4)
 }
 
 function PolicyMetaGrid({ project }: { project: SupportProject }) {
@@ -320,14 +345,16 @@ function EmptyPolicies({ analysisId }: { analysisId: string }) {
 function HeroSection({
   summary,
   equipmentName,
+  snapshotCapturedAt,
 }: {
   summary: {
-    totalPolicyCount: number
-    activePolicyCount: number
+    snapshotPolicyCount: number
     matchedPolicyCount: number
+    candidatePolicyCount: number
     priorityPolicyCount: number
   }
   equipmentName: string
+  snapshotCapturedAt: string
 }) {
   return (
     <div className="ff-policy-hero">
@@ -339,33 +366,31 @@ function HeroSection({
           지원사업을 찾았습니다.
         </h1>
         <p>
-          전체 정책 DB {summary.totalPolicyCount.toLocaleString("ko-KR")}건 중,
-          <br />
-          현재 기업·설비 조건과 연결되는 공고{" "}
-          {summary.matchedPolicyCount.toLocaleString("ko-KR")}건을
-          <br />
-          우선순위로 정리했습니다.
+          이 분석 당시 저장된 정책 추천 결과입니다.
         </p>
+        {snapshotCapturedAt && (
+          <p className="ff-policy-hero-snapshot-meta">분석 시점: {snapshotCapturedAt}</p>
+        )}
       </div>
 
       <div className="ff-policy-hero-right">
         <img className="ff-policy-bot" src={factoFitAiCharacter} alt="FactoFit AI" />
         <div className="ff-hero-stats">
           <div className="ff-hero-stat">
-            <span>정책 DB 전체</span>
-            <strong>{summary.totalPolicyCount.toLocaleString("ko-KR")}건</strong>
+            <span>분석 당시 정책 수</span>
+            <strong>{formatCount(summary.snapshotPolicyCount)}</strong>
           </div>
           <div className="ff-hero-stat">
-            <span>현재 확인 가능 공고</span>
-            <strong>{summary.activePolicyCount.toLocaleString("ko-KR")}건</strong>
+            <span>내 조건 매칭 수</span>
+            <strong>{formatCount(summary.matchedPolicyCount)}</strong>
           </div>
           <div className="ff-hero-stat">
-            <span>내 조건 매칭 공고</span>
-            <strong>{summary.matchedPolicyCount.toLocaleString("ko-KR")}건</strong>
+            <span>추천 후보 수</span>
+            <strong>{formatCount(summary.candidatePolicyCount)}</strong>
           </div>
           <div className="ff-hero-stat">
             <span>우선 검토 정책</span>
-            <strong>{summary.priorityPolicyCount.toLocaleString("ko-KR")}건</strong>
+            <strong>{formatCount(summary.priorityPolicyCount)}</strong>
           </div>
         </div>
       </div>
@@ -375,55 +400,49 @@ function HeroSection({
 
 function PriorityPolicyCard({
   project,
-  analysisId,
-  equipmentName,
-  conditionPurpose,
-  connectedItems,
+  onOpenDetail,
 }: {
   project: SupportProject
-  analysisId: string
-  equipmentName: string
-  conditionPurpose: string
-  connectedItems: string[]
+  onOpenDetail: (project: SupportProject) => void
 }) {
-  const navigate = useNavigate()
-  const policyRouteId = getPolicyRouteId(project)
   const reviewItems = getReviewItems(project)
-  const reasonChips = getReasonChips({
-    project,
-    equipmentName,
-    conditionPurpose,
-  })
-  const reviewLine =
-    reviewItems.length > 0
-      ? reviewItems.join(" · ")
-      : "세부 업종코드 · 필수 제출서류 · 유사 사업 수혜 이력"
-  const visibleReviewItems =
-    reviewItems.length > 0
-      ? reviewItems
-      : ["세부 업종코드", "필수 제출서류", "최근 유사 사업 수혜 이력"]
+  const reasons = getPolicyReasons(project)
+  const snapshotTags = getSnapshotTags(project)
+  const scoreRatio = Math.min(100, Math.max(0, project.fitScore))
+  const dday = getDday(project.deadlineRaw)
+  const metaItems = [
+    project.agency && project.agency !== "주관사 미확인" ? project.agency : "",
+    project.amountValueManwon !== null ? project.amount : "",
+    project.deadline && project.deadline !== "마감일 미정" ? project.deadline : "",
+    dday && dday !== "마감일 미정" ? dday : "",
+  ].filter(Boolean)
 
   return (
     <section className="ff-priority-card">
       <div className="ff-priority-final-grid">
         <div className="ff-priority-final-main">
           <span className="ff-policy-badge blue">우선 검토 정책</span>
+          {metaItems.length > 0 && (
+            <p className="ff-policy-subline">{metaItems.join(" · ")}</p>
+          )}
           <h2>{project.title}</h2>
-          <p className="ff-policy-subline">
-            {project.agency || "주관기관 공고 확인"} · {formatAmount(project)} ·{" "}
-            {formatDeadline(project)}
-          </p>
 
-          <div className="ff-short-reason">
-            <strong>이 공고를 먼저 보는 이유</strong>
-            <p>현재 기업·설비 조건과 정책 목적의 연결도가 가장 높습니다.</p>
-          </div>
-
-          {reasonChips.length > 0 && (
-            <div className="ff-reason-chip-row" aria-label="추천 이유">
-              {reasonChips.map((chip) => (
+          {snapshotTags.length > 0 && (
+            <div className="ff-reason-chip-row" aria-label="정책 태그">
+              {snapshotTags.map((chip) => (
                 <span key={chip}>{chip}</span>
               ))}
+            </div>
+          )}
+
+          {reasons.length > 0 && (
+            <div className="ff-short-reason">
+              <strong>이 공고를 먼저 보는 이유</strong>
+              <ul>
+                {reasons.slice(0, 3).map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
             </div>
           )}
 
@@ -431,9 +450,7 @@ function PriorityPolicyCard({
             <button
               type="button"
               className="ff-policy-primary"
-              onClick={() => {
-                navigate(`/analysis/${analysisId}/policies/${policyRouteId}`)
-              }}
+              onClick={() => onOpenDetail(project)}
             >
               지원 조건 확인하기
             </button>
@@ -447,10 +464,6 @@ function PriorityPolicyCard({
               </button>
             )}
           </div>
-
-          <p className="ff-policy-next-hint">
-            다음 단계: 공고 조건 확인 → 필요 서류 확인 → 신청서 초안 작성
-          </p>
         </div>
 
         <aside className="ff-priority-final-side">
@@ -462,11 +475,15 @@ function PriorityPolicyCard({
             </strong>
           </div>
 
-          {connectedItems.length > 0 && (
+          <div className="ff-priority-score-progress" aria-hidden="true">
+            <span style={{ width: `${scoreRatio}%` }} />
+          </div>
+
+          {snapshotTags.length > 0 && (
             <div className="ff-side-check-block">
               <h3>현재 조건과 연결된 항목</h3>
               <ul>
-                {connectedItems.slice(0, 3).map((item) => (
+                {snapshotTags.slice(0, 3).map((item) => (
                   <li key={item}>
                     <b>✓</b>
                     {item}
@@ -476,23 +493,20 @@ function PriorityPolicyCard({
             </div>
           )}
 
-          <div className="ff-side-check-block warn">
-            <h3>신청 전 확인 필요</h3>
-            <ul>
-              {visibleReviewItems.slice(0, 3).map((item) => (
-                <li key={item}>
-                  <b>!</b>
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
+          {reviewItems.length > 0 && (
+            <div className="ff-side-check-block warn">
+              <h3>신청 전 확인 필요</h3>
+              <ul>
+                {reviewItems.slice(0, 3).map((item) => (
+                  <li key={item}>
+                    <b>!</b>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </aside>
-      </div>
-
-      <div className="ff-policy-checkline">
-        <strong>신청 전 확인:</strong> {reviewLine}
-        <small>공고문에서 최종 자격과 제외 조건을 확인해주세요.</small>
       </div>
     </section>
   )
@@ -506,12 +520,20 @@ function PolicyComparisonTabs({
   analysisId: string
 }) {
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState<"priority" | "all">("priority")
-  const [showAll, setShowAll] = useState(false)
-  const priorityProjects = projects.slice(1, 5)
-  const visibleProjects = showAll ? projects : projects.slice(0, 5)
+  const candidateProjects = projects.slice(1, 5)
 
-  if (projects.length <= 1) return null
+  if (projects.length <= 1) {
+    return (
+      <section className="ff-policy-section-card">
+        <div className="ff-policy-section-title">
+          <div>
+            <h2>다른 지원사업 비교</h2>
+            <p>비교 가능한 추가 후보 정책이 없습니다.</p>
+          </div>
+        </div>
+      </section>
+    )
+  }
 
   return (
     <section className="ff-policy-section-card">
@@ -520,93 +542,84 @@ function PolicyComparisonTabs({
           <h2>다른 지원사업 비교</h2>
         </div>
       </div>
-
-      <div className="ff-policy-tabs" role="tablist" aria-label="지원사업 비교">
-        <button
-          type="button"
-          className={activeTab === "priority" ? "active" : ""}
-          onClick={() => setActiveTab("priority")}
-        >
-          우선순위 후보 5건
-        </button>
-        <button
-          type="button"
-          className={activeTab === "all" ? "active" : ""}
-          onClick={() => setActiveTab("all")}
-        >
-          전체 매칭 {projects.length}건
-        </button>
-      </div>
-
-      {activeTab === "priority" && (
-        <div className="ff-policy-list">
-          {priorityProjects.map((project, index) => (
+      <div className="ff-policy-list">
+        {candidateProjects.map((project, index) => {
+          const scoreRatio = Math.min(100, Math.max(0, project.fitScore))
+          return (
             <article
-              className="ff-policy-row ff-policy-row-soft"
-              key={`${project.rawId}-${project.title}`}
+              className="ff-policy-candidate-row"
+              key={`${project.rawId}-${project.title}-${index}`}
               onClick={() =>
                 navigate(`/analysis/${analysisId}/policies/${getPolicyRouteId(project)}`)
               }
             >
               <span className="ff-policy-rank">{index + 2}</span>
-              <span>
+              <div className="ff-policy-candidate-main">
                 <strong>{project.title}</strong>
-                <small>
-                  {project.agency || "주관기관 공고 확인"} · 매칭 적합도 {project.fitScore}점
-                </small>
-              </span>
-              <span className="ff-policy-badge gray">추가 검토</span>
-            </article>
-          ))}
-        </div>
-      )}
-
-      {activeTab === "all" && (
-        <>
-          <div className="ff-policy-table-head" aria-hidden="true">
-            <span>순위</span>
-            <span>정책명</span>
-            <span>주관기관</span>
-            <span>매칭 적합도</span>
-            <span>상태</span>
-          </div>
-
-          <div className="ff-policy-list">
-            {visibleProjects.map((project, index) => (
-              <article
-                className="ff-policy-table-row"
-                key={`${project.rawId}-${project.title}-${index}`}
-                onClick={() =>
-                  navigate(`/analysis/${analysisId}/policies/${getPolicyRouteId(project)}`)
-                }
-              >
-                <span className="ff-policy-rank">{index + 1}</span>
-                <span>
-                  <strong>{project.title}</strong>
-                  <small>{project.policyCategory || "정책 분류 공고 확인"}</small>
-                </span>
-                <span>{project.agency || "공고 확인"}</span>
-                <span>{project.fitScore}점</span>
-                <span className="ff-policy-badge gray">
-                  {index === 0 ? "우선 검토" : "추가 검토"}
-                </span>
-              </article>
-            ))}
-          </div>
-
-          {!showAll && projects.length > 5 && (
-            <div className="ff-policy-more">
+                <small>{project.agency && project.agency !== "주관사 미확인" ? project.agency : ""}</small>
+              </div>
+              <div className="ff-policy-candidate-score">
+                <p>{project.fitScore}점</p>
+                <div className="ff-policy-candidate-progress" aria-hidden="true">
+                  <span style={{ width: `${scoreRatio}%` }} />
+                </div>
+              </div>
               <button
                 type="button"
-                className="ff-policy-secondary"
-                onClick={() => setShowAll(true)}
+                className="ff-policy-secondary ff-policy-candidate-button"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  navigate(`/analysis/${analysisId}/policies/${getPolicyRouteId(project)}`)
+                }}
               >
-                더 보기 ({projects.length - 5}건 더)
+                상세 보기
               </button>
-            </div>
-          )}
-        </>
-      )}
+            </article>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
+function LegacySnapshotMissingState({
+  analysisId,
+  equipmentId,
+}: {
+  analysisId: string
+  equipmentId: string
+}) {
+  const navigate = useNavigate()
+  const reanalysisPath =
+    analysisId && equipmentId
+      ? `/analysis/new?mode=reanalysis&equipmentId=${encodeURIComponent(equipmentId)}&parentAnalysisId=${encodeURIComponent(analysisId)}`
+      : "/analysis/new"
+
+  return (
+    <section className="ff-policy-empty">
+      <span className="ff-policy-badge gray">정책 이력 없음</span>
+      <h2>이 분석은 정책 이력 저장 전 생성되었습니다.</h2>
+      <p>
+        정확한 지원사업 이력을 보려면 투자 조건을 다시 분석해 주세요.
+        <br />
+        새 분석에서는 정책 추천 결과가 함께 저장됩니다.
+      </p>
+      <div className="ff-policy-actions">
+        <button
+          type="button"
+          className="ff-policy-primary"
+          onClick={() => navigate(reanalysisPath)}
+        >
+          투자 조건 다시 설정
+        </button>
+        <button
+          type="button"
+          className="ff-policy-secondary"
+          onClick={() => navigate("/support-projects")}
+        >
+          최신 지원사업 둘러보기
+        </button>
+      </div>
     </section>
   )
 }
@@ -615,50 +628,70 @@ function usePolicyPageContext() {
   const { id = "latest" } = useParams()
   const analysisResult = getAnalysisResult(id)
   const condition = getAnalysisConditionDraft()
-  const profile = getCompanyProfileDraft()
   const support = useSupportProjects({
     analysisId: id && id !== "latest" ? id : undefined,
   })
+  const equipmentId = pickText(
+    (analysisResult as Record<string, unknown> | null)?.equipmentId,
+    (analysisResult as Record<string, unknown> | null)?.equipment_id,
+    (support.analysisData as Record<string, unknown> | null)?.equipment_id,
+    (support.analysisData as Record<string, unknown> | null)?.equipmentId,
+    support.analysisData.equipment?.equipment_id,
+    window.localStorage.getItem("factofit_selected_equipment_id"),
+    window.localStorage.getItem("factofit_equipment_id"),
+  )
   const equipmentName =
     analysisResult?.equipmentName ||
     support.selectedEquipmentContext.equipmentName ||
     condition.equipmentName ||
     "검토 설비"
-  const investmentAmount = formatInvestment(condition.investmentAmount || condition.investmentRange)
-  const connectedItems = [
-    profile.industry || profile.industryCode ? "업종" : "",
-    profile.regionSido || profile.regionSigungu ? "지역" : "",
-    condition.equipmentName || condition.equipmentCategory || condition.purpose
-      ? "설비·투자 목적"
-      : "",
-  ].filter(Boolean)
 
   return {
     analysisId: id,
     analysisResult,
     condition,
     support,
+    equipmentId,
     equipmentName,
-    investmentAmount,
-    connectedItems,
   }
 }
 
 export function AnalysisPoliciesPage() {
   const navigate = useNavigate()
-  const { analysisId, support, equipmentName, condition, connectedItems } = usePolicyPageContext()
+  const { analysisId, analysisResult, support, equipmentId, equipmentName } = usePolicyPageContext()
+  const [detailProject, setDetailProject] = useState<SupportProject | null>(null)
   const policies = support.policyCards
   const topPolicy = policies[0]
+  const isSnapshotMissing = support.policyErrorCode === "POLICY_SNAPSHOT_MISSING"
   const summary = {
-    totalPolicyCount: support.policySummary.totalPolicyCount,
-    activePolicyCount: support.policySummary.activePolicyCount,
-    matchedPolicyCount: support.policySummary.matchedPolicyCount || policies.length,
-    priorityPolicyCount:
-      support.policySummary.priorityPolicyCount || (topPolicy ? 1 : 0),
+    snapshotPolicyCount: policies.length,
+    matchedPolicyCount: policies.length,
+    candidatePolicyCount: Math.max(policies.length - 1, 0),
+    priorityPolicyCount: topPolicy ? 1 : 0,
+  }
+  const snapshotCapturedAt = formatSnapshotCapturedAt(analysisResult, support.analysisData)
+  const handleGoDraftFromDetail = (project: SupportProject) => {
+    const policyId = project.rawId || String(project.id)
+    navigate(`/analysis/${analysisId}/policies/${getPolicyRouteId(project)}/application`, {
+      state: {
+        analysisId,
+        policyId,
+        policy_id: policyId,
+        selectedProject: project,
+      },
+    })
   }
 
   return (
     <main className="ff-policy-page">
+      <PolicyDetailDialog
+        project={detailProject}
+        onClose={() => setDetailProject(null)}
+        onCreateDraft={() => {
+          if (!detailProject) return
+          handleGoDraftFromDetail(detailProject)
+        }}
+      />
       <section className="ff-policy-shell">
         <button
           type="button"
@@ -671,11 +704,16 @@ export function AnalysisPoliciesPage() {
         <HeroSection
           summary={summary}
           equipmentName={equipmentName}
+          snapshotCapturedAt={snapshotCapturedAt}
         />
 
         {support.policyState === "loading" && <LoadingPolicyState />}
         {support.policyState === "error" && (
-          <ErrorPolicyState onBackToRoi={() => navigate(`/analysis/${analysisId}/result`)} />
+          isSnapshotMissing ? (
+            <LegacySnapshotMissingState analysisId={analysisId} equipmentId={equipmentId} />
+          ) : (
+            <ErrorPolicyState onBackToRoi={() => navigate(`/analysis/${analysisId}/result`)} />
+          )
         )}
         {support.policyState === "empty" && <EmptyPolicies analysisId={analysisId} />}
 
@@ -683,10 +721,7 @@ export function AnalysisPoliciesPage() {
           <>
             <PriorityPolicyCard
               project={topPolicy}
-              analysisId={analysisId}
-              equipmentName={equipmentName}
-              conditionPurpose={condition.purpose}
-              connectedItems={connectedItems}
+              onOpenDetail={setDetailProject}
             />
             <PolicyComparisonTabs projects={policies} analysisId={analysisId} />
           </>

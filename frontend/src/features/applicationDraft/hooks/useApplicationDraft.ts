@@ -50,6 +50,7 @@ type DraftParams = {
   companyId: string
   equipmentId: string
   policyId: string
+  analysisId?: string
 }
 
 type RoutePolicyContext = {
@@ -353,7 +354,8 @@ function resolveDraftParams(
   const selectedProjectFromStorage = getSelectedProjectFromStorage()
   const analysisData = getStoredAnalysisData()
   const routePolicyId = readText(routeContext?.policyId)
-  const isAnalysisPolicyRoute = Boolean(routeContext?.analysisId && routePolicyId)
+  const routeAnalysisId = readText(routeContext?.analysisId)
+  const isAnalysisPolicyRoute = Boolean(routeAnalysisId && routePolicyId)
   const routeProject = asDict(routeContext?.selectedProject) ?? selectedProjectFromState ?? null
 
   if (isAnalysisPolicyRoute && !routeProject) return null
@@ -420,6 +422,12 @@ function resolveDraftParams(
     readLocalStorage("factofit_selected_policy_id") ||
     readLocalStorage("selected_policy_id") ||
     readLocalStorage("policy_id")
+  const analysisId =
+    routeAnalysisId ||
+    pickText(state, ["analysisId", "analysis_id", "id"]) ||
+    pickText(selectedProjectFromState, ["analysisId", "analysis_id"]) ||
+    readLocalStorage("factofit_analysis_id") ||
+    readLocalStorage("analysis_id")
 
   if (!companyId || !equipmentId || !policyId) return null
 
@@ -427,6 +435,7 @@ function resolveDraftParams(
     companyId,
     equipmentId,
     policyId,
+    analysisId: analysisId || undefined,
   }
 }
 
@@ -675,6 +684,7 @@ export function useApplicationDraft(
             company_id: params.companyId,
             equipment_id: params.equipmentId,
             policy_id: params.policyId,
+            ...(params.analysisId ? { analysis_id: params.analysisId } : {}),
           }),
         })
 

@@ -310,6 +310,66 @@ function getRecommendationDetail(roiResult: ApiRecord) {
   return getText(ai, "summary") || getText(roiResult, "summary", "message", "recommendation")
 }
 
+function compactScenario(record: ApiRecord) {
+  const compact: ApiRecord = {}
+  const numericKeys = [
+    "investment_manwon",
+    "subsidy_manwon",
+    "net_investment_manwon",
+    "net_cost_manwon",
+    "annual_net_benefit_manwon",
+    "annual_saving_manwon",
+    "saving_manwon",
+    "roi_pct",
+    "roi_percent",
+    "payback_years",
+    "paybackYears",
+  ]
+
+  for (const key of numericKeys) {
+    const value = getNumber(record, key)
+    if (value !== null) compact[key] = value
+  }
+
+  const policyApplication = asRecord(record.policy_application)
+  const policyStatus = getText(policyApplication, "status")
+  const supportAmount = getNumber(policyApplication, "applied_support_manwon")
+  if (policyStatus || supportAmount !== null) {
+    compact.policy_application = {
+      ...(policyStatus ? { status: policyStatus } : {}),
+      ...(supportAmount !== null ? { applied_support_manwon: supportAmount } : {}),
+    }
+  }
+
+  return compact
+}
+
+function buildCompactRoiResult(roiResult: ApiRecord) {
+  const scenarioA = compactScenario(getFirstRecord(roiResult.scenario_a, roiResult.scenarioA))
+  const scenarioB = compactScenario(getFirstRecord(roiResult.scenario_b, roiResult.scenarioB))
+  const aiRecommendation = asRecord(roiResult.ai_recommendation)
+  const aiSummary = getText(aiRecommendation, "summary")
+  const aiBullets = Array.isArray(aiRecommendation.reason_bullets)
+    ? aiRecommendation.reason_bullets
+      .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      .slice(0, 3)
+    : []
+
+  return {
+    recommended: normalizeRecommended(roiResult.recommended),
+    ...(Object.keys(scenarioA).length > 0 ? { scenario_a: scenarioA } : {}),
+    ...(Object.keys(scenarioB).length > 0 ? { scenario_b: scenarioB } : {}),
+    ...(aiSummary || aiBullets.length > 0
+      ? {
+        ai_recommendation: {
+          ...(aiSummary ? { summary: aiSummary } : {}),
+          ...(aiBullets.length > 0 ? { reason_bullets: aiBullets } : {}),
+        },
+      }
+      : {}),
+  }
+}
+
 function getRecommendationTitle(policyCount: number) {
   void policyCount
   return "현재 조건에서 투자 검토를 권장합니다."
@@ -372,8 +432,7 @@ function buildSnapshot(
     recommendedScenario: recommended,
     companyId,
     equipmentId,
-    roiResult,
-    policies,
+    roiResult: buildCompactRoiResult(roiResult),
     policyStatus: typeof data.policy_status === "string" ? data.policy_status : undefined,
     policyError: typeof data.policy_error === "string" ? data.policy_error : null,
     createdAt: new Date().toISOString(),
@@ -564,7 +623,6 @@ export async function runOnboardingAnalysis(
 
   return {
     ...buildSnapshot(id, condition, companyId, equipmentId, analyzeJson),
-    analysisInput: { ...condition },
   }
 }
 
@@ -636,12 +694,17 @@ export async function runExistingEquipmentAnalysis(
   equipmentId: string,
 ) {
   void profile
+  const equipmentPayload = buildEquipmentPayload(condition)
+  await requestJson(`/api/equipment/${encodeURIComponent(equipmentId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(equipmentPayload),
+  })
+
   const query = new URLSearchParams({ company_id: companyId, equipment_id: equipmentId })
   const analyzeJson = (await requestJson(`/api/analyze?${query.toString()}`, {
     method: "POST",
   })) as ApiRecord
   return {
     ...buildSnapshot(id, condition, companyId, equipmentId, analyzeJson),
-    analysisInput: { ...condition },
   }
 }

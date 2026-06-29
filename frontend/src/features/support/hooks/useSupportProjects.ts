@@ -5,7 +5,12 @@ import type {
   PolicyState,
   SupportProject,
 } from "../supportProjects.contract"
-import { fetchPolicyCards, fetchPolicySummary, getStoredCompanyId } from "../supportProjects.api"
+import {
+  fetchPolicyCards,
+  fetchPolicySummary,
+  getStoredCompanyId,
+  PolicyCardsApiError,
+} from "../supportProjects.api"
 import {
   buildPolicyCounters,
   getAnalysisFingerprint,
@@ -39,6 +44,8 @@ export function useSupportProjects(options?: { analysisId?: string }) {
     buildPolicyCounters([]),
   )
   const [policySummary, setPolicySummary] = useState<PolicySummary>(EMPTY_POLICY_SUMMARY)
+  const [policyErrorCode, setPolicyErrorCode] = useState("")
+  const [policyErrorMessage, setPolicyErrorMessage] = useState("")
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null)
   const [detailProject, setDetailProject] = useState<SupportProject | null>(null)
 
@@ -80,15 +87,19 @@ export function useSupportProjects(options?: { analysisId?: string }) {
       setPolicySummary(summary)
       setSelectedProjectId(null)
       setDetailProject(null)
+      setPolicyErrorCode("")
+      setPolicyErrorMessage("")
       setPolicyState("empty")
     }
 
-    function applyErrorState() {
+    function applyErrorState(errorCode = "", message = "") {
       setPolicyCards([])
       setPolicyCounters(buildPolicyCounters([]))
       setPolicySummary(EMPTY_POLICY_SUMMARY)
       setSelectedProjectId(null)
       setDetailProject(null)
+      setPolicyErrorCode(errorCode)
+      setPolicyErrorMessage(message)
       setPolicyState("error")
     }
 
@@ -100,6 +111,8 @@ export function useSupportProjects(options?: { analysisId?: string }) {
 
       try {
         setPolicyState("loading")
+        setPolicyErrorCode("")
+        setPolicyErrorMessage("")
 
         const [result, summary] = await Promise.all([
           fetchPolicyCards(companyId, equipmentId, analysisFingerprint, analysisId),
@@ -123,14 +136,14 @@ export function useSupportProjects(options?: { analysisId?: string }) {
         setPolicyCards(rankedCards)
         setPolicySummary({
           ...summary,
-          matchedPolicyCount: summary.matchedPolicyCount || rankedCards.length,
-          priorityPolicyCount: summary.priorityPolicyCount || (rankedCards.length > 0 ? 1 : 0),
+          matchedPolicyCount: summary.matchedPolicyCount ?? rankedCards.length,
+          priorityPolicyCount: summary.priorityPolicyCount ?? (rankedCards.length > 0 ? 1 : 0),
         })
         setPolicyCounters(
           buildPolicyCounters(rankedCards, {
             ...result.counters,
             industryMatchedCount:
-              result.counters.industryMatchedCount || rankedCards.length,
+              result.counters.industryMatchedCount ?? rankedCards.length,
             aiRecommendedCount,
             priorityCount: aiRecommendedCount > 0 ? 1 : 0,
             otherMatchedCount: Math.max(
@@ -145,7 +158,11 @@ export function useSupportProjects(options?: { analysisId?: string }) {
         console.error("정책 추천 API 호출 실패:", error)
 
         if (!ignore) {
-          applyErrorState()
+          if (error instanceof PolicyCardsApiError) {
+            applyErrorState(error.errorCode, error.message)
+          } else {
+            applyErrorState("", error instanceof Error ? error.message : "")
+          }
         }
       }
     }
@@ -186,6 +203,8 @@ export function useSupportProjects(options?: { analysisId?: string }) {
     otherMatchedProjects,
     policyCounters,
     policySummary,
+    policyErrorCode,
+    policyErrorMessage,
     selectedProject,
     selectedProjectId,
     detailProject,

@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom"
+import { BrowserRouter, Navigate, Routes, Route, useParams } from "react-router-dom"
 
 import MainPage from "./pages/MainPage"
 import LoginPage from "./pages/LoginPage"
@@ -17,13 +17,18 @@ import EquipmentSetupPage from "./features/onboarding/pages/EquipmentSetupPage"
 import AnalysisNewPage from "./features/onboarding/pages/AnalysisNewPage"
 import AnalysisReviewPage from "./features/onboarding/pages/AnalysisReviewPage"
 import AnalysisResultPage from "./features/onboarding/pages/AnalysisResultPage"
-import {
-  AnalysisPoliciesPage,
-  AnalysisPolicyDetailPage,
-} from "./features/support/AnalysisPoliciesPage"
 
 // 공통 레이아웃 (GlobalHeader + 인증 가드 포함)
 import AuthenticatedLayout from "./components/layout/AuthenticatedLayout"
+
+function AnalysisPoliciesRedirect() {
+  const { id, policyId } = useParams()
+  const query = new URLSearchParams()
+  if (id) query.set("analysisId", id)
+  if (policyId) query.set("policyId", policyId)
+  const queryText = query.toString()
+  return <Navigate to={queryText ? `/support-projects?${queryText}` : "/support-projects"} replace />
+}
 
 function App() {
   return (
@@ -60,11 +65,8 @@ function App() {
           <Route path="/analysis/:id" element={<AnalysisResultPage />} />
 
           {/* 지원사업 추천 */}
-          <Route path="/analysis/:id/policies" element={<AnalysisPoliciesPage />} />
-          <Route
-            path="/analysis/:id/policies/:policyId"
-            element={<AnalysisPolicyDetailPage />}
-          />
+          <Route path="/analysis/:id/policies" element={<AnalysisPoliciesRedirect />} />
+          <Route path="/analysis/:id/policies/:policyId" element={<AnalysisPoliciesRedirect />} />
           <Route
             path="/analysis/:id/policies/:policyId/application"
             element={<ApplicationDraftPage />}

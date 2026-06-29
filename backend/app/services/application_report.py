@@ -61,6 +61,111 @@ def _first(rows: list[dict] | None) -> dict:
     return rows[0] if rows else {}
 
 
+def _as_dict(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _is_empty_policy_snapshot(snapshot: Any) -> bool:
+    if not isinstance(snapshot, dict) or not snapshot:
+        return True
+    if not snapshot.get("snapshot_version"):
+        return True
+    return False
+
+
+def _snapshot_policy_rows(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for item in snapshot.get("policies") or []:
+        if not isinstance(item, dict):
+            continue
+        policy_id = str(item.get("policy_id") or "").strip()
+        if not policy_id:
+            continue
+        rows.append(item)
+    return rows
+
+
+def _snapshot_policy_by_id(
+    snapshot: dict[str, Any],
+    *,
+    requested_policy_id: str | None,
+) -> dict[str, Any] | None:
+    rows = _snapshot_policy_rows(snapshot)
+    if not rows:
+        return None
+
+    requested = str(requested_policy_id or "").strip()
+    if requested:
+        return next(
+            (
+                row
+                for row in rows
+                if str(row.get("policy_id") or "").strip() == requested
+            ),
+            None,
+        )
+
+    preferred_id = str(snapshot.get("recommended_policy_id") or "").strip()
+    if preferred_id:
+        preferred = next(
+            (
+                row
+                for row in rows
+                if str(row.get("policy_id") or "").strip() == preferred_id
+            ),
+            None,
+        )
+        if preferred:
+            return preferred
+    return rows[0]
+
+
+def _matched_policy_from_snapshot(item: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "policy_id": str(item.get("policy_id") or ""),
+        "title": item.get("title") or "선택 지원사업",
+        "organization": item.get("organization") or "주관기관 정보 없음",
+        "reason": item.get("reason")
+        or "분석 시점에 저장된 정책 스냅샷 기준 추천 결과입니다.",
+        "scenario_match": item.get("scenario_match"),
+        "scenario_label": item.get("scenario_label"),
+        "match_score": item.get("match_score"),
+        "llm_score": item.get("llm_score"),
+        "eligible": item.get("eligible", True),
+    }
+
+
+def _policy_from_snapshot(item: dict[str, Any]) -> dict[str, Any]:
+    support_items = item.get("support_items")
+    if isinstance(support_items, list):
+        support_summary = ", ".join(
+            [str(entry).strip() for entry in support_items if str(entry).strip()]
+        )
+    else:
+        support_summary = ""
+
+    return {
+        "policy_id": str(item.get("policy_id") or ""),
+        "title": item.get("title") or "지원사업명 미확인",
+        "organization": item.get("organization"),
+        "agency": item.get("organization"),
+        "provider": item.get("organization"),
+        "max_amount": item.get("max_amount_numeric_manwon")
+        or item.get("max_amount_actual"),
+        "summary": item.get("summary") or support_summary,
+        "eligibility_text": item.get("eligibility_text"),
+        "required_documents_json": item.get("required_documents_json") or [],
+        "deadline": item.get("deadline"),
+        "deadline_display": item.get("deadline_display"),
+        "source_url": item.get("url"),
+        "url": item.get("url"),
+        "source_name": item.get("source_name"),
+        "policy_category": item.get("policy_category"),
+        "policy_subcategory": item.get("policy_subcategory"),
+        "support_items": support_items if isinstance(support_items, list) else [],
+    }
+
+
 def _as_list(value: Any) -> list[str]:
     if value is None:
         return []
@@ -438,6 +543,7 @@ def load_application_report_data(
     equipment_id: str,
     policy_id: str | None = None,
     *,
+    analysis_id: str | None = None,
     user_id: str | None = None,
     tone: str = "submission",
 ) -> dict:
@@ -485,50 +591,81 @@ def load_application_report_data(
         raise ValueError("설비 정보를 찾을 수 없습니다.")
     equipment_id = str(equipment.get("equipment_id") or equipment_id)
 
-    roi_output = _first(
-        db.table("roi_output")
-        .select("*")
-        .eq("company_id", company_id)
-        .eq("equipment_id", equipment_id)
-        .order("created_at", desc=True)
-        .limit(1)
-        .execute()
-        .data
-    )
-    if not roi_output:
-        roi_output = {}
+    snapshot_policy: dict[str, Any] | None = None
+    if analysis_id:
+        roi_output = _first(
+            db.table("roi_output")
+            .select("*")
+            .eq("id", analysis_id)
+            .eq("company_id", company_id)
+            .eq("equipment_id", equipment_id)
+            .limit(1)
+            .execute()
+            .data
+        )
+        if not roi_output:
+            raise ValueError("분석 이력을 찾을 수 없습니다.")
 
-    matched_query = (
-        db.table("matched_policy")
-        .select("*")
-        .eq("company_id", company_id)
-        .eq("equipment_id", equipment_id)
-    )
-    if policy_id:
-        matched_query = matched_query.eq("policy_id", policy_id)
-    matched_policy = _first(
-        matched_query.order("match_score", desc=True).limit(1).execute().data
-    )
+        snapshot = _as_dict(roi_output.get("policy_snapshot"))
+        if _is_empty_policy_snapshot(snapshot):
+            raise ValueError("저장된 정책 정보 없음")
 
-    policy_id = str(matched_policy.get("policy_id") or policy_id or "")
-    policy = _first(
-        db.table("policy").select("*").eq("policy_id", policy_id).limit(1).execute().data
-    )
-    if not matched_policy:
-        matched_policy = {
-            "policy_id": policy_id,
-            "title": policy.get("title") or "선택 지원사업",
-            "organization": (
-                policy.get("organization")
-                or policy.get("agency")
-                or policy.get("provider")
-                or "주관기관 정보 없음"
-            ),
-            "reason": "추천 캐시가 없어 선택한 공고 정보를 기준으로 PDF를 생성합니다.",
-            "scenario_match": None,
-            "scenario_label": None,
-            "match_score": None,
-        }
+        snapshot_policy = _snapshot_policy_by_id(
+            snapshot,
+            requested_policy_id=policy_id,
+        )
+        if not snapshot_policy:
+            raise ValueError("저장된 정책 정보에서 요청한 정책을 찾을 수 없습니다.")
+    else:
+        roi_output = _first(
+            db.table("roi_output")
+            .select("*")
+            .eq("company_id", company_id)
+            .eq("equipment_id", equipment_id)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+            .data
+        )
+        if not roi_output:
+            roi_output = {}
+
+    if snapshot_policy:
+        matched_policy = _matched_policy_from_snapshot(snapshot_policy)
+        policy = _policy_from_snapshot(snapshot_policy)
+        policy_id = str(snapshot_policy.get("policy_id") or "")
+    else:
+        matched_query = (
+            db.table("matched_policy")
+            .select("*")
+            .eq("company_id", company_id)
+            .eq("equipment_id", equipment_id)
+        )
+        if policy_id:
+            matched_query = matched_query.eq("policy_id", policy_id)
+        matched_policy = _first(
+            matched_query.order("match_score", desc=True).limit(1).execute().data
+        )
+
+        policy_id = str(matched_policy.get("policy_id") or policy_id or "")
+        policy = _first(
+            db.table("policy").select("*").eq("policy_id", policy_id).limit(1).execute().data
+        )
+        if not matched_policy:
+            matched_policy = {
+                "policy_id": policy_id,
+                "title": policy.get("title") or "선택 지원사업",
+                "organization": (
+                    policy.get("organization")
+                    or policy.get("agency")
+                    or policy.get("provider")
+                    or "주관기관 정보 없음"
+                ),
+                "reason": "추천 캐시가 없어 선택한 공고 정보를 기준으로 PDF를 생성합니다.",
+                "scenario_match": None,
+                "scenario_label": None,
+                "match_score": None,
+            }
     draft = _first(
         db.table("draft_result")
         .select("*")
@@ -1167,6 +1304,7 @@ def build_report_context(
         company_id,
         equipment_id,
         policy_id,
+        analysis_id=analysis_id,
         user_id=user_id,
         tone=tone,
     )

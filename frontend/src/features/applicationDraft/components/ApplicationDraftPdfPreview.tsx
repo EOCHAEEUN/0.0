@@ -1,4 +1,4 @@
-﻿import type { DraftStatus } from "../applicationDraft.contract"
+import type { DraftStatus } from "../applicationDraft.contract"
 import type { ApplicationDraftModel } from "../hooks/useApplicationDraft"
 
 type PdfDraftSource = {
@@ -26,6 +26,7 @@ type ReportParams = {
   companyId: string
   equipmentId: string
   policyId: string
+  analysisId?: string
 }
 
 const API_BASE_URL = (
@@ -92,10 +93,12 @@ function getReportParams(model: ApplicationDraftModel): ReportParams | null {
     readText(draftParams.equipmentId) || readText(draftApiData.equipment_id)
   const policyId =
     readText(draftParams.policyId) || readText(draftApiData.policy_id)
+  const analysisId =
+    readText(draftParams.analysisId) || readText(draftApiData.analysis_id)
 
   if (!companyId || !equipmentId || !policyId) return null
 
-  return { companyId, equipmentId, policyId }
+  return { companyId, equipmentId, policyId, analysisId: analysisId || undefined }
 }
 
 function hasReadyDraftApiData(model: ApplicationDraftModel): boolean {
@@ -204,6 +207,7 @@ async function downloadApplicationReportPdf(model: ApplicationDraftModel, report
       company_id: params.companyId,
       equipment_id: params.equipmentId,
       policy_id: params.policyId,
+      analysis_id: params.analysisId,
       report_type: reportType,
       tone: "submission",
     }),

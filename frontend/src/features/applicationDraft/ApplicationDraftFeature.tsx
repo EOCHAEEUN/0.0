@@ -1,5 +1,5 @@
 import { useMemo } from "react"
-import { useLocation, useNavigate, useParams } from "react-router-dom"
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { ApplicationDraftChecklistDialog } from "./components/ApplicationDraftChecklistDialog"
 import { ApplicationDraftHero } from "./components/ApplicationDraftHero"
 import { ApplicationDraftPdfPreview } from "./components/ApplicationDraftPdfPreview"
@@ -14,26 +14,44 @@ function findProjectByRouteId(projects: SupportProject[], policyId?: string) {
   return projects.find((project) => String(project.rawId || project.id) === decodedId) || null
 }
 
+function readSearchParam(searchParams: URLSearchParams, key: string) {
+  const value = searchParams.get(key)
+  return value && value.trim() ? value.trim() : undefined
+}
+
 export function ApplicationDraftFeature() {
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams] = useSearchParams()
   const { id, policyId } = useParams()
-  const routeAnalysisId = id && id !== "latest" ? id : undefined
+  const queryAnalysisId = useMemo(
+    () => readSearchParam(searchParams, "analysisId"),
+    [searchParams],
+  )
+  const queryPolicyId = useMemo(
+    () => readSearchParam(searchParams, "policyId"),
+    [searchParams],
+  )
+  const routeAnalysisId = (id && id !== "latest" ? id : undefined) || queryAnalysisId
+  const resolvedPolicyId = policyId || queryPolicyId
   const support = useSupportProjects({ analysisId: routeAnalysisId })
   const routeProject = useMemo(
-    () => findProjectByRouteId(support.policyCards, policyId),
-    [policyId, support.policyCards],
+    () => findProjectByRouteId(support.policyCards, resolvedPolicyId),
+    [resolvedPolicyId, support.policyCards],
   )
   const routeState = useMemo(
     () => ({
       analysisId: routeAnalysisId,
-      policyId,
+      policyId: resolvedPolicyId,
       selectedProject: routeProject,
     }),
-    [policyId, routeAnalysisId, routeProject],
+    [resolvedPolicyId, routeAnalysisId, routeProject],
   )
   const draft = useApplicationDraft(location.state, routeState)
-  const isAnalysisPolicyRoute = Boolean(routeAnalysisId && policyId)
+  const isAnalysisPolicyRoute = Boolean(routeAnalysisId && resolvedPolicyId)
+  const analysisPoliciesPath = routeAnalysisId
+    ? `/analysis/${encodeURIComponent(routeAnalysisId)}/policies`
+    : "/support-projects"
 
   if (isAnalysisPolicyRoute && support.policyState === "loading") {
     return (
@@ -52,7 +70,7 @@ export function ApplicationDraftFeature() {
       <main className="page ff-draft-page">
         <section className="section white">
           <div className="container">
-            <ErrorPolicyState onBackToRoi={() => navigate(`/analysis/${id}/policies`)} />
+            <ErrorPolicyState onBackToRoi={() => navigate(analysisPoliciesPath)} />
           </div>
         </section>
       </main>
@@ -66,7 +84,7 @@ export function ApplicationDraftFeature() {
           <div className="container">
             <button
               type="button"
-              onClick={() => navigate(`/analysis/${id}/policies`)}
+              onClick={() => navigate(analysisPoliciesPath)}
               className="ff-draft-back-button"
             >
               ← 맞춤 지원사업 목록
@@ -141,7 +159,9 @@ export function ApplicationDraftFeature() {
             type="button"
             onClick={() =>
               isAnalysisPolicyRoute
-                ? navigate(`/analysis/${id}/policies/${encodeURIComponent(policyId || "")}`)
+                ? navigate(
+                    `/analysis/${encodeURIComponent(routeAnalysisId || "")}/policies/${encodeURIComponent(resolvedPolicyId || "")}`,
+                  )
                 : navigate("/support-projects")
             }
             className="ff-draft-back-button"

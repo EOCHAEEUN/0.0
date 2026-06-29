@@ -240,21 +240,38 @@ export default function RoiPage() {
 
   if (!result) return <Navigate to="/analysis/new" replace />
 
+  const resultRecord = result as Record<string, unknown>
   const roiResult = asRecord(result.roiResult)
-  const rec = normalizeRec(roiResult.recommended)
-  const scenarioA = getScenario(roiResult, "a")
-  const scenarioB = getScenario(roiResult, "b")
+  const rec = normalizeRec(roiResult.recommended ?? resultRecord.recommendedScenario)
+  const topLevelRoi = (result as Record<string, unknown>).roiPct as number ?? null
+  const topLevelPayback = (result as Record<string, unknown>).paybackYears as number ?? null
+  const fallbackScenario =
+    topLevelRoi !== null || topLevelPayback !== null
+      ? {
+        roi_pct: topLevelRoi,
+        payback_years: topLevelPayback,
+      }
+      : {}
+  const scenarioA = Object.keys(getScenario(roiResult, "a")).length > 0
+    ? getScenario(roiResult, "a")
+    : rec === "a"
+      ? fallbackScenario
+      : {}
+  const scenarioB = Object.keys(getScenario(roiResult, "b")).length > 0
+    ? getScenario(roiResult, "b")
+    : rec === "b"
+      ? fallbackScenario
+      : {}
   const hasB = Object.keys(scenarioB).length > 0
   const mA = buildMetrics(scenarioA)
   const mB = buildMetrics(scenarioB)
-  const hasRecommendation = rec !== null
+  const hasRecommendation = rec !== null || topLevelRoi !== null || topLevelPayback !== null
   const mRec = rec === "b" ? mB : rec === "a" ? mA : null
   const mRecFallback = mRec ?? mA
 
-  const roi = mRec?.roi ?? (result as Record<string, unknown>).roiPct as number ?? null
-  const payback = mRec?.payback ?? (result as Record<string, unknown>).paybackYears as number ?? null
+  const roi = mRec?.roi ?? topLevelRoi
+  const payback = mRec?.payback ?? topLevelPayback
   const draftId = analysisId || (result as Record<string, unknown>).id || "latest"
-  const resultRecord = result as Record<string, unknown>
   const resultEquipment = asRecord(resultRecord.equipment)
   const resultAnalysisInput = asRecord(resultRecord.analysisInput ?? resultRecord.analysis_input)
   const resultEquipmentId = String(
@@ -280,6 +297,10 @@ export default function RoiPage() {
   const recShort = rec === "b" ? "B안" : rec === "a" ? "A안" : "투자안"
 
   const priorityPolicyId = extractPriorityPolicyId((result as Record<string, unknown>).policies)
+  const supportProjectsPath = `/support-projects?analysisId=${encodeURIComponent(String(draftId))}`
+  const priorityPolicyPath = priorityPolicyId
+    ? `/support-projects?analysisId=${encodeURIComponent(String(draftId))}&policyId=${encodeURIComponent(priorityPolicyId)}`
+    : supportProjectsPath
 
   const subsidyRatio =
     mRecFallback.subsidy !== null && mRecFallback.investment !== null && mRecFallback.investment > 0
@@ -560,7 +581,7 @@ export default function RoiPage() {
                 >
                   <button
                     type="button"
-                    onClick={() => navigate(`/analysis/${draftId}/policies`)}
+                    onClick={() => navigate(supportProjectsPath)}
                     style={{
                       display: "inline-flex",
                       alignItems: "center",
@@ -1117,7 +1138,7 @@ export default function RoiPage() {
                 <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
                   <button
                     type="button"
-                    onClick={() => navigate(`/analysis/${draftId}/policies`)}
+                    onClick={() => navigate(supportProjectsPath)}
                     style={{
                       display: "inline-flex",
                       alignItems: "center",
@@ -1143,7 +1164,7 @@ export default function RoiPage() {
                   {priorityPolicyId && (
                     <button
                       type="button"
-                      onClick={() => navigate(`/analysis/${draftId}/policies/${priorityPolicyId}`)}
+                      onClick={() => navigate(priorityPolicyPath)}
                       style={{
                         height: "44px",
                         padding: "0 20px",

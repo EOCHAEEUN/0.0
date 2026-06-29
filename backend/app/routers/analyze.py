@@ -509,14 +509,8 @@ async def analyze(
     ]
 
     # 7. 기존 분석·초안·매칭을 정리하고 final ROI 저장
+    saved_roi_output = None
     try:
-        (
-            db.table("roi_output")
-            .delete()
-            .eq("company_id", company_id)
-            .eq("equipment_id", equipment_id)
-            .execute()
-        )
         (
             db.table("draft_result")
             .delete()
@@ -531,7 +525,7 @@ async def analyze(
             .eq("equipment_id", equipment_id)
             .execute()
         )
-        (
+        roi_insert_result = (
             db.table("roi_output")
             .insert(
                 {
@@ -543,6 +537,7 @@ async def analyze(
             )
             .execute()
         )
+        saved_roi_output = roi_insert_result.data[0] if roi_insert_result.data else None
     except Exception as exc:
         print(f"분석 결과 초기화/roi_output 저장 실패: {exc}")
 
@@ -612,6 +607,8 @@ async def analyze(
                 "final_recommended": roi_result.get("recommended"),
                 "policy_applications": roi_result.get("policy_applications", {}),
             },
+            "analysis_id": saved_roi_output.get("id") if saved_roi_output else None,
+            "roi_output": saved_roi_output,
             "response": response_message,
         },
     }

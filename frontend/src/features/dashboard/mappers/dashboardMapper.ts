@@ -266,6 +266,48 @@ function normalizePolicies(analysis: DashboardAnalysisStorage | null) {
   )
 }
 
+function mapRoiOutputToAnalysis(
+  roiOutput: DashboardOnboardingMeResponse["latest_roi_output"],
+  onboarding: DashboardOnboardingMeResponse | null | undefined,
+): DashboardAnalysisStorage | null {
+  if (!roiOutput?.roi_data) return null
+
+  const equipments = onboarding?.equipments ?? []
+  const equipmentId = compactText(roiOutput.equipment_id)
+  const equipment = equipments.find((item) =>
+    [item.equipment_id, item.id].some((id) => compactText(id) === equipmentId),
+  )
+  const matchedPolicies = (onboarding?.matched_policies ?? []).filter((policy) =>
+    !equipmentId || compactText(policy.equipment_id) === equipmentId,
+  )
+
+  return {
+    id: compactText(roiOutput.id) || compactText(roiOutput.analysis_id),
+    company_id: roiOutput.company_id,
+    equipment_id: equipmentId,
+    company: onboarding?.company ?? null,
+    equipment: equipment ?? null,
+    equipments,
+    roi_output: roiOutput,
+    roi_data: roiOutput.roi_data,
+    matched_policies: matchedPolicies,
+    createdAt: roiOutput.created_at,
+  } as DashboardAnalysisStorage
+}
+
+function getServerAnalyses(onboarding: DashboardOnboardingMeResponse | null | undefined) {
+  const roiOutputs =
+    onboarding?.roi_outputs && onboarding.roi_outputs.length > 0
+      ? onboarding.roi_outputs
+      : onboarding?.latest_roi_output
+        ? [onboarding.latest_roi_output]
+        : []
+
+  return roiOutputs
+    .map((roiOutput) => mapRoiOutputToAnalysis(roiOutput, onboarding))
+    .filter((analysis): analysis is DashboardAnalysisStorage => analysis !== null)
+}
+
 function getRoiData(analysis: DashboardAnalysisStorage | null) {
   const record = readRecord(analysis)
   return (
@@ -488,6 +530,8 @@ function getAnalysisId(analysis: DashboardAnalysisStorage | null) {
   return (
     compactText(record?.id) ||
     compactText(record?.analysis_id) ||
+    compactText(analysis?.roi_output?.id) ||
+    compactText(analysis?.roi_output?.analysis_id) ||
     compactText(record?.draft_id) ||
     ""
   )
@@ -899,10 +943,18 @@ export function mapDashboardData({
   onboarding,
   analysis,
 }: MapDashboardDataParams): DashboardViewModel {
-  const company = onboarding?.company ?? analysis?.company ?? null
-  const equipments = normalizeEquipments(onboarding, analysis)
-  const workspace = mapWorkspace(company, analysis, equipments)
-  const analyses = mapAnalysisRows(workspace, analysis).slice(0, 5)
+  const serverAnalyses = getServerAnalyses(onboarding)
+  const effectiveAnalysis = serverAnalyses[0] ?? analysis
+  const company = onboarding?.company ?? effectiveAnalysis?.company ?? null
+  const equipments = normalizeEquipments(onboarding, effectiveAnalysis)
+  const workspace = mapWorkspace(company, effectiveAnalysis, equipments)
+  const analyses = (
+    serverAnalyses.length > 0
+      ? serverAnalyses.flatMap((item) =>
+          mapAnalysisRows(mapWorkspace(company, item, equipments), item),
+        )
+      : mapAnalysisRows(workspace, effectiveAnalysis)
+  ).slice(0, 5)
 
   return {
     companyRows: mapCompanyRows(company),
@@ -910,8 +962,9 @@ export function mapDashboardData({
     workspace: {
       ...workspace,
       analyses,
-      hasMoreAnalyses: analyses.length > 5,
+      recentAnalysisCount: serverAnalyses.length || workspace.recentAnalysisCount,
+      hasMoreAnalyses: serverAnalyses.length > 5,
     },
-    isFallback: !analysis,
+    isFallback: !effectiveAnalysis,
   }
 }

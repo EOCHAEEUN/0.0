@@ -119,6 +119,8 @@ async def get_my_company(
 
         # 가장 최근 ROI 분석 결과 조회 (재로그인 후 화면 복원용)
         latest_roi_output = None
+        roi_outputs = []
+        matched_policies = []
         if equipments:
             equipment_ids = [e.get("equipment_id") for e in equipments if e.get("equipment_id")]
             if equipment_ids:
@@ -128,10 +130,19 @@ async def get_my_company(
                         .select("*")
                         .in_("equipment_id", equipment_ids)
                         .order("created_at", desc=True)
-                        .limit(1)
+                        .limit(50)
                         .execute()
                     )
-                    latest_roi_output = roi_query.data[0] if roi_query.data else None
+                    roi_outputs = roi_query.data or []
+                    latest_roi_output = roi_outputs[0] if roi_outputs else None
+                    policy_query = (
+                        db.table("matched_policy")
+                        .select("*")
+                        .in_("equipment_id", equipment_ids)
+                        .order("created_at", desc=True)
+                        .execute()
+                    )
+                    matched_policies = policy_query.data or []
                 except Exception as roi_exc:
                     print(f"[onboarding/me] roi_output 조회 실패: {roi_exc}")
 
@@ -142,6 +153,8 @@ async def get_my_company(
                 "company": company,
                 "equipments": equipments,
                 "latest_roi_output": latest_roi_output,
+                "roi_outputs": roi_outputs,
+                "matched_policies": matched_policies,
             },
         }
 

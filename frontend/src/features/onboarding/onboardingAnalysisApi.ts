@@ -323,6 +323,11 @@ function buildSnapshot(
   analyzeResponse: ApiRecord,
 ): AnalysisResultSnapshot {
   const data = getFirstRecord(analyzeResponse.data, analyzeResponse)
+  const savedRoiOutput = asRecord(data.roi_output)
+  const resolvedId =
+    getText(data, "analysis_id") ||
+    getText(savedRoiOutput, "id", "analysis_id", "analysisId") ||
+    id
   const roiResult = findRoiResult(analyzeResponse)
   const policies = getFirstArray(data.matched_policies, data.policies)
   const { recommended, selected, source } = getScenario(roiResult)
@@ -354,7 +359,7 @@ function buildSnapshot(
 
   return {
     schemaVersion: ANALYSIS_RESULT_SCHEMA_VERSION,
-    id,
+    id: resolvedId,
     equipmentName: condition.equipmentName || "검토 설비",
     recommendation: getRecommendationTitle(policies.length),
     recommendationDetail: getRecommendationDetail(roiResult),

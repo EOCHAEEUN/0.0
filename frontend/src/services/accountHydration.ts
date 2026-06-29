@@ -67,6 +67,7 @@ function buildSnapshotFromRoiOutput(
   roiOutput: ApiRecord,
   equipments: ApiRecord[],
   companyId: string,
+  allPolicies: ApiRecord[] = [],
 ): ReturnType<typeof saveAnalysisResult> | null {
   const roiData = asRecord(roiOutput.roi_data)
   if (!roiData || Object.keys(roiData).length === 0) return null
@@ -76,6 +77,10 @@ function buildSnapshotFromRoiOutput(
     (e) => String(e.equipment_id ?? "") === equipmentId,
   )
   const equipmentName = String(matchedEquipment?.name ?? roiOutput.equipment_name ?? "검토 설비")
+
+  const matchedPolicies = allPolicies.filter(
+    (policy) => String(policy.equipment_id ?? "") === equipmentId,
+  )
 
   const recommended = String(roiData.recommended ?? "A").toUpperCase().trim()
   const recScenario = asRecord(recommended === "B" ? roiData.scenario_b : roiData.scenario_a)
@@ -97,14 +102,14 @@ function buildSnapshotFromRoiOutput(
     roiPct,
     roiPercent: roiPct,
     paybackYears,
-    matchedPolicies: 0,
-    priorityPolicies: 0,
-    priorityPolicyName: "",
+    matchedPolicies: matchedPolicies.length,
+    priorityPolicies: matchedPolicies.length > 0 ? 1 : 0,
+    priorityPolicyName: String(matchedPolicies[0]?.title ?? ""),
     recommendedScenario: recommended,
     companyId,
     equipmentId,
     roiResult: roiData,
-    policies: [],
+    policies: matchedPolicies,
     createdAt: String(roiOutput.created_at ?? new Date().toISOString()),
   }
 
@@ -197,16 +202,33 @@ async function _doHydrate(token: string, requestUserId: string): Promise<Hydrate
 
     // 3. ROI 분석 결과 복원
     let hasAnalysis = false
-    const roiOutput = asRecord(data.latest_roi_output as unknown)
+    const roiOutputs = Array.isArray(data.roi_outputs)
+      ? (data.roi_outputs as unknown[]).map(asRecord)
+      : []
+    const fallbackLatestRoiOutput = asRecord(data.latest_roi_output as unknown)
+    const allPolicies = Array.isArray(data.matched_policies)
+      ? (data.matched_policies as unknown[]).map(asRecord)
+      : []
     const companyId = String(company.company_id ?? "")
-    if (Object.keys(roiOutput).length > 0 && companyId) {
-      const saved = buildSnapshotFromRoiOutput(roiOutput, equipments, companyId)
-      hasAnalysis = saved !== null
+    const outputsToSave =
+      roiOutputs.length > 0
+        ? roiOutputs
+        : Object.keys(fallbackLatestRoiOutput).length > 0
+          ? [fallbackLatestRoiOutput]
+          : []
+    if (outputsToSave.length > 0 && companyId) {
+      const saved = [...outputsToSave]
+        .reverse()
+        .map((roiOutput) =>
+          buildSnapshotFromRoiOutput(roiOutput, equipments, companyId, allPolicies),
+        )
+        .filter(Boolean)
+      hasAnalysis = saved.length > 0
     }
 
     updateUserOnboardingState({
       companyProfileStatus: hasCompany ? "completed" : "not_started",
-      analysisCount: hasAnalysis ? 1 : 0,
+      analysisCount: outputsToSave.length,
     })
 
     console.log("[accountHydration] 완료", { hasCompany, hasAnalysis, userId: requestUserId })

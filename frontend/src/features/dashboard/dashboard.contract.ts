@@ -29,6 +29,8 @@ export type DashboardEquipmentContract = {
 }
 
 export type DashboardRoiOutputContract = {
+  id?: string
+  analysis_id?: string
   company_id?: string
   equipment_id?: string
   roi_data?: Record<string, unknown> | null
@@ -93,9 +95,15 @@ export type DashboardOnboardingMeResponse = {
   } | null
   company?: DashboardCompanyContract | null
   equipments?: DashboardEquipmentContract[] | null
+  latest_roi_output?: DashboardRoiOutputContract | null
+  roi_outputs?: DashboardRoiOutputContract[] | null
+  matched_policies?: DashboardMatchedPolicyContract[] | null
 }
 
 export type DashboardAnalysisStorage = {
+  id?: string
+  analysis_id?: string
+  createdAt?: string
   company_id?: string
   equipment_id?: string
   company?: DashboardCompanyContract | null

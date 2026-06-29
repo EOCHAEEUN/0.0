@@ -1,6 +1,7 @@
 import { getCurrentUserId } from "../../services/auth"
 
 export type CompanyProfileStatus = "not_started" | "in_progress" | "completed"
+export type EquipmentSetupStatus = "not_started" | "in_progress" | "completed"
 export type AnalysisDraftStatus = "in_progress" | "ready_for_review" | "completed"
 
 export type CompanyProfileDraft = {
@@ -19,6 +20,8 @@ export type CompanyProfileDraft = {
 
 export type UserOnboardingState = {
   companyProfileStatus: CompanyProfileStatus
+  equipmentSetupStatus: EquipmentSetupStatus
+  companyId?: string
   welcomeDismissed: boolean
   analysisDraftId?: string
   analysisDraftStatus?: AnalysisDraftStatus
@@ -109,6 +112,7 @@ export const emptyCompanyProfileDraft: CompanyProfileDraft = {
 
 const defaultOnboardingState: UserOnboardingState = {
   companyProfileStatus: "not_started",
+  equipmentSetupStatus: "not_started",
   welcomeDismissed: false,
   analysisCount: 0,
 }
@@ -252,12 +256,18 @@ export function getUserOnboardingState(): UserOnboardingState {
       : analysis
         ? 1
         : 0
+  const storedCompanyId = window.localStorage.getItem("factofit_company_id") ?? ""
+  const storedEquipmentId = window.localStorage.getItem("factofit_equipment_id") ?? ""
 
   return {
     ...defaultOnboardingState,
     ...stored,
     companyProfileStatus:
       stored.companyProfileStatus ?? draft.status ?? "not_started",
+    equipmentSetupStatus: storedEquipmentId
+      ? "completed"
+      : stored.equipmentSetupStatus ?? "not_started",
+    companyId: stored.companyId ?? (storedCompanyId || undefined),
     analysisCount,
   }
 }
@@ -310,7 +320,9 @@ export function resolvePostLoginPath(isJustSignedUp = consumeJustSignedUp()) {
 
   if (isJustSignedUp) return "/welcome"
 
-  if (state.companyProfileStatus === "in_progress") return "/setup/company"
+  if (state.companyProfileStatus !== "completed") return "/setup/company"
+
+  if (state.equipmentSetupStatus !== "completed") return "/setup/equipment"
 
   if (state.companyProfileStatus === "completed" && state.analysisDraftId) {
     const draftStatus = state.analysisDraftStatus ?? "in_progress"
@@ -321,12 +333,6 @@ export function resolvePostLoginPath(isJustSignedUp = consumeJustSignedUp()) {
 
     return `/analysis/new?draftId=${state.analysisDraftId}`
   }
-
-  if (state.companyProfileStatus === "completed" && state.analysisCount === 0) {
-    return "/analysis/new"
-  }
-
-  if (state.analysisCount > 0) return "/dashboard"
 
   return "/dashboard"
 }

@@ -380,7 +380,7 @@ function buildSnapshot(
   }
 }
 
-function buildCompanyPayload(profile: CompanyProfileDraft, condition: AnalysisConditionDraft) {
+function buildCompanyPayload(profile: CompanyProfileDraft, primaryPurpose: string[] = []) {
   const region = [profile.regionSido, profile.regionSigungu]
     .filter((value) => value.trim())
     .join(" ")
@@ -392,7 +392,7 @@ function buildCompanyPayload(profile: CompanyProfileDraft, condition: AnalysisCo
     industry_code: splitIndustryCodes(profile.industryCode),
     region: region || "지역 미입력",
     company_type: "제조업",
-    primary_purpose: condition.purpose ? [condition.purpose] : [],
+    primary_purpose: primaryPurpose,
     employee_count: parseEmployeeCount(profile.employeeRange),
     annual_revenue: 0,
   }
@@ -438,20 +438,83 @@ function findEquipmentId(json: ApiRecord) {
   return String(data.equipment_id ?? equipment.equipment_id ?? json.equipment_id ?? "")
 }
 
+export async function saveOnboardingCompany(
+  profile: CompanyProfileDraft,
+  primaryPurpose: string[] = [],
+) {
+  const companyPayload = buildCompanyPayload(profile, primaryPurpose)
+  let companyId = window.localStorage.getItem(COMPANY_ID_STORAGE_KEY) || ""
+
+  if (companyId) {
+    await requestJson(`/api/onboarding/company/${encodeURIComponent(companyId)}`, {
+      method: "PATCH",
+      body: JSON.stringify(companyPayload),
+    })
+  } else {
+    const companyJson = (await requestJson("/api/onboarding", {
+      method: "POST",
+      body: JSON.stringify(companyPayload),
+    })) as ApiRecord
+    companyId = findCompanyId(companyJson)
+  }
+
+  if (!companyId) {
+    throw new Error("기업 정보 저장 응답에서 company_id를 찾지 못했습니다.")
+  }
+
+  window.localStorage.setItem(COMPANY_ID_STORAGE_KEY, companyId)
+  return companyId
+}
+
+export type OnboardingEquipmentInput = {
+  name: string
+  category: string
+  ageYears: number
+  process?: string
+  energyCostAnnual?: number | null
+}
+
+export async function createOnboardingEquipment(
+  companyId: string,
+  equipment: OnboardingEquipmentInput,
+) {
+  const equipmentJson = (await requestJson(
+    `/api/onboarding/${encodeURIComponent(companyId)}/equipment`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        name: equipment.name,
+        category: equipment.category,
+        age_years: equipment.ageYears,
+        process: equipment.process?.trim() || null,
+        energy_cost_annual: equipment.energyCostAnnual ?? null,
+      }),
+    },
+  )) as ApiRecord
+  const equipmentId = findEquipmentId(equipmentJson)
+
+  if (!equipmentId) {
+    throw new Error("설비 정보 저장 응답에서 equipment_id를 찾지 못했습니다.")
+  }
+
+  window.localStorage.setItem(EQUIPMENT_ID_STORAGE_KEY, equipmentId)
+  window.localStorage.setItem(SELECTED_EQUIPMENT_ID_STORAGE_KEY, equipmentId)
+  return equipmentId
+}
+
 export async function runOnboardingAnalysis(
   id: string,
   profile: CompanyProfileDraft,
   condition: AnalysisConditionDraft,
 ) {
-  const companyPayload = buildCompanyPayload(profile, condition)
   let companyId = window.localStorage.getItem(COMPANY_ID_STORAGE_KEY) || ""
 
   if (companyId) {
     try {
-      await requestJson(`/api/onboarding/company/${encodeURIComponent(companyId)}`, {
-        method: "PATCH",
-        body: JSON.stringify(companyPayload),
-      })
+      companyId = await saveOnboardingCompany(
+        profile,
+        condition.purpose ? [condition.purpose] : [],
+      )
     } catch (error) {
       console.warn(
         "[onboarding-analysis] Existing company update failed; continuing with stored company_id.",
@@ -460,11 +523,10 @@ export async function runOnboardingAnalysis(
     }
   } else {
     try {
-      const companyJson = (await requestJson("/api/onboarding", {
-        method: "POST",
-        body: JSON.stringify(companyPayload),
-      })) as ApiRecord
-      companyId = findCompanyId(companyJson)
+      companyId = await saveOnboardingCompany(
+        profile,
+        condition.purpose ? [condition.purpose] : [],
+      )
     } catch {
       throw new Error("기업 정보 저장 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.")
     }

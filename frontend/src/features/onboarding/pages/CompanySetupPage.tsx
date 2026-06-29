@@ -4,8 +4,10 @@ import { OnboardingStepper } from "../components/OnboardingStepper"
 import {
   getCompanyProfileDraft,
   saveCompanyProfileDraft,
+  updateUserOnboardingState,
   type CompanyProfileDraft,
 } from "../onboardingState"
+import { saveOnboardingCompany } from "../onboardingAnalysisApi"
 import { INDUSTRY_OPTIONS } from "../../../components/auth/signup/signup.constants"
 
 const sidoOptions = ["서울", "경기", "인천", "부산", "대구", "광주", "대전", "울산", "충남", "경남"]
@@ -47,6 +49,8 @@ export default function CompanySetupPage() {
   const [draft, setDraft] = useState<CompanyProfileDraft>(() => getCompanyProfileDraft())
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "failed">("idle")
   const [submitted, setSubmitted] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState("")
   const timerRef = useRef<number | null>(null)
 
   const missingFields = useMemo(
@@ -114,16 +118,9 @@ export default function CompanySetupPage() {
     draft.smartFactoryStatus,
   ])
 
-  const handleDashboard = () => {
-    saveCompanyProfileDraft({
-      ...draft,
-      status: getProfileStatus(draft),
-    })
-    navigate("/dashboard")
-  }
-
-  const handleContinue = () => {
+  const handleContinue = async () => {
     setSubmitted(true)
+    setSubmitError("")
     if (
       missingFields.companyName ||
       missingFields.region ||
@@ -133,11 +130,25 @@ export default function CompanySetupPage() {
       return
     }
 
-    saveCompanyProfileDraft({
+    const completedDraft = saveCompanyProfileDraft({
       ...draft,
       status: "completed",
     })
-    navigate("/analysis/new")
+    setIsSubmitting(true)
+    try {
+      const companyId = await saveOnboardingCompany(completedDraft)
+      updateUserOnboardingState({
+        companyProfileStatus: "completed",
+        companyId,
+      })
+      navigate("/setup/equipment")
+    } catch (reason) {
+      setSubmitError(
+        reason instanceof Error ? reason.message : "기업 정보를 저장하지 못했습니다.",
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const saveLabel =
@@ -159,7 +170,7 @@ export default function CompanySetupPage() {
       </header>
 
       <section className="ff-setup-shell">
-        <OnboardingStepper currentStep={1} />
+        <OnboardingStepper currentStep={1} variant="setup" />
 
         <div className="ff-setup-grid">
           <aside className="ff-setup-intro">
@@ -298,13 +309,16 @@ export default function CompanySetupPage() {
             </p>
 
             <div className="ff-setup-actions">
-              <button type="button" className="ff-secondary-action" onClick={handleDashboard}>
-                대시보드로 이동
-              </button>
-              <button type="button" className="ff-primary-action" onClick={handleContinue}>
-                저장하고 투자 조건 입력
+              <button
+                type="button"
+                className="ff-primary-action"
+                onClick={() => void handleContinue()}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "저장 중..." : "저장하고 설비 정보 입력"}
               </button>
             </div>
+            {submitError && <p className="ff-field-error" role="alert">{submitError}</p>}
           </section>
         </div>
       </section>

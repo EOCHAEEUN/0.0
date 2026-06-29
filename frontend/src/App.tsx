@@ -13,6 +13,7 @@ import MyPage from "./pages/MyPage"
 import GlobalAiAdvisor from "./features/aiAdvisor/GlobalAiAdvisor"
 import WelcomePage from "./features/onboarding/pages/WelcomePage"
 import CompanySetupPage from "./features/onboarding/pages/CompanySetupPage"
+import EquipmentSetupPage from "./features/onboarding/pages/EquipmentSetupPage"
 import AnalysisNewPage from "./features/onboarding/pages/AnalysisNewPage"
 import AnalysisReviewPage from "./features/onboarding/pages/AnalysisReviewPage"
 import AnalysisResultPage from "./features/onboarding/pages/AnalysisResultPage"
@@ -38,6 +39,7 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/welcome" element={<WelcomePage />} />
         <Route path="/setup/company" element={<CompanySetupPage />} />
+        <Route path="/setup/equipment" element={<EquipmentSetupPage />} />
         {/* 분석 생성/검토는 온보딩 UI 흐름이므로 공통 헤더 제외 */}
         <Route path="/analysis/new" element={<AnalysisNewPage />} />
         <Route path="/analysis/review" element={<AnalysisReviewPage />} />

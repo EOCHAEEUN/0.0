@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
+import { resolveRoiNavigationPath } from "../features/roi/roiNavigation"
 
 type NavItem = {
   label: string
@@ -133,6 +134,14 @@ export default function AppHeader() {
     setSelectedInquiryId(null)
   }
 
+  const handleNavigation = async (item: NavItem) => {
+    if (item.label === "ROI 분석") {
+      navigate(await resolveRoiNavigationPath(location.pathname, location.search))
+      return
+    }
+    navigate(item.path)
+  }
+
   return (
     <>
       <header
@@ -219,7 +228,7 @@ export default function AppHeader() {
                 <button
                   key={item.path}
                   type="button"
-                  onClick={() => navigate(item.path)}
+                  onClick={() => void handleNavigation(item)}
                   style={{
                     height: "44px",
                     padding: "0 16px",

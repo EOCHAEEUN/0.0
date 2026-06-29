@@ -401,17 +401,17 @@ function buildEquipmentPayload(condition: AnalysisConditionDraft) {
   const payload = {
     name: condition.equipmentName || "검토 설비",
     category: condition.equipmentCategory || "press",
-    process: condition.purpose || null,
+    process: condition.process || condition.purpose || null,
     age_years: toNumber(condition.ageYears, 0),
     energy_cost_annual: toOptionalNumber(condition.energyCostAnnual),
-    defect_rate: null,
+    defect_rate: toOptionalNumber(condition.defectRate),
     maintenance_cost_annual: toAnnualManwonFromMonthly(condition.monthlyMaintenanceCost),
     current_capacity_value: capacity,
     production_qty:
       toFirstNumber(condition.monthlyProduction) === null
         ? null
         : Math.round((toFirstNumber(condition.monthlyProduction) ?? 0) * 12),
-    contribution_margin_won: null,
+    contribution_margin_won: toOptionalNumber(condition.contributionMarginWon),
     scenario_a_investment_manwon: investmentA,
     scenario_b_investment_manwon: investmentB,
   }
@@ -495,5 +495,86 @@ export async function runOnboardingAnalysis(
     method: "POST",
   })) as ApiRecord
 
-  return buildSnapshot(id, condition, companyId, equipmentId, analyzeJson)
+  return {
+    ...buildSnapshot(id, condition, companyId, equipmentId, analyzeJson),
+    analysisInput: { ...condition },
+  }
+}
+
+export type SavedEquipment = {
+  equipmentId: string
+  name: string
+  category: string
+  purpose: string
+  process: string
+  ageYears: string
+  energyCostAnnual: string
+  monthlyMaintenanceCost: string
+  defectRate: string
+  monthlyProduction: string
+  contributionMarginWon: string
+  investmentAmount: string
+  scenarioBInvestmentManwon: string
+}
+
+function unwrapData(value: unknown) {
+  const record = asRecord(value)
+  return getFirstRecord(record.data, record)
+}
+
+function equipmentToSaved(value: unknown): SavedEquipment {
+  const item = asRecord(value)
+  const annualMaintenance = getNumber(item, "maintenance_cost_annual")
+  return {
+    equipmentId: getText(item, "equipment_id", "equipmentId"),
+    name: getText(item, "name"),
+    category: getText(item, "category"),
+    purpose: getText(item, "primary_purpose", "purpose", "process"),
+    process: getText(item, "process"),
+    ageYears: String(getNumber(item, "age_years") ?? ""),
+    energyCostAnnual: String(getNumber(item, "energy_cost_annual") ?? ""),
+    monthlyMaintenanceCost:
+      annualMaintenance === null ? "" : String(Math.round(annualMaintenance / 12)),
+    defectRate: String(getNumber(item, "defect_rate") ?? ""),
+    monthlyProduction: String(
+      (getNumber(item, "production_qty") ?? 0) > 0
+        ? Math.round((getNumber(item, "production_qty") ?? 0) / 12)
+        : "",
+    ),
+    contributionMarginWon: String(getNumber(item, "contribution_margin_won") ?? ""),
+    investmentAmount: String(getNumber(item, "scenario_a_investment_manwon") ?? ""),
+    scenarioBInvestmentManwon: String(
+      getNumber(item, "scenario_b_investment_manwon") ?? "",
+    ),
+  }
+}
+
+export async function fetchAnalysisEntryContext() {
+  const json = await requestJson("/api/onboarding/me", { method: "GET" })
+  const data = unwrapData(json)
+  const latestAnalysis = asRecord(data.latest_roi_output)
+  return {
+    companyId: getText(asRecord(data.company), "company_id"),
+    equipments: getFirstArray(data.equipments).map(equipmentToSaved),
+    latestAnalysisId: getText(latestAnalysis, "id", "analysis_id", "analysisId"),
+    latestEquipmentId: getText(latestAnalysis, "equipment_id", "equipmentId"),
+  }
+}
+
+export async function runExistingEquipmentAnalysis(
+  id: string,
+  profile: CompanyProfileDraft,
+  condition: AnalysisConditionDraft,
+  companyId: string,
+  equipmentId: string,
+) {
+  void profile
+  const query = new URLSearchParams({ company_id: companyId, equipment_id: equipmentId })
+  const analyzeJson = (await requestJson(`/api/analyze?${query.toString()}`, {
+    method: "POST",
+  })) as ApiRecord
+  return {
+    ...buildSnapshot(id, condition, companyId, equipmentId, analyzeJson),
+    analysisInput: { ...condition },
+  }
 }

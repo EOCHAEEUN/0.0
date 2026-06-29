@@ -1,719 +1,373 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { OnboardingStepper } from "../components/OnboardingStepper"
-import { runOnboardingAnalysis } from "../onboardingAnalysisApi"
 import {
-  type AnalysisConditionDraft,
-  getAnalysisConditionDraft,
+  fetchAnalysisEntryContext,
+  runExistingEquipmentAnalysis,
+  runOnboardingAnalysis,
+  type SavedEquipment,
+} from "../onboardingAnalysisApi"
+import {
+  emptyAnalysisConditionDraft,
   getAnalysisResult,
   getCompanyProfileDraft,
-  saveAnalysisConditionDraft,
   saveAnalysisResult,
-  updateUserOnboardingState,
+  type AnalysisConditionDraft,
 } from "../onboardingState"
 
-const equipmentCategoryOptions = [
+type AnalysisMode = "start" | "new_equipment" | "existing_equipment" | "reanalysis"
+
+const categoryOptions = [
   { label: "프레스", value: "press" },
   { label: "CNC", value: "cnc" },
   { label: "사출성형기", value: "injection" },
   { label: "기타 설비", value: "other" },
 ]
+const purposeOptions = ["노후 설비 교체", "생산량 확대", "인력 절감", "에너지 절감", "안전성 개선"]
 
-const equipmentNamePlaceholders: Record<string, string> = {
-  press: "예: 프레스 1호기",
-  cnc: "예: CNC 선반 1호기",
-  injection: "예: 사출성형기 1호기",
-  other: "예: 설비명 직접 입력",
-}
-
-const purposeOptions = [
-  "노후 설비 교체",
-  "생산량 확대",
-  "인력 절감",
-  "에너지 절감",
-  "안전성 개선",
-]
-
-function createDraftId() {
+function createAnalysisId() {
   return `analysis-${Date.now()}`
 }
 
-function formatNumber(raw: string): string {
-  const digits = raw.replace(/\D/g, "")
-  return digits ? Number(digits).toLocaleString("ko-KR") : ""
+function toDraft(equipment: SavedEquipment): AnalysisConditionDraft {
+  return {
+    ...emptyAnalysisConditionDraft,
+    equipmentCategory: equipment.category,
+    equipmentName: equipment.name,
+    purpose: equipment.purpose,
+    process: equipment.process,
+    ageYears: equipment.ageYears,
+    energyCostAnnual: equipment.energyCostAnnual,
+    monthlyMaintenanceCost: equipment.monthlyMaintenanceCost,
+    defectRate: equipment.defectRate,
+    monthlyProduction: equipment.monthlyProduction,
+    contributionMarginWon: equipment.contributionMarginWon,
+    investmentAmount: equipment.investmentAmount,
+    scenarioBInvestmentManwon: equipment.scenarioBInvestmentManwon,
+  }
 }
 
-function stripFormatting(value: string): string {
-  return value.replace(/,/g, "")
+function numberValue(value: string | undefined) {
+  const digits = String(value ?? "").replace(/\D/g, "")
+  return digits ? Number(digits).toLocaleString("ko-KR") : ""
 }
 
 export default function AnalysisNewPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const draftId = searchParams.get("draftId")
-  const isEditMode = Boolean(draftId)
+  const rawMode = searchParams.get("mode")
+  const equipmentId = searchParams.get("equipmentId")
+  const parentAnalysisId = searchParams.get("parentAnalysisId")
+  const mode: AnalysisMode =
+    rawMode === "new"
+      ? "new_equipment"
+      : rawMode === "existing"
+        ? "existing_equipment"
+        : rawMode === "reanalysis"
+          ? "reanalysis"
+          : "start"
 
   const profile = useMemo(() => getCompanyProfileDraft(), [])
-  const existingResult = useMemo(
-    () => (draftId ? getAnalysisResult(draftId) : null),
-    [draftId],
-  )
-
-  const [condition, setCondition] = useState<AnalysisConditionDraft>(() =>
-    getAnalysisConditionDraft(),
-  )
-  const [submitted, setSubmitted] = useState(false)
-  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle")
-  const [toast, setToast] = useState<string | null>(null)
+  const [condition, setCondition] = useState<AnalysisConditionDraft>({
+    ...emptyAnalysisConditionDraft,
+  })
+  const [equipments, setEquipments] = useState<SavedEquipment[]>([])
+  const [companyId, setCompanyId] = useState("")
+  const [showEquipmentList, setShowEquipmentList] = useState(false)
+  const [isLoadingEquipment, setIsLoadingEquipment] = useState(false)
+  const [isLoadingEquipmentList, setIsLoadingEquipmentList] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
-  const [errorMessage, setErrorMessage] = useState("")
-  const saveTimerRef = useRef<number | null>(null)
-  const toastTimerRef = useRef<number | null>(null)
-  const navTimerRef = useRef<number | null>(null)
-
-  const missing = {
-    equipmentCategory: !condition.equipmentCategory.trim(),
-    equipmentName: !condition.equipmentName.trim(),
-    investmentAmount: !condition.investmentAmount.trim(),
-    purpose: !condition.purpose.trim(),
-  }
-
-  const updateCondition = (patch: Partial<AnalysisConditionDraft>) => {
-    setCondition((prev) => ({ ...prev, ...patch }))
-  }
+  const [error, setError] = useState("")
+  const [loadError, setLoadError] = useState("")
+  const selectedEquipment = equipments.find((item) => item.equipmentId === equipmentId)
 
   useEffect(() => {
-    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current)
-    setSaveState("saving")
-    saveTimerRef.current = window.setTimeout(() => {
-      saveAnalysisConditionDraft(condition)
-      setSaveState("saved")
-    }, 800)
-    return () => {
-      if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current)
+    setError("")
+    setLoadError("")
+    setShowEquipmentList(false)
+
+    if (mode === "start" || mode === "new_equipment") {
+      setIsLoadingEquipment(false)
+      setEquipments([])
+      setCompanyId("")
+      setCondition({ ...emptyAnalysisConditionDraft })
+      return
     }
-  }, [condition])
 
-  const showToast = (message: string) => {
-    setToast(message)
-    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current)
-    toastTimerRef.current = window.setTimeout(() => setToast(null), 4000)
-  }
+    let active = true
+    const loadEquipment = async () => {
+      setIsLoadingEquipment(true)
+      try {
+        const context = await fetchAnalysisEntryContext()
+        if (!active) return
+        setCompanyId(context.companyId)
+        setEquipments(context.equipments)
+        const equipment = context.equipments.find((item) => item.equipmentId === equipmentId)
+        if (!equipment) throw new Error("선택한 설비를 찾을 수 없습니다.")
+        const equipmentDraft = toDraft(equipment)
+        if (mode === "reanalysis") {
+          const previous = getAnalysisResult(parentAnalysisId ?? undefined)
+          if (!previous) {
+            throw new Error("이전 분석 이력을 찾을 수 없습니다.")
+          }
+          setCondition({
+            ...equipmentDraft,
+            ...(previous?.analysisInput ?? {}),
+            equipmentCategory: equipmentDraft.equipmentCategory,
+            equipmentName: equipmentDraft.equipmentName,
+            process: equipmentDraft.process,
+            ageYears: equipmentDraft.ageYears,
+          })
+        } else {
+          setCondition(equipmentDraft)
+        }
+      } catch (reason) {
+        if (active) {
+          setLoadError(
+            reason instanceof Error ? reason.message : "설비 정보를 불러오지 못했습니다.",
+          )
+        }
+      } finally {
+        if (active) setIsLoadingEquipment(false)
+      }
+    }
 
-  // ── 신규 모드 핸들러 ──
-  const handleDashboard = () => {
-    const id = draftId || createDraftId()
-    saveAnalysisConditionDraft(condition)
-    updateUserOnboardingState({ analysisDraftId: id, analysisDraftStatus: "in_progress" })
-    showToast("입력한 내용이 저장되었습니다. 대시보드에서 언제든 이어서 작성할 수 있어요.")
-    if (navTimerRef.current) window.clearTimeout(navTimerRef.current)
-    navTimerRef.current = window.setTimeout(() => navigate("/dashboard"), 1500)
-  }
+    if (
+      (mode === "existing_equipment" || mode === "reanalysis") &&
+      equipmentId &&
+      (mode !== "reanalysis" ||
+        (Boolean(parentAnalysisId) && equipmentId !== parentAnalysisId))
+    ) {
+      void loadEquipment()
+    } else {
+      setIsLoadingEquipment(false)
+    }
 
-  const handleReview = () => {
-    setSubmitted(true)
-    if (Object.values(missing).some(Boolean)) return
+    return () => {
+      active = false
+    }
+  }, [equipmentId, mode, parentAnalysisId])
 
-    const id = draftId || createDraftId()
-    saveAnalysisConditionDraft(condition)
-    updateUserOnboardingState({
-      companyProfileStatus: "completed",
-      analysisDraftId: id,
-      analysisDraftStatus: "ready_for_review",
-    })
-    navigate(`/analysis/review?draftId=${id}`)
-  }
-
-  // ── 수정 모드 핸들러 ──
-  const handleCancelEdit = () => {
-    navigate(`/roi?analysisId=${draftId}`)
-  }
-
-  const handleReanalyze = async () => {
-    setSubmitted(true)
-    if (Object.values(missing).some(Boolean)) return
-
-    setIsAnalyzing(true)
-    setErrorMessage("")
-
+  const handleShowEquipmentList = async () => {
+    setShowEquipmentList(true)
+    setIsLoadingEquipmentList(true)
+    setError("")
     try {
-      saveAnalysisConditionDraft(condition)
-      const result = await runOnboardingAnalysis(draftId!, profile, condition)
+      const context = await fetchAnalysisEntryContext()
+      setCompanyId(context.companyId)
+      setEquipments(context.equipments)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "설비 목록을 불러오지 못했습니다.")
+    } finally {
+      setIsLoadingEquipmentList(false)
+    }
+  }
+
+  const update = (patch: Partial<AnalysisConditionDraft>) =>
+    setCondition((current) => ({ ...current, ...patch }))
+
+  const handleAnalyze = async () => {
+    if (!condition.equipmentCategory || !condition.equipmentName || !condition.investmentAmount) {
+      setError("설비 종류, 검토 설비명, A안 투자금을 입력해주세요.")
+      return
+    }
+    setIsAnalyzing(true)
+    setError("")
+    const id = createAnalysisId()
+    try {
+      const result =
+        mode === "new_equipment"
+          ? await runOnboardingAnalysis(id, profile, condition)
+          : await runExistingEquipmentAnalysis(
+              id,
+              profile,
+              condition,
+              companyId,
+              equipmentId!,
+            )
       saveAnalysisResult(result)
-      navigate(`/roi?analysisId=${draftId}`)
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "분석 중 오류가 발생했습니다.",
-      )
+      navigate(`/roi?analysisId=${encodeURIComponent(id)}`)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "분석 중 오류가 발생했습니다.")
     } finally {
       setIsAnalyzing(false)
     }
   }
 
-  const saveLabel =
-    saveState === "saving" ? "저장 중..." : saveState === "saved" ? "자동 저장됨" : ""
+  const needsEquipmentLoading =
+    (mode === "existing_equipment" || mode === "reanalysis") &&
+    Boolean(equipmentId) &&
+    isLoadingEquipment
 
-  const equipmentPlaceholder =
-    equipmentNamePlaceholders[condition.equipmentCategory] ?? "예: 설비명 입력"
+  const invalidReanalysisMessage =
+    mode === "reanalysis" && (!equipmentId || !parentAnalysisId)
+      ? "재분석에 필요한 설비 또는 분석 정보가 없습니다."
+      : mode === "reanalysis" && equipmentId === parentAnalysisId
+        ? "설비 ID와 분석 ID가 올바르게 구분되지 않았습니다."
+        : mode === "existing_equipment" && !equipmentId
+          ? "분석할 설비 정보가 없습니다."
+          : ""
 
-  const equipmentDisplayName =
-    existingResult?.equipmentName || condition.equipmentName || "투자 설비"
-
-  const companyLine =
-    [
-      profile.companyName,
-      profile.industry,
-      [profile.regionSido, profile.regionSigungu].filter(Boolean).join(" "),
-    ]
-      .filter(Boolean)
-      .join(" · ") || "기업 정보 미입력"
-
-  // ════════════════════════════════════════
-  // 수정 모드 렌더
-  // ════════════════════════════════════════
-  if (isEditMode) {
+  if (invalidReanalysisMessage) {
     return (
       <main className="ff-onboarding-page">
-        {toast && (
-          <div className="ff-toast" role="status" aria-live="polite">
-            {toast}
-          </div>
-        )}
-
-        <header className="ff-setup-header">
-          <button
-            type="button"
-            className="ff-logo-button"
-            onClick={() => navigate("/dashboard")}
-          >
-            FactoFit
-          </button>
-          <span className={`ff-save-status ${saveState}`}>{saveLabel}</span>
-        </header>
-
-        <div className="ff-edit-shell">
-          {/* 뒤로가기 */}
-          <nav className="ff-edit-nav">
-            <button type="button" className="ff-edit-back-link" onClick={handleCancelEdit}>
-              ← {equipmentDisplayName} 투자 검토 결과로 돌아가기
-            </button>
-          </nav>
-
-          {/* 헤더 */}
-          <div className="ff-edit-header">
-            <p className="ff-onboarding-eyebrow">ANALYSIS CONDITIONS</p>
-            <h1 className="ff-edit-title">{equipmentDisplayName} 분석 조건 조정</h1>
-            <p className="ff-edit-desc">
-              변경한 조건을 기준으로 ROI와 지원사업 매칭을 다시 계산합니다.
-            </p>
-          </div>
-
-          {/* 기업 정보 요약 줄 */}
-          <div className="ff-edit-company-summary">
-            <div className="ff-edit-company-info">
-              <span className="ff-edit-company-label">기업 정보</span>
-              <span className="ff-edit-company-line">{companyLine}</span>
-            </div>
-            <button
-              type="button"
-              className="ff-edit-company-edit-btn"
-              onClick={() => navigate("/setup/company")}
-            >
-              기업 정보 수정
-            </button>
-          </div>
-
-          {/* 폼 패널 */}
+        <section className="ff-analysis-shell">
           <div className="ff-edit-form-panel">
-            {/* 섹션 1: 핵심 투자 조건 */}
-            <p className="ff-edit-section-title">핵심 투자 조건</p>
-            <div className="ff-placeholder-form">
-              <label>
-                <span>
-                  설비 종류 <em className="ff-required-mark">*</em>
-                </span>
-                <select
-                  value={condition.equipmentCategory}
-                  onChange={(e) => updateCondition({ equipmentCategory: e.target.value })}
-                >
-                  <option value="">설비 종류 선택</option>
-                  {equipmentCategoryOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                {submitted && missing.equipmentCategory && <em>필수 항목입니다.</em>}
-              </label>
-
-              <label>
-                <span>
-                  검토 설비 <em className="ff-required-mark">*</em>
-                </span>
-                <input
-                  value={condition.equipmentName}
-                  onChange={(e) => updateCondition({ equipmentName: e.target.value })}
-                  placeholder={equipmentPlaceholder}
-                />
-                {submitted && missing.equipmentName && <em>필수 항목입니다.</em>}
-              </label>
-
-              <div className="ff-purpose-field">
-                <span className="ff-field-label">
-                  주요 목적 <em className="ff-required-mark">*</em>
-                </span>
-                <div className="ff-purpose-chips" role="group" aria-label="주요 목적 선택">
-                  {purposeOptions.map((opt) => (
-                    <button
-                      key={opt}
-                      type="button"
-                      className={`ff-purpose-chip${condition.purpose === opt ? " selected" : ""}`}
-                      onClick={() => updateCondition({ purpose: opt })}
-                      aria-pressed={condition.purpose === opt}
-                    >
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-                {submitted && missing.purpose && (
-                  <p className="ff-field-error">필수 항목입니다.</p>
-                )}
-              </div>
-            </div>
-
-            <hr className="ff-edit-divider" />
-
-            {/* 섹션 2: 비용 및 운영 가정 */}
-            <p className="ff-edit-section-title">비용 및 운영 가정</p>
-            <div className="ff-placeholder-form">
-              <label>
-                <span>
-                  A안 투자금 (전체 교체) <em className="ff-required-mark">*</em>
-                </span>
-                <div className="ff-input-with-unit">
-                  <input
-                    inputMode="numeric"
-                    value={formatNumber(condition.investmentAmount)}
-                    onChange={(e) =>
-                      updateCondition({ investmentAmount: stripFormatting(e.target.value) })
-                    }
-                    placeholder="예: 15,000"
-                  />
-                  <span className="ff-input-unit">만원</span>
-                </div>
-                {submitted && missing.investmentAmount && <em>필수 항목입니다.</em>}
-              </label>
-
-              <label>
-                <span>B안 투자금 (부분 교체)</span>
-                <div className="ff-input-with-unit">
-                  <input
-                    inputMode="numeric"
-                    value={formatNumber(condition.scenarioBInvestmentManwon ?? "")}
-                    onChange={(e) =>
-                      updateCondition({
-                        scenarioBInvestmentManwon: stripFormatting(e.target.value),
-                      })
-                    }
-                    placeholder="예: 3,000"
-                  />
-                  <span className="ff-input-unit">만원</span>
-                </div>
-              </label>
-
-              <label>
-                <span>설비 사용연수</span>
-                <input
-                  inputMode="numeric"
-                  value={condition.ageYears}
-                  onChange={(e) => updateCondition({ ageYears: e.target.value })}
-                  placeholder="예: 10"
-                />
-              </label>
-
-              <label>
-                <span>연간 에너지 비용</span>
-                <div className="ff-input-with-unit">
-                  <input
-                    inputMode="numeric"
-                    value={formatNumber(condition.energyCostAnnual)}
-                    onChange={(e) =>
-                      updateCondition({ energyCostAnnual: stripFormatting(e.target.value) })
-                    }
-                    placeholder="예: 4,800"
-                  />
-                  <span className="ff-input-unit">만원</span>
-                </div>
-              </label>
-
-              <label>
-                <span>월 유지보수 비용</span>
-                <div className="ff-input-with-unit">
-                  <input
-                    inputMode="numeric"
-                    value={formatNumber(condition.monthlyMaintenanceCost)}
-                    onChange={(e) =>
-                      updateCondition({
-                        monthlyMaintenanceCost: stripFormatting(e.target.value),
-                      })
-                    }
-                    placeholder="예: 150"
-                  />
-                  <span className="ff-input-unit">만원</span>
-                </div>
-              </label>
-            </div>
-
-            {/* 추가 가정 접힘 */}
-            <details className="ff-analysis-optional">
-              <summary>추가 계산 가정 펼치기</summary>
-              <div className="ff-placeholder-form ff-optional-inner">
-                <label>
-                  <span>설비 용량 · 규격</span>
-                  <div className="ff-input-with-unit">
-                    <input
-                      inputMode="numeric"
-                      value={formatNumber(condition.equipmentCapacity ?? "")}
-                      onChange={(e) =>
-                        updateCondition({
-                          equipmentCapacity: stripFormatting(e.target.value),
-                        })
-                      }
-                      placeholder="예: 200 (ton 또는 kW)"
-                    />
-                    <span className="ff-input-unit">ton / kW</span>
-                  </div>
-                </label>
-                <label>
-                  <span>월 생산량 또는 작업량</span>
-                  <input
-                    value={condition.monthlyProduction}
-                    onChange={(e) => updateCondition({ monthlyProduction: e.target.value })}
-                    placeholder="예: 5,000개 / 200시간"
-                  />
-                </label>
-                <label>
-                  <span>월 인건비</span>
-                  <div className="ff-input-with-unit">
-                    <input
-                      inputMode="numeric"
-                      value={formatNumber(condition.monthlyLaborCost)}
-                      onChange={(e) =>
-                        updateCondition({ monthlyLaborCost: stripFormatting(e.target.value) })
-                      }
-                      placeholder="예: 500"
-                    />
-                    <span className="ff-input-unit">만원</span>
-                  </div>
-                </label>
-                <label>
-                  <span>예상 매출 증가액</span>
-                  <div className="ff-input-with-unit">
-                    <input
-                      inputMode="numeric"
-                      value={formatNumber(condition.expectedRevenueIncrease)}
-                      onChange={(e) =>
-                        updateCondition({
-                          expectedRevenueIncrease: stripFormatting(e.target.value),
-                        })
-                      }
-                      placeholder="예: 2,000"
-                    />
-                    <span className="ff-input-unit">만원/월</span>
-                  </div>
-                </label>
-                <p className="ff-setup-helper">
-                  정확한 수치를 모르는 항목은 비워두셔도 됩니다.
-                  <br />
-                  업종 평균값으로 보정해 분석합니다.
-                </p>
-              </div>
-            </details>
-
-            {errorMessage && (
-              <p className="ff-field-error" role="alert" style={{ marginTop: 14 }}>
-                {errorMessage}
-              </p>
-            )}
-
-            {isAnalyzing && (
-              <div
-                className="ff-analysis-loading"
-                role="status"
-                aria-live="polite"
-                style={{ marginTop: 16 }}
-              >
-                <strong>분석 중...</strong>
-                <span>ROI 계산</span>
-                <span>회수기간 예측</span>
-                <span>지원사업 조건 비교</span>
-              </div>
-            )}
-
-            <div className="ff-edit-actions">
-              <button
-                type="button"
-                className="ff-edit-cancel"
-                onClick={handleCancelEdit}
-                disabled={isAnalyzing}
-              >
-                취소하고 결과로 돌아가기
-              </button>
-              <button
-                type="button"
-                className="ff-edit-submit"
-                onClick={handleReanalyze}
-                disabled={isAnalyzing}
-              >
-                {isAnalyzing ? "분석 중..." : "변경사항으로 다시 분석"}
-              </button>
-            </div>
+            <h1>분석 조건을 불러올 수 없습니다.</h1>
+            <p className="ff-field-error" role="alert">{invalidReanalysisMessage}</p>
+            <button className="ff-primary-action" onClick={() => navigate("/company")}>
+              설비 관리로 이동
+            </button>
           </div>
-        </div>
+        </section>
       </main>
     )
   }
 
-  // ════════════════════════════════════════
-  // 신규 분석 모드 렌더 (기존 그대로)
-  // ════════════════════════════════════════
+  if (needsEquipmentLoading) {
+    return <main className="ff-onboarding-page"><div className="ff-analysis-loading">설비 정보를 불러오는 중...</div></main>
+  }
+
+  if (
+    loadError &&
+    (mode === "existing_equipment" || mode === "reanalysis")
+  ) {
+    return (
+      <main className="ff-onboarding-page">
+        <section className="ff-analysis-shell">
+          <div className="ff-edit-form-panel">
+            <h1>분석 조건을 불러올 수 없습니다.</h1>
+            <p className="ff-field-error" role="alert">{loadError}</p>
+            <button className="ff-primary-action" onClick={() => navigate("/company")}>
+              설비 관리로 이동
+            </button>
+          </div>
+        </section>
+      </main>
+    )
+  }
+
+  if (mode === "start") {
+    return (
+      <main className="ff-onboarding-page">
+        <header className="ff-setup-header"><button className="ff-logo-button" onClick={() => navigate("/dashboard")}>FactoFit</button></header>
+        <section className="ff-analysis-shell">
+          <div className="ff-edit-header">
+            <p className="ff-onboarding-eyebrow">ROI ANALYSIS</p>
+            <h1>새 투자 분석을 시작하세요</h1>
+            <p>등록 설비를 다시 분석하거나,<br />새 설비의 투자 타당성을 검토할 수 있습니다.</p>
+          </div>
+          {!showEquipmentList ? (
+            <div className="ff-edit-form-panel ff-setup-actions">
+              <button className="ff-primary-action" onClick={handleShowEquipmentList}>등록된 설비 재분석</button>
+              <button className="ff-secondary-action" onClick={() => navigate("/analysis/new?mode=new")}>새 설비 등록 후 분석</button>
+            </div>
+          ) : (
+            <div className="ff-edit-form-panel">
+              <h2>등록된 설비를 선택하세요.</h2>
+              <div className="ff-analysis-grid">
+                {isLoadingEquipmentList && <p>등록 설비 목록을 불러오는 중...</p>}
+                {equipments.map((equipment) => (
+                  <article className="ff-setup-note" key={equipment.equipmentId}>
+                    <strong>{equipment.name}</strong>
+                    <span>{equipment.category} · {equipment.purpose || "목적 미입력"} · 사용 {equipment.ageYears || "-"}년</span>
+                    <button className="ff-primary-action" onClick={() => navigate(`/analysis/new?mode=existing&equipmentId=${encodeURIComponent(equipment.equipmentId)}`)}>이 설비로 분석</button>
+                  </article>
+                ))}
+                {!isLoadingEquipmentList && equipments.length === 0 && <p>등록된 설비가 없습니다.</p>}
+              </div>
+              <button className="ff-secondary-action" onClick={() => navigate("/analysis/new?mode=new")}>+ 새 설비 등록 후 분석</button>
+            </div>
+          )}
+          {error && <p className="ff-field-error">{error}</p>}
+        </section>
+      </main>
+    )
+  }
+
+  const readOnlyEquipment = mode !== "new_equipment"
+  const isReanalysis = mode === "reanalysis"
+  const title =
+    mode === "new_equipment"
+      ? "새 설비 투자 분석"
+      : isReanalysis
+        ? `${condition.equipmentName || "설비"} 분석 조건 조정`
+        : `${condition.equipmentName || "설비"} 새 투자 분석`
+  const description =
+    mode === "new_equipment"
+      ? "새 설비 정보를 입력하고 투자 효과를 분석하세요."
+      : isReanalysis
+        ? "이전 분석 조건을 바탕으로 비용과 투자 가정을 수정해 새 결과를 만듭니다."
+        : "등록된 설비의 분석 조건을 조정해 새 ROI 결과를 만듭니다."
+
+  const numericField = (
+    label: string,
+    key: keyof AnalysisConditionDraft,
+    unit: string,
+    disabled = false,
+  ) => (
+    <label>
+      <span>{label}</span>
+      <div className="ff-input-with-unit">
+        <input
+          inputMode="numeric"
+          value={numberValue(String(condition[key] ?? ""))}
+          disabled={disabled}
+          onChange={(event) => update({ [key]: event.target.value.replace(/,/g, "") })}
+        />
+        <span className="ff-input-unit">{unit}</span>
+      </div>
+    </label>
+  )
+
   return (
     <main className="ff-onboarding-page">
-      {toast && (
-        <div className="ff-toast" role="status" aria-live="polite">
-          {toast}
-        </div>
-      )}
-
-      <header className="ff-setup-header">
-        <button type="button" className="ff-logo-button" onClick={() => navigate("/dashboard")}>
-          FactoFit
-        </button>
-        <span className={`ff-save-status ${saveState}`}>{saveLabel}</span>
-      </header>
-
+      <header className="ff-setup-header"><button className="ff-logo-button" onClick={() => navigate("/dashboard")}>FactoFit</button></header>
       <section className="ff-analysis-shell">
-        <OnboardingStepper currentStep={2} />
-
-        <div className="ff-analysis-grid">
-          <aside className="ff-analysis-copy">
-            <p className="ff-onboarding-eyebrow">INVESTMENT CONDITIONS</p>
-            <h1>투자 조건을 정리해 주세요.</h1>
-            <p>
-              등록한 기업 정보를 기준으로, 이번에 검토할 설비와 투자 목적을 입력합니다.
-              다음 단계에서 ROI, 지원사업, 신청서 준비 가능성을 한 번에 확인합니다.
-            </p>
-            <div className="ff-setup-note">
-              <strong>기업 정보</strong>
-              <span>
-                {profile.companyName || "기업명 미입력"} · {profile.industry || "업종 미입력"}
-              </span>
-            </div>
-          </aside>
-
-          <section className="ff-analysis-panel">
-            <div className="ff-placeholder-form">
-              <label>
-                <span>
-                  설비 종류 <em className="ff-required-mark">*</em>
-                </span>
-                <select
-                  value={condition.equipmentCategory}
-                  onChange={(e) => updateCondition({ equipmentCategory: e.target.value })}
-                >
-                  <option value="">설비 종류 선택</option>
-                  {equipmentCategoryOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                {submitted && missing.equipmentCategory && <em>필수 항목입니다.</em>}
-              </label>
-
-              <label>
-                <span>
-                  검토 설비 <em className="ff-required-mark">*</em>
-                </span>
-                <input
-                  value={condition.equipmentName}
-                  onChange={(e) => updateCondition({ equipmentName: e.target.value })}
-                  placeholder={equipmentPlaceholder}
-                />
-                {submitted && missing.equipmentName && <em>필수 항목입니다.</em>}
-              </label>
-
-              <label>
-                <span>
-                  A안 투자금 (전체 교체) <em className="ff-required-mark">*</em>
-                </span>
-                <div className="ff-input-with-unit">
-                  <input
-                    inputMode="numeric"
-                    value={formatNumber(condition.investmentAmount)}
-                    onChange={(e) =>
-                      updateCondition({ investmentAmount: stripFormatting(e.target.value) })
-                    }
-                    placeholder="예: 15,000"
-                  />
-                  <span className="ff-input-unit">만원</span>
-                </div>
-                {submitted && missing.investmentAmount && <em>필수 항목입니다.</em>}
-              </label>
-
-              <div className="ff-purpose-field">
-                <span className="ff-field-label">
-                  주요 목적 <em className="ff-required-mark">*</em>
-                </span>
-                <div className="ff-purpose-chips" role="group" aria-label="주요 목적 선택">
-                  {purposeOptions.map((opt) => (
-                    <button
-                      key={opt}
-                      type="button"
-                      className={`ff-purpose-chip${condition.purpose === opt ? " selected" : ""}`}
-                      onClick={() => updateCondition({ purpose: opt })}
-                      aria-pressed={condition.purpose === opt}
-                    >
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-                {submitted && missing.purpose && (
-                  <p className="ff-field-error">필수 항목입니다.</p>
-                )}
-              </div>
-            </div>
-
-            <details className="ff-analysis-optional">
-              <summary>추가 정보를 입력하면 ROI 정확도가 높아집니다.</summary>
-              <div className="ff-placeholder-form ff-optional-inner">
-                <label>
-                  <span>B안 투자금 (부분 교체)</span>
-                  <div className="ff-input-with-unit">
-                    <input
-                      inputMode="numeric"
-                      value={formatNumber(condition.scenarioBInvestmentManwon ?? "")}
-                      onChange={(e) =>
-                        updateCondition({
-                          scenarioBInvestmentManwon: stripFormatting(e.target.value),
-                        })
-                      }
-                      placeholder="예: 3,000"
-                    />
-                    <span className="ff-input-unit">만원</span>
-                  </div>
-                </label>
-                <label>
-                  <span>설비 용량 · 규격</span>
-                  <div className="ff-input-with-unit">
-                    <input
-                      inputMode="numeric"
-                      value={formatNumber(condition.equipmentCapacity ?? "")}
-                      onChange={(e) =>
-                        updateCondition({
-                          equipmentCapacity: stripFormatting(e.target.value),
-                        })
-                      }
-                      placeholder="예: 200 (ton 또는 kW)"
-                    />
-                    <span className="ff-input-unit">ton / kW</span>
-                  </div>
-                </label>
-                <label>
-                  <span>설비 사용연수</span>
-                  <input
-                    inputMode="numeric"
-                    value={condition.ageYears}
-                    onChange={(e) => updateCondition({ ageYears: e.target.value })}
-                    placeholder="예: 10"
-                  />
-                </label>
-                <label>
-                  <span>연간 에너지 비용</span>
-                  <div className="ff-input-with-unit">
-                    <input
-                      inputMode="numeric"
-                      value={formatNumber(condition.energyCostAnnual)}
-                      onChange={(e) =>
-                        updateCondition({ energyCostAnnual: stripFormatting(e.target.value) })
-                      }
-                      placeholder="예: 4,800"
-                    />
-                    <span className="ff-input-unit">만원</span>
-                  </div>
-                </label>
-                <label>
-                  <span>월 생산량 또는 작업량</span>
-                  <input
-                    value={condition.monthlyProduction}
-                    onChange={(e) => updateCondition({ monthlyProduction: e.target.value })}
-                    placeholder="예: 5,000개 / 200시간"
-                  />
-                </label>
-                <label>
-                  <span>월 인건비</span>
-                  <div className="ff-input-with-unit">
-                    <input
-                      inputMode="numeric"
-                      value={formatNumber(condition.monthlyLaborCost)}
-                      onChange={(e) =>
-                        updateCondition({ monthlyLaborCost: stripFormatting(e.target.value) })
-                      }
-                      placeholder="예: 500"
-                    />
-                    <span className="ff-input-unit">만원</span>
-                  </div>
-                </label>
-                <label>
-                  <span>월 유지보수 비용</span>
-                  <div className="ff-input-with-unit">
-                    <input
-                      inputMode="numeric"
-                      value={formatNumber(condition.monthlyMaintenanceCost)}
-                      onChange={(e) =>
-                        updateCondition({
-                          monthlyMaintenanceCost: stripFormatting(e.target.value),
-                        })
-                      }
-                      placeholder="예: 150"
-                    />
-                    <span className="ff-input-unit">만원</span>
-                  </div>
-                </label>
-                <label>
-                  <span>예상 매출 증가액</span>
-                  <div className="ff-input-with-unit">
-                    <input
-                      inputMode="numeric"
-                      value={formatNumber(condition.expectedRevenueIncrease)}
-                      onChange={(e) =>
-                        updateCondition({
-                          expectedRevenueIncrease: stripFormatting(e.target.value),
-                        })
-                      }
-                      placeholder="예: 2,000"
-                    />
-                    <span className="ff-input-unit">만원/월</span>
-                  </div>
-                </label>
-                <p className="ff-setup-helper">
-                  정확한 수치를 모르는 항목은 비워두셔도 됩니다.
-                  <br />
-                  업종 평균값으로 보정해 분석합니다.
-                </p>
-              </div>
-            </details>
-
-            <div className="ff-setup-actions">
-              <button type="button" className="ff-secondary-action" onClick={handleDashboard}>
-                대시보드로 이동
-              </button>
-              <button type="button" className="ff-primary-action" onClick={handleReview}>
-                저장하고 입력 내용 확인하기
-              </button>
-            </div>
-          </section>
+        <div className="ff-edit-header">
+          <p className="ff-onboarding-eyebrow">INVESTMENT CONDITIONS</p>
+          <h1>{title}</h1>
+          <p>{description}</p>
         </div>
+        <section className="ff-edit-form-panel">
+          <p className="ff-edit-section-title">설비 기본 정보</p>
+          <div className="ff-placeholder-form">
+            <label>
+              <span>설비 종류</span>
+              <select disabled={readOnlyEquipment} value={condition.equipmentCategory} onChange={(event) => update({ equipmentCategory: event.target.value })}>
+                <option value="">설비 종류 선택</option>
+                {categoryOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </label>
+            <label><span>검토 설비명</span><input disabled={readOnlyEquipment} value={condition.equipmentName} onChange={(event) => update({ equipmentName: event.target.value })} /></label>
+            {readOnlyEquipment && <label><span>공정</span><input disabled value={condition.process || selectedEquipment?.process || ""} /></label>}
+            {numericField("사용연수", "ageYears", "년", readOnlyEquipment)}
+          </div>
+          {readOnlyEquipment && <p className="ff-setup-helper">설비 기본 정보를 수정하려면 설비 관리에서 변경하세요. <button className="ff-edit-company-edit-btn" onClick={() => navigate("/company")}>설비 관리로 이동</button></p>}
+          <hr className="ff-edit-divider" />
+          <p className="ff-edit-section-title">분석 조건</p>
+          <div className="ff-placeholder-form">
+            {!isReanalysis && (
+              <div className="ff-purpose-field">
+                <span className="ff-field-label">주요 목적</span>
+                <div className="ff-purpose-chips">
+                  {purposeOptions.map((purpose) => <button type="button" key={purpose} className={`ff-purpose-chip${condition.purpose === purpose ? " selected" : ""}`} onClick={() => update({ purpose })}>{purpose}</button>)}
+                </div>
+              </div>
+            )}
+            {numericField("연간 에너지 비용", "energyCostAnnual", "만원")}
+            {numericField("월 유지보수 비용", "monthlyMaintenanceCost", "만원")}
+            {numericField("불량률", "defectRate", "%")}
+            {numericField("생산량", "monthlyProduction", "개/월")}
+            {numericField("공헌이익", "contributionMarginWon", "원")}
+            {numericField("A안 투자금", "investmentAmount", "만원")}
+            {numericField("B안 투자금", "scenarioBInvestmentManwon", "만원")}
+          </div>
+          {error && <p className="ff-field-error" role="alert">{error}</p>}
+          <div className="ff-edit-actions">
+            <button className="ff-edit-cancel" onClick={() => navigate("/analysis/new")} disabled={isAnalyzing}>취소</button>
+            <button className="ff-edit-submit" onClick={handleAnalyze} disabled={isAnalyzing}>{isAnalyzing ? "분석 중..." : "ROI 분석 실행"}</button>
+          </div>
+        </section>
       </section>
     </main>
   )

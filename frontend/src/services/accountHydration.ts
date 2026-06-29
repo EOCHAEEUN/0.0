@@ -90,7 +90,7 @@ function buildSnapshotFromRoiOutput(
 
   const snapshot = {
     schemaVersion: ANALYSIS_RESULT_SCHEMA_VERSION,
-    id: equipmentId || String(roiOutput.id ?? `roi-${Date.now()}`),
+    id: String(roiOutput.id ?? "") || equipmentId || `roi-${Date.now()}`,
     equipmentName,
     recommendation: "현재 조건에서 투자 검토를 권장합니다.",
     recommendationDetail: aiSummary,

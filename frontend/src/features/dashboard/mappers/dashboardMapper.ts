@@ -719,7 +719,15 @@ function mapWorkspace(
       ? getPolicyDetailPath(analysisId, priorityPolicy)
       : `/analysis/${analysisId}/policies`
     : "/support-projects"
-  const draftPath = analysisId ? `/analysis/new?draftId=${analysisId}` : "/analysis/new"
+  const analysisEquipmentId = compactText(
+    analysisRecord?.equipmentId ??
+      analysisRecord?.equipment_id ??
+      analysisRecord?.selected_equipment_id,
+  )
+  const draftPath =
+    analysisId && analysisEquipmentId
+      ? `/analysis/new?mode=reanalysis&equipmentId=${encodeURIComponent(analysisEquipmentId)}&parentAnalysisId=${encodeURIComponent(analysisId)}`
+      : "/analysis/new"
   const roiData = getRoiData(analysis)
   const roi =
     findNumberByKeys(analysisRecord, ["roiPct", "roiPercent"]) ??

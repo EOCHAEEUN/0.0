@@ -40,6 +40,9 @@ export type AnalysisConditionDraft = {
   // 추가 ROI 입력값 — API EquipmentInput의 scenario_b_investment_manwon, current_capacity_value 매핑
   scenarioBInvestmentManwon?: string
   equipmentCapacity?: string
+  defectRate?: string
+  contributionMarginWon?: string
+  process?: string
 }
 
 export type AnalysisResultSnapshot = {
@@ -61,6 +64,7 @@ export type AnalysisResultSnapshot = {
   policies?: unknown[]
   policyStatus?: string
   policyError?: string | null
+  analysisInput?: AnalysisConditionDraft
   createdAt: string
 }
 
@@ -85,6 +89,9 @@ export const emptyAnalysisConditionDraft: AnalysisConditionDraft = {
   purpose: "",
   scenarioBInvestmentManwon: "",
   equipmentCapacity: "",
+  defectRate: "",
+  contributionMarginWon: "",
+  process: "",
 }
 
 export const emptyCompanyProfileDraft: CompanyProfileDraft = {
@@ -325,18 +332,5 @@ export function resolvePostLoginPath(isJustSignedUp = consumeJustSignedUp()) {
 }
 
 export function resolveStartAnalysisPath() {
-  const state = getUserOnboardingState()
-
-  if (state.companyProfileStatus !== "completed") return "/setup/company"
-
-  if (state.analysisDraftId) {
-    const draftStatus = state.analysisDraftStatus ?? "in_progress"
-    if (draftStatus === "ready_for_review") {
-      return `/analysis/review?draftId=${state.analysisDraftId}`
-    }
-
-    return `/analysis/new?draftId=${state.analysisDraftId}`
-  }
-
   return "/analysis/new"
 }

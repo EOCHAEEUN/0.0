@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from "react"
-import { Landmark, Zap, Leaf, ShieldCheck, ChevronRight, Settings, ArrowLeft } from "lucide-react"
+import { Landmark, Zap, Leaf, ShieldCheck, ChevronRight, SlidersHorizontal, ArrowLeft } from "lucide-react"
 import type { RoiFormState, ScenarioCard } from "../roi.contract"
 import { colors } from "../roi.constants"
 import { formatMoneyFromManwon, formatPaybackYears } from "../roi.utils"
@@ -109,27 +109,6 @@ export function RoiHero({
           내 투자 분석
         </button>
 
-        <button
-          type="button"
-          onClick={onReset}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "6px",
-            height: "34px",
-            padding: "0 14px",
-            borderRadius: "8px",
-            border: "1px solid rgba(255,255,255,0.18)",
-            background: "transparent",
-            color: "rgba(255,255,255,0.6)",
-            fontSize: "12px",
-            fontWeight: 800,
-            cursor: "pointer",
-          }}
-        >
-          <Settings size={13} />
-          분석 가정 수정
-        </button>
       </div>
 
       {/* hero body */}
@@ -191,28 +170,68 @@ export function RoiHero({
             {recommendedScenarioId === "A" ? "A안" : "B안"}이 더 적합합니다.
           </p>
 
-          <button
-            type="button"
-            onClick={onNavigateSupport}
+          <div
             style={{
-              display: "inline-flex",
+              display: "flex",
               alignItems: "center",
-              gap: "6px",
+              gap: "12px",
+              flexWrap: "wrap",
               marginTop: "22px",
-              height: "44px",
-              padding: "0 20px",
-              borderRadius: "10px",
-              border: "0",
-              background: C.blue,
-              color: "#ffffff",
-              fontSize: "14px",
-              fontWeight: 900,
-              cursor: "pointer",
             }}
           >
-            지원사업 상세보기
-            <ChevronRight size={15} />
-          </button>
+            <button
+              type="button"
+              onClick={onNavigateSupport}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                minHeight: "48px",
+                padding: "0 22px",
+                borderRadius: "12px",
+                border: "0",
+                background: C.blue,
+                color: "#ffffff",
+                fontSize: "16px",
+                fontWeight: 900,
+                cursor: "pointer",
+              }}
+            >
+              지원사업 상세보기
+              <ChevronRight size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={onReset}
+              onMouseEnter={(event) => {
+                event.currentTarget.style.background = "#E7902A"
+                event.currentTarget.style.borderColor = "#E7902A"
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.background = "#F4A340"
+                event.currentTarget.style.borderColor = "#F4A340"
+              }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                minHeight: "48px",
+                padding: "0 22px",
+                borderRadius: "12px",
+                border: "1px solid #F4A340",
+                background: "#F4A340",
+                color: "#16213E",
+                fontSize: "16px",
+                fontWeight: 900,
+                cursor: "pointer",
+              }}
+            >
+              <SlidersHorizontal size={16} />
+              투자 조건 다시 설정
+            </button>
+          </div>
         </div>
 
         {/* right: 2×2 KPI */}

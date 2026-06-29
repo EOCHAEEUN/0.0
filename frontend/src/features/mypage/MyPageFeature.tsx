@@ -1116,6 +1116,7 @@ export default function MyPage() {
 
       const { responseData: companyResponseData, companyId } =
         await submitCompanyPayload(companyPayload);
+      void companyResponseData;
 
       let nextEquipmentList = [...equipmentList];
       const equipmentResponses = [];
@@ -1172,6 +1173,7 @@ export default function MyPage() {
       };
 
       const savedOnboarding = await fetchSavedOnboarding();
+      void savedOnboarding;
 
       setEquipmentList(nextEquipmentList);
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(storageData));
@@ -1237,6 +1239,13 @@ export default function MyPage() {
 
     if (!selectedEquipment) {
       window.alert("ROI 분석에 사용할 설비를 선택해주세요.");
+      return;
+    }
+
+    if (selectedEquipment.equipmentId) {
+      window.location.assign(
+        `/analysis/new?mode=existing&equipmentId=${encodeURIComponent(selectedEquipment.equipmentId)}`,
+      );
       return;
     }
 

@@ -1,7 +1,9 @@
 import { useState } from "react"
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom"
-import { Landmark, Zap, Leaf, ShieldCheck, ChevronRight, ArrowLeft, Settings } from "lucide-react"
+import { fetchAnalysisEntryContext } from "../features/onboarding/onboardingAnalysisApi"
 import { getAnalysisResult } from "../features/onboarding/onboardingState"
+import { hydrateAccountData } from "../services/accountHydration"
+import { Landmark, Zap, Leaf, ShieldCheck, ChevronRight, ArrowLeft, SlidersHorizontal } from "lucide-react"
 
 // ── data helpers (unchanged) ──────────────────────────────────────────────────
 function asRecord(v: unknown): Record<string, unknown> {
@@ -232,6 +234,8 @@ export default function RoiPage() {
   const result = getAnalysisResult(analysisId)
 
   const [selectedScen, setSelectedScen] = useState<"a" | "b" | null>(null)
+  const [reanalysisError, setReanalysisError] = useState("")
+  const [isResolvingReanalysis, setIsResolvingReanalysis] = useState(false)
 
   if (!result) return <Navigate to="/analysis/new" replace />
 
@@ -249,11 +253,30 @@ export default function RoiPage() {
   const roi = mRec?.roi ?? (result as Record<string, unknown>).roiPct as number ?? null
   const payback = mRec?.payback ?? (result as Record<string, unknown>).paybackYears as number ?? null
   const draftId = analysisId || (result as Record<string, unknown>).id || "latest"
+  const resultRecord = result as Record<string, unknown>
+  const resultEquipment = asRecord(resultRecord.equipment)
+  const resultAnalysisInput = asRecord(resultRecord.analysisInput ?? resultRecord.analysis_input)
+  const resultEquipmentId = String(
+    resultRecord.equipmentId ??
+      resultRecord.equipment_id ??
+      resultEquipment.equipment_id ??
+      resultEquipment.equipmentId ??
+      resultEquipment.id ??
+      resultAnalysisInput.equipment_id ??
+      resultAnalysisInput.equipmentId ??
+      "",
+  )
+  const matchedPolicyCount = Number((result as Record<string, unknown>).matchedPolicies || 0)
+  const recommendation = String((result as Record<string, unknown>).recommendation || "")
+  const recommendationDetail = String(
+    (result as Record<string, unknown>).recommendationDetail || "",
+  )
+  const priorityPolicyName = String(
+    (result as Record<string, unknown>).priorityPolicyName || "",
+  )
 
   const recLabel = rec === "b" ? "B안 · 부분 교체" : rec === "a" ? "A안 · 전체 교체" : "A/B안"
   const recShort = rec === "b" ? "B안" : rec === "a" ? "A안" : "투자안"
-  const aIsRec = rec === "a"
-  const bIsRec = rec === "b"
 
   const priorityPolicyId = extractPriorityPolicyId((result as Record<string, unknown>).policies)
 
@@ -289,6 +312,55 @@ export default function RoiPage() {
       : null
   const heroText = getHeroText(recLabel, mRecFallback.subsidyStatus, mRecFallback.subsidyRaw, hasRecommendation)
   const aiSummary = getAiSummary(roiResult, rec)
+
+  const handleReanalysis = async () => {
+    setReanalysisError("")
+    setIsResolvingReanalysis(true)
+    try {
+      let resolvedEquipmentId = resultEquipmentId
+      let resolvedAnalysisId = String(draftId)
+
+      if (!resolvedEquipmentId || resolvedEquipmentId === resolvedAnalysisId) {
+        await hydrateAccountData()
+        const refreshedResult = getAnalysisResult()
+        const context = await fetchAnalysisEntryContext()
+        resolvedEquipmentId =
+          String(refreshedResult?.equipmentId ?? "") ||
+          resolvedEquipmentId ||
+          context.latestEquipmentId
+        if (
+          resolvedEquipmentId === resolvedAnalysisId ||
+          !resolvedAnalysisId
+        ) {
+          resolvedAnalysisId =
+            String(refreshedResult?.id ?? "") || context.latestAnalysisId
+        }
+      }
+
+      if (!resolvedEquipmentId || !resolvedAnalysisId || resolvedEquipmentId === resolvedAnalysisId) {
+        console.error("재분석에 필요한 equipmentId 또는 analysisId를 구분할 수 없습니다.", {
+          result,
+          resolvedEquipmentId,
+          resolvedAnalysisId,
+        })
+        setReanalysisError(
+          "설비 정보를 찾을 수 없어 분석 조건을 불러오지 못했습니다. 설비 관리에서 다시 분석을 시작해 주세요.",
+        )
+        return
+      }
+
+      navigate(
+        `/analysis/new?mode=reanalysis&equipmentId=${encodeURIComponent(resolvedEquipmentId)}&parentAnalysisId=${encodeURIComponent(resolvedAnalysisId)}`,
+      )
+    } catch (error) {
+      console.error("재분석 정보 확인에 실패했습니다.", error)
+      setReanalysisError(
+        "설비 정보를 확인하지 못했습니다. 잠시 후 다시 시도하거나 설비 관리에서 분석을 시작해 주세요.",
+      )
+    } finally {
+      setIsResolvingReanalysis(false)
+    }
+  }
 
   return (
     <main className="page">
@@ -338,28 +410,16 @@ export default function RoiPage() {
                 <ArrowLeft size={14} />
                 내 투자 분석
               </button>
-              <button
-                type="button"
-                onClick={() => navigate(`/analysis/new?draftId=${draftId}`)}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  height: "34px",
-                  padding: "0 14px",
-                  borderRadius: "8px",
-                  border: "1px solid rgba(255,255,255,0.18)",
-                  background: "transparent",
-                  color: "rgba(255,255,255,0.6)",
-                  fontSize: "12px",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                }}
-              >
-                <Settings size={13} />
-                분석 가정 수정
-              </button>
             </div>
+
+            {reanalysisError && (
+              <p
+                role="alert"
+                style={{ color: "#fecaca", fontSize: "13px", fontWeight: 800, padding: "0 32px 18px" }}
+              >
+                {reanalysisError}
+              </p>
+            )}
 
             {/* hero body */}
             <div
@@ -421,27 +481,69 @@ export default function RoiPage() {
                     {heroText.sub}
                   </p>
                 )}
-                <button
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "12px",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <button
                   type="button"
                   onClick={() => navigate(`/analysis/${draftId}/policies`)}
                   style={{
                     display: "inline-flex",
                     alignItems: "center",
-                    gap: "6px",
-                    height: "44px",
-                    padding: "0 20px",
-                    borderRadius: "10px",
+                    justifyContent: "center",
+                    gap: "8px",
+                    minHeight: "48px",
+                    padding: "0 22px",
+                    borderRadius: "12px",
                     border: 0,
                     background: C.blue,
                     color: "#ffffff",
-                    fontSize: "14px",
+                    fontSize: "16px",
                     fontWeight: 900,
                     cursor: "pointer",
                   }}
                 >
-                  지원사업 상세보기
-                  <ChevronRight size={15} />
-                </button>
+                    지원사업 상세보기
+                    <ChevronRight size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleReanalysis()}
+                    disabled={isResolvingReanalysis}
+                    onMouseEnter={(event) => {
+                      event.currentTarget.style.background = "#E7902A"
+                      event.currentTarget.style.borderColor = "#E7902A"
+                    }}
+                    onMouseLeave={(event) => {
+                      event.currentTarget.style.background = "#F4A340"
+                      event.currentTarget.style.borderColor = "#F4A340"
+                    }}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      minHeight: "48px",
+                      padding: "0 22px",
+                      borderRadius: "12px",
+                      border: "1px solid #F4A340",
+                      background: "#F4A340",
+                      color: "#16213E",
+                      fontSize: "16px",
+                      fontWeight: 900,
+                      cursor: isResolvingReanalysis ? "wait" : "pointer",
+                      opacity: isResolvingReanalysis ? 0.82 : 1,
+                    }}
+                  >
+                    <SlidersHorizontal size={16} />
+                    {isResolvingReanalysis ? "설비 정보 확인 중..." : "투자 조건 다시 설정"}
+                  </button>
+                </div>
               </div>
 
               {/* right: 2×2 KPI */}
@@ -960,7 +1062,7 @@ export default function RoiPage() {
                     }}
                   >
                     맞춤 지원사업
-                    {(result as Record<string, unknown>).matchedPolicies as number > 0
+                    {Number((result as Record<string, unknown>).matchedPolicies) > 0
                       ? ` ${(result as Record<string, unknown>).matchedPolicies}건`
                       : ""}{" "}
                     보기
@@ -989,7 +1091,7 @@ export default function RoiPage() {
               </div>
 
               {/* right: 정책 카드 */}
-              {(result as Record<string, unknown>).priorityPolicyName && (
+              {priorityPolicyName && (
                 <div
                   style={{
                     background: "#ffffff",
@@ -1031,11 +1133,11 @@ export default function RoiPage() {
                       marginBottom: "10px",
                     }}
                   >
-                    {(result as Record<string, unknown>).priorityPolicyName as string}
+                    {priorityPolicyName}
                   </p>
                   <p style={{ color: C.muted, fontSize: "12px", fontWeight: 800 }}>
                     내 기업·설비 조건 매칭{" "}
-                    {(result as Record<string, unknown>).matchedPolicies as number > 0
+                    {matchedPolicyCount > 0
                       ? `${(result as Record<string, unknown>).matchedPolicies}건`
                       : ""}{" "}
                     중 우선 검토{" "}
@@ -1088,8 +1190,8 @@ export default function RoiPage() {
             </Accordion>
 
             <Accordion title="AI 판단 상세 근거 보기">
-              {(result as Record<string, unknown>).recommendation && (
-                <div style={{ marginBottom: (result as Record<string, unknown>).recommendationDetail ? "18px" : 0 }}>
+              {recommendation && (
+                <div style={{ marginBottom: recommendationDetail ? "18px" : 0 }}>
                   <p
                     style={{
                       color: C.blue,
@@ -1102,11 +1204,11 @@ export default function RoiPage() {
                     추천 요약
                   </p>
                   <p style={{ color: "#1e3a6f", fontSize: "14px", fontWeight: 800, lineHeight: 1.75 }}>
-                    {(result as Record<string, unknown>).recommendation as string}
+                    {recommendation}
                   </p>
                 </div>
               )}
-              {(result as Record<string, unknown>).recommendationDetail && (
+              {recommendationDetail && (
                 <div>
                   <p
                     style={{
@@ -1120,12 +1222,11 @@ export default function RoiPage() {
                     상세 근거
                   </p>
                   <p style={{ color: C.muted, fontSize: "14px", fontWeight: 800, lineHeight: 1.75 }}>
-                    {(result as Record<string, unknown>).recommendationDetail as string}
+                    {recommendationDetail}
                   </p>
                 </div>
               )}
-              {!(result as Record<string, unknown>).recommendation &&
-                !(result as Record<string, unknown>).recommendationDetail && (
+              {!recommendation && !recommendationDetail && (
                   <p style={{ color: "#94a3b8", fontSize: "14px", fontWeight: 800 }}>
                     상세 근거 데이터가 없습니다.
                   </p>

@@ -10,7 +10,6 @@ import { useNavigate } from "react-router-dom"
 // AppHeader는 AuthenticatedLayout의 GlobalHeader로 통합됨
 import engiBot from "../../assets/advisor/engi-bot-transparent.png"
 import { useDashboardData } from "./hooks/useDashboardData"
-import { resolveStartAnalysisPath } from "../onboarding/onboardingState"
 import type {
   DashboardAnalysisRow,
   DashboardDeadlineList,
@@ -123,7 +122,7 @@ export default function DashboardFeature() {
   const workspace = dashboard.workspace
 
   const handleStartAnalysis = () => {
-    navigate(resolveStartAnalysisPath())
+    navigate("/analysis/new")
   }
 
   const handlePolicyNavigate = () => {

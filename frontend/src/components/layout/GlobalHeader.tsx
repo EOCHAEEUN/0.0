@@ -2,6 +2,7 @@ import { useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { clearAuthSession } from "../../services/auth"
 import { clearUserOnboardingData } from "../../features/onboarding/onboardingState"
+import { resolveRoiNavigationPath } from "../../features/roi/roiNavigation"
 
 // ─── 네비게이션 메뉴 정의 ───────────────────────────────────────────────────
 
@@ -100,6 +101,14 @@ export default function GlobalHeader() {
     clearUserOnboardingData()
     clearAuthSession()
     navigate("/", { replace: true })
+  }
+
+  const handleNavigation = async (item: NavItem) => {
+    if (item.label === "ROI 분석") {
+      navigate(await resolveRoiNavigationPath(location.pathname, location.search))
+      return
+    }
+    navigate(item.path)
   }
 
   const isEngiActive =
@@ -210,7 +219,7 @@ export default function GlobalHeader() {
                 key={item.path}
                 type="button"
                 id={`ff-nav-${item.path.replace(/\//g, "").replace(/-/g, "_") || "dashboard"}`}
-                onClick={() => navigate(item.path)}
+                onClick={() => void handleNavigation(item)}
                 aria-current={active ? "page" : undefined}
                 style={{
                   position: "relative",
@@ -406,7 +415,7 @@ export default function GlobalHeader() {
                   key={item.path}
                   type="button"
                   onClick={() => {
-                    navigate(item.path)
+                    void handleNavigation(item)
                     setMobileOpen(false)
                   }}
                   style={{

@@ -31,5 +31,6 @@ data/raw/*.csv
 data/models/*.pkl
 *.log
 backend/generated_reports/
+backup_20260628/
 .DS_Store
 .vscode/

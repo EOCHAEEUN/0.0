@@ -9,13 +9,20 @@ from app.core.llm import llm
 from app.tools.query_builder import _get_impact_keywords
 from datetime import date
 from app.core.database import get_db
-from app.agents.capex import (
-    format_roi_result,
-    show_roi_detail,
-    compare_scenarios,
-    compare_roi_results,
-    analyze_roi_followup
-)
+try:
+    from app.agents.capex import (
+        format_roi_result,
+        show_roi_detail,
+        compare_scenarios,
+        compare_roi_results,
+        analyze_roi_followup,
+    )
+except ImportError:
+    format_roi_result = None
+    show_roi_detail = None
+    compare_scenarios = None
+    compare_roi_results = None
+    analyze_roi_followup = None
 from app.tools.roi_calc_tool import calculate_equipment_roi
 
 

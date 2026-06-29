@@ -1,4 +1,4 @@
-import type { DraftStatus } from "../applicationDraft.contract"
+﻿import type { DraftStatus } from "../applicationDraft.contract"
 import type { ApplicationDraftModel } from "../hooks/useApplicationDraft"
 
 type PdfDraftSource = {
@@ -118,7 +118,7 @@ function getPdfPreviewData(model: ApplicationDraftModel): PdfPreviewData {
       readText(apiDraft.agency) ||
       readText(apiDraft.organization) ||
       model.selectedAgency ||
-      "주관사 정보 없음",
+      "주관기관 정보 없음",
     scenarioLabel:
       readText(apiDraft.scenario_label) || model.scenarioLabel || "시나리오 미확인",
     businessNecessity:
@@ -175,7 +175,9 @@ async function readErrorMessage(response: Response): Promise<string> {
   return "PDF 생성 중 오류가 발생했습니다."
 }
 
-async function downloadApplicationReportPdf(model: ApplicationDraftModel) {
+type ReportType = "consumer_summary" | "application_evidence"
+
+async function downloadApplicationReportPdf(model: ApplicationDraftModel, reportType: ReportType) {
   const params = getReportParams(model)
   if (!params) {
     throw new Error("PDF 생성에 필요한 company_id, equipment_id, policy_id가 없습니다.")
@@ -190,13 +192,19 @@ async function downloadApplicationReportPdf(model: ApplicationDraftModel) {
     headers.Authorization = `Bearer ${token}`
   }
 
-  const response = await fetch(buildApiUrl("/api/reports/application.pdf"), {
+  const endpoint =
+    reportType === "consumer_summary"
+      ? "/api/reports/consumer-summary.pdf"
+      : "/api/reports/application-evidence.pdf"
+
+  const response = await fetch(buildApiUrl(endpoint), {
     method: "POST",
     headers,
     body: JSON.stringify({
       company_id: params.companyId,
       equipment_id: params.equipmentId,
       policy_id: params.policyId,
+      report_type: reportType,
       tone: "submission",
     }),
   })
@@ -235,14 +243,14 @@ export function ApplicationDraftPdfPreview({
   const isLoading = Boolean(model.analysisData?.isLoading)
   const canDownload = draftStatus !== "idle" && hasDraftApiData && !isLoading
 
-  const handleDownload = async () => {
+  const handleDownload = async (reportType: ReportType) => {
     if (!canDownload) {
       window.alert("PDF 생성에 필요한 데이터가 아직 준비되지 않았습니다. 잠시 후 다시 시도해주세요.")
       return
     }
 
     try {
-      await downloadApplicationReportPdf(model)
+      await downloadApplicationReportPdf(model, reportType)
       onPrepareDownload()
     } catch (error) {
       console.error("PDF 다운로드 실패:", error)
@@ -260,7 +268,7 @@ export function ApplicationDraftPdfPreview({
         <div className="ff-pdf-expand-head">
           <div>
             <span className="ff-mini-label">PDF 확장 미리보기</span>
-            <h4>최종 PDF는 제출 참고 보고서 형식으로 생성됩니다.</h4>
+            <h4>최종 PDF에 제출 참고 보고서 형식으로 생성됩니다</h4>
           </div>
           <p>
             현재 DB에 저장된 기업정보, 설비현황, ROI 분석 결과, 신청서 초안을 바탕으로
@@ -286,13 +294,13 @@ export function ApplicationDraftPdfPreview({
 
           <article>
             <span>03</span>
-            <h5>기대효과</h5>
+            <h5>기대 효과</h5>
             <p>
               {pdf.expectedBenefits.length > 0
                 ? `${pdf.expectedBenefits.slice(0, 3).join(", ")} 효과를 중심으로 성과관리 기준까지 확장합니다.`
                 : expectedBenefits.length > 0
                   ? `${expectedBenefits.slice(0, 3).join(", ")} 효과를 중심으로 성과관리 기준까지 확장합니다.`
-                  : "DB에 저장된 신청서 초안의 기대효과를 PDF에 반영합니다."}
+                  : "DB에 저장된 신청서 초안의 기대 효과를 PDF에 반영합니다."}
             </p>
           </article>
         </div>
@@ -307,9 +315,18 @@ export function ApplicationDraftPdfPreview({
           className="dark"
           type="button"
           disabled={!canDownload}
-          onClick={handleDownload}
+          onClick={() => handleDownload("consumer_summary")}
         >
-          {canDownload ? "PDF 다운로드" : "PDF 준비 중"}
+          {canDownload ? "표 중심 리포트" : "PDF 준비 중"}
+        </button>
+
+        <button
+          className="dark"
+          type="button"
+          disabled={!canDownload}
+          onClick={() => handleDownload("application_evidence")}
+        >
+          {canDownload ? "사업계획서 리포트" : "PDF 준비 중"}
         </button>
 
         <button className="green" type="button" onClick={onGoSupportProjects}>
@@ -319,7 +336,7 @@ export function ApplicationDraftPdfPreview({
 
       {draftStatus === "saved" && hasDraftApiData && (
         <div className="ff-draft-alert success">
-          초안이 DB에 저장되었습니다. 정식 application report 형식으로 PDF를 다운로드할 수 있습니다.
+          초안이 DB에 저장되었습니다. application report 형식으로 PDF를 다운로드할 수 있습니다.
         </div>
       )}
 
@@ -331,7 +348,7 @@ export function ApplicationDraftPdfPreview({
 
       {draftStatus === "downloadReady" && (
         <div className="ff-draft-alert success">
-          PDF 다운로드가 완료되었습니다. 동일한 버튼으로 최신 DB 기준 보고서를 다시 받을 수 있습니다.
+          PDF 다운로드가 완료되었습니다. 같은 버튼으로 최신 DB 기준 보고서를 다시 받을 수 있습니다.
         </div>
       )}
 

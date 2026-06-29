@@ -3,6 +3,7 @@ import type {
   PolicyApiResponse,
   PolicyCounters,
   PolicySummary,
+  SafetyPreview,
   SupportProject,
 } from "./supportProjects.contract"
 import { buildPolicyCounters, mapPolicyToProject, rankProjects, toNumberOrNull } from "./supportProjects.utils"
@@ -37,6 +38,14 @@ export function getStoredCompanyId() {
 
 export function getStoredAccessToken() {
   return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || ""
+}
+
+function getJsonHeaders() {
+  const token = getStoredAccessToken()
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  }
 }
 
 function normalizePolicySummary(value: unknown): PolicySummary {
@@ -123,7 +132,6 @@ export async function fetchPolicyCards(
   const inFlight = policyCardsInFlightCache.get(cacheKey)
   if (inFlight) return inFlight
 
-  const token = getStoredAccessToken()
   const query = new URLSearchParams({
     company_id: companyId,
     limit: String(POLICY_FETCH_LIMIT),
@@ -136,8 +144,7 @@ export async function fetchPolicyCards(
   const requestPromise = fetch(url, {
     method: "GET",
     headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...getJsonHeaders(),
     },
   })
     .then(async (response) => {
@@ -194,15 +201,13 @@ export async function fetchPolicySummary(
   const inFlight = policySummaryInFlightCache.get(cacheKey)
   if (inFlight) return inFlight
 
-  const token = getStoredAccessToken()
   const query = new URLSearchParams({ company_id: companyId })
   if (equipmentId) query.set("equipment_id", equipmentId)
 
   const requestPromise = fetch(buildApiUrl(`/api/analyze/policy-summary?${query.toString()}`), {
     method: "GET",
     headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...getJsonHeaders(),
     },
   })
     .then(async (response) => {
@@ -229,4 +234,88 @@ export async function fetchPolicySummary(
 
   policySummaryInFlightCache.set(cacheKey, requestPromise)
   return requestPromise
+}
+
+function buildSafetyPreviewUrl(
+  analysisId: string,
+  policyId: string,
+  equipmentId?: string | null,
+  investmentPlanId?: string | null,
+) {
+  const query = new URLSearchParams()
+  if (equipmentId) query.set("equipment_id", equipmentId)
+  if (investmentPlanId) query.set("investment_plan_id", investmentPlanId)
+
+  const suffix = query.toString() ? `?${query.toString()}` : ""
+  return buildApiUrl(
+    `/api/analysis/${encodeURIComponent(analysisId)}/policies/${encodeURIComponent(policyId)}/safety-preview${suffix}`,
+  )
+}
+
+export async function fetchSafetyPreview({
+  analysisId,
+  policyId,
+  equipmentId,
+  investmentPlanId,
+}: {
+  analysisId: string
+  policyId: string
+  equipmentId?: string | null
+  investmentPlanId?: string | null
+}): Promise<SafetyPreview | null> {
+  const response = await fetch(
+    buildSafetyPreviewUrl(analysisId, policyId, equipmentId, investmentPlanId),
+    {
+      method: "GET",
+      headers: getJsonHeaders(),
+    },
+  )
+  const json = (await response.json().catch(() => ({}))) as {
+    success?: boolean
+    data?: SafetyPreview | null
+    message?: string
+    error?: string
+  }
+
+  if (response.status === 404) return null
+  if (!response.ok || json.success === false) {
+    throw new Error(json.message || json.error || `Safety preview API failed: ${response.status}`)
+  }
+
+  return json.data ?? null
+}
+
+export async function generateSafetyPreview({
+  analysisId,
+  policyId,
+  equipmentId,
+  investmentPlanId,
+  body,
+}: {
+  analysisId: string
+  policyId: string
+  equipmentId?: string | null
+  investmentPlanId?: string | null
+  body: Record<string, unknown>
+}): Promise<SafetyPreview | null> {
+  const response = await fetch(
+    buildSafetyPreviewUrl(analysisId, policyId, equipmentId, investmentPlanId),
+    {
+      method: "POST",
+      headers: getJsonHeaders(),
+      body: JSON.stringify(body),
+    },
+  )
+  const json = (await response.json().catch(() => ({}))) as {
+    success?: boolean
+    data?: SafetyPreview | null
+    message?: string
+    error?: string
+  }
+
+  if (!response.ok || json.success === false) {
+    throw new Error(json.message || json.error || `Safety preview generation failed: ${response.status}`)
+  }
+
+  return json.data ?? null
 }

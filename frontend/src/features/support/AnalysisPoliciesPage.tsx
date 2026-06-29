@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import factoFitAiCharacter from "./assets/factofit-ai-character.png"
 import {
@@ -8,7 +8,8 @@ import {
 } from "../onboarding/onboardingState"
 import { LoadingPolicyState, ErrorPolicyState } from "./components/SupportProjectStates"
 import { useSupportProjects } from "./hooks/useSupportProjects"
-import type { SupportProject } from "./supportProjects.contract"
+import { fetchSafetyPreview, generateSafetyPreview } from "./supportProjects.api"
+import type { RequiredEvidence, SafetyPreview, SupportProject } from "./supportProjects.contract"
 import { getDday } from "./supportProjects.utils"
 import "./AnalysisPoliciesPage.css"
 
@@ -159,6 +160,138 @@ function ReasonAndReviewBlocks({ project }: { project: SupportProject }) {
         </p>
       </section>
     </div>
+  )
+}
+
+function SafetyImprovementPreview({
+  preview,
+  state,
+}: {
+  preview: SafetyPreview | null
+  state: "loading" | "error" | "success"
+}) {
+  return <SafetyImprovementPreviewFromApi preview={preview} state={state} />
+}
+
+function getPreviewStatusBadgeClass(value: string) {
+  return value.includes("설치") || value.includes("준비") ? "planned" : "needs-improvement"
+}
+
+function PreviewStatusBadge({ value }: { value: string }) {
+  return (
+    <span className={`ff-policy-safety-table-badge ${getPreviewStatusBadgeClass(value)}`}>
+      {value}
+    </span>
+  )
+}
+
+function getEvidenceLabel(evidence: RequiredEvidence): string {
+  if (typeof evidence === "string") return evidence
+  return evidence.label || evidence.base_label || "준비자료 확인 필요"
+}
+
+function PreviewRequiredEvidences({
+  evidences,
+  count,
+}: {
+  evidences: RequiredEvidence[]
+  count?: number | null
+}) {
+  const evidenceCount = count ?? evidences.length
+
+  return (
+    <span className="ff-policy-safety-evidence-popover">
+      <button type="button" className="ff-policy-safety-evidence-count">
+        필요 자료 {evidenceCount}개
+      </button>
+      {evidences.length > 0 && (
+        <span className="ff-policy-safety-evidence-tooltip" role="tooltip">
+          <strong>준비할 자료</strong>
+          <ul>
+            {evidences.map((evidence, index) => (
+              <li key={`${getEvidenceLabel(evidence)}-${index}`}>{getEvidenceLabel(evidence)}</li>
+            ))}
+          </ul>
+        </span>
+      )}
+    </span>
+  )
+}
+
+function SafetyImprovementPreviewFromApi({
+  preview,
+  state,
+}: {
+  preview: SafetyPreview | null
+  state: "loading" | "error" | "success"
+}) {
+  if (state === "loading") {
+    return (
+      <section className="ff-policy-safety-preview">
+        <p className="ff-policy-safety-preview-note">안전개선 준비 항목을 불러오고 있습니다.</p>
+      </section>
+    )
+  }
+
+  if (state === "error" || !preview) {
+    return (
+      <section className="ff-policy-safety-preview">
+        <p className="ff-policy-safety-preview-note">안전개선 준비 항목을 불러오지 못했습니다.</p>
+      </section>
+    )
+  }
+
+  const items = preview.safety_preview_items || []
+
+  return (
+    <section className="ff-policy-safety-preview">
+      <div className="ff-policy-safety-preview-head">
+        <div>
+          <span className="ff-safety-status-badge">안전개선 신청서 활용 가능성</span>
+          <h3>{preview.equipment_name || "선택 설비"}</h3>
+          <p>선택한 설비와 투자안을 기준으로 생성된 안전개선 준비 항목입니다.</p>
+        </div>
+      </div>
+
+      <div className="ff-policy-safety-table-wrap">
+        <table className="ff-policy-safety-table">
+          <thead>
+            <tr>
+              <th>번호</th>
+              <th>안전개선 관점</th>
+              <th>현재 판단</th>
+              <th>준비할 자료</th>
+              <th>설명/근거</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item) => (
+              <tr key={`${item.no}-${item.viewpoint_key}`}>
+                <td>{item.no}</td>
+                <td>{item.viewpoint_title}</td>
+                <td>
+                  <PreviewStatusBadge value={item.current_judgement} />
+                </td>
+                <td>
+                  <PreviewRequiredEvidences
+                    evidences={item.required_evidences || []}
+                    count={item.required_evidence_count}
+                  />
+                </td>
+                <td>
+                  <p className="ff-policy-safety-description">{item.description}</p>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="ff-policy-safety-preview-note">
+        선택한 설비와 투자안을 기준으로 생성된 안전개선 준비 항목입니다. 실제 증빙 업로드는 신청서 작성 화면에서 진행합니다.
+      </p>
+
+    </section>
   )
 }
 
@@ -575,11 +708,83 @@ export function AnalysisPoliciesPage() {
 export function AnalysisPolicyDetailPage() {
   const navigate = useNavigate()
   const { id = "latest", policyId } = useParams()
-  const { support } = usePolicyPageContext()
+  const { support, condition } = usePolicyPageContext()
   const project = useMemo(
     () => findProjectByRouteId(support.policyCards, policyId),
     [policyId, support.policyCards],
   )
+  const canShowSafetyImprovement = project?.can_run_safety_logic === true
+  const [safetyPreview, setSafetyPreview] = useState<SafetyPreview | null>(null)
+  const [safetyPreviewState, setSafetyPreviewState] = useState<"idle" | "loading" | "error" | "success">("idle")
+  const equipmentId =
+    support.analysisData.equipment?.equipment_id ||
+    support.analysisData.equipment_id ||
+    window.localStorage.getItem("factofit_equipment_id") ||
+    window.localStorage.getItem("factofit_selected_equipment_id") ||
+    ""
+
+  useEffect(() => {
+    let ignore = false
+
+    async function loadSafetyPreview() {
+      if (!project || project.can_run_safety_logic !== true) {
+        setSafetyPreview(null)
+        setSafetyPreviewState("idle")
+        return
+      }
+
+      try {
+        setSafetyPreviewState("loading")
+        const preview =
+          (await fetchSafetyPreview({
+            analysisId: id,
+            policyId: project.rawId || String(project.id),
+            equipmentId,
+          })) ||
+          (await generateSafetyPreview({
+            analysisId: id,
+            policyId: project.rawId || String(project.id),
+            equipmentId,
+            body: {
+              policy: project,
+              equipment: {
+                name: support.selectedEquipmentContext.equipmentName,
+                category: support.analysisData.equipment?.category,
+                process: support.analysisData.equipment?.process,
+              },
+              equipment_name: support.selectedEquipmentContext.equipmentName,
+              equipment_type:
+                support.analysisData.equipment?.category ||
+                support.analysisData.equipment?.process ||
+                condition.equipmentCategory,
+              roi_context: {
+                recommendedScenario: support.selectedEquipmentContext.recommendedScenario,
+                roiPaybackMonths: support.selectedEquipmentContext.roiPaybackMonths,
+                investmentManwon: support.selectedEquipmentContext.investmentManwon,
+                subsidyManwon: support.selectedEquipmentContext.subsidyManwon,
+                purpose: condition.purpose,
+              },
+            },
+          }))
+
+        if (ignore) return
+        setSafetyPreview(preview)
+        setSafetyPreviewState("success")
+      } catch (error) {
+        console.error("안전개선 preview API 호출 실패:", error)
+        if (!ignore) {
+          setSafetyPreview(null)
+          setSafetyPreviewState("error")
+        }
+      }
+    }
+
+    void loadSafetyPreview()
+
+    return () => {
+      ignore = true
+    }
+  }, [condition.equipmentCategory, condition.purpose, equipmentId, id, project, support.analysisData.equipment, support.analysisData.equipment_id, support.selectedEquipmentContext])
 
   return (
     <main className="ff-policy-page">
@@ -621,6 +826,12 @@ export function AnalysisPolicyDetailPage() {
 
             <PolicyMetaGrid project={project} />
             <ReasonAndReviewBlocks project={project} />
+            {canShowSafetyImprovement && (
+              <SafetyImprovementPreview
+                preview={safetyPreview}
+                state={safetyPreviewState === "idle" ? "loading" : safetyPreviewState}
+              />
+            )}
 
             {project.supportContent && project.supportContent !== "지원내용 준비 중" && (
               <section className="ff-policy-info-box" style={{ marginTop: "16px" }}>

@@ -472,6 +472,53 @@ function getFieldValue(source: Record<string, unknown>, ...keys: string[]) {
   return null
 }
 
+function toBooleanOrUndefined(value: unknown) {
+  if (typeof value === "boolean") return value
+  if (typeof value === "number") return value === 1 ? true : value === 0 ? false : undefined
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase()
+    if (["true", "1", "yes", "y"].includes(normalized)) return true
+    if (["false", "0", "no", "n"].includes(normalized)) return false
+  }
+  return undefined
+}
+
+export function resolveCanRunSafetyLogic(status?: unknown): boolean {
+  if (typeof status === "boolean") return status
+  if (status === null || status === undefined) return false
+
+  const normalized = String(status).trim().toLowerCase()
+  return ["사용 가능", "조건부 사용 가능", "available", "conditional"].includes(normalized)
+}
+
+function resolvePolicySafetyLogic(policy: PolicyApiItem, metadata: Record<string, unknown>) {
+  const explicitValue = toBooleanOrUndefined(
+    policy.can_run_safety_logic ?? getFieldValue(metadata, "can_run_safety_logic"),
+  )
+  if (explicitValue !== undefined) return explicitValue
+
+  return resolveCanRunSafetyLogic(
+    getFieldValue(
+      policy as unknown as Record<string, unknown>,
+      "safety_justification_usable",
+      "usage_status",
+      "availability",
+      "display_status",
+      "policy_status",
+      "classification",
+    ) ??
+      getFieldValue(
+        metadata,
+        "safety_justification_usable",
+        "usage_status",
+        "availability",
+        "display_status",
+        "policy_status",
+        "classification",
+      ),
+  )
+}
+
 function normalizeReasonList(value: unknown) {
   if (Array.isArray(value)) {
     return value
@@ -823,6 +870,7 @@ export function mapPolicyToProject(policy: PolicyApiItem, index: number): Suppor
     scenario,
     scenarioLabel: scenario === "B" ? "부분교체" : "전체교체",
     sourceUrl: getPolicySourceUrl(policy),
+    can_run_safety_logic: resolvePolicySafetyLogic(policy, metadata),
   }
 }
 

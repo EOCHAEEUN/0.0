@@ -5,7 +5,7 @@ from app.prompts.router import ROUTER_SYSTEM_PROMPT
 from app.state import FactofitState
 
 
-VALID_INTENTS = ["roi", "policy", "draft", "safety", "info_missing", "general"]
+VALID_INTENTS = ["roi", "roi_followup", "policy", "draft", "safety", "info_missing", "general"]
 
 ROI_ANALYSIS_KEYWORDS = [
     "roi", "분석", "투자", "교체", "검토",
@@ -37,6 +37,7 @@ def router_node(state: FactofitState) -> FactofitState:
     equipment = state.get("equipment")
     equipments = state.get("equipments", [])
     equipment_count = len(equipments)
+    roi_result = state.get("roi_result")
 
     industry_codes = company.industry_code if company else "정보 없음"
     region = company.region if company else "정보 없음"
@@ -84,6 +85,11 @@ def router_node(state: FactofitState) -> FactofitState:
         and any(keyword in query for keyword in ROI_ANALYSIS_KEYWORDS)
     ):
         intent = "roi"
+
+    # ✅ 추가! ROI 결과가 있으면 roi_followup으로 분류
+    # (후속질문: 상세, 비교, 시뮬레이션 등이 들어올 수 있음)
+    if roi_result and intent in ["roi", "policy", "draft"]:
+        intent = "roi_followup"
 
     state["intent"] = intent
     return state

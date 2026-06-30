@@ -151,3 +151,93 @@ export type ApplicationDraftSavePayload = {
   required_documents: string[]
   saved_at: string
 }
+
+export type ReadinessItemStatus =
+  | "complete"
+  | "needs_revision"
+  | "needs_evidence"
+  | "legacy_missing"
+
+export type WorkspaceReadinessItem = {
+  status: ReadinessItemStatus
+  summary: string
+  missing_fields?: string[]
+}
+
+export type WorkspaceScenario = {
+  label?: string | null
+  investment_manwon?: number | null
+  subsidy_manwon?: number | null
+  net_investment_manwon?: number | null
+  payback_years?: number | null
+  payback_months?: number | null
+  roi_pct?: number | null
+  annual_net_benefit_manwon?: number | null
+}
+
+export type WorkspaceSafetyRow = {
+  no: number
+  viewpoint_key: string
+  viewpoint_label: string
+  current_status: string
+  evidence_status: "보유" | "일부 보유" | "미보유"
+  description: string
+}
+
+export type ApplicationDraftWorkspaceData = {
+  state: "ready" | "analysis_required"
+  message?: string
+  analysis_id: string | null
+  company_id?: string
+  equipment_id?: string
+  policy_id?: string | null
+  company: {
+    company_name?: string | null
+    industry_name?: string | null
+    region?: string | null
+    company_type?: string | null
+  }
+  equipment: {
+    equipment_id?: string | null
+    name?: string | null
+    category?: string | null
+    age_years?: number | null
+    energy_cost_annual?: number | null
+  }
+  readiness: {
+    company: WorkspaceReadinessItem
+    equipment: WorkspaceReadinessItem
+    roi: WorkspaceReadinessItem
+    policy: WorkspaceReadinessItem
+  }
+  scenarios: {
+    selected: "a" | "b"
+    a: WorkspaceScenario
+    b: WorkspaceScenario
+  }
+  policy: {
+    policy_id?: string | null
+    title?: string | null
+    deadline?: string | null
+    source: "policy_snapshot" | "legacy_missing"
+    legacy_missing?: boolean
+  }
+  draft: {
+    exists: boolean
+    draft_result_id?: string | null
+    content: DraftResult & Record<string, unknown>
+    summary_paragraphs: string[]
+  }
+  safety: {
+    rows: WorkspaceSafetyRow[]
+    has_viewer_policy: boolean
+  }
+}
+
+export type ApplicationDraftReportParams = {
+  companyId: string
+  equipmentId: string
+  policyId: string
+  analysisId?: string
+  draftResultId?: string
+}

@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import AppHeader from "../../components/AppHeader";
+import {
+  getStoredCompanyId,
+  patchRepresentativeEquipment,
+} from "../dashboard/dashboard.api";
 import { MYPAGE_DOCUMENT_STORAGE_KEY } from "../documents/documentStorage";
 import { MyPageDocumentUploadPanel } from "./MyPageDocumentUploadPanel";
 import type {
@@ -76,6 +81,8 @@ import {
   hasRequiredEquipmentFields,
   AiGuideHeroBanner,
   AccordionPanel,
+  EquipmentOptionalAccordion,
+  countEquipmentOptionalFieldsFilled,
 } from "./myPage.parts";
 
 
@@ -287,6 +294,11 @@ function mapRemoteEquipment(item: unknown, index: number): EquipmentInfo {
 
 
 export default function MyPage() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnToDashboard = searchParams.get("return_to") === "dashboard";
+  const focusRepresentative = searchParams.get("focus") === "representative";
+
   const storedData = useMemo(() => {
     if (typeof window === "undefined") return null;
     return loadStoredMyPageData();
@@ -307,6 +319,9 @@ export default function MyPage() {
   const [energyTooltipEquipmentId, setEnergyTooltipEquipmentId] = useState<
     number | null
   >(null);
+  const [equipmentOptionalOpen, setEquipmentOptionalOpen] = useState<
+    Record<number, boolean>
+  >({});
 
   const [openSections, setOpenSections] = useState<
     Record<MyPagePanelKey, boolean>
@@ -345,6 +360,14 @@ export default function MyPage() {
         storedData?.equipmentList?.[0]?.id ??
         1,
     );
+  const [representativeEquipmentId, setRepresentativeEquipmentId] = useState("");
+  const [representativeFeedback, setRepresentativeFeedback] = useState("");
+
+  useEffect(() => {
+    if (focusRepresentative || searchParams.get("panel") === "equipment") {
+      setOpenSections((prev) => ({ ...prev, equipment: true }));
+    }
+  }, [focusRepresentative, searchParams]);
 
   useEffect(() => {
     setBasicInfo((prev) => ({
@@ -430,6 +453,10 @@ export default function MyPage() {
         }
 
         if (company) {
+          const representativeId = getStringValue(company.representative_equipment_id);
+          if (representativeId) {
+            setRepresentativeEquipmentId(representativeId);
+          }
           const industryCodes = getStringArrayValue(company.industry_code);
           const industryName = getStringValue(company.industry_name);
           const remoteIndustries = normalizeRemoteIndustries(
@@ -823,6 +850,16 @@ export default function MyPage() {
     );
   };
 
+  const toggleEquipmentOptional = (equipmentId: number) => {
+    setEquipmentOptionalOpen((prev) => ({
+      ...prev,
+      [equipmentId]: !prev[equipmentId],
+    }));
+  };
+
+  const isEquipmentOptionalOpen = (equipmentId: number) =>
+    Boolean(equipmentOptionalOpen[equipmentId]);
+
   const addEquipment = () => {
     const nextId =
       equipmentList.length > 0
@@ -833,6 +870,58 @@ export default function MyPage() {
 
     if (!selectedAnalysisEquipmentId) {
       setSelectedAnalysisEquipmentId(nextId);
+    }
+  };
+
+  const handleSetRepresentativeEquipment = async (equipment: EquipmentInfo) => {
+    const companyId =
+      window.localStorage.getItem(COMPANY_ID_STORAGE_KEY) || getStoredCompanyId();
+    const equipmentId = equipment.equipmentId?.trim();
+    const equipmentLabel = equipment.name?.trim() || `설비 ${equipment.id}`;
+
+    if (!companyId || !equipmentId) {
+      window.alert("대표 설비를 저장하려면 먼저 설비 정보를 저장해주세요.");
+      return;
+    }
+
+    try {
+      await patchRepresentativeEquipment({ companyId, equipmentId });
+      setRepresentativeEquipmentId(equipmentId);
+      setRepresentativeFeedback(`대표 설비를 ${equipmentLabel}로 변경했습니다.`);
+      if (returnToDashboard) {
+        navigate("/dashboard");
+      }
+    } catch (error) {
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : "대표 설비를 저장하지 못했습니다.",
+      );
+    }
+  };
+
+  const handleClearRepresentativeEquipment = async () => {
+    const companyId =
+      window.localStorage.getItem(COMPANY_ID_STORAGE_KEY) || getStoredCompanyId();
+
+    if (!companyId) {
+      window.alert("회사 정보를 먼저 저장해주세요.");
+      return;
+    }
+
+    try {
+      await patchRepresentativeEquipment({ companyId, equipmentId: null });
+      setRepresentativeEquipmentId("");
+      setRepresentativeFeedback("대표 설비를 해제했습니다.");
+      if (returnToDashboard) {
+        navigate("/dashboard");
+      }
+    } catch (error) {
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : "대표 설비를 해제하지 못했습니다.",
+      );
     }
   };
 
@@ -852,6 +941,10 @@ export default function MyPage() {
         window.alert(getErrorMessage(error));
         return;
       }
+
+      if (representativeEquipmentId === targetEquipment.equipmentId) {
+        setRepresentativeEquipmentId("");
+      }
     }
 
     const nextEquipmentList = equipmentList.filter(
@@ -864,6 +957,11 @@ export default function MyPage() {
 
     setEquipmentList(nextEquipmentList);
     setSelectedAnalysisEquipmentId(nextSelectedAnalysisEquipmentId);
+    setEquipmentOptionalOpen((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
 
     const nextSelectedEquipmentUuid =
       nextEquipmentList.find(
@@ -2344,6 +2442,37 @@ export default function MyPage() {
               open={openSections.equipment}
               onToggle={() => toggleSection("equipment")}
             >
+              {representativeFeedback ? (
+                <div
+                  style={{
+                    marginBottom: "16px",
+                    padding: "14px 16px",
+                    borderRadius: "16px",
+                    background: "#E7F4EC",
+                    color: "#2E6F44",
+                    fontSize: "14px",
+                    fontWeight: 800,
+                  }}
+                >
+                  {representativeFeedback}
+                </div>
+              ) : null}
+              {returnToDashboard && focusRepresentative && (
+                <div
+                  style={{
+                    marginBottom: "16px",
+                    padding: "14px 16px",
+                    borderRadius: "16px",
+                    background: "#F1F5FF",
+                    color: "#344BA0",
+                    fontSize: "14px",
+                    fontWeight: 800,
+                  }}
+                >
+                  대시보드에서 우선 확인할 설비를 선택해주세요. 아래에서 [대표
+                  설비로 설정]을 누르면 저장됩니다.
+                </div>
+              )}
               <div
                 style={{
                   display: "flex",
@@ -2455,32 +2584,89 @@ export default function MyPage() {
                           </span>
                         </button>
 
-                        <button
-                          type="button"
-                          onClick={() => removeEquipment(equipment.id)}
-                          style={{
-                            height: "40px",
-                            borderRadius: "999px",
-                            border: "1px solid #FEE2E2",
-                            background: "#FFFFFF",
-                            color: "#CD2E3A",
-                            padding: "0 16px",
-                            fontSize: "13px",
-                            fontWeight: 950,
-                            cursor: "pointer",
-                          }}
-                        >
-                          삭제
-                        </button>
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                          {representativeEquipmentId === equipment.equipmentId ? (
+                            <>
+                              <span
+                                style={{
+                                  height: "40px",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  borderRadius: "999px",
+                                  padding: "0 14px",
+                                  background: "#E7F4EC",
+                                  color: "#2E6F44",
+                                  fontSize: "13px",
+                                  fontWeight: 950,
+                                }}
+                              >
+                                대표 설비
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => void handleClearRepresentativeEquipment()}
+                                style={{
+                                  height: "40px",
+                                  borderRadius: "999px",
+                                  border: "1px solid #CBD5E1",
+                                  background: "#FFFFFF",
+                                  color: "#475467",
+                                  padding: "0 16px",
+                                  fontSize: "13px",
+                                  fontWeight: 950,
+                                  cursor: "pointer",
+                                }}
+                              >
+                                대표 설비 해제
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => void handleSetRepresentativeEquipment(equipment)}
+                              style={{
+                                height: "40px",
+                                borderRadius: "999px",
+                                border: "1px solid #CBD5E1",
+                                background: "#FFFFFF",
+                                color: "#344BA0",
+                                padding: "0 16px",
+                                fontSize: "13px",
+                                fontWeight: 950,
+                                cursor: "pointer",
+                              }}
+                            >
+                              대표 설비로 설정
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => removeEquipment(equipment.id)}
+                            style={{
+                              height: "40px",
+                              borderRadius: "999px",
+                              border: "1px solid #FEE2E2",
+                              background: "#FFFFFF",
+                              color: "#CD2E3A",
+                              padding: "0 16px",
+                              fontSize: "13px",
+                              fontWeight: 950,
+                              cursor: "pointer",
+                            }}
+                          >
+                            삭제
+                          </button>
+                        </div>
                       </div>
 
                       <section
                         style={{
-                          border: "1px solid #E2E8F0",
+                          border: "1px solid rgba(52,75,160,.16)",
                           borderRadius: "24px",
                           padding: "20px",
                           display: "grid",
                           gap: "18px",
+                          background: "#FFFFFF",
                         }}
                       >
                         <h3
@@ -2491,18 +2677,10 @@ export default function MyPage() {
                             margin: 0,
                           }}
                         >
-                          설비 기본정보
+                          설비 기본 정보
                         </h3>
 
-                        <div
-                          className="ff-mypage-three-col"
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "1.1fr 1fr 1fr",
-                            gap: "16px",
-                            alignItems: "start",
-                          }}
-                        >
+                        <div className="ff-mypage-equipment-required">
                           <SelectField
                             label="설비 종류"
                             required
@@ -2524,26 +2702,6 @@ export default function MyPage() {
                             }
                           />
 
-                          <Field
-                            label="공정"
-                            selectable
-                            value={equipment.process}
-                            placeholder="예: 프레스"
-                            onChange={(value) =>
-                              updateEquipment(equipment.id, "process", value)
-                            }
-                          />
-                        </div>
-
-                        <div
-                          className="ff-mypage-three-col"
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "0.8fr 1fr 1fr",
-                            gap: "16px",
-                            alignItems: "start",
-                          }}
-                        >
                           <Field
                             label="설비 사용연수"
                             required
@@ -2613,245 +2771,215 @@ export default function MyPage() {
                               )
                             }
                           />
-
-                          <Field
-                            label="불량률"
-                            selectable
-                            value={equipment.defectRate}
-                            placeholder="예: 3"
-                            helperText="% 단위"
-                            onChange={(value) =>
-                              updateEquipment(equipment.id, "defectRate", value)
-                            }
-                          />
                         </div>
                       </section>
 
-                      <section
-                        style={{
-                          border: "1px solid #E2E8F0",
-                          borderRadius: "24px",
-                          padding: "20px",
-                          display: "grid",
-                          gap: "18px",
-                        }}
+                      <EquipmentOptionalAccordion
+                        title="선택정보 입력하기"
+                        description="공정·투자비용·운영지표를 입력하면 분석 정확도를 높일 수 있어요."
+                        open={isEquipmentOptionalOpen(equipment.id)}
+                        filledCount={countEquipmentOptionalFieldsFilled(equipment)}
+                        onToggle={() => toggleEquipmentOptional(equipment.id)}
                       >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                            flexWrap: "wrap",
-                          }}
-                        >
-                          <h3
-                            style={{
-                              color: "#061B34",
-                              fontSize: "17px",
-                              fontWeight: 950,
-                              margin: 0,
-                            }}
-                          >
-                            예상 투자비용 입력하기
-                          </h3>
-                          <SelectChip />
-                        </div>
-
-                        <div
-                          className="ff-mypage-two-col"
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "1fr 1fr",
-                            gap: "16px",
-                          }}
-                        >
-                          <Field
-                            label="전체교체 예상 투자금"
-                            value={equipment.scenarioAInvestment}
-                            placeholder="예: 22,000"
-                            helperText="단위: 만원"
-                            inputMode="numeric"
-                            onChange={(value) =>
-                              updateEquipment(
-                                equipment.id,
-                                "scenarioAInvestment",
-                                formatCommaNumber(value),
-                              )
-                            }
-                          />
-
-                          <Field
-                            label="부분교체 예상 투자금"
-                            value={equipment.scenarioBInvestment}
-                            placeholder="예: 4,994"
-                            helperText="단위: 만원"
-                            inputMode="numeric"
-                            onChange={(value) =>
-                              updateEquipment(
-                                equipment.id,
-                                "scenarioBInvestment",
-                                formatCommaNumber(value),
-                              )
-                            }
-                          />
-                        </div>
-
-                        <p
-                          style={{
-                            color: "#667085",
-                            fontSize: "13px",
-                            fontWeight: 850,
-                            lineHeight: 1.65,
-                            margin: 0,
-                          }}
-                        >
-                          입력하지 않으면 업계 평균 투자금으로 ROI를 추정합니다.
-                          입력하면 실제 투자 계획에 가까운 ROI 분석이
-                          가능합니다.
-                        </p>
-                      </section>
-
-                      <section
-                        style={{
-                          border: "1px solid #E2E8F0",
-                          borderRadius: "24px",
-                          padding: "20px",
-                          display: "grid",
-                          gap: "18px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                            flexWrap: "wrap",
-                          }}
-                        >
-                          <h3
-                            style={{
-                              color: "#061B34",
-                              fontSize: "17px",
-                              fontWeight: 950,
-                              margin: 0,
-                            }}
-                          >
-                            추가 운영지표 입력하기
-                          </h3>
-                          <SelectChip />
-                        </div>
-
-                        <div
-                          className="ff-mypage-four-col"
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-                            gap: "16px",
-                            alignItems: "start",
-                          }}
-                        >
-                          <Field
-                            label="연간 유지보수 비용"
-                            value={equipment.maintenanceCostAnnual}
-                            placeholder="예: 1,200"
-                            helperText="단위: 만원"
-                            inputMode="numeric"
-                            onChange={(value) =>
-                              updateEquipment(
-                                equipment.id,
-                                "maintenanceCostAnnual",
-                                formatCommaNumber(value),
-                              )
-                            }
-                          />
-
-                          <Field
-                            label="설비 용량 규격값"
-                            value={equipment.currentCapacityValue}
-                            placeholder="예: 100"
-                            labelRight={
-                              <span
-                                style={{
-                                  position: "relative",
-                                  display: "inline-flex",
-                                }}
-                                onMouseEnter={() =>
-                                  setCapacityTooltipEquipmentId(equipment.id)
+                        <div className="ff-setup-optional-groups">
+                          <section className="ff-setup-optional-group">
+                            <h4>설비 상세 정보</h4>
+                            <div
+                              className="ff-mypage-two-col"
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: "1fr 1fr",
+                                gap: "16px",
+                              }}
+                            >
+                              <Field
+                                label="공정"
+                                selectable
+                                value={equipment.process}
+                                placeholder="예: 프레스"
+                                onChange={(value) =>
+                                  updateEquipment(equipment.id, "process", value)
                                 }
-                                onMouseLeave={() =>
-                                  setCapacityTooltipEquipmentId(null)
+                              />
+                              <Field
+                                label="불량률"
+                                selectable
+                                value={equipment.defectRate}
+                                placeholder="예: 3"
+                                helperText="% 단위"
+                                onChange={(value) =>
+                                  updateEquipment(equipment.id, "defectRate", value)
                                 }
-                                onFocus={() =>
-                                  setCapacityTooltipEquipmentId(equipment.id)
-                                }
-                                onBlur={() =>
-                                  setCapacityTooltipEquipmentId(null)
-                                }
-                              >
-                                <button
-                                  type="button"
-                                  aria-label="설비 용량 규격값 안내"
-                                  style={{
-                                    width: "18px",
-                                    height: "18px",
-                                    borderRadius: "999px",
-                                    border: 0,
-                                    background: "#F1F5F9",
-                                    color: "#64748B",
-                                    fontSize: "11px",
-                                    fontWeight: 800,
-                                    cursor: "help",
-                                  }}
-                                >
-                                  i
-                                </button>
-                                <InfoTooltip
-                                  open={
-                                    capacityTooltipEquipmentId === equipment.id
-                                  }
-                                  text="보조 단위: 프레스/사출기: 톤, CNC: kW"
-                                />
-                              </span>
-                            }
-                            onChange={(value) =>
-                              updateEquipment(
-                                equipment.id,
-                                "currentCapacityValue",
-                                value,
-                              )
-                            }
-                          />
+                              />
+                            </div>
+                          </section>
 
-                          <Field
-                            label="연간 생산량"
-                            value={equipment.productionQty}
-                            placeholder="예: 50000"
-                            inputMode="numeric"
-                            onChange={(value) =>
-                              updateEquipment(
-                                equipment.id,
-                                "productionQty",
-                                value,
-                              )
-                            }
-                          />
+                          <section className="ff-setup-optional-group">
+                            <h4>실제 투자비용</h4>
+                            <div
+                              className="ff-mypage-two-col"
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: "1fr 1fr",
+                                gap: "16px",
+                              }}
+                            >
+                              <Field
+                                label="전체교체 예상 투자금"
+                                value={equipment.scenarioAInvestment}
+                                placeholder="예: 22,000"
+                                helperText="단위: 만원"
+                                inputMode="numeric"
+                                onChange={(value) =>
+                                  updateEquipment(
+                                    equipment.id,
+                                    "scenarioAInvestment",
+                                    formatCommaNumber(value),
+                                  )
+                                }
+                              />
+                              <Field
+                                label="부분교체 예상 투자금"
+                                value={equipment.scenarioBInvestment}
+                                placeholder="예: 4,994"
+                                helperText="단위: 만원"
+                                inputMode="numeric"
+                                onChange={(value) =>
+                                  updateEquipment(
+                                    equipment.id,
+                                    "scenarioBInvestment",
+                                    formatCommaNumber(value),
+                                  )
+                                }
+                              />
+                            </div>
+                            <p
+                              style={{
+                                color: "#667085",
+                                fontSize: "13px",
+                                fontWeight: 850,
+                                lineHeight: 1.65,
+                                margin: "12px 0 0",
+                              }}
+                            >
+                              입력하지 않으면 업계 평균 투자금으로 ROI를 추정합니다.
+                              입력하면 실제 투자 계획에 가까운 ROI 분석이
+                              가능합니다.
+                            </p>
+                          </section>
 
-                          <Field
-                            label="제품 개당 예상이익"
-                            value={equipment.contributionMarginWon}
-                            placeholder="예: 12,000"
-                            helperText="원 단위"
-                            inputMode="numeric"
-                            onChange={(value) =>
-                              updateEquipment(
-                                equipment.id,
-                                "contributionMarginWon",
-                                formatCommaNumber(value),
-                              )
-                            }
-                          />
+                          <section className="ff-setup-optional-group">
+                            <h4>추가 운영지표</h4>
+                            <div
+                              className="ff-mypage-four-col"
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+                                gap: "16px",
+                                alignItems: "start",
+                              }}
+                            >
+                              <Field
+                                label="연간 유지보수 비용"
+                                value={equipment.maintenanceCostAnnual}
+                                placeholder="예: 1,200"
+                                helperText="단위: 만원"
+                                inputMode="numeric"
+                                onChange={(value) =>
+                                  updateEquipment(
+                                    equipment.id,
+                                    "maintenanceCostAnnual",
+                                    formatCommaNumber(value),
+                                  )
+                                }
+                              />
+                              <Field
+                                label="설비 용량 규격값"
+                                value={equipment.currentCapacityValue}
+                                placeholder="예: 100"
+                                labelRight={
+                                  <span
+                                    style={{
+                                      position: "relative",
+                                      display: "inline-flex",
+                                    }}
+                                    onMouseEnter={() =>
+                                      setCapacityTooltipEquipmentId(equipment.id)
+                                    }
+                                    onMouseLeave={() =>
+                                      setCapacityTooltipEquipmentId(null)
+                                    }
+                                    onFocus={() =>
+                                      setCapacityTooltipEquipmentId(equipment.id)
+                                    }
+                                    onBlur={() =>
+                                      setCapacityTooltipEquipmentId(null)
+                                    }
+                                  >
+                                    <button
+                                      type="button"
+                                      aria-label="설비 용량 규격값 안내"
+                                      style={{
+                                        width: "18px",
+                                        height: "18px",
+                                        borderRadius: "999px",
+                                        border: 0,
+                                        background: "#F1F5F9",
+                                        color: "#64748B",
+                                        fontSize: "11px",
+                                        fontWeight: 800,
+                                        cursor: "help",
+                                      }}
+                                    >
+                                      i
+                                    </button>
+                                    <InfoTooltip
+                                      open={
+                                        capacityTooltipEquipmentId === equipment.id
+                                      }
+                                      text="보조 단위: 프레스/사출기: 톤, CNC: kW"
+                                    />
+                                  </span>
+                                }
+                                onChange={(value) =>
+                                  updateEquipment(
+                                    equipment.id,
+                                    "currentCapacityValue",
+                                    value,
+                                  )
+                                }
+                              />
+                              <Field
+                                label="연간 생산량"
+                                value={equipment.productionQty}
+                                placeholder="예: 50000"
+                                inputMode="numeric"
+                                onChange={(value) =>
+                                  updateEquipment(
+                                    equipment.id,
+                                    "productionQty",
+                                    value,
+                                  )
+                                }
+                              />
+                              <Field
+                                label="제품 개당 예상이익"
+                                value={equipment.contributionMarginWon}
+                                placeholder="예: 12,000"
+                                helperText="원 단위"
+                                inputMode="numeric"
+                                onChange={(value) =>
+                                  updateEquipment(
+                                    equipment.id,
+                                    "contributionMarginWon",
+                                    formatCommaNumber(value),
+                                  )
+                                }
+                              />
+                            </div>
+                          </section>
                         </div>
-                      </section>
+                      </EquipmentOptionalAccordion>
                     </article>
                   );
                 })}

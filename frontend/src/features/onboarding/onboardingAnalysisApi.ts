@@ -3,7 +3,10 @@ import type {
   AnalysisResultSnapshot,
   CompanyProfileDraft,
 } from "./onboardingState"
-import { ANALYSIS_RESULT_SCHEMA_VERSION } from "./onboardingState"
+import {
+  ANALYSIS_RESULT_SCHEMA_VERSION,
+  emptyAnalysisConditionDraft,
+} from "./onboardingState"
 import { resolveCanonicalPolicies } from "./analysisPolicySource"
 
 const API_BASE_URL =
@@ -455,16 +458,33 @@ function buildCompanyPayload(profile: CompanyProfileDraft, primaryPurpose: strin
     .filter((value) => value.trim())
     .join(" ")
 
+  const purposeList =
+    primaryPurpose.length > 0
+      ? primaryPurpose
+      : profile.purpose && profile.purpose !== "선택 필요"
+        ? [profile.purpose]
+        : []
+
   return {
     company_name: profile.companyName || "미입력 기업",
-    business_registration_no: null,
+    business_registration_no: profile.businessNumber.trim() || null,
     industry_name: profile.industry || null,
     industry_code: splitIndustryCodes(profile.industryCode),
     region: region || "지역 미입력",
-    company_type: "제조업",
-    primary_purpose: primaryPurpose,
-    employee_count: parseEmployeeCount(profile.employeeRange),
-    annual_revenue: 0,
+    company_type:
+      profile.companyType && profile.companyType !== "선택 필요"
+        ? profile.companyType
+        : "중소기업",
+    primary_purpose: purposeList,
+    employee_count:
+      parseEmployeeCount(profile.employees) ??
+      parseEmployeeCount(profile.employeeRange),
+    annual_revenue: toOptionalNumber(profile.annualRevenue) ?? 0,
+    established_year: toOptionalNumber(profile.foundedYear),
+    workplace_type:
+      profile.businessSiteType && profile.businessSiteType !== "선택 필요"
+        ? profile.businessSiteType
+        : null,
   }
 }
 
@@ -718,4 +738,37 @@ export async function runExistingEquipmentAnalysis(
   return {
     ...buildSnapshot(id, condition, companyId, equipmentId, analyzeJson),
   }
+}
+
+export async function runSetupRoiAnalysis(
+  companyId: string,
+  equipmentId: string,
+  equipmentName = "검토 설비",
+): Promise<AnalysisResultSnapshot> {
+  const query = new URLSearchParams({
+    company_id: companyId,
+    equipment_id: equipmentId,
+  })
+  const analyzeJson = (await requestJson(`/api/analyze?${query.toString()}`, {
+    method: "POST",
+  })) as ApiRecord
+
+  const data = asRecord(analyzeJson.data)
+  const savedRoiOutput = getFirstRecord(
+    data.roi_output,
+    data.saved_roi_output,
+    analyzeJson.roi_output,
+  )
+  const analysisId =
+    getText(data, "analysis_id", "analysisId") ||
+    getText(savedRoiOutput, "id", "analysis_id", "analysisId") ||
+    getText(analyzeJson, "analysis_id", "analysisId") ||
+    `analysis-${Date.now()}`
+
+  const condition: AnalysisConditionDraft = {
+    ...emptyAnalysisConditionDraft,
+    equipmentName,
+  }
+
+  return buildSnapshot(analysisId, condition, companyId, equipmentId, analyzeJson)
 }

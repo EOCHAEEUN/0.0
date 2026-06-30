@@ -2,11 +2,10 @@ import {
   ArrowRight,
   ClipboardCheck,
   FileSearch,
-  Gauge,
   Plus,
 } from "lucide-react"
 import { useMemo, type ReactNode } from "react"
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom"
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom"
 // AppHeader는 AuthenticatedLayout의 GlobalHeader로 통합됨
 import engiBot from "../../assets/advisor/engi-bot-transparent.png"
 import { useDashboardData } from "./hooks/useDashboardData"
@@ -38,28 +37,37 @@ function ActionButton({
 
 function AnalysisRow({
   row,
+  index,
   onNavigate,
 }: {
   row: DashboardAnalysisRow
+  index: number
   onNavigate: (path: string) => void
 }) {
   return (
-    <article className="ff-analysis-row">
-      <div className="ff-analysis-thumb" aria-hidden="true">
-        <Gauge size={20} />
+    <article
+      className="ff-analysis-row is-clickable"
+      role="button"
+      tabIndex={0}
+      onClick={() => onNavigate(row.ctaPath)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault()
+          onNavigate(row.ctaPath)
+        }
+      }}
+    >
+      <div className="ff-analysis-index" aria-hidden="true">
+        {String(index + 1).padStart(2, "0")}
       </div>
       <div className="ff-analysis-main">
         <div className="ff-analysis-title-line">
           <strong>{row.title}</strong>
-          <span className={`ff-status-badge ${row.status}`}>{row.statusLabel}</span>
         </div>
-        <p>{row.equipmentName}</p>
-        <span>{row.summary}</span>
-        <em>{row.detail}</em>
+        <p>{[row.equipmentName, row.summary].filter(Boolean).join(" · ")}</p>
+        <span>{row.detail}</span>
       </div>
-      <button type="button" onClick={() => onNavigate(row.ctaPath)}>
-        {row.ctaLabel}
-      </button>
+      <span className={`ff-status-badge ${row.status}`}>{row.statusLabel}</span>
     </article>
   )
 }
@@ -77,8 +85,8 @@ function DeadlineListPanel({
     <aside className="ff-deadline-list-panel">
       <header>
         <div>
-          <h3>{list.title}</h3>
-          <p>{list.subtitle}</p>
+          <strong className="ff-deadline-panel-title">{list.title}</strong>
+          {list.subtitle ? <p>{list.subtitle}</p> : null}
         </div>
         <button type="button" onClick={onViewAll}>
           {list.viewAllLabel}
@@ -156,16 +164,32 @@ export default function DashboardFeature() {
   })
   const workspace = dashboard.workspace
 
-  const handleStartAnalysis = () => {
-    navigate("/analysis/new")
+  const isEmpty = workspace.status === "empty"
+  const isDraft = workspace.status === "draft"
+  const heroKpis = [
+    { label: "등록설비", value: `${workspace.equipmentCount}대` },
+    { label: "마감임박", value: `${workspace.closingSoonCount ?? 0}건` },
+    { label: "지원사업 매칭", value: `${workspace.policySummary.matchedPolicyCount}건` },
+    { label: "최근 분석", value: `${workspace.recentAnalysisCount}건` },
+  ]
+
+  const handlePriorityEquipmentNavigate = () => {
+    navigate(
+      workspace.equipmentManagePath ||
+        "/mypage?return_to=dashboard&focus=representative&panel=equipment",
+    )
   }
 
   const handlePolicyNavigate = () => {
+    if (workspace.legacyPolicyMissing) {
+      navigate(
+        workspace.analysisId
+          ? `/support-projects?analysisId=${encodeURIComponent(workspace.analysisId)}`
+          : "/support-projects",
+      )
+      return
+    }
     navigate(workspace.policyPath)
-  }
-
-  const handleRoiNavigate = () => {
-    navigate(workspace.roiPath)
   }
 
   const handleDraftNavigate = () => {
@@ -176,15 +200,17 @@ export default function DashboardFeature() {
     navigate(workspace.advisorPath)
   }
 
-  const isEmpty = workspace.status === "empty"
-  const isDraft = workspace.status === "draft"
-  const isCompleted = workspace.status === "completed"
-  const heroKpis = [
-    { label: "관리 설비", value: `${workspace.equipmentCount}대` },
-    { label: "우선 검토 설비", value: `${workspace.priorityEquipmentCount}대` },
-    { label: "지원사업 매칭", value: `${workspace.policySummary.matchedPolicyCount}` },
-    { label: "최근 분석", value: `${workspace.recentAnalysisCount}건` },
-  ]
+  const handleNewRoiNavigate = () => {
+    if (!workspace.analysisId && workspace.equipmentCount === 0) {
+      handlePriorityEquipmentNavigate()
+      return
+    }
+    navigate(workspace.newRoiPath || "/roi?source=dashboard")
+  }
+
+  const handleStartAnalysis = () => {
+    navigate(workspace.newAnalysisPath || "/analysis/new?source=dashboard")
+  }
 
   return (
     <main className="page ff-dashboard-workspace-page">
@@ -200,19 +226,28 @@ export default function DashboardFeature() {
           <div className="ff-dashboard-hero-copy">
             <span className="ff-ai-engi-badge">FACTOFIT AI ENGI</span>
             <p className="ff-dashboard-hero-eyebrow">설비 투자 대시보드</p>
-            <h1>이번 주, 우선 검토할 설비가 {workspace.actionCount}대 있습니다.</h1>
-            <strong>운영비 · 노후도 · 투자효과를 바탕으로 먼저 확인할 대상을 정리했어요.</strong>
+            <h1>
+              이번 주, 우선 검토할 설비가 {workspace.priorityEquipmentCount}대 있습니다.
+            </h1>
+            <strong>
+              {workspace.heroSummary ||
+                "운영비 · 노후도 · 투자효과를 바탕으로 먼저 확인할 대상을 정리했어요."}
+            </strong>
             <p>
-              {workspace.equipmentName}은(는) 노후도와 유지보수 부담을 기준으로 현재 투자 검토 우선순위가 높습니다.
+              {workspace.heroReason ||
+                `${workspace.equipmentName}은(는) 운영비와 투자효과를 기준으로 먼저 확인할 설비입니다.`}
             </p>
             <div className="ff-dashboard-hero-actions">
-              <ActionButton onClick={handleRoiNavigate}>우선 설비 확인하기</ActionButton>
-              <ActionButton variant="secondary" onClick={handleStartAnalysis}>새 ROI 분석하기</ActionButton>
+              <ActionButton onClick={handlePriorityEquipmentNavigate}>
+                우선 설비 확인하기
+              </ActionButton>
+              <ActionButton variant="secondary" onClick={handleNewRoiNavigate}>
+                새 ROI 분석하기
+              </ActionButton>
             </div>
           </div>
 
           <div className="ff-dashboard-hero-side">
-            <img className="ff-dashboard-hero-bot" src={engiBot} alt="" aria-hidden="true" />
             <div className="ff-dashboard-hero-kpis">
               {heroKpis.map((kpi) => (
                 <div key={kpi.label} className="ff-dashboard-hero-kpi">
@@ -252,7 +287,11 @@ export default function DashboardFeature() {
                   )}
                   <em>
                     {workspace.equipmentName} ·{" "}
-                    {isCompleted ? "분석 완료" : isDraft ? "작성 중" : "분석 필요"}
+                    {workspace.analysisId
+                      ? workspace.legacyPolicyMissing
+                        ? "정책 이력 없음"
+                        : "분석 완료"
+                      : "분석 필요"}
                   </em>
                 </>
               ) : (
@@ -271,7 +310,7 @@ export default function DashboardFeature() {
             <div className="ff-company-context-side">
               <strong>오늘 확인할 작업 {workspace.actionCount}개</strong>
               <span>{workspace.nearestDeadlineSummary}</span>
-              {isCompleted && (
+              {workspace.actionCount > 0 && (
                 <small className="ff-engi-analyzed-note">
                   <img src={engiBot} alt="" />
                   Engi가 우선 행동을 정리했어요
@@ -325,10 +364,6 @@ export default function DashboardFeature() {
                       </span>
                     </span>
                   </div>
-                  <p className="ff-priority-intro">
-                    내 조건 매칭 {workspace.matchedPolicyCount} 중<br />
-                    가장 먼저 조건을 확인할 공고입니다.
-                  </p>
                   <strong>{workspace.priorityPolicyTitle}</strong>
                   {workspace.priorityChips.length > 0 && (
                     <div className="ff-priority-chip-row">
@@ -347,20 +382,11 @@ export default function DashboardFeature() {
                   <div className="ff-action-buttons">
                     <ActionButton onClick={handlePolicyNavigate}>
                       <FileSearch aria-hidden="true" size={18} />
-                      지원 조건 확인하기
-                    </ActionButton>
-                    <ActionButton variant="secondary" onClick={handleRoiNavigate}>
-                      ROI 결과 보기
+                      {workspace.legacyPolicyMissing
+                        ? "지원사업 추천 보기"
+                        : "지원 조건 확인하기"}
                     </ActionButton>
                   </div>
-                  <button
-                    type="button"
-                    className="ff-advisor-reason-link"
-                    onClick={handleAdvisorNavigate}
-                  >
-                    <img src={engiBot} alt="" className="ff-engi-btn-icon" />
-                    Engi에게 추천 이유 묻기
-                  </button>
                 </div>
 
                 <DeadlineListPanel
@@ -395,9 +421,8 @@ export default function DashboardFeature() {
 
         <section className="ff-my-analysis-section">
           <header>
-            <div>
-              <span>내 투자 분석</span>
-              <h2>투자안을 계속 관리하세요.</h2>
+            <div className="ff-analysis-section-head">
+              <strong>투자안 분석</strong>
             </div>
             <button type="button" onClick={handleStartAnalysis}>
               <Plus aria-hidden="true" size={17} />새 투자 분석 시작
@@ -405,19 +430,28 @@ export default function DashboardFeature() {
           </header>
 
           {workspace.analyses.length > 0 ? (
-            <div className="ff-analysis-list">
-              {workspace.analyses.map((row) => (
-                <AnalysisRow
-                  key={`${row.id ?? row.title}-${row.status}`}
-                  row={row}
-                  onNavigate={navigate}
-                />
-              ))}
-              {workspace.hasMoreAnalyses && (
-                <Link className="ff-all-analysis-link" to="/roi/history">
-                  전체 분석 보기
-                </Link>
-              )}
+            <div className="ff-analysis-panel">
+              <div className="ff-analysis-list-scroll">
+                <div className="ff-analysis-list">
+                  {workspace.analyses.map((row, index) => (
+                    <AnalysisRow
+                      key={`${row.id ?? row.title}-${row.status}`}
+                      row={row}
+                      index={index}
+                      onNavigate={navigate}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="ff-analysis-list-footer">
+                <button
+                  type="button"
+                  className="ff-all-analysis-link ff-all-analysis-link-below"
+                  onClick={() => navigate("/roi/history")}
+                >
+                  투자안분석 전체보기
+                </button>
+              </div>
             </div>
           ) : (
             <div className="ff-analysis-empty">

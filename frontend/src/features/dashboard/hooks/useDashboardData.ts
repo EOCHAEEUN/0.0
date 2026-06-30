@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   fetchDashboardOnboarding,
-  getStoredDashboardAnalysisResult,
+  fetchDashboardOverview,
+  getStoredCompanyId,
+  getStoredDashboardActiveAnalysisId,
 } from "../dashboard.api"
-import type {
-  DashboardAnalysisStorage,
-  DashboardOnboardingMeResponse,
-} from "../dashboard.contract"
+import type { DashboardOverviewResponse } from "../dashboard.contract"
 import {
-  mapDashboardData,
+  mapDashboardOverview,
   type DashboardViewModel,
 } from "../mappers/dashboardMapper"
 
@@ -23,20 +22,90 @@ type UseDashboardDataOptions = {
   preferredAnalysisId?: string
 }
 
+const EMPTY_DASHBOARD: DashboardViewModel = {
+  companyRows: [],
+  equipmentRows: [],
+  workspace: {
+    status: "empty",
+    analysisId: null,
+    companyName: "",
+    industryLabel: "",
+    regionLabel: "",
+    actionCount: 0,
+    equipmentCount: 0,
+    priorityEquipmentCount: 0,
+    recentAnalysisCount: 0,
+    nearestDeadlineSummary: "",
+    briefingTitle: "",
+    recentStatusMessage: "",
+    equipmentName: "대표 설비",
+    actionTitle: "",
+    actionMessage: "",
+    priorityPolicyTitle: "",
+    priorityPolicyId: null,
+    deadlinePolicyId: null,
+    matchedPolicyCount: "0",
+    needsText: "",
+    priorityChips: [],
+    roiPath: "/roi",
+    policyPath: "/support-projects",
+    draftPath: "/analysis/new",
+    advisorPath: "/advisor",
+    engiTitle: "",
+    kpis: [],
+    analysisMetricText: "",
+    recommendedScenarioName: "",
+    summaryStatusText: "",
+    policySummary: {
+      totalPolicyCount: "0",
+      activePolicyCount: "0",
+      matchedPolicyCount: "0",
+    },
+    deadline: {
+      label: "",
+      dday: "-",
+      policyTitle: "-",
+      supportAmountText: "-",
+      deadlineDisplay: "-",
+      policyId: null,
+    },
+    deadlineList: {
+      title: "마감 일정",
+      subtitle: "",
+      viewAllLabel: "전체 보기",
+      emptyMessage: "",
+      items: [],
+    },
+    progressText: "",
+    nextStepText: "",
+    engiMessage: "",
+    analyses: [],
+    hasMoreAnalyses: false,
+    equipmentManagePath: "/mypage",
+    newRoiPath: "/roi",
+    newAnalysisPath: "/analysis/new",
+  },
+  isFallback: true,
+}
+
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message
   return "대시보드 데이터를 불러오지 못했습니다."
 }
 
 export function useDashboardData(options?: UseDashboardDataOptions): DashboardDataState {
-  const [onboarding, setOnboarding] =
-    useState<DashboardOnboardingMeResponse | null>(null)
-  const [analysis, setAnalysis] = useState<DashboardAnalysisStorage | null>(() =>
-    getStoredDashboardAnalysisResult(),
-  )
+  const [overview, setOverview] = useState<DashboardOverviewResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const requestSequenceRef = useRef(0)
+
+  const resolvedAnalysisId = useMemo(() => {
+    return (
+      options?.preferredAnalysisId?.trim() ||
+      getStoredDashboardActiveAnalysisId() ||
+      undefined
+    )
+  }, [options?.preferredAnalysisId])
 
   const refetch = useCallback(async () => {
     const requestSequence = requestSequenceRef.current + 1
@@ -45,33 +114,27 @@ export function useDashboardData(options?: UseDashboardDataOptions): DashboardDa
     setError(null)
 
     try {
-      const [nextOnboarding, nextAnalysis] = await Promise.all([
-        fetchDashboardOnboarding(),
-        Promise.resolve(getStoredDashboardAnalysisResult()),
-      ])
+      const onboarding = await fetchDashboardOnboarding()
+      if (requestSequence !== requestSequenceRef.current) return
+
+      const companyId =
+        onboarding?.company?.company_id || getStoredCompanyId() || ""
+
+      if (!companyId) {
+        setOverview({
+          empty_state: "company_missing",
+          company: onboarding?.company ?? undefined,
+        })
+        return
+      }
+
+      const nextOverview = await fetchDashboardOverview({
+        companyId,
+        analysisId: resolvedAnalysisId,
+      })
 
       if (requestSequence !== requestSequenceRef.current) return
-      setOnboarding(nextOnboarding)
-      setAnalysis(nextAnalysis)
-
-      if (import.meta.env.DEV) {
-        const a = nextAnalysis as Record<string, unknown> | null
-        console.debug("[DashboardContext]", {
-          companyName: nextOnboarding?.company?.company_name ?? null,
-          companyId: nextOnboarding?.company?.company_id ?? null,
-          equipmentId: a?.equipment_id ?? a?.equipmentId ?? null,
-          analysisId: a?.id ?? null,
-          schemaVersion: a?.schemaVersion ?? null,
-          roiFetch: a?.roi_result ?? a?.roiResult ? "ok" : "no_roi",
-          policyFetch:
-            ((a?.policies as unknown[])?.length ??
-              (a?.matched_policies as unknown[])?.length ??
-              0) > 0
-              ? "ok"
-              : "no_policies",
-          companyFetch: nextOnboarding?.company ? "ok" : "no_company",
-        })
-      }
+      setOverview(nextOverview)
     } catch (nextError) {
       if (requestSequence !== requestSequenceRef.current) return
       setError(getErrorMessage(nextError))
@@ -79,21 +142,28 @@ export function useDashboardData(options?: UseDashboardDataOptions): DashboardDa
       if (requestSequence !== requestSequenceRef.current) return
       setLoading(false)
     }
-  }, [])
+  }, [resolvedAnalysisId])
 
   useEffect(() => {
     void refetch()
   }, [refetch])
 
-  const dashboard = useMemo(
-    () =>
-      mapDashboardData({
-        onboarding,
-        analysis,
-        preferredAnalysisId: options?.preferredAnalysisId,
-      }),
-    [onboarding, analysis, options?.preferredAnalysisId],
-  )
+  useEffect(() => {
+    const handleDashboardRefresh = () => {
+      void refetch()
+    }
+    window.addEventListener("factofit:dashboard-refresh", handleDashboardRefresh)
+    return () => {
+      window.removeEventListener("factofit:dashboard-refresh", handleDashboardRefresh)
+    }
+  }, [refetch])
+
+  const dashboard = useMemo(() => {
+    if (overview && overview.company?.company_id) {
+      return mapDashboardOverview(overview)
+    }
+    return EMPTY_DASHBOARD
+  }, [overview])
 
   return {
     dashboard,

@@ -6,11 +6,17 @@ export type AnalysisDraftStatus = "in_progress" | "ready_for_review" | "complete
 
 export type CompanyProfileDraft = {
   companyName: string
+  companyType: string
   regionSido: string
   regionSigungu: string
   industry: string
   industryCode: string
   employeeRange: string
+  employees: string
+  annualRevenue: string
+  businessNumber: string
+  purpose: string
+  businessSiteType: string
   foundedYear?: string
   revenueRange?: string
   smartFactoryStatus?: string
@@ -99,11 +105,17 @@ export const emptyAnalysisConditionDraft: AnalysisConditionDraft = {
 
 export const emptyCompanyProfileDraft: CompanyProfileDraft = {
   companyName: "",
+  companyType: "선택 필요",
   regionSido: "",
   regionSigungu: "",
   industry: "",
   industryCode: "",
   employeeRange: "",
+  employees: "",
+  annualRevenue: "",
+  businessNumber: "",
+  purpose: "선택 필요",
+  businessSiteType: "선택 필요",
   foundedYear: "",
   revenueRange: "",
   smartFactoryStatus: "",
@@ -431,7 +443,7 @@ export function resolvePostLoginPath(isJustSignedUp = consumeJustSignedUp()) {
 
   if (state.companyProfileStatus !== "completed") return "/setup/company"
 
-  if (state.equipmentSetupStatus !== "completed") return "/analysis/new?mode=new"
+  if (state.equipmentSetupStatus !== "completed") return "/setup/equipment"
 
   if (state.companyProfileStatus === "completed" && state.analysisDraftId) {
     const draftStatus = state.analysisDraftStatus ?? "in_progress"

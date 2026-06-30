@@ -5,7 +5,7 @@ from app.agents.guard import guard_node
 from app.agents.router import router_node
 from app.agents.info_collector import info_collector_node
 from app.agents.capex import capex_advisor_node
-from app.agents.policy import policy_matching_node
+from app.agents.policy import policy_chat_node
 from app.agents.draft import application_draft_node
 from app.agents.response import response_node
 from app.agents.equipment_safety import equipment_safety_node
@@ -19,7 +19,7 @@ def build_graph():
     graph.add_node("router_node", router_node)
     graph.add_node("info_collector_node", info_collector_node)
     graph.add_node("capex_advisor_node", capex_advisor_node)
-    graph.add_node("policy_matching_node", policy_matching_node)
+    graph.add_node("policy_chat_node", policy_chat_node)
     graph.add_node("application_draft_node", application_draft_node)
     graph.add_node("equipment_safety_node", equipment_safety_node)
     graph.add_node("response_node", response_node)
@@ -40,8 +40,9 @@ def build_graph():
         lambda state: state["intent"],
         {
             "roi": "capex_advisor_node",
-            "policy": "policy_matching_node",
-            "calendar": "policy_matching_node",
+            "roi_followup": "policy_chat_node",
+            "policy": "policy_chat_node",
+            "calendar": "policy_chat_node",
             "safety": "equipment_safety_node",
             "draft": "application_draft_node",
             "info_missing": "info_collector_node",
@@ -55,15 +56,28 @@ def build_graph():
         lambda state: state["intent"] if state["final_response"] == "" else "__end__",
         {
             "roi": "capex_advisor_node",
-            "policy": "policy_matching_node",
+            "policy": "policy_chat_node",
             "safety": "equipment_safety_node",
             "__end__": END
         }
     )
 
+    # capex_advisor_node → policy_chat_node
+    graph.add_edge("capex_advisor_node", "policy_chat_node")
+
+    # policy_chat_node → 분기
+    graph.add_conditional_edges(
+        "policy_chat_node",
+        lambda state: state["intent"],
+        {
+            "policy": "policy_chat_node",
+            "draft": "application_draft_node",
+            "response": "response_node",
+            "general": "response_node"
+        }
+    )
+
     # 각 specialist → response_node
-    graph.add_edge("capex_advisor_node", "response_node")
-    graph.add_edge("policy_matching_node", "response_node")
     graph.add_edge("application_draft_node", "response_node")
     graph.add_edge("equipment_safety_node", "response_node")
 

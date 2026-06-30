@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom"
 import engiBot from "../assets/advisor/engi-bot-transparent.png"
+import AdvisorQuickActions from "../features/aiAdvisor/AdvisorQuickActions"
+import AdvisorResponseCards from "../features/aiAdvisor/AdvisorResponseCards"
+import InvestmentSimulationDialog from "../features/aiAdvisor/InvestmentSimulationDialog"
+import { ANALYSIS_QUICK_ACTIONS, type AdvisorActionDefinition } from "../features/aiAdvisor/advisorActions"
+import "../features/aiAdvisor/aiAdvisor.css"
 import {
   createAdvisorChatSession,
   fetchAdvisorChatSessionDetail,
@@ -10,16 +15,12 @@ import {
 } from "../features/aiAdvisor/aiAdvisor.api"
 import { fetchDashboardOnboarding } from "../features/dashboard/dashboard.api"
 import type { DashboardOnboardingMeResponse } from "../features/dashboard/dashboard.contract"
-import {
-  fetchPolicyCards,
-  PolicyCardsApiError,
-} from "../features/support/supportProjects.api"
-import type { SupportProject } from "../features/support/supportProjects.contract"
 
 type ChatMessage = {
   id: string
   role: "user" | "assistant"
   content: string
+  cards?: unknown[]
 }
 
 type EquipmentOption = {
@@ -37,6 +38,7 @@ type AnalysisContext = {
   createdAt: string
   roiPct: number | null
   scenarioAInvestment: number | null
+  scenarioBInvestment: number | null
   snapshotMissing: boolean
 }
 
@@ -134,6 +136,7 @@ function mapContexts(onboarding: DashboardOnboardingMeResponse | null) {
       const equipmentId = readText(roiOutput.equipment_id)
       const roiData = asRecord(roiOutput.roi_data)
       const scenarioA = asRecord(roiData.scenario_a)
+      const scenarioB = asRecord(roiData.scenario_b)
       const snapshot = asRecord(roiOutput.policy_snapshot)
       return {
         analysisId,
@@ -143,6 +146,7 @@ function mapContexts(onboarding: DashboardOnboardingMeResponse | null) {
         createdAt: readText(roiOutput.created_at),
         roiPct: readNumber(scenarioA.roi_pct),
         scenarioAInvestment: readNumber(scenarioA.investment_manwon),
+        scenarioBInvestment: readNumber(scenarioB.investment_manwon),
         snapshotMissing:
           Boolean(analysisId) &&
           (!snapshot.snapshot_version || !Array.isArray(snapshot.policies)),
@@ -173,15 +177,15 @@ function extractEquipmentSelection(cards: unknown[]) {
 function toMessageListFromSession(data: unknown): ChatMessage[] {
   const record = asRecord(data)
   const items = Array.isArray(record.messages) ? (record.messages as unknown[]) : []
-  return items
-    .map((item) => {
-      const row = asRecord(item)
-      const role = readText(row.role).toLowerCase() === "assistant" ? "assistant" : "user"
-      const content = readText(row.content)
-      if (!content) return null
-      return { id: crypto.randomUUID(), role, content } satisfies ChatMessage
-    })
-    .filter((item): item is ChatMessage => Boolean(item))
+  const messages: ChatMessage[] = []
+  for (const item of items) {
+    const row = asRecord(item)
+    const role = readText(row.role).toLowerCase() === "assistant" ? "assistant" : "user"
+    const content = readText(row.content)
+    if (!content) continue
+    messages.push({ id: crypto.randomUUID(), role, content })
+  }
+  return messages
 }
 
 export default function AiAdvisorPage() {
@@ -211,15 +215,16 @@ export default function AiAdvisorPage() {
   const [sending, setSending] = useState(false)
   const [chatError, setChatError] = useState("")
   const [lastFailedQuestion, setLastFailedQuestion] = useState("")
+  const [lastFailedAction, setLastFailedAction] = useState<AdvisorActionDefinition | null>(null)
   const [equipmentSelectionCards, setEquipmentSelectionCards] = useState<EquipmentOption[]>([])
+  const [loadingActionId, setLoadingActionId] = useState<string | null>(null)
+  const [simulationOpen, setSimulationOpen] = useState(false)
+  const [actionError, setActionError] = useState("")
 
   const [sessionsLoading, setSessionsLoading] = useState(false)
   const [sessionsError, setSessionsError] = useState("")
   const [sessions, setSessions] = useState<AdvisorChatSessionItem[]>([])
   const [activeChatId, setActiveChatId] = useState("")
-
-  const [snapshotPolicies, setSnapshotPolicies] = useState<SupportProject[]>([])
-  const [snapshotLegacy, setSnapshotLegacy] = useState(false)
 
   const selectedContext = useMemo(
     () => contexts.find((item) => item.analysisId === selectedAnalysisId) ?? null,
@@ -250,7 +255,7 @@ export default function AiAdvisorPage() {
     let cancelled = false
     void fetchDashboardOnboarding()
       .then((response) => {
-        if (cancelled) return
+        if (cancelled || !response) return
         setOnboarding(response)
         const mapped = mapContexts(response)
         setContexts(mapped)
@@ -390,10 +395,16 @@ export default function AiAdvisorPage() {
   const requestChat = async (
     question: string,
     historyOverride?: ChatMessage[],
-    selectedEquipmentOverride?: string,
+    options?: {
+      selectedEquipmentOverride?: string
+      action?: string
+      simulationInput?: Record<string, number>
+    },
   ) => {
     setChatError("")
+    setActionError("")
     setLastFailedQuestion("")
+    setLastFailedAction(null)
     setSending(true)
     try {
       const sessionId = await ensureActiveSessionId()
@@ -407,21 +418,30 @@ export default function AiAdvisorPage() {
         {
           companyId,
           selectedEquipmentId:
-            selectedEquipmentOverride ||
+            options?.selectedEquipmentOverride ||
             selectedContext?.equipmentId ||
             selectedEquipmentId,
           analysisId: selectedContext?.analysisId,
+          action: options?.action,
+          simulationInput: options?.simulationInput,
           chatId: sessionId || undefined,
           sessionId: sessionId || undefined,
+          source: "advisor",
         },
       )
       setMessages((prev) => [
         ...prev,
-        { id: crypto.randomUUID(), role: "assistant", content: response.text },
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: response.text,
+          cards: response.cards,
+        },
       ])
       setEquipmentSelectionCards(extractEquipmentSelection(response.cards))
       setActiveChatId((prev) => response.chatId || sessionId || prev)
       await reloadSessions()
+      return response
     } catch (error) {
       setChatError(
         error instanceof Error
@@ -429,9 +449,54 @@ export default function AiAdvisorPage() {
           : "AI 상담 서비스를 일시적으로 연결하지 못했습니다.",
       )
       setLastFailedQuestion(question)
+      throw error
     } finally {
       setSending(false)
     }
+  }
+
+  const executeAdvisorAction = async (
+    actionDef: AdvisorActionDefinition,
+    simulationInput?: Record<string, number>,
+  ) => {
+    if (loadingActionId || sending) return
+    if (actionDef.responseType === "dialog") {
+      setSimulationOpen(true)
+      return
+    }
+
+    setActionError("")
+    setLoadingActionId(actionDef.id)
+    const userMessage: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: actionDef.userMessage,
+    }
+    const nextMessages = [...messages, userMessage]
+    setMessages(nextMessages)
+
+    try {
+      await requestChat(actionDef.userMessage, nextMessages, {
+        action: actionDef.id,
+        simulationInput,
+      })
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : "요청 처리 중 오류가 발생했습니다.",
+      )
+      setLastFailedAction(actionDef)
+    } finally {
+      setLoadingActionId(null)
+    }
+  }
+
+  const handleSimulationSubmit = async (simulationInput: Record<string, number>) => {
+    setSimulationOpen(false)
+    const simulationAction = ANALYSIS_QUICK_ACTIONS.find(
+      (item) => item.id === "investment_simulation",
+    )
+    if (!simulationAction) return
+    await executeAdvisorAction(simulationAction, simulationInput)
   }
 
   const sendChat = async () => {
@@ -453,20 +518,27 @@ export default function AiAdvisorPage() {
   }
 
   const selectEquipmentFromCard = async (equipment: EquipmentOption) => {
-    if (!equipment.equipment_id || sending) return
+    if (!equipment.equipment_id || sending || loadingActionId) return
     setSelectedEquipmentId(equipment.equipment_id)
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
-      content: `${equipment.name} 설비로 이어서 진행해줘`,
+      content: `${equipment.name} 설비 ROI 분석`,
     }
-    setMessages((prev) => [...prev, userMessage])
-    await requestChat(
-      "선택한 설비 기준으로 이어서 답변해줘.",
-      [...messages, userMessage],
-      equipment.equipment_id,
-    )
-    setEquipmentSelectionCards([])
+    const nextMessages = [...messages, userMessage]
+    setMessages(nextMessages)
+    setLoadingActionId("roi_analyze")
+    try {
+      await requestChat(userMessage.content, nextMessages, {
+        selectedEquipmentOverride: equipment.equipment_id,
+        action: "roi_analyze",
+      })
+      setEquipmentSelectionCards([])
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "설비 분석 시작 실패")
+    } finally {
+      setLoadingActionId(null)
+    }
   }
 
   const openSession = async (session: AdvisorChatSessionItem) => {
@@ -516,37 +588,9 @@ export default function AiAdvisorPage() {
           content: "새 대화를 시작합니다. 궁금한 내용을 편하게 물어보세요.",
         },
       ])
-      setSnapshotPolicies([])
-      setSnapshotLegacy(false)
       await reloadSessions()
     } catch (error) {
       setSessionsError(error instanceof Error ? error.message : "새 대화 생성 실패")
-    }
-  }
-
-  const loadSnapshotPolicies = async () => {
-    const target = selectedContext
-    if (!target?.analysisId || !target.equipmentId || !target.companyId) return
-    if (target.snapshotMissing) {
-      setSnapshotLegacy(true)
-      setSnapshotPolicies([])
-      return
-    }
-    try {
-      const response = await fetchPolicyCards(
-        target.companyId,
-        target.equipmentId,
-        target.analysisId,
-        target.analysisId,
-      )
-      setSnapshotPolicies(response.cards.slice(0, 5))
-      setSnapshotLegacy(false)
-    } catch (error) {
-      if (error instanceof PolicyCardsApiError && error.errorCode === "POLICY_SNAPSHOT_MISSING") {
-        setSnapshotLegacy(true)
-      } else {
-        setChatError(error instanceof Error ? error.message : "정책 조회 실패")
-      }
     }
   }
 
@@ -575,102 +619,11 @@ export default function AiAdvisorPage() {
             </div>
 
             {!loading && !loadError && (
-              <>
-                <div
-                  style={{
-                    marginTop: 12,
-                    border: "1px solid #d0d5dd",
-                    borderRadius: 12,
-                    padding: "10px 12px",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: 10,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <div>
-                    {selectedContext ? (
-                      <strong style={{ color: "#1d2939", fontSize: 13 }}>
-                        [현재 분석] {selectedContext.equipmentName} · ROI{" "}
-                        {formatPercent(selectedContext.roiPct)} · A안{" "}
-                        {selectedContext.scenarioAInvestment ?? "-"}만원
-                      </strong>
-                    ) : (
-                      <strong style={{ color: "#1d2939", fontSize: 13 }}>
-                        [분석 선택] 현재 분석 없이 일반 상담 중입니다.
-                      </strong>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    className="ff-support-btn ghost"
-                    onClick={() => setAnalysisPickerOpen(true)}
-                  >
-                    분석 변경
-                  </button>
-                </div>
-
-                <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    className="ff-ai-advisor-chip"
-                    disabled={!selectedContext}
-                    onClick={() =>
-                      selectedContext &&
-                      navigate(`/roi?analysisId=${encodeURIComponent(selectedContext.analysisId)}`)
-                    }
-                  >
-                    ROI 상세
-                  </button>
-                  <button
-                    type="button"
-                    className="ff-ai-advisor-chip"
-                    disabled={!selectedContext}
-                    onClick={() =>
-                      selectedContext &&
-                      navigate(`/roi?analysisId=${encodeURIComponent(selectedContext.analysisId)}`)
-                    }
-                  >
-                    A/B 비교
-                  </button>
-                  <button
-                    type="button"
-                    className="ff-ai-advisor-chip"
-                    disabled={!selectedContext}
-                    onClick={() => void loadSnapshotPolicies()}
-                  >
-                    정책 보기
-                  </button>
-                  <button
-                    type="button"
-                    className="ff-ai-advisor-chip"
-                    disabled={!selectedContext}
-                    onClick={() =>
-                      selectedContext &&
-                      navigate(
-                        `/support-projects?analysisId=${encodeURIComponent(selectedContext.analysisId)}`,
-                      )
-                    }
-                  >
-                    지원사업 열기
-                  </button>
-                  <button
-                    type="button"
-                    className="ff-ai-advisor-chip"
-                    disabled={!selectedContext || snapshotPolicies.length === 0}
-                    onClick={() => {
-                      const first = snapshotPolicies[0]
-                      if (!selectedContext || !first) return
-                      navigate(
-                        `/application-draft?policyId=${encodeURIComponent(first.rawId)}&analysisId=${encodeURIComponent(selectedContext.analysisId)}`,
-                      )
-                    }}
-                  >
-                    신청서 작성
-                  </button>
-                </div>
-              </>
+              <p style={{ marginTop: 10, color: "#475467", fontSize: 13 }}>
+                {selectedContext
+                  ? `${selectedContext.equipmentName} 분석 기준으로 빠른 실행 버튼을 사용할 수 있습니다.`
+                  : "분석이 없으면 새 투자 분석부터 시작하세요."}
+              </p>
             )}
 
             {loading && <p style={{ marginTop: 10 }}>상담 컨텍스트 로딩 중...</p>}
@@ -680,12 +633,23 @@ export default function AiAdvisorPage() {
           <div style={{ display: "grid", gridTemplateColumns: "1.25fr 0.75fr", gap: 16 }}>
             <article className="card" style={{ padding: 18 }}>
               <h3 style={{ marginBottom: 8 }}>현재 대화</h3>
+
+              {!loading && !loadError && (
+                <AdvisorQuickActions
+                  hasAnalysis={Boolean(selectedContext)}
+                  analysisName={selectedContext?.equipmentName}
+                  loadingActionId={loadingActionId}
+                  onChangeAnalysis={() => setAnalysisPickerOpen(true)}
+                  onAction={(action) => void executeAdvisorAction(action)}
+                />
+              )}
+
               <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
                 {[
-                  "안녕",
-                  "지금은 어떤 걸 먼저 해야 해?",
-                  "검토 설비 ROI를 쉽게 설명해줘",
-                  "안 알아보고 싶은데",
+                  "현재 분석 요약해줘",
+                  "추천 시나리오 근거 알려줘",
+                  "A안/B안 차이 쉽게 설명해줘",
+                  "지금 바로 해야 할 일 정리해줘",
                 ].map((question) => (
                   <button
                     key={question}
@@ -702,10 +666,40 @@ export default function AiAdvisorPage() {
                 {messages.map((message) => (
                   <div key={message.id} className={`ff-advisor-message ${message.role}`}>
                     {message.content}
+                    {message.role === "assistant" && message.cards && message.cards.length > 0 && (
+                      <AdvisorResponseCards
+                        cards={message.cards}
+                        analysisId={selectedContext?.analysisId}
+                      />
+                    )}
                   </div>
                 ))}
                 <div ref={messageEndRef} />
               </div>
+
+              {actionError && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    border: "1px solid #fecdca",
+                    background: "#fef3f2",
+                    borderRadius: 10,
+                    padding: "8px 10px",
+                  }}
+                >
+                  <p style={{ margin: 0, color: "#b42318", fontWeight: 800 }}>{actionError}</p>
+                  {lastFailedAction && (
+                    <button
+                      type="button"
+                      className="ff-support-btn ghost"
+                      style={{ marginTop: 6 }}
+                      onClick={() => void executeAdvisorAction(lastFailedAction)}
+                    >
+                      다시 시도
+                    </button>
+                  )}
+                </div>
+              )}
 
               {chatError && (
                 <div
@@ -836,27 +830,16 @@ export default function AiAdvisorPage() {
             </article>
           </div>
 
-          {snapshotLegacy && (
-            <article className="card" style={{ marginTop: 14, padding: 18 }}>
-              <strong>이 분석은 정책 이력 저장 전 생성되었습니다.</strong>
-              <p>
-                당시 매칭 정책 정보를 복원할 수 없습니다. 재분석 또는 최신 지원사업 보기를
-                이용해 주세요.
-              </p>
-              <div className="ff-support-legacy-actions">
-                <button type="button" className="btn dark" onClick={() => navigate("/analysis/new")}>
-                  재분석
-                </button>
-                <button type="button" className="btn blue" onClick={() => navigate("/support-projects")}>
-                  최신 지원사업 보기
-                </button>
-              </div>
-            </article>
-          )}
-        </div>
-      </section>
+          <InvestmentSimulationDialog
+            open={simulationOpen}
+            scenarioAInvestment={selectedContext?.scenarioAInvestment ?? null}
+            scenarioBInvestment={selectedContext?.scenarioBInvestment ?? null}
+            loading={loadingActionId === "investment_simulation"}
+            onClose={() => setSimulationOpen(false)}
+            onSubmit={(input) => void handleSimulationSubmit(input)}
+          />
 
-      {analysisPickerOpen && (
+          {analysisPickerOpen && (
         <section className="ff-advisor-agent-shell" aria-label="분석 선택">
           <div className="ff-advisor-agent-stage" style={{ maxWidth: 720 }}>
             <header className="ff-advisor-agent-header">
@@ -909,6 +892,8 @@ export default function AiAdvisorPage() {
           </div>
         </section>
       )}
+        </div>
+      </section>
     </main>
   )
 }

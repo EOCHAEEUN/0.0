@@ -33,5 +33,6 @@ export type AdvisorApiResponse = {
   selectedEquipmentForPolicy: unknown | null
   nextQuestions: unknown[]
   chatId: string | null
+  metadata?: Record<string, unknown>
   raw: unknown
 }

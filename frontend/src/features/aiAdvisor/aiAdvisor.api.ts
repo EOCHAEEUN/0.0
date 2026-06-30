@@ -64,9 +64,21 @@ export async function requestAdvisorAnswer(
     action?: string
     chatId?: string
     sessionId?: string
+    source?: string
+    simulationInput?: Record<string, number>
   },
 ): Promise<AdvisorApiResponse> {
-  const { companyId, selectedEquipmentId, policyIntentChoice, analysisId, action, chatId, sessionId } = options ?? {}
+  const {
+    companyId,
+    selectedEquipmentId,
+    policyIntentChoice,
+    analysisId,
+    action,
+    chatId,
+    sessionId,
+    source,
+    simulationInput,
+  } = options ?? {}
 
   const response = await fetch(`${API_BASE_URL}/chat`, {
     method: "POST",
@@ -81,7 +93,8 @@ export async function requestAdvisorAnswer(
       action: action ?? "",
       chat_id: chatId ?? "",
       session_id: sessionId ?? chatId ?? "",
-      source: "global_ai_advisor",
+      source: source ?? "advisor",
+      simulation_input: simulationInput ?? {},
     }),
   })
 
@@ -114,6 +127,7 @@ export async function requestAdvisorAnswer(
       normalizeChatId(payload?.session_id) ??
       normalizeChatId(payload?.chat_id) ??
       normalizeChatId(payload?.id),
+    metadata: payload?.metadata ?? undefined,
     raw: payload,
   }
 }

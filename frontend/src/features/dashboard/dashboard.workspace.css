@@ -24,13 +24,13 @@
 .ff-dashboard-hero-card {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.72fr);
-  gap: clamp(32px, 5vw, 72px);
-  min-height: 340px;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.68fr);
+  gap: clamp(24px, 4vw, 48px);
+  min-height: 272px;
   margin-bottom: 22px;
-  padding: clamp(30px, 4vw, 52px);
+  padding: clamp(24px, 3vw, 36px);
   overflow: hidden;
-  border-radius: 26px;
+  border-radius: 22px;
   background:
     radial-gradient(circle at 83% 22%, rgba(255, 255, 255, 0.16), transparent 24%),
     linear-gradient(124deg, #0f1d35 0%, #142038 58%, #273348 100%);
@@ -57,64 +57,64 @@
 .ff-ai-engi-badge {
   display: inline-flex;
   align-items: center;
-  min-height: 32px;
-  margin-bottom: 22px;
-  padding: 0 17px;
+  min-height: 30px;
+  margin-bottom: 14px;
+  padding: 0 15px;
   border: 1px solid rgba(255, 235, 174, 0.38);
   border-radius: 999px;
   color: #fff2b6;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 950;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
 }
 
 .ff-dashboard-hero-eyebrow {
-  margin: 0 0 18px;
-  color: rgba(255, 255, 255, 0.46);
+  margin: 0 0 12px;
+  color: rgba(255, 255, 255, 0.52);
   font-size: 15px;
   font-weight: 900;
 }
 
 .ff-dashboard-hero-copy h1 {
   max-width: 720px;
-  margin: 0 0 18px;
+  margin: 0 0 12px;
   color: #ffffff;
-  font-size: clamp(32px, 4.2vw, 52px);
+  font-size: clamp(26px, 3vw, 36px);
   font-weight: 950;
-  line-height: 1.12;
-  letter-spacing: -0.045em;
+  line-height: 1.18;
+  letter-spacing: -0.035em;
 }
 
 .ff-dashboard-hero-copy strong {
   display: block;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   color: #93c5fd;
-  font-size: clamp(18px, 2vw, 25px);
+  font-size: clamp(17px, 1.7vw, 20px);
   font-weight: 950;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .ff-dashboard-hero-copy p:last-of-type {
   max-width: 720px;
   margin: 0;
-  color: rgba(255, 255, 255, 0.58);
-  font-size: clamp(16px, 1.6vw, 19px);
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 15px;
   font-weight: 850;
-  line-height: 1.75;
+  line-height: 1.65;
 }
 
 .ff-dashboard-hero-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  margin-top: 30px;
+  margin-top: 22px;
 }
 
 .ff-dashboard-hero-actions .ff-workspace-btn {
-  min-height: 48px;
-  padding: 0 22px;
+  min-height: 44px;
+  padding: 0 20px;
   border-radius: 10px;
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .ff-dashboard-hero-actions .ff-workspace-btn.secondary {
@@ -126,8 +126,8 @@
 .ff-dashboard-hero-side {
   display: grid;
   align-content: end;
-  gap: 24px;
-  min-height: 240px;
+  gap: 18px;
+  min-height: 180px;
 }
 
 .ff-dashboard-hero-bot {
@@ -145,8 +145,8 @@
 }
 
 .ff-dashboard-hero-kpi {
-  min-height: 96px;
-  padding: 18px 20px;
+  min-height: 84px;
+  padding: 14px 16px;
   border: 1px solid rgba(255, 255, 255, 0.11);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.075);
@@ -154,18 +154,18 @@
 
 .ff-dashboard-hero-kpi span {
   display: block;
-  margin-bottom: 11px;
-  color: rgba(255, 255, 255, 0.48);
+  margin-bottom: 8px;
+  color: rgba(255, 255, 255, 0.55);
   font-size: 14px;
   font-weight: 900;
 }
 
 .ff-dashboard-hero-kpi strong {
   color: #ffffff;
-  font-size: clamp(28px, 3vw, 38px);
+  font-size: clamp(22px, 2.4vw, 30px);
   font-weight: 950;
   line-height: 1;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.04em;
 }
 
 .ff-investment-action-card,
@@ -198,7 +198,7 @@
 
 .ff-company-context-main strong {
   color: #07182f;
-  font-size: clamp(22px, 2.6vw, 30px);
+  font-size: clamp(20px, 2.2vw, 24px);
   font-weight: 900;
   line-height: 1.2;
   letter-spacing: 0;
@@ -206,7 +206,7 @@
 
 .ff-company-context-main span {
   color: #61758d;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 800;
   line-height: 1.35;
 }
@@ -219,7 +219,7 @@
   border-radius: 999px;
   background: #e8f5ef;
   color: #0b7a53;
-  font-size: 12px;
+  font-size: 14px;
   font-style: normal;
   font-weight: 900;
 }
@@ -231,13 +231,13 @@
 
 .ff-company-context-side strong {
   color: #123b6d;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 900;
 }
 
 .ff-company-context-side span {
   color: #64748b;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 900;
 }
 
@@ -248,7 +248,7 @@
   display: inline-flex;
   align-items: center;
   color: #315d91;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 900;
   letter-spacing: 0;
 }
@@ -307,23 +307,38 @@
   font-weight: 900;
 }
 
-.ff-priority-card-head > strong {
+.ff-priority-card-head > strong,
+.ff-deadline-panel-title {
   color: #07182f;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 900;
+  line-height: 1.35;
+}
+
+.ff-deadline-list-panel > header .ff-deadline-panel-title {
+  display: block;
+  margin: 0;
+}
+
+.ff-deadline-list-panel header p {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.45;
 }
 
 .ff-engi-recommend-chip {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  min-height: 28px;
-  padding: 4px 9px 4px 4px;
+  min-height: 30px;
+  padding: 4px 10px 4px 4px;
   border-radius: 999px;
   background: rgba(79, 70, 229, 0.07);
   border: 1px solid rgba(79, 70, 229, 0.22);
   color: #4338ca;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 900;
 }
 
@@ -342,16 +357,16 @@
 }
 
 .ff-engi-chip-label b {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 900;
   color: #4338ca;
 }
 
 .ff-engi-chip-label small {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
-  color: rgba(67, 56, 202, 0.6);
-  letter-spacing: 0.04em;
+  color: rgba(67, 56, 202, 0.68);
+  letter-spacing: 0.02em;
 }
 
 .ff-policy-action-panel h2,
@@ -363,20 +378,13 @@
   letter-spacing: 0;
 }
 
-.ff-priority-intro {
-  margin: 0 0 12px !important;
-  color: #52677f !important;
-  font-size: 14px !important;
-  font-weight: 900 !important;
-  line-height: 1.55 !important;
-}
-
 .ff-policy-action-panel strong {
   display: -webkit-box;
   max-width: 760px;
   overflow: hidden;
   color: #123b6d;
-  font-size: clamp(22px, 2.4vw, 30px);
+  font-size: clamp(20px, 2.2vw, 26px);
+  font-weight: 900;
   line-height: 1.35;
   letter-spacing: 0;
   overflow-wrap: anywhere;
@@ -387,9 +395,9 @@
 .ff-policy-action-panel p {
   margin: 14px 0 0;
   color: #52677f;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 800;
-  line-height: 1.7;
+  line-height: 1.65;
 }
 
 .ff-engi-inline-advice {
@@ -400,7 +408,7 @@
   border-radius: 6px;
   background: rgba(79, 70, 229, 0.05);
   color: #33465f;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 900;
   line-height: 1.55;
 }
@@ -409,15 +417,15 @@
   display: block;
   margin-bottom: 4px;
   color: #4338ca;
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 900;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
 }
 
 .ff-engi-inline-advice p {
   margin: 0;
   color: #33465f;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 900;
   line-height: 1.55;
 }
@@ -453,12 +461,12 @@
 .ff-priority-chip-row span {
   display: inline-flex;
   align-items: center;
-  min-height: 26px;
-  padding: 0 9px;
+  min-height: 28px;
+  padding: 0 10px;
   border-radius: 999px;
   background: #eef6ff;
   color: #315d91;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 900;
 }
 
@@ -496,7 +504,7 @@
   min-height: 44px;
   padding: 0 16px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 900;
 }
 
@@ -548,8 +556,8 @@
   align-items: center;
   gap: 4px;
   margin-top: 5px;
-  color: rgba(67, 56, 202, 0.62);
-  font-size: 11px;
+  color: rgba(67, 56, 202, 0.72);
+  font-size: 13px;
   font-weight: 800;
   font-style: normal;
 }
@@ -578,28 +586,12 @@
   border-bottom: 1px solid #e1e9f3;
 }
 
-.ff-deadline-list-panel h3 {
-  margin: 0 0 5px;
-  color: #07182f;
-  font-size: 18px;
-  line-height: 1.35;
-  letter-spacing: 0;
-}
-
-.ff-deadline-list-panel header p {
-  margin: 0;
-  color: #64748b;
-  font-size: 12px;
-  font-weight: 900;
-  line-height: 1.45;
-}
-
 .ff-deadline-list-panel header button {
   flex: 0 0 auto;
   padding: 0;
   background: transparent;
   color: #315d91;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 900;
   white-space: nowrap;
 }
@@ -638,7 +630,7 @@
   margin-top: 2px;
   overflow: hidden;
   color: #07182f;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 900;
   line-height: 1.4;
   -webkit-box-orient: vertical;
@@ -649,7 +641,7 @@
   grid-column: 1 / -1;
   overflow: hidden;
   color: #64748b;
-  font-size: 12px;
+  font-size: 14px;
   font-style: normal;
   font-weight: 800;
   line-height: 1.45;
@@ -660,7 +652,7 @@
 .ff-deadline-list-row b {
   grid-column: 1 / -1;
   color: #123b6d;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 900;
 }
 
@@ -669,10 +661,10 @@
   display: inline-flex;
   align-items: center;
   width: fit-content;
-  min-height: 24px;
-  padding: 0 8px;
+  min-height: 26px;
+  padding: 0 9px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 900;
   line-height: 1;
 }
@@ -748,7 +740,7 @@
 .ff-action-kpi-bar span {
   display: block;
   color: #708198;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 900;
 }
 
@@ -756,7 +748,7 @@
   display: block;
   margin-top: 5px;
   color: #07182f;
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1.2;
   overflow-wrap: anywhere;
 }
@@ -765,7 +757,7 @@
 .ff-action-trust-line {
   margin-top: 14px;
   color: #64748b;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 800;
   line-height: 1.55;
 }
@@ -853,6 +845,7 @@
 .ff-my-analysis-section {
   margin-top: 18px;
   padding: 24px;
+  background: linear-gradient(180deg, #f9fafc 0%, #ffffff 100%);
 }
 
 .ff-my-analysis-section header {
@@ -863,11 +856,62 @@
   margin-bottom: 16px;
 }
 
-.ff-my-analysis-section header h2 {
-  margin: 4px 0 0;
+.ff-analysis-section-head strong {
   color: #07182f;
-  font-size: 24px;
+  font-size: clamp(18px, 2vw, 22px);
+  font-weight: 900;
   letter-spacing: 0;
+  line-height: 1.25;
+}
+
+.ff-analysis-panel {
+  display: grid;
+  gap: 0;
+}
+
+.ff-analysis-list-scroll {
+  --ff-analysis-row-height: 92px;
+  --ff-analysis-row-gap: 12px;
+  max-height: calc(
+    3 * var(--ff-analysis-row-height) + 2 * var(--ff-analysis-row-gap)
+  );
+  overflow-y: auto;
+  padding-right: 6px;
+  scrollbar-gutter: stable;
+}
+
+.ff-analysis-list-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ff-analysis-list-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #cbd5e1;
+}
+
+.ff-analysis-list-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.ff-all-analysis-link-below {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.ff-all-analysis-link-below:hover {
+  background: #e8edf3;
+  border-color: #d5dee8;
 }
 
 .ff-my-analysis-section header button {
@@ -879,14 +923,14 @@
   border-radius: 8px;
   background: #123b6d;
   color: #fff;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 900;
   white-space: nowrap;
 }
 
 .ff-analysis-list {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .ff-analysis-row {
@@ -894,20 +938,26 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
-  padding: 14px;
+  padding: 14px 16px;
   border: 1px solid #e1e9f3;
-  border-radius: 8px;
-  background: #fbfdff;
+  border-radius: 12px;
+  background: #ffffff;
 }
 
-.ff-analysis-thumb {
+.ff-analysis-row.is-clickable {
+  cursor: pointer;
+}
+
+.ff-analysis-index {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
-  background: #eaf2fb;
-  color: #123b6d;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 15px;
+  font-weight: 900;
 }
 
 .ff-analysis-main {
@@ -923,7 +973,7 @@
 
 .ff-analysis-title-line strong {
   color: #07182f;
-  font-size: 16px;
+  font-size: 17px;
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
@@ -931,10 +981,10 @@
 .ff-status-badge {
   display: inline-flex;
   align-items: center;
-  min-height: 24px;
-  padding: 0 8px;
+  min-height: 26px;
+  padding: 0 9px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 900;
 }
 
@@ -959,7 +1009,7 @@
   display: block;
   margin: 4px 0 0;
   color: #64748b;
-  font-size: 13px;
+  font-size: 15px;
   font-style: normal;
   font-weight: 800;
   line-height: 1.45;
@@ -967,17 +1017,6 @@
 
 .ff-analysis-row span {
   color: #33465f;
-}
-
-.ff-analysis-row button {
-  min-height: 38px;
-  padding: 0 13px;
-  border-radius: 8px;
-  background: #eaf2fb;
-  color: #123b6d;
-  font-size: 13px;
-  font-weight: 900;
-  white-space: nowrap;
 }
 
 .ff-roi-history-row {
@@ -1060,7 +1099,7 @@
   gap: 6px 12px;
   margin-top: 16px;
   color: #64748b;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 900;
 }
 
@@ -1072,7 +1111,7 @@
   padding: 0;
   background: transparent;
   color: #315d91;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 900;
 }
 
@@ -1123,10 +1162,14 @@
 
   .ff-engi-strip button,
   .ff-advisor-reason-link,
-  .ff-analysis-row button,
   .ff-my-analysis-section header button {
     width: 100%;
     justify-content: center;
+  }
+
+  .ff-all-analysis-link-below {
+    width: auto;
+    min-width: 168px;
   }
 
   .ff-roi-history-row .ff-roi-history-result-btn {

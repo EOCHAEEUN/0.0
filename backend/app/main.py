@@ -2,10 +2,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import (
     analyze,
+    application_draft,
     auth,
     chat,
     click_chat,
     click_chat_two,
+    dashboard,
     documents,
     draft,
     industry,
@@ -47,11 +49,13 @@ app.add_middleware(
 app.include_router(chat.router, prefix="/api", tags=["chat"])
 app.include_router(auth.router, prefix="/api", tags=["auth"])
 app.include_router(onboarding.router, prefix="/api", tags=["onboarding"])
+app.include_router(dashboard.router, prefix="/api", tags=["dashboard"])
 app.include_router(industry.router, prefix="/api", tags=["industry"])
 app.include_router(safety.router, prefix="/api", tags=["safety"])
 app.include_router(safety_preview.router, prefix="/api", tags=["safety-preview"])
 app.include_router(analyze.router, prefix="/api", tags=["analyze"])
 app.include_router(draft.router, prefix="/api", tags=["draft"])
+app.include_router(application_draft.router, prefix="/api", tags=["application-draft"])
 app.include_router(reports.router, prefix="/api", tags=["reports"])
 app.include_router(documents.router, prefix="/api", tags=["documents"])
 app.include_router(click_chat.router)

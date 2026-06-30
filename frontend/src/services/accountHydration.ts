@@ -4,6 +4,7 @@ import {
   saveAnalysisResult,
   updateUserOnboardingState,
   ANALYSIS_RESULT_SCHEMA_VERSION,
+  emptyCompanyProfileDraft,
   type CompanyProfileDraft,
 } from "../features/onboarding/onboardingState"
 import { resolveCanonicalPolicies } from "../features/onboarding/analysisPolicySource"
@@ -69,17 +70,39 @@ function mapCompanyToProfileDraft(company: ApiRecord): CompanyProfileDraft {
 
   const employeeCount =
     typeof company.employee_count === "number" ? company.employee_count : null
+  const annualRevenue =
+    typeof company.annual_revenue === "number" ? company.annual_revenue : null
 
   return {
+    ...emptyCompanyProfileDraft,
     companyName: typeof company.company_name === "string" ? company.company_name : "",
+    companyType:
+      typeof company.company_type === "string" && company.company_type.trim()
+        ? company.company_type
+        : "선택 필요",
     regionSido,
     regionSigungu,
     industry: typeof company.industry_name === "string" ? company.industry_name : "",
     industryCode: String(firstCode),
     employeeRange: mapEmployeeCountToRange(employeeCount),
-    foundedYear: "",
-    revenueRange: "",
-    smartFactoryStatus: "",
+    employees: employeeCount !== null ? String(employeeCount) : "",
+    annualRevenue: annualRevenue !== null ? String(annualRevenue) : "",
+    businessNumber:
+      typeof company.business_registration_no === "string"
+        ? company.business_registration_no
+        : "",
+    purpose:
+      Array.isArray(company.primary_purpose) && company.primary_purpose[0]
+        ? String(company.primary_purpose[0])
+        : "선택 필요",
+    businessSiteType:
+      typeof company.workplace_type === "string" && company.workplace_type.trim()
+        ? company.workplace_type
+        : "선택 필요",
+    foundedYear:
+      typeof company.established_year === "number"
+        ? String(company.established_year)
+        : "",
     status: "completed",
     updatedAt: new Date().toISOString(),
   }

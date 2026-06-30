@@ -893,6 +893,117 @@ export function SelectChip() {
   );
 }
 
+export type EquipmentOptionalSectionKey =
+  | "details"
+  | "investment"
+  | "operations";
+
+function isEquipmentFieldFilled(value: string | undefined) {
+  return Boolean(String(value ?? "").trim());
+}
+
+export function countEquipmentOptionalSectionFilled(
+  equipment: EquipmentInfo,
+  section: EquipmentOptionalSectionKey,
+) {
+  switch (section) {
+    case "details":
+      return [equipment.process, equipment.defectRate].filter(isEquipmentFieldFilled)
+        .length;
+    case "investment":
+      return [
+        equipment.scenarioAInvestment,
+        equipment.scenarioBInvestment,
+      ].filter(isEquipmentFieldFilled).length;
+    case "operations":
+      return [
+        equipment.maintenanceCostAnnual,
+        equipment.currentCapacityValue,
+        equipment.productionQty,
+        equipment.contributionMarginWon,
+      ].filter(isEquipmentFieldFilled).length;
+    default:
+      return 0;
+  }
+}
+
+export function countEquipmentOptionalFieldsFilled(equipment: EquipmentInfo) {
+  return (
+    countEquipmentOptionalSectionFilled(equipment, "details") +
+    countEquipmentOptionalSectionFilled(equipment, "investment") +
+    countEquipmentOptionalSectionFilled(equipment, "operations")
+  );
+}
+
+export function EquipmentOptionalAccordion({
+  title,
+  description,
+  open,
+  filledCount,
+  onToggle,
+  children,
+}: {
+  title: string;
+  description: string;
+  open: boolean;
+  filledCount: number;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  const filledLabel =
+    filledCount > 0
+      ? filledCount === 1
+        ? "입력됨"
+        : `${filledCount}개 입력됨`
+      : "";
+
+  return (
+    <section className="ff-equipment-optional-accordion">
+      <button
+        type="button"
+        className="ff-equipment-optional-accordion__header"
+        aria-expanded={open}
+        onClick={onToggle}
+      >
+        <span className="ff-equipment-optional-accordion__header-main">
+          <span className="ff-equipment-optional-accordion__title-row">
+            <span className="ff-equipment-optional-accordion__title">{title}</span>
+            <SelectChip />
+            {filledLabel ? (
+              <span className="ff-equipment-optional-accordion__filled-badge">
+                {filledLabel}
+              </span>
+            ) : null}
+          </span>
+          <span className="ff-equipment-optional-accordion__description">
+            {description}
+          </span>
+        </span>
+        <span
+          className={`ff-equipment-optional-accordion__chevron${open ? " is-open" : ""}`}
+          aria-hidden="true"
+        >
+          ▼
+        </span>
+      </button>
+
+      <div
+        className={`ff-equipment-optional-accordion__panel${open ? " is-open" : ""}`}
+        aria-hidden={!open}
+        inert={!open}
+      >
+        <div
+          className="ff-equipment-optional-accordion__panel-inner"
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => event.stopPropagation()}
+        >
+          {children}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function FieldLabel({
   label,
   required,

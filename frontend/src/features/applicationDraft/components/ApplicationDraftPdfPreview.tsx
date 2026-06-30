@@ -1,34 +1,48 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import type { DraftStatus } from "../applicationDraft.contract"
-import type { ApplicationDraftModel } from "../hooks/useApplicationDraft"
 
-type PdfDraftSource = {
-  company_name?: string | null
-  equipment_name?: string | null
-  selected_policy?: string | null
-  agency?: string | null
-  organization?: string | null
-  scenario_label?: string | null
-  business_necessity?: string | null
-  expected_benefits?: string[] | null
+import type { ApplicationDraftReportParams } from "../applicationDraft.contract"
+import type { ApplicationDraftWorkspaceModel } from "../hooks/useApplicationDraftWorkspace"
+
+type ReportType = "consumer_summary" | "application_evidence"
+
+type DownloadOption = {
+  key: ReportType
+  label: string
 }
 
-type PdfPreviewData = {
-  companyName: string
-  equipmentName: string
-  selectedPolicy: string
-  selectedAgency: string
-  scenarioLabel: string
-  businessNecessity: string
-  expectedBenefits: string[]
+const DOWNLOAD_OPTIONS: DownloadOption[] = [
+  { key: "consumer_summary", label: "표 중심 분석 PDF" },
+  { key: "application_evidence", label: "계획서 초안 PDF" },
+]
+
+const FALLBACK_FILENAMES: Record<ReportType, string> = {
+  consumer_summary: "FactoFit_분석결과_표중심.pdf",
+  application_evidence: "FactoFit_신청서초안.pdf",
 }
 
-type ReportParams = {
-  companyId: string
-  equipmentId: string
-  policyId: string
-  analysisId?: string
-}
+const PDF_PREVIEW_COPY = {
+  badge: "PDF 확장 미리보기",
+  title: "최종 PDF에 제출 참고 보고서 형식으로 생성됩니다",
+  description:
+    "신청서 초안 리포트와 안전개선 근거 리포트를 미리 확인하거나 필요한 PDF만 선택해 다운로드할 수 있습니다.",
+  cards: [
+    {
+      no: "01",
+      title: "사업 필요성",
+      body: "노후 설비, 에너지 비용, 유지보수 부담, 품질 개선 필요성을 신청 배경으로 정리합니다.",
+    },
+    {
+      no: "02",
+      title: "추진 내용",
+      body: "A안 전체교체 기준으로 설비 교체 방향, 도입 목적, 실행 계획을 보고서 문장으로 구성합니다.",
+    },
+    {
+      no: "03",
+      title: "기대효과",
+      body: "에너지 비용 절감, 유지보수 비용 절감, 불량률 감소 효과를 중심으로 성과관리 기준까지 확장합니다.",
+    },
+  ],
+} as const
 
 const API_BASE_URL = (
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
@@ -39,24 +53,7 @@ function buildApiUrl(path: string) {
   if (API_BASE_URL.endsWith("/api")) {
     return `${API_BASE_URL}${path.replace(/^\/api/, "")}`
   }
-
   return `${API_BASE_URL}${path}`
-}
-
-function asRecord(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : {}
-}
-
-function readText(value: unknown): string {
-  return typeof value === "string" ? value.trim() : ""
-}
-
-function readStringList(value: unknown): string[] {
-  if (!Array.isArray(value)) return []
-
-  return value.map((item) => String(item).trim()).filter(Boolean)
 }
 
 function readLocalStorage(key: string): string {
@@ -73,75 +70,6 @@ function getToken() {
     readLocalStorage("access_token") ||
     readLocalStorage("token")
   )
-}
-
-function getApiDraft(model: ApplicationDraftModel): PdfDraftSource {
-  const analysisData = asRecord(model.analysisData)
-  const draftApiData = asRecord(analysisData.draft_api_data)
-  const draftResult = asRecord(draftApiData.draft_result)
-
-  return draftResult as PdfDraftSource
-}
-
-function getReportParams(model: ApplicationDraftModel): ReportParams | null {
-  const analysisData = asRecord(model.analysisData)
-  const draftParams = asRecord(analysisData.draft_params)
-  const draftApiData = asRecord(analysisData.draft_api_data)
-
-  const responseAnalysisId = readText(draftApiData.analysis_id)
-  const usesSnapshot = Boolean(responseAnalysisId)
-  const companyId =
-    (usesSnapshot ? readText(draftApiData.company_id) : "") ||
-    readText(draftParams.companyId) ||
-    readText(draftApiData.company_id)
-  const equipmentId =
-    (usesSnapshot ? readText(draftApiData.equipment_id) : "") ||
-    readText(draftParams.equipmentId) ||
-    readText(draftApiData.equipment_id)
-  const policyId =
-    (usesSnapshot ? readText(draftApiData.policy_id) : "") ||
-    readText(draftParams.policyId) ||
-    readText(draftApiData.policy_id)
-  const analysisId =
-    responseAnalysisId || readText(draftParams.analysisId)
-
-  if (!companyId || !equipmentId || !policyId) return null
-
-  return { companyId, equipmentId, policyId, analysisId: analysisId || undefined }
-}
-
-function hasReadyDraftApiData(model: ApplicationDraftModel): boolean {
-  return Boolean(getReportParams(model))
-}
-
-function getPdfPreviewData(model: ApplicationDraftModel): PdfPreviewData {
-  const apiDraft = getApiDraft(model)
-  const expectedBenefitsFromApi = readStringList(apiDraft.expected_benefits)
-
-  return {
-    companyName: readText(apiDraft.company_name) || model.companyName || "기업명 미확인",
-    equipmentName:
-      readText(apiDraft.equipment_name) || model.equipmentName || "설비명 미확인",
-    selectedPolicy:
-      readText(apiDraft.selected_policy) ||
-      model.selectedPolicy ||
-      "추천 지원사업 미확인",
-    selectedAgency:
-      readText(apiDraft.agency) ||
-      readText(apiDraft.organization) ||
-      model.selectedAgency ||
-      "주관기관 정보 없음",
-    scenarioLabel:
-      readText(apiDraft.scenario_label) || model.scenarioLabel || "시나리오 미확인",
-    businessNecessity:
-      readText(apiDraft.business_necessity) ||
-      model.businessNecessity ||
-      "DB에 저장된 신청서 초안의 사업 필요성을 정리합니다.",
-    expectedBenefits:
-      expectedBenefitsFromApi.length > 0
-        ? expectedBenefitsFromApi
-        : model.expectedBenefits,
-  }
 }
 
 function parseContentDispositionFilename(header: string | null): string {
@@ -195,37 +123,10 @@ async function readErrorMessage(response: Response): Promise<string> {
   return "PDF 생성 중 오류가 발생했습니다."
 }
 
-type ReportType = "consumer_summary" | "application_evidence"
-
-type ReportRequestResult = {
-  blob: Blob
-  filename: string
-}
-
-type DownloadOption = {
-  key: ReportType
-  label: string
-}
-
-const DOWNLOAD_OPTIONS: DownloadOption[] = [
-  { key: "consumer_summary", label: "표 중심 분석 PDF" },
-  { key: "application_evidence", label: "계획서 초안 PDF" },
-]
-
-const FALLBACK_FILENAMES: Record<ReportType, string> = {
-  consumer_summary: "FactoFit_분석결과_표중심.pdf",
-  application_evidence: "FactoFit_신청서초안.pdf",
-}
-
 async function requestApplicationReportPdf(
-  model: ApplicationDraftModel,
+  params: ApplicationDraftReportParams,
   reportType: ReportType,
-): Promise<ReportRequestResult> {
-  const params = getReportParams(model)
-  if (!params) {
-    throw new Error("PDF 생성에 필요한 company_id, equipment_id, policy_id가 없습니다.")
-  }
-
+) {
   const token = getToken()
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -248,6 +149,7 @@ async function requestApplicationReportPdf(
       equipment_id: params.equipmentId,
       policy_id: params.policyId,
       analysis_id: params.analysisId,
+      draft_result_id: params.draftResultId,
       report_type: reportType,
       tone: "submission",
     }),
@@ -261,24 +163,23 @@ async function requestApplicationReportPdf(
   const serverFilename = parseContentDispositionFilename(
     response.headers.get("Content-Disposition"),
   )
-  const filename = FALLBACK_FILENAMES[reportType] || serverFilename || "factofit_application_report.pdf"
+  const filename =
+    FALLBACK_FILENAMES[reportType] ||
+    serverFilename ||
+    "factofit_application_report.pdf"
 
   return { blob, filename }
 }
 
 export function ApplicationDraftPdfPreview({
   model,
-  draftStatus,
-  onPrepareDownload,
 }: {
-  model: ApplicationDraftModel
-  draftStatus: DraftStatus
-  onPrepareDownload: () => void
+  model: ApplicationDraftWorkspaceModel
 }) {
-  const pdf = getPdfPreviewData(model)
-  const hasDraftApiData = hasReadyDraftApiData(model)
-  const isLoading = Boolean(model.analysisData?.isLoading)
-  const canGeneratePdf = draftStatus !== "idle" && hasDraftApiData && !isLoading
+  const reportParams = model.reportParams
+  const canGeneratePdf = model.canUsePdf && Boolean(reportParams)
+  const isLoading = model.isLoading
+
   const [previewOpen, setPreviewOpen] = useState(false)
   const [previewTab, setPreviewTab] = useState<ReportType>("consumer_summary")
   const [previewLoading, setPreviewLoading] = useState<Record<ReportType, boolean>>({
@@ -304,16 +205,13 @@ export function ApplicationDraftPdfPreview({
   const [downloadFeedback, setDownloadFeedback] = useState("")
 
   const unavailableReason = useMemo(() => {
-    if (isLoading) return "신청서 초안을 생성 중입니다. 잠시 후 다시 시도해주세요."
-    if (!hasDraftApiData) return "정책 선택 후 PDF 바로보기가 가능합니다."
-    if (draftStatus === "idle") {
-      return (
-        readText(model.analysisData?.errorMessage) ||
-        "신청서 초안 생성 후 PDF 바로보기가 가능합니다."
-      )
+    if (isLoading) return "신청서 화면 데이터를 불러오는 중입니다."
+    if (!reportParams) return "분석·정책 정보가 준비되면 PDF 바로보기가 가능합니다."
+    if (model.data?.policy?.legacy_missing) {
+      return "정책 스냅샷 이력이 없어 PDF를 생성할 수 없습니다."
     }
     return ""
-  }, [draftStatus, hasDraftApiData, isLoading, model.analysisData?.errorMessage])
+  }, [isLoading, model.data?.policy?.legacy_missing, reportParams])
 
   useEffect(() => {
     previewUrlsRef.current = previewUrls
@@ -329,15 +227,18 @@ export function ApplicationDraftPdfPreview({
 
   const ensurePreviewPdf = async (reportType: ReportType) => {
     if (previewUrls[reportType] || previewLoading[reportType]) return
-    if (unavailableReason) {
-      setPreviewErrors((prev) => ({ ...prev, [reportType]: unavailableReason }))
+    if (unavailableReason || !reportParams) {
+      setPreviewErrors((prev) => ({
+        ...prev,
+        [reportType]: unavailableReason || "PDF 생성 정보가 부족합니다.",
+      }))
       return
     }
 
     setPreviewErrors((prev) => ({ ...prev, [reportType]: "" }))
     setPreviewLoading((prev) => ({ ...prev, [reportType]: true }))
     try {
-      const { blob } = await requestApplicationReportPdf(model, reportType)
+      const { blob } = await requestApplicationReportPdf(reportParams, reportType)
       const nextUrl = window.URL.createObjectURL(blob)
       setPreviewUrls((prev) => {
         if (prev[reportType]) {
@@ -365,13 +266,14 @@ export function ApplicationDraftPdfPreview({
   const selectedDownloadCount = Object.values(downloadSelection).filter(Boolean).length
 
   const downloadSelectedPdfs = async () => {
-    if (downloading || selectedDownloadCount === 0) return
+    if (downloading || selectedDownloadCount === 0 || !reportParams) return
     setDownloading(true)
     setDownloadFeedback("")
 
     const failed: string[] = []
     const succeeded: string[] = []
     const selectedItems = DOWNLOAD_OPTIONS.filter((option) => downloadSelection[option.key])
+
     for (const option of DOWNLOAD_OPTIONS) {
       if (!downloadSelection[option.key]) continue
       if (unavailableReason) {
@@ -379,7 +281,10 @@ export function ApplicationDraftPdfPreview({
         continue
       }
       try {
-        const { blob, filename } = await requestApplicationReportPdf(model, option.key)
+        const { blob, filename } = await requestApplicationReportPdf(
+          reportParams,
+          option.key,
+        )
         await triggerBrowserDownload(blob, filename)
         succeeded.push(option.label)
         if (selectedItems.length > 1) {
@@ -392,15 +297,11 @@ export function ApplicationDraftPdfPreview({
       }
     }
 
-    if (succeeded.length > 0) {
-      onPrepareDownload()
-    }
-
     if (succeeded.length > 0 && failed.length === 0) {
       setDownloadFeedback(`PDF ${succeeded.length}개 다운로드를 요청했습니다.`)
     } else if (succeeded.length > 0 && failed.length > 0) {
       setDownloadFeedback(
-        `PDF ${succeeded.length}개 다운로드를 요청했습니다. ${failed.length}개 파일은 생성하지 못했습니다. (${failed.join(" | ")}) 브라우저에서 이 사이트의 여러 파일 다운로드 허용 여부도 확인해주세요.`,
+        `PDF ${succeeded.length}개 다운로드를 요청했습니다. ${failed.length}개 파일은 생성하지 못했습니다. (${failed.join(" | ")})`,
       )
     } else if (failed.length > 0) {
       setDownloadFeedback(`다운로드 실패: ${failed.join(" | ")}`)
@@ -415,40 +316,20 @@ export function ApplicationDraftPdfPreview({
       <div className="ff-pdf-expand-preview">
         <div className="ff-pdf-expand-head">
           <div>
-            <span className="ff-mini-label">PDF 확장 바로보기</span>
-            <h4>최종 PDF에 제출 참고 보고서 형식으로 생성됩니다</h4>
+            <span className="ff-mini-label">{PDF_PREVIEW_COPY.badge}</span>
+            <h4>{PDF_PREVIEW_COPY.title}</h4>
           </div>
-          <p>
-            현재 DB에 저장된 기업정보, 설비현황, ROI 분석 결과, 신청서 초안을 바탕으로
-            application report 형식의 PDF를 생성합니다.
-          </p>
+          <p>{PDF_PREVIEW_COPY.description}</p>
         </div>
 
         <div className="ff-pdf-expand-grid">
-          <article>
-            <span>01</span>
-            <h5>사업 필요성</h5>
-            <p>{pdf.businessNecessity}</p>
-          </article>
-
-          <article>
-            <span>02</span>
-            <h5>추진 내용</h5>
-            <p>
-              {pdf.scenarioLabel} 기준으로 {pdf.equipmentName} 설비
-              개선 방향, 도입 목적, 실행 계획을 보고서 문장으로 구성합니다.
-            </p>
-          </article>
-
-          <article>
-            <span>03</span>
-            <h5>기대 효과</h5>
-            <p>
-              {pdf.expectedBenefits.length > 0
-                ? `${pdf.expectedBenefits.slice(0, 3).join(", ")} 효과를 중심으로 성과관리 기준까지 확장합니다.`
-                : "DB에 저장된 신청서 초안의 기대 효과를 PDF에 반영합니다."}
-            </p>
-          </article>
+          {PDF_PREVIEW_COPY.cards.map((card) => (
+            <article key={card.no}>
+              <span>{card.no}</span>
+              <h5>{card.title}</h5>
+              <p>{card.body}</p>
+            </article>
+          ))}
         </div>
       </div>
 
@@ -456,6 +337,7 @@ export function ApplicationDraftPdfPreview({
         <button
           className="ff-pdf-action-button outline"
           type="button"
+          disabled={!canGeneratePdf}
           onClick={() => void openPreview()}
         >
           PDF 바로보기
@@ -463,7 +345,7 @@ export function ApplicationDraftPdfPreview({
         <button
           className="ff-pdf-action-button primary"
           type="button"
-          disabled={isLoading}
+          disabled={!canGeneratePdf || isLoading}
           onClick={() => setDownloadDialogOpen(true)}
         >
           PDF 다운로드 ▾
@@ -471,23 +353,36 @@ export function ApplicationDraftPdfPreview({
       </div>
 
       {downloadFeedback && (
-        <div className={downloadFeedback.includes("실패") ? "ff-draft-alert warning" : "ff-draft-alert success"}>
+        <div
+          className={
+            downloadFeedback.includes("실패")
+              ? "ff-draft-alert warning"
+              : "ff-draft-alert success"
+          }
+        >
           {downloadFeedback}
         </div>
       )}
 
-      {!canGeneratePdf && (
-        <div className="ff-draft-alert warning">
-          {unavailableReason || "신청서 초안 생성이 완료되면 PDF를 준비할 수 있습니다."}
-        </div>
+      {!canGeneratePdf && unavailableReason && (
+        <div className="ff-draft-alert warning">{unavailableReason}</div>
       )}
 
       {previewOpen && (
-        <div className="ff-pdf-modal-backdrop" role="dialog" aria-modal="true" aria-label="PDF 바로보기">
+        <div
+          className="ff-pdf-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label="PDF 바로보기"
+        >
           <div className="ff-pdf-modal">
             <div className="ff-pdf-modal-head">
               <h4>PDF 바로보기</h4>
-              <button type="button" className="ff-support-btn ghost" onClick={() => setPreviewOpen(false)}>
+              <button
+                type="button"
+                className="ff-support-btn ghost"
+                onClick={() => setPreviewOpen(false)}
+              >
                 닫기
               </button>
             </div>
@@ -510,11 +405,12 @@ export function ApplicationDraftPdfPreview({
             </div>
             <div className="ff-pdf-preview-body">
               {previewLoading[previewTab] && <p>PDF 준비 중...</p>}
-              {!previewLoading[previewTab] && (previewErrors[previewTab] || unavailableReason) && (
-                <div className="ff-draft-alert warning">
-                  {previewErrors[previewTab] || unavailableReason}
-                </div>
-              )}
+              {!previewLoading[previewTab] &&
+                (previewErrors[previewTab] || unavailableReason) && (
+                  <div className="ff-draft-alert warning">
+                    {previewErrors[previewTab] || unavailableReason}
+                  </div>
+                )}
               {!previewLoading[previewTab] &&
                 !previewErrors[previewTab] &&
                 !unavailableReason &&
@@ -531,7 +427,12 @@ export function ApplicationDraftPdfPreview({
       )}
 
       {downloadDialogOpen && (
-        <div className="ff-pdf-modal-backdrop" role="dialog" aria-modal="true" aria-label="PDF 다운로드">
+        <div
+          className="ff-pdf-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-label="PDF 다운로드"
+        >
           <div className="ff-pdf-download-dialog">
             <h4>PDF 다운로드</h4>
             <p>필요한 문서를 선택해 한 번에 다운로드할 수 있습니다.</p>

@@ -128,3 +128,83 @@ export type DashboardAnalysisStorage = {
   policy_summary?: Record<string, unknown> | null
   policy_snapshot_missing?: boolean
 }
+
+export type DashboardOverviewDeadline = {
+  policy_id?: string | null
+  title: string
+  deadline?: string | null
+  deadline_display: string
+  d_day: string
+  days_remaining: number
+  status_hint: string
+  is_priority?: boolean
+}
+
+export type DashboardOverviewAnalysis = {
+  index: number
+  analysis_id: string
+  equipment_id?: string | null
+  title: string
+  equipment_name: string
+  summary: string
+  detail: string
+  status: string
+  created_at?: string | null
+}
+
+export type DashboardOverviewResponse = {
+  company?: {
+    company_id?: string
+    company_name?: string
+    industry_name?: string | null
+    region?: string | null
+    company_type?: string | null
+    representative_equipment_id?: string | null
+  }
+  active_analysis?: {
+    analysis_id?: string | null
+    equipment_id?: string | null
+    equipment_name?: string | null
+    analysis_created_at?: string | null
+    status?: string
+    policy_snapshot_legacy_missing?: boolean
+  }
+  hero?: {
+    priority_equipment_count: number
+    priority_equipment_name: string
+    summary: string
+    reason: string
+  }
+  counts?: {
+    registered_equipment: number
+    closing_soon: number
+    matched_policies: number
+    recent_analyses: number
+  }
+  today_tasks?: {
+    count: number
+    summary: string
+    items: Array<{ key: string; label: string; summary: string }>
+  }
+  priority_policy?: {
+    exists: boolean
+    policy_id?: string | null
+    title?: string | null
+    deadline?: string | null
+    d_day?: string | null
+    tags: string[]
+    reason: string
+    legacy_missing?: boolean
+  }
+  deadlines?: DashboardOverviewDeadline[]
+  recent_analyses?: DashboardOverviewAnalysis[]
+  equipments?: Array<{
+    equipment_id?: string
+    name?: string
+    category?: string
+    process?: string | null
+    age_years?: number | null
+    is_representative?: boolean
+  }>
+  empty_state?: string | null
+}

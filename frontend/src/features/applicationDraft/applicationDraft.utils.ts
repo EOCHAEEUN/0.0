@@ -58,7 +58,27 @@ export function formatMonthlyPayback(value?: number | null) {
     return `${months.toFixed(1)}개월`
   }
 
-  return `약 ${months.toFixed(months % 1 === 0 ? 0 : 1)}개월`
+  return `약 ${Math.round(months)}개월`
+}
+
+export function formatPaybackFromScenario(params: {
+  payback_months?: number | null
+  payback_years?: number | null
+}) {
+  if (params.payback_months !== null && params.payback_months !== undefined) {
+    return formatMonthlyPayback(params.payback_months)
+  }
+
+  if (params.payback_years !== null && params.payback_years !== undefined) {
+    const years = Number(params.payback_years)
+    if (years >= 1 && Number.isInteger(years)) {
+      return `약 ${years}년`
+    }
+    const months = years * 12
+    return formatMonthlyPayback(months)
+  }
+
+  return "-"
 }
 
 export function formatPercent(value?: number | null) {

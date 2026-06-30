@@ -283,206 +283,74 @@ def analyze_roi_followup(user_query: str, roi_result: dict) -> dict:
 
 
 def capex_advisor_node(state: FactofitState) -> FactofitState:
+    """
+    ROI 분석 노드:
+    1. equipment 확인 (필수)
+    2. equipment 정규화 (press/cnc/injection만 지원)
+    3. DB에서 ROI 조회 (없으면 "분석하기" 멘트)
+    4. ROI 결과 포맷팅만!
+    
+    Tool 호출은 하지 않음 (analyze.py의 /analyze/run-roi-analysis에서만 실행)
+    ROI 후속질문은 policy_chat_node의 상태 3.5에서 처리
+    """
     equipment = state.get("equipment")
-    company = state.get("company_info")
-    matched_policies = state.get("matched_policies", [])
-    user_query = str(state.get("user_query") or "")
     roi_result = state.get("roi_result")
-
-    # 이미 ROI가 있으면 후속 질문을 우선 처리해 불필요한 재계산을 줄입니다.
-    if isinstance(roi_result, dict) and roi_result:
-        followup = analyze_roi_followup(user_query, roi_result)
-        intent = followup.get("intent")
-        if intent == "detail":
-            state["final_response"] = show_roi_detail(roi_result, user_query)
-            return state
-        if intent == "compare":
-            state["final_response"] = compare_scenarios(roi_result)
-            return state
-        if intent == "simulate":
-            new_investment = followup.get("new_investment")
-            if not equipment or new_investment is None:
-                state["final_response"] = (
-                    "시뮬레이션하려는 투자금(만원 단위)을 함께 알려주세요. "
-                    "예: 'A안 투자금 6000만원으로 재계산'"
-                )
-                return state
-            if hasattr(equipment, "model_copy"):
-                simulation_equipment = equipment.model_copy(
-                    update={"scenario_a_investment_manwon": _safe_int(new_investment)}
-                )
-            else:
-                data = equipment.dict()
-                data["scenario_a_investment_manwon"] = _safe_int(new_investment)
-                simulation_equipment = type(equipment)(**data)
-            if hasattr(simulation_equipment, "model_dump"):
-                equipment_data = simulation_equipment.model_dump()
-            else:
-                equipment_data = simulation_equipment.dict()
-            new_roi = calculate_equipment_roi.invoke({"equipment": equipment_data})
-            state["final_response"] = compare_roi_results(roi_result, new_roi)
-            return state
-
-    # equipment가 없으면 user_query에서 설비 정보를 추출합니다.
+    company = state.get("company_info")
+    
+    # equipment 확인
     if not equipment:
-        extract_prompt = """
-아래 텍스트에서 설비 정보를 추출해서 JSON으로만 반환하세요. 설명 금지.
-주의: 금액은 반드시 만원 단위로 변환하세요. (예: 4800만원 -> 4800)
-{{
-  "equipment_name": "설비명",
-  "age_years": 숫자,
-  "energy_cost_annual": 숫자 (만원 단위),
-  "industry_code": "코드",
-  "region": "지역"
-}}
-텍스트: {user_query}
-""".format(user_query=state["user_query"])
-
-        extract_response = llm.invoke([SystemMessage(content=extract_prompt)])
-
-        try:
-            content = extract_response.content.strip()
-
-            if content.startswith("```"):
-                content = content.split("```")[1]
-                if content.startswith("json"):
-                    content = content[4:]
-
-            data = json.loads(content.strip())
-
-            category = normalize_equipment_category(
-                data.get("equipment_category", ""),
-                data.get("equipment_name", ""),
-            )
-
-            from app.models.equipment import EquipmentInput
-            from app.models.company import CompanyContext
-
-            state["equipment"] = EquipmentInput(
-                name=data.get("equipment_name", ""),
-                category=category,
-                age_years=int(data.get("age_years", 0)),
-                energy_cost_annual=int(data.get("energy_cost_annual", 0)),
-            )
-
-            if not company:
-                state["company_info"] = CompanyContext(
-                    company_name="",
-                    industry_code=[data.get("industry_code", "")]
-                    if data.get("industry_code")
-                    else [],
-                    region=data.get("region", ""),
-                )
-
-            equipment = state["equipment"]
-            company = state["company_info"]
-
-        except Exception as e:
-            print(f"정보 추출 실패: {e}")
-            state["final_response"] = (
-                "설비 정보를 이해하지 못했어요. "
-                "설비 종류, 연식, 에너지 비용을 다시 알려주세요."
-            )
-            return state
-
-    # equipment가 이미 state에 있어도 category를 다시 정규화합니다.
-    # Supabase 값 또는 LLM 추출값이 섞여 들어와도 ROI 계산기에는 press/cnc/injection만 넘기기 위함입니다.
-    if equipment:
-        normalized_category = normalize_equipment_category(
-            getattr(equipment, "category", ""),
-            getattr(equipment, "name", ""),
-        )
-        equipment.category = normalized_category
-        state["equipment"] = equipment
-
-    # 지원하지 않는 카테고리는 ROI 계산기로 보내지 않고 여기서 종료합니다.
+        state["final_response"] = "설비 정보가 필요합니다."
+        state["intent"] = "response"
+        return state
+    
+    # equipment 정규화
+    normalized_category = normalize_equipment_category(
+        getattr(equipment, "category", ""),
+        getattr(equipment, "name", ""),
+    )
+    equipment.category = normalized_category
+    state["equipment"] = equipment
+    
+    # 지원하는 카테고리 확인
     supported = ["press", "cnc", "injection"]
-    if not equipment or equipment.category not in supported:
+    if equipment.category not in supported:
         state["final_response"] = (
             "현재 ROI 계산은 프레스, CNC, 사출성형기 설비만 지원합니다. "
             "설비명을 프레스/CNC/사출기 중 하나로 입력해주세요."
         )
+        state["intent"] = "response"
         return state
-
-    # LLM에 ROI 계산 Tool을 바인딩합니다.
-    llm_with_tools = llm.bind_tools([calculate_equipment_roi])
-
-    if matched_policies:
-        policy_summary = [
-            {
-                "title": p.get("metadata", {}).get("title", ""),
-                "max_amount": p.get("metadata", {}).get("max_amount", 0),
-            }
-            for p in matched_policies[:3]
-        ]
-        matched_policies_text = str(policy_summary)
-    else:
-        matched_policies_text = "매칭된 지원사업 없음"
-
-    prompt = CAPEX_SYSTEM_PROMPT.format(
-        industry_code=", ".join(company.industry_code)
-        if company and company.industry_code
-        else "정보 없음",
-        region=company.region if company else "정보 없음",
-        equipment_name=equipment.name if equipment else "정보 없음",
-        age_years=equipment.age_years if equipment else 0,
-        energy_cost=equipment.energy_cost_annual if equipment else 0,
-        defect_rate=equipment.defect_rate
-        if equipment and equipment.defect_rate
-        else "정보 없음",
-        roi_result="Tool을 호출해서 계산하세요.",
-        matched_policies=matched_policies_text,
-    )
-
-    messages = [
-        SystemMessage(content=prompt),
-        HumanMessage(content=state["user_query"]),
-    ]
-
-    response = llm_with_tools.invoke(messages)
-    messages.append(response)
-
-    if response.tool_calls:
-        for tool_call in response.tool_calls:
-            # 중요:
-            # LLM이 만든 tool_call["args"]는 신뢰하지 않습니다.
-            # LLM이 industry_code(C21)나 company_type(제조업)을 equipment.category로 잘못 넣을 수 있기 때문입니다.
-            # 따라서 서버에서 검증/정규화한 state["equipment"]만 ROI 계산기에 전달합니다.
-            if hasattr(state["equipment"], "model_dump"):
-                equipment_data = state["equipment"].model_dump()
-            else:
-                equipment_data = state["equipment"].dict()
-
-            safe_tool_args = {"equipment": equipment_data}
-
-            print("=== safe ROI tool args ===")
-            print(safe_tool_args)
-
-            tool_result = calculate_equipment_roi.invoke(safe_tool_args)
-
-            messages.append(
-                ToolMessage(
-                    content=json.dumps(tool_result, ensure_ascii=False),
-                    tool_call_id=tool_call["id"],
-                )
-            )
-
-            state["roi_result"] = tool_result
-
-        final_response = llm.invoke(messages)
-        state["final_response"] = final_response.content
-
-        if matched_policies:
-            title = matched_policies[0]["metadata"].get("title", "")
-            amount = matched_policies[0]["metadata"].get("max_amount", 0)
-
-            if title and amount:
-                state["final_response"] += (
-                    f"\n\n💡 매칭 지원사업: [{title}] "
-                    f"최대 {amount}만원 활용 가능"
-                )
-
-    else:
-        state["final_response"] = response.content
-
+    
+    # roi_result 없으면 DB에서 로드
+    if not roi_result:
+        from app.core.database import get_db
+        
+        db = get_db()
+        equipment_id = state.get("equipment_id") or state.get("selected_equipment_id")
+        company_id = company.company_id if company else None
+        
+        if not company_id or not equipment_id:
+            state["final_response"] = "회사 또는 설비 정보가 필요합니다."
+            state["intent"] = "response"
+            return state
+        
+        roi_output = (
+            db.table("roi_output")
+            .select("*")
+            .eq("company_id", company_id)
+            .eq("equipment_id", equipment_id)
+            .execute()
+        )
+        
+        if not roi_output.data:
+            state["final_response"] = "ROI 분석이 필요합니다. 먼저 분석을 진행해주세요."
+            state["intent"] = "response"
+            return state
+        
+        roi_data = roi_output.data[0].get("roi_data", {})
+        state["roi_result"] = roi_data
+    
+    # 포맷팅만!
+    state["final_response"] = format_roi_result(state["roi_result"])
+    state["intent"] = "response"
     return state

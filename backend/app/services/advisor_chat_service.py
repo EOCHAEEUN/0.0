@@ -10,7 +10,17 @@ from app.core.database import get_db
 from app.graph import factofit_graph
 from app.models.company import CompanyContext
 from app.models.equipment import EquipmentInput
+from app.agents.capex import compare_roi_results, compare_scenarios, format_roi_result
 from app.tools.roi_calc import calculate_roi
+
+EXPLICIT_DB_ACTIONS = {
+    "roi_detail",
+    "roi_compare",
+    "matched_policies",
+    "application_draft_status",
+}
+EXPLICIT_SIMULATION_ACTIONS = {"investment_simulation"}
+EXPLICIT_NEW_ANALYSIS_ACTIONS = {"start_analysis", "new_analysis", "roi_analyze"}
 
 
 def _as_dict(value):
@@ -359,7 +369,7 @@ def _scenario_metrics(roi_data: dict, key: str):
 
 
 def _is_simulation_request(query: str, action: str) -> bool:
-    if action in {"simulate", "roi_simulate", "investment_change"}:
+    if action in {"simulate", "roi_simulate", "investment_change", "investment_simulation"}:
         return True
     if not any(keyword in query for keyword in ["바꾸", "변경", "다시 계산", "재계산"]):
         return False
@@ -476,6 +486,247 @@ def _build_database_answer(bundle: dict, query: str, action: str):
     return {
         "text": "현재 분석 DB 값으로 답변합니다. ROI/A·B 비교/정책 snapshot/신청서 초안 상태를 확인해 드릴 수 있습니다.",
         "cards": [],
+    }
+
+
+def _simulate_with_input(bundle: dict, simulation_input: dict):
+    """Run temporary ROI simulation without persisting to roi_output."""
+    db = get_db()
+    equipment_result = (
+        db.table("equipment")
+        .select("*")
+        .eq("company_id", bundle.get("company_id"))
+        .eq("equipment_id", bundle.get("equipment_id"))
+        .limit(1)
+        .execute()
+    )
+    if not equipment_result.data:
+        raise HTTPException(status_code=404, detail="시뮬레이션용 설비 정보를 찾을 수 없습니다.")
+    equipment_row = _as_dict(equipment_result.data[0])
+    roi_data = _as_dict(bundle.get("roi_data"))
+    baseline_a = _scenario_metrics(roi_data, "scenario_a")
+    baseline_b = _scenario_metrics(roi_data, "scenario_b")
+    input_values = _as_dict(simulation_input)
+    scenario_a = (
+        input_values.get("scenario_a_investment_manwon")
+        if input_values.get("scenario_a_investment_manwon") is not None
+        else equipment_row.get("scenario_a_investment_manwon")
+    )
+    scenario_b = (
+        input_values.get("scenario_b_investment_manwon")
+        if input_values.get("scenario_b_investment_manwon") is not None
+        else equipment_row.get("scenario_b_investment_manwon")
+    )
+    if scenario_a is None and scenario_b is None:
+        raise HTTPException(status_code=400, detail="변경할 투자금(A안 또는 B안)을 입력해 주세요.")
+    simulation_equipment = EquipmentInput(
+        name=_as_text(equipment_row.get("name")),
+        category=_as_text(equipment_row.get("category")),
+        age_years=_safe_int(equipment_row.get("age_years")),
+        energy_cost_annual=_safe_int(equipment_row.get("energy_cost_annual")),
+        defect_rate=equipment_row.get("defect_rate"),
+        maintenance_cost_annual=_safe_int(equipment_row.get("maintenance_cost_annual")),
+        current_capacity_value=equipment_row.get("current_capacity_value"),
+        production_qty=equipment_row.get("production_qty"),
+        process=equipment_row.get("process"),
+        contribution_margin_won=equipment_row.get("contribution_margin_won"),
+        scenario_a_investment_manwon=_safe_int(scenario_a if scenario_a is not None else baseline_a["investment"]),
+        scenario_b_investment_manwon=_safe_int(scenario_b if scenario_b is not None else baseline_b["investment"]),
+    )
+    policy_applications = _as_dict(roi_data.get("policy_applications"))
+    energy_provided = _safe_float(equipment_row.get("energy_cost_annual"), 0) > 0
+    simulated = calculate_roi(
+        simulation_equipment,
+        energy_provided=energy_provided,
+        policy_applications=policy_applications if policy_applications else None,
+    )
+    a = _scenario_metrics(simulated, "scenario_a")
+    b = _scenario_metrics(simulated, "scenario_b")
+    recommended = _as_text(simulated.get("recommended")).upper() or "A"
+    compare_text = compare_roi_results(roi_data, simulated)
+    text = (
+        "임시 시뮬레이션 결과입니다. 기존 분석 결과는 변경되지 않습니다.\n\n"
+        f"{compare_text}\n\n"
+        f"A안 ROI {a['roi_pct']:.1f}% / 회수 {a['payback_years']:.2f}년, "
+        f"B안 ROI {b['roi_pct']:.1f}% / 회수 {b['payback_years']:.2f}년, 추천 {recommended}안"
+    )
+    return {
+        "text": text,
+        "cards": [
+            {
+                "type": "roi_simulation",
+                "data": {
+                    "baseline": {"scenario_a": baseline_a, "scenario_b": baseline_b},
+                    "simulated": simulated,
+                    "temporary": True,
+                },
+            }
+        ],
+    }
+
+
+def _build_explicit_action_answer(action: str, bundle: dict | None, simulation_input: dict | None = None):
+    if action in EXPLICIT_DB_ACTIONS | EXPLICIT_SIMULATION_ACTIONS and not bundle:
+        return {
+            "text": "현재 선택된 분석이 없습니다. 분석을 선택하거나 새 투자 분석을 시작해 주세요.",
+            "cards": [{"type": "missing_analysis", "data": {}}],
+            "answer_source": "missing_data",
+            "used_roi_recalculation": False,
+        }
+
+    if action == "roi_detail":
+        roi_data = _as_dict(bundle.get("roi_data"))
+        scenario_a = _scenario_metrics(roi_data, "scenario_a")
+        scenario_b = _scenario_metrics(roi_data, "scenario_b")
+        recommended = _as_text(roi_data.get("recommended")).upper() or "A"
+        target = scenario_a if recommended == "A" else scenario_b
+        detail_text = format_roi_result(roi_data)
+        text = (
+            "현재 분석 결과를 정리했어요.\n\n"
+            f"추천 {recommended}안 · 투자금 {target['investment']:,}만원 · "
+            f"실부담 {target['net_investment']:,}만원 · ROI {target['roi_pct']:.1f}% · "
+            f"회수기간 {target['payback_years']:.2f}년 · 연간 순편익 {target['annual_benefit']:,}만원\n\n"
+            f"{detail_text}"
+        )
+        return {
+            "text": text,
+            "cards": [
+                {
+                    "type": "roi_snapshot",
+                    "data": {
+                        "scenario_a": scenario_a,
+                        "scenario_b": scenario_b,
+                        "recommended": recommended,
+                    },
+                }
+            ],
+            "answer_source": "database",
+            "used_roi_recalculation": False,
+        }
+
+    if action == "roi_compare":
+        roi_data = _as_dict(bundle.get("roi_data"))
+        scenario_a = _scenario_metrics(roi_data, "scenario_a")
+        scenario_b = _scenario_metrics(roi_data, "scenario_b")
+        recommended = _as_text(roi_data.get("recommended")).upper() or "A"
+        text = "저장된 분석 기준 A/B 비교입니다.\n\n" + compare_scenarios(roi_data)
+        return {
+            "text": text,
+            "cards": [
+                {
+                    "type": "roi_compare",
+                    "data": {
+                        "scenario_a": scenario_a,
+                        "scenario_b": scenario_b,
+                        "recommended": recommended,
+                    },
+                }
+            ],
+            "answer_source": "database",
+            "used_roi_recalculation": False,
+        }
+
+    if action == "matched_policies":
+        if _legacy_snapshot(bundle):
+            return {
+                "text": (
+                    "이 분석은 정책 이력 저장 전 생성되어 매칭 정책을 복원할 수 없습니다. "
+                    "재분석 또는 최신 지원사업 보기를 이용해 주세요."
+                ),
+                "cards": [
+                    {
+                        "type": "legacy_policy_snapshot_missing",
+                        "data": {"analysis_id": bundle.get("analysis_id")},
+                    }
+                ],
+                "answer_source": "database",
+                "used_roi_recalculation": False,
+            }
+        snapshot = _as_dict(bundle.get("policy_snapshot"))
+        policies = snapshot.get("policies") if isinstance(snapshot.get("policies"), list) else []
+        policy_lines = []
+        for policy in policies[:5]:
+            row = _as_dict(policy)
+            title = _as_text(row.get("title")) or "정책명 미확인"
+            deadline = _as_text(row.get("deadline_display") or row.get("deadline")) or "마감일 미정"
+            support = _as_text(row.get("max_amount_actual")) or f"{_safe_int(row.get('max_amount_numeric_manwon')):,}만원"
+            policy_lines.append(f"- {title} / {support} / {deadline}")
+        return {
+            "text": "저장된 매칭 지원사업 snapshot입니다.\n" + ("\n".join(policy_lines) if policy_lines else "- 매칭 정책 없음"),
+            "cards": [{"type": "policy_snapshot_cards", "data": policies[:5]}],
+            "answer_source": "database",
+            "used_roi_recalculation": False,
+        }
+
+    if action == "application_draft_status":
+        draft_content = _as_text(bundle.get("draft_content"))
+        analysis_id = _as_text(bundle.get("analysis_id"))
+        if draft_content:
+            return {
+                "text": f"신청서 초안이 준비되어 있습니다.\n{draft_content[:360]}",
+                "cards": [
+                    {
+                        "type": "application_draft_status",
+                        "data": {
+                            "status": "ready",
+                            "analysis_id": analysis_id,
+                            "preview": draft_content[:240],
+                        },
+                    }
+                ],
+                "answer_source": "database",
+                "used_roi_recalculation": False,
+            }
+        return {
+            "text": "현재 분석에 연결된 신청서 초안이 아직 없습니다. 신청서 탭에서 초안을 생성해 주세요.",
+            "cards": [
+                {
+                    "type": "application_draft_status",
+                    "data": {"status": "missing", "analysis_id": analysis_id},
+                }
+            ],
+            "answer_source": "database",
+            "used_roi_recalculation": False,
+        }
+
+    if action == "investment_simulation":
+        simulated = _simulate_with_input(bundle, _as_dict(simulation_input))
+        simulated["answer_source"] = "simulation"
+        simulated["used_roi_recalculation"] = True
+        return simulated
+
+    return None
+
+
+def _build_start_analysis_answer(equipments: list[dict]):
+    if not equipments:
+        return {
+            "text": "등록된 설비가 없습니다. 먼저 설비 정보를 등록한 뒤 ROI 분석을 시작해 주세요.",
+            "cards": [],
+            "answer_source": "missing_data",
+            "used_roi_recalculation": False,
+        }
+    return {
+        "text": (
+            "등록된 설비를 기반으로 ROI 분석, 투자 시나리오 비교, 맞춤 정책 추천, 신청서 초안 작성을 도와드릴 수 있어요.\n\n"
+            "어떤 설비에 대해 분석해드릴까요?"
+        ),
+        "cards": [
+            {
+                "type": "equipment_selection",
+                "data": [
+                    {
+                        "equipment_id": row.get("equipment_id"),
+                        "name": row.get("name"),
+                        "category": row.get("category"),
+                        "age_years": row.get("age_years"),
+                    }
+                    for row in equipments
+                ],
+            }
+        ],
+        "answer_source": "missing_data",
+        "used_roi_recalculation": False,
     }
 
 
@@ -669,7 +920,12 @@ class AdvisorChatService:
             analysis_id = _as_text(req.analysis_id)
             if not analysis_id and requested_session_id and session_row and session_row.data:
                 analysis_id = _as_text(_as_dict(_as_dict(session_row.data[0]).get("roi_result")).get("analysis_id"))
-            if not analysis_id and not _is_new_analysis_request(query, action):
+            explicit_action = action in (
+                EXPLICIT_DB_ACTIONS | EXPLICIT_SIMULATION_ACTIONS | EXPLICIT_NEW_ANALYSIS_ACTIONS
+            )
+            if not analysis_id and explicit_action and action not in EXPLICIT_NEW_ANALYSIS_ACTIONS:
+                analysis_id = _latest_analysis_id(req.company_id)
+            if not analysis_id and not _is_new_analysis_request(query, action) and not explicit_action:
                 analysis_id = _latest_analysis_id(req.company_id)
 
             bundle = _load_analysis_bundle(req.company_id, analysis_id) if analysis_id else None
@@ -703,6 +959,97 @@ class AdvisorChatService:
             ) if requested_equipment_id else None
             selected_equipment_input = _build_equipment_input(selected_equipment) if selected_equipment else None
             selected_equipment_name = _as_text((selected_equipment or {}).get("name"))
+
+            if explicit_action:
+                if action in {"start_analysis", "new_analysis"}:
+                    answered = _build_start_analysis_answer(equipments)
+                    answer_source = answered["answer_source"]
+                    response_text = answered["text"]
+                    cards = answered["cards"]
+                    used_roi_recalculation = False
+                    used_graph = False
+                    used_llm = False
+                    intent_value = "info_missing"
+                    resolved_analysis_id = analysis_id
+                    resolved_equipment_id = requested_equipment_id
+                    metadata = _build_metadata(
+                        answer_source=answer_source,
+                        analysis_id=resolved_analysis_id,
+                        session_id=session_id,
+                        used_graph=used_graph,
+                        used_llm=used_llm,
+                        used_roi_recalculation=used_roi_recalculation,
+                    )
+                    _upsert_session(
+                        company_id=req.company_id,
+                        session_id=session_id,
+                        analysis_id=resolved_analysis_id,
+                        equipment_id=resolved_equipment_id,
+                        intent=intent_value,
+                        user_message=req.message,
+                        assistant_message=response_text,
+                        server_history=server_history,
+                        client_history=req.chat_history,
+                    )
+                    payload = {
+                        "intent": intent_value,
+                        "response": response_text,
+                        "cards": cards,
+                        "next_questions": [],
+                        "chat_id": session_id,
+                        "session_id": session_id,
+                        "resolved_equipment_id": resolved_equipment_id,
+                        "analysis_id": resolved_analysis_id,
+                        "metadata": metadata,
+                    }
+                    return payload
+                if action in EXPLICIT_DB_ACTIONS | EXPLICIT_SIMULATION_ACTIONS:
+                    answered = _build_explicit_action_answer(
+                        action,
+                        bundle,
+                        getattr(req, "simulation_input", None) or {},
+                    )
+                    if answered:
+                        answer_source = answered["answer_source"]
+                        response_text = answered["text"]
+                        cards = answered["cards"]
+                        used_roi_recalculation = answered.get("used_roi_recalculation", False)
+                        used_graph = False
+                        used_llm = False
+                        intent_value = "response"
+                        resolved_analysis_id = _as_text(bundle.get("analysis_id")) if bundle else analysis_id
+                        resolved_equipment_id = _as_text(bundle.get("equipment_id")) if bundle else ""
+                        metadata = _build_metadata(
+                            answer_source=answer_source,
+                            analysis_id=resolved_analysis_id,
+                            session_id=session_id,
+                            used_graph=used_graph,
+                            used_llm=used_llm,
+                            used_roi_recalculation=used_roi_recalculation,
+                        )
+                        _upsert_session(
+                            company_id=req.company_id,
+                            session_id=session_id,
+                            analysis_id=resolved_analysis_id,
+                            equipment_id=resolved_equipment_id,
+                            intent=intent_value,
+                            user_message=req.message,
+                            assistant_message=response_text,
+                            server_history=server_history,
+                            client_history=req.chat_history,
+                        )
+                        payload = {
+                            "intent": intent_value,
+                            "response": response_text,
+                            "cards": cards,
+                            "next_questions": [],
+                            "chat_id": session_id,
+                            "session_id": session_id,
+                            "resolved_equipment_id": resolved_equipment_id,
+                            "analysis_id": resolved_analysis_id,
+                            "metadata": metadata,
+                        }
+                        return payload
 
             answer_source = "missing_data"
             response_text = "현재 조회 가능한 분석 데이터가 없습니다. 먼저 분석을 선택하거나 실행해 주세요."

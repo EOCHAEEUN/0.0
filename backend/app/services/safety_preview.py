@@ -249,41 +249,11 @@ def _fetch_equipment(equipment_id: str | None, body: dict[str, Any]) -> dict[str
 
     return {
         "equipment_id": equipment_id,
-        "name": _first_text(body_equipment.get("name"), body.get("equipment_name"), "?좏깮 ?ㅻ퉬"),
-        "category": _first_text(body_equipment.get("category"), body.get("equipment_type"), body.get("equipment_category")),
-        "process": _first_text(body_equipment.get("process")),
-    }
-
-    metadata = _as_dict(policy.get("metadata"))
-    policy_title = _first_text(policy.get("title"), metadata.get("title"), "선택한 공고")
-    policy_nature = _first_text(policy.get("policy_primary_nature"), metadata.get("policy_primary_nature"))
-    recommendation = _first_text(
-        policy.get("application_reflection_recommendation"),
-        metadata.get("application_reflection_recommendation"),
-    )
-    reason = _first_text(policy.get("safety_justification_reason"), metadata.get("safety_justification_reason"))
-    policy_prefix_parts = [policy_title]
-    if policy_nature:
-        policy_prefix_parts.append(policy_nature)
-    if recommendation:
-        policy_prefix_parts.append(recommendation)
-    policy_prefix = " / ".join(policy_prefix_parts)
-    if rule_titles:
-        description = (
-            f"{policy_prefix} 기준으로 {equipment_name} 투자안은 {', '.join(rule_titles[:2])} 항목을 "
-            f"{title} 관점에서 준비해야 합니다."
-        )
-    else:
-        description = f"{policy_prefix} 기준으로 {equipment_name} 투자안의 {title} 준비 자료를 확인해야 합니다."
-    if reason:
-        description = f"{description} 정책 검토 사유: {reason[:160]}"
-
-    return {
-        "equipment_id": equipment_id,
         "name": _first_text(body_equipment.get("name"), body.get("equipment_name"), "선택 설비"),
         "category": _first_text(body_equipment.get("category"), body.get("equipment_type"), body.get("equipment_category")),
         "process": _first_text(body_equipment.get("process")),
     }
+
 
 
 def _fetch_legal_rules(equipment_type: str) -> list[dict[str, Any]]:
@@ -343,15 +313,6 @@ def _policy_viewpoint_keys(policy: dict[str, Any]) -> list[str]:
         ("worker_risk_reduction", ["worker_risk_reduction", "작업자", "위험 노출", "위험 감소", "방호", "비상"]),
         ("post_install_safety_management", ["post_install_safety_management", "안전관리", "설치 후", "점검", "교육", "기록"]),
         ("accident_prevention_system", ["accident_prevention_system", "사고", "위험성평가", "예방", "사후관리"]),
-    ]
-
-    candidates = [
-        ("automation_safety", ["automation_safety", "\uc790\ub3d9\ud654", "ai", "ax", "\ub85c\ubd07", "\uc13c\uc11c", "\uc81c\uc5b4"]),
-        ("operation_stability", ["operation_stability", "\uc124\ube44 \uc6b4\uc6a9", "\uc6b4\uc6a9 \uc548\uc815", "\uc124\ube44 \uc774\uc6a9", "\uc774\uc6a9 \uc548\uc815", "\uc124\ube44 \uc548\uc815", "\uace0\uc7a5", "\uc608\uc9c0", "\uc720\uc9c0\ubcf4\uc218"]),
-        ("work_environment_improvement", ["work_environment_improvement", "\uc791\uc5c5\ud658\uacbd", "\ud658\uacbd \uac1c\uc120", "\uc18c\uc74c", "\ubd84\uc9c4", "\ubc30\uae30"]),
-        ("worker_risk_reduction", ["worker_risk_reduction", "\uc791\uc5c5\uc790", "\uc704\ud5d8 \ub178\ucd9c", "\uc704\ud5d8 \uac10\uc18c", "\ubc29\ud638", "\ube44\uc0c1"]),
-        ("post_install_safety_management", ["post_install_safety_management", "\uc548\uc804\uad00\ub9ac", "\uc124\uce58 \ud6c4", "\uc810\uac80", "\uad50\uc721", "\uae30\ub85d"]),
-        ("accident_prevention_system", ["accident_prevention_system", "\uc0ac\uace0", "\uc704\ud5d8\uc131\ud3c9\uac00", "\uc608\ubc29", "\uc0ac\ud6c4\uad00\ub9ac"]),
     ]
 
     keys = []
@@ -644,26 +605,6 @@ def _build_item(
     if reason:
         description = f"{description} 정책 검토 사유: {reason[:160]}"
 
-    policy_title = _first_text(policy.get("title"), metadata.get("title"), "\uc120\ud0dd\ud55c \uacf5\uace0")
-    policy_prefix_parts = [policy_title]
-    if policy_nature:
-        policy_prefix_parts.append(policy_nature)
-    if recommendation:
-        policy_prefix_parts.append(recommendation)
-    policy_prefix = " / ".join(policy_prefix_parts)
-    if rule_titles:
-        description = (
-            f"{policy_prefix} \uae30\uc900\uc73c\ub85c {equipment_name} \ud22c\uc790\uc548\uc740 "
-            f"{', '.join(rule_titles[:2])} \ud56d\ubaa9\uc744 {title} \uad00\uc810\uc5d0\uc11c "
-            f"\uc900\ube44\ud574\uc57c \ud569\ub2c8\ub2e4."
-        )
-    else:
-        description = (
-            f"{policy_prefix} \uae30\uc900\uc73c\ub85c {equipment_name} \ud22c\uc790\uc548\uc758 "
-            f"{title} \uc900\ube44 \uc790\ub8cc\ub97c \ud655\uc778\ud574\uc57c \ud569\ub2c8\ub2e4."
-        )
-    if reason:
-        description = f"{description} \uc815\ucc45 \uac80\ud1a0 \uc0ac\uc720: {reason[:160]}"
     description = _short_description(viewpoint_key, description)
 
     return {

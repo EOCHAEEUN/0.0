@@ -5,12 +5,17 @@ from app.prompts.router import ROUTER_SYSTEM_PROMPT
 from app.state import FactofitState
 
 
-VALID_INTENTS = ["roi", "policy", "draft", "safety", "info_missing"]
+VALID_INTENTS = ["roi", "policy", "draft", "safety", "info_missing", "general"]
 
 ROI_ANALYSIS_KEYWORDS = [
     "roi", "분석", "투자", "교체", "검토",
     "회수", "절감", "비용", "효율", "수익",
     "생산성", "노후", "유지보수",
+]
+
+GENERAL_CONVERSATION_KEYWORDS = [
+    "안녕", "반가", "고마워", "고민", "싫", "나중", "무슨", "무엇", "도움",
+    "할 수 있어", "소개", "서비스", "가능", "설명해줘",
 ]
 
 
@@ -60,14 +65,18 @@ def router_node(state: FactofitState) -> FactofitState:
 
     response = llm.invoke([SystemMessage(content=prompt)])
     intent = response.content.strip().lower()
+    query = (state.get("user_query") or "").lower()
 
     if intent not in VALID_INTENTS:
-        intent = "info_missing"
+        intent = "general"
+
+    # 일반 상담/인사/감정 표현은 설비 선택 강제 없이 general로 처리한다.
+    if intent == "info_missing" and any(keyword in query for keyword in GENERAL_CONVERSATION_KEYWORDS):
+        intent = "general"
 
     # 선택 설비가 이미 확정된 뒤에는 다중 설비 선택 요청을 반복하지 않도록,
     # 분석/ROI 계열 질문의 info_missing을 roi로 보정한다.
     has_selected_equipment = equipment is not None
-    query = (state.get("user_query") or "").lower()
 
     if (
         intent == "info_missing"

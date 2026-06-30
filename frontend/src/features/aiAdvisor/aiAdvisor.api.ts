@@ -19,6 +19,15 @@ function getCompanyId(): string {
   return window.localStorage.getItem("factofit_company_id") ?? ""
 }
 
+function getSelectedEquipmentId(): string {
+  if (typeof window === "undefined") return ""
+  return (
+    window.localStorage.getItem("factofit_selected_equipment_id") ||
+    window.localStorage.getItem("factofit_equipment_id") ||
+    ""
+  )
+}
+
 function buildHeaders() {
   const token = getAccessToken()
   const headers: Record<string, string> = {
@@ -45,9 +54,11 @@ export async function requestAdvisorAnswer(
     companyId?: string
     selectedEquipmentId?: string
     policyIntentChoice?: string
+    analysisId?: string
+    chatId?: string
   },
 ): Promise<AdvisorApiResponse> {
-  const { companyId, selectedEquipmentId, policyIntentChoice } = options ?? {}
+  const { companyId, selectedEquipmentId, policyIntentChoice, analysisId, chatId } = options ?? {}
 
   const response = await fetch(`${API_BASE_URL}/chat`, {
     method: "POST",
@@ -56,8 +67,10 @@ export async function requestAdvisorAnswer(
       company_id: companyId ?? getCompanyId(),
       message,
       chat_history: history ?? [],
-      selected_equipment_id: selectedEquipmentId ?? "",
+      selected_equipment_id: selectedEquipmentId ?? getSelectedEquipmentId(),
       policy_intent_choice: policyIntentChoice ?? "",
+      analysis_id: analysisId ?? "",
+      chat_id: chatId ?? "",
       source: "global_ai_advisor",
     }),
   })
@@ -90,6 +103,85 @@ export async function requestAdvisorAnswer(
     chatId: payload?.chat_id ?? null,
     raw: payload,
   }
+}
+
+export async function requestAdvisorSimulation(params: {
+  companyId: string
+  equipmentId: string
+  analysisId?: string
+  scenarioAInvestmentManwon?: number
+  scenarioBInvestmentManwon?: number
+}) {
+  const response = await fetch(`${API_BASE_URL}/roi/simulate`, {
+    method: "POST",
+    headers: buildHeaders(),
+    body: JSON.stringify({
+      company_id: params.companyId,
+      equipment_id: params.equipmentId,
+      analysis_id: params.analysisId,
+      scenario_a_investment_manwon: params.scenarioAInvestmentManwon,
+      scenario_b_investment_manwon: params.scenarioBInvestmentManwon,
+    }),
+  })
+  const payload = await response.json().catch(() => null)
+  if (!response.ok || payload?.success === false) {
+    throw new Error(
+      payload?.detail ||
+        payload?.message ||
+        `ROI 시뮬레이션 요청에 실패했습니다. (${response.status})`,
+    )
+  }
+  return payload?.data ?? null
+}
+
+export type AdvisorChatSessionItem = {
+  chat_id: string
+  intent: string
+  title: string
+  preview: string
+  created_at: string
+  analysis_id: string
+}
+
+export async function fetchAdvisorChatSessions(companyId: string) {
+  const response = await fetch(
+    `${API_BASE_URL}/chat/sessions?company_id=${encodeURIComponent(companyId)}`,
+    {
+      method: "GET",
+      headers: buildHeaders(),
+    },
+  )
+  const payload = await response.json().catch(() => null)
+  if (!response.ok || payload?.success === false) {
+    throw new Error(
+      payload?.detail ||
+        payload?.message ||
+        `대화 내역 조회에 실패했습니다. (${response.status})`,
+    )
+  }
+  return Array.isArray(payload?.data) ? (payload.data as AdvisorChatSessionItem[]) : []
+}
+
+export async function fetchAdvisorChatSessionDetail(
+  companyId: string,
+  chatId: string,
+) {
+  const response = await fetch(
+    `${API_BASE_URL}/chat/sessions/${encodeURIComponent(chatId)}?company_id=${encodeURIComponent(companyId)}`,
+    {
+      method: "GET",
+      headers: buildHeaders(),
+    },
+  )
+  const payload = await response.json().catch(() => null)
+  if (!response.ok || payload?.success === false) {
+    throw new Error(
+      payload?.detail ||
+        payload?.message ||
+        `대화 상세 조회에 실패했습니다. (${response.status})`,
+    )
+  }
+  return payload?.data ?? null
 }
 
 export function buildLocalAdvisorResponse(text: string): AdvisorMessage {

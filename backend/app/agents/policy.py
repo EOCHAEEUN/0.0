@@ -7,11 +7,19 @@ import re
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from app.agents.capex import (
+    analyze_roi_followup,
+    compare_roi_results,
+    compare_scenarios,
+    format_roi_result,
+    show_roi_detail,
+)
 from app.core.database import get_db
 from app.core.llm import llm
 from app.prompts.policy import POLICY_SYSTEM_PROMPT
 from app.state import FactofitState
 from app.tools.query_builder import _get_impact_keywords
+from app.tools.roi_calc_tool import calculate_equipment_roi
 from app.tools.vector_search import search_policies
 
 
@@ -1019,13 +1027,38 @@ def analyze_followup_query(user_query: str, matched_policies: list) -> dict:
     return json.loads(response.content)
 
 
+def _load_latest_roi_result(company_id: str, equipment_id: str) -> dict:
+    db = get_db()
+    result = (
+        db.table("roi_output")
+        .select("roi_data")
+        .eq("company_id", company_id)
+        .eq("equipment_id", equipment_id)
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if not result.data:
+        return {}
+    row = result.data[0] if isinstance(result.data[0], dict) else {}
+    roi_data = row.get("roi_data")
+    return roi_data if isinstance(roi_data, dict) else {}
+
+
 def policy_chat_node(state: FactofitState) -> FactofitState:
     policy_intent_choice = state.get("policy_intent_choice")
     selected_equipment = state.get("selected_equipment_for_policy")
     matched_policies = state.get("matched_policies", [])
+    roi_result = state.get("roi_result")
+    equipment = state.get("equipment")
     company_info = state.get("company_info")
     company_id = company_info.company_id if company_info else None
     user_query = state.get("user_query", "")
+    equipment_id = (
+        state.get("selected_equipment_id")
+        or state.get("equipment_id")
+        or selected_equipment
+    )
 
     if not policy_intent_choice:
         result = ask_policy_intent(user_query)
@@ -1035,17 +1068,71 @@ def policy_chat_node(state: FactofitState) -> FactofitState:
         return state
 
     if policy_intent_choice == "equipment" and not selected_equipment:
-        get_user_equipment_list(company_id)
+        equipments = get_user_equipment_list(company_id)
         state["final_response"] = "어떤 설비의 정책 정보를 원하시나요?"
+        state["options"] = [
+            {"id": item.get("equipment_id"), "label": item.get("name")}
+            for item in equipments
+            if item.get("equipment_id")
+        ]
         state["intent"] = "response"
         return state
 
-    if policy_intent_choice == "equipment" and selected_equipment and not matched_policies:
-        state["matched_policies"] = get_equipment_policies(
-            company_id,
-            selected_equipment,
+    if policy_intent_choice == "equipment" and equipment_id and not matched_policies:
+        if not roi_result:
+            roi_result = _load_latest_roi_result(company_id, equipment_id)
+            if roi_result:
+                state["roi_result"] = roi_result
+
+        if roi_result:
+            followup = analyze_roi_followup(user_query, roi_result)
+            followup_intent = followup.get("intent")
+
+            if followup_intent == "detail":
+                state["final_response"] = show_roi_detail(roi_result, user_query)
+                state["intent"] = "response"
+                return state
+            if followup_intent == "compare":
+                state["final_response"] = compare_scenarios(roi_result)
+                state["intent"] = "response"
+                return state
+            if followup_intent == "simulate":
+                new_investment = followup.get("new_investment")
+                if not equipment or new_investment is None:
+                    state["final_response"] = (
+                        "시뮬레이션하려면 투자금(만원 단위)과 설비 정보가 필요합니다."
+                    )
+                    state["intent"] = "response"
+                    return state
+                if hasattr(equipment, "model_copy"):
+                    simulation_equipment = equipment.model_copy(
+                        update={"scenario_a_investment_manwon": int(new_investment)}
+                    )
+                else:
+                    data = equipment.dict()
+                    data["scenario_a_investment_manwon"] = int(new_investment)
+                    simulation_equipment = type(equipment)(**data)
+                equipment_data = (
+                    simulation_equipment.model_dump()
+                    if hasattr(simulation_equipment, "model_dump")
+                    else simulation_equipment.dict()
+                )
+                simulated = calculate_equipment_roi.invoke({"equipment": equipment_data})
+                state["final_response"] = compare_roi_results(roi_result, simulated)
+                state["intent"] = "response"
+                return state
+
+            state["final_response"] = (
+                f"{format_roi_result(roi_result)}\n\n"
+                "정책 추천을 보려면 '정책 추천'이라고 말씀해 주세요."
+            )
+            state["intent"] = "response"
+            return state
+
+        state["matched_policies"] = get_equipment_policies(company_id, equipment_id)
+        state["final_response"] = (
+            "선택하신 설비의 적합한 정책들입니다. 더 궁금한 점이 있으신가요?"
         )
-        state["final_response"] = "선택하신 설비의 적합한 정책들입니다. 더 궁금한 점이 있으신가요?"
         state["intent"] = "response"
         return state
 

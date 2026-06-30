@@ -61,11 +61,12 @@ export async function requestAdvisorAnswer(
     selectedEquipmentId?: string
     policyIntentChoice?: string
     analysisId?: string
+    action?: string
     chatId?: string
     sessionId?: string
   },
 ): Promise<AdvisorApiResponse> {
-  const { companyId, selectedEquipmentId, policyIntentChoice, analysisId, chatId, sessionId } = options ?? {}
+  const { companyId, selectedEquipmentId, policyIntentChoice, analysisId, action, chatId, sessionId } = options ?? {}
 
   const response = await fetch(`${API_BASE_URL}/chat`, {
     method: "POST",
@@ -77,6 +78,7 @@ export async function requestAdvisorAnswer(
       selected_equipment_id: selectedEquipmentId ?? getSelectedEquipmentId(),
       policy_intent_choice: policyIntentChoice ?? "",
       analysis_id: analysisId ?? "",
+      action: action ?? "",
       chat_id: chatId ?? "",
       session_id: sessionId ?? chatId ?? "",
       source: "global_ai_advisor",

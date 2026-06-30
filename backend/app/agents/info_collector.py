@@ -23,14 +23,9 @@ def info_collector_node(state: FactofitState) -> FactofitState:
         )
         return state
 
-    equipment_list = "\n".join([
-        f"• {eq.get('name', '알 수 없음')}"
-        for eq in equipments
-    ])
-
     state["final_response"] = (
-        f"등록된 설비가 여러 대 있어요. "
-        f"어떤 설비에 대해 알아볼까요?\n\n{equipment_list}"
+        "등록된 설비가 여러 대 있어요. "
+        "어떤 설비에 대해 알아볼까요?"
     )
 
     return state

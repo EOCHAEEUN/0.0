@@ -5,8 +5,8 @@ import {
   Gauge,
   Plus,
 } from "lucide-react"
-import type { ReactNode } from "react"
-import { useNavigate } from "react-router-dom"
+import { useMemo, type ReactNode } from "react"
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom"
 // AppHeader는 AuthenticatedLayout의 GlobalHeader로 통합됨
 import engiBot from "../../assets/advisor/engi-bot-transparent.png"
 import { useDashboardData } from "./hooks/useDashboardData"
@@ -107,9 +107,26 @@ function DeadlineListPanel({
       ) : (
         <div className="ff-deadline-empty">
           <p>{list.emptyMessage}</p>
-          <button type="button" onClick={onViewAll}>
-            전체 매칭 공고 보기
-          </button>
+          {list.emptyState === "snapshot_missing" ? (
+            <div className="ff-deadline-empty-actions">
+              <button
+                type="button"
+                onClick={() => onNavigate(list.primaryActionPath || "/analysis/new")}
+              >
+                {list.primaryActionLabel || "투자 조건 다시 설정"}
+              </button>
+              <button
+                type="button"
+                onClick={() => onNavigate(list.secondaryActionPath || "/support-projects")}
+              >
+                {list.secondaryActionLabel || "최신 지원사업 보기"}
+              </button>
+            </div>
+          ) : (
+            <button type="button" onClick={onViewAll}>
+              전체 매칭 공고 보기
+            </button>
+          )}
         </div>
       )}
     </aside>
@@ -118,7 +135,25 @@ function DeadlineListPanel({
 
 export default function DashboardFeature() {
   const navigate = useNavigate()
-  const { dashboard, loading, error, refetch } = useDashboardData()
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
+  const preferredAnalysisId = useMemo(() => {
+    const fromQuery =
+      searchParams.get("analysisId")?.trim() || searchParams.get("analysis_id")?.trim() || ""
+    if (fromQuery) return fromQuery
+    const stateRecord =
+      location.state && typeof location.state === "object"
+        ? (location.state as Record<string, unknown>)
+        : null
+    const fromState =
+      (typeof stateRecord?.analysisId === "string" && stateRecord.analysisId.trim()) ||
+      (typeof stateRecord?.analysis_id === "string" && stateRecord.analysis_id.trim()) ||
+      ""
+    return fromState
+  }, [location.state, searchParams])
+  const { dashboard, loading, error, refetch } = useDashboardData({
+    preferredAnalysisId,
+  })
   const workspace = dashboard.workspace
 
   const handleStartAnalysis = () => {
@@ -379,9 +414,9 @@ export default function DashboardFeature() {
                 />
               ))}
               {workspace.hasMoreAnalyses && (
-                <button className="ff-all-analysis-link" type="button">
+                <Link className="ff-all-analysis-link" to="/roi/history">
                   전체 분석 보기
-                </button>
+                </Link>
               )}
             </div>
           ) : (

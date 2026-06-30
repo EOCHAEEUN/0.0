@@ -21,6 +21,14 @@ function asRecord(v: unknown): ApiRecord {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as ApiRecord) : {}
 }
 
+function pickText(record: ApiRecord, keys: string[]): string {
+  for (const key of keys) {
+    const value = record[key]
+    if (typeof value === "string" && value.trim()) return value.trim()
+  }
+  return ""
+}
+
 function getPolicyTitle(policy: ApiRecord): string {
   const metadata = asRecord(policy.metadata)
   return String(
@@ -86,7 +94,8 @@ function buildSnapshotFromRoiOutput(
   const roiData = asRecord(roiOutput.roi_data)
   if (!roiData || Object.keys(roiData).length === 0) return null
 
-  const analysisId = String(roiOutput.id ?? "").trim()
+  const analysisId =
+    pickText(roiOutput, ["analysis_id", "analysisId"]) || pickText(roiOutput, ["id"])
   const equipmentId = String(roiOutput.equipment_id ?? "")
   const matchedEquipment = equipments.find(
     (e) => String(e.equipment_id ?? "") === equipmentId,
@@ -121,7 +130,7 @@ function buildSnapshotFromRoiOutput(
 
   const snapshot = {
     schemaVersion: ANALYSIS_RESULT_SCHEMA_VERSION,
-    id: String(roiOutput.id ?? "") || equipmentId || `roi-${Date.now()}`,
+    id: analysisId || equipmentId || `roi-${Date.now()}`,
     equipmentName,
     recommendation: "현재 조건에서 투자 검토를 권장합니다.",
     recommendationDetail: aiSummary,

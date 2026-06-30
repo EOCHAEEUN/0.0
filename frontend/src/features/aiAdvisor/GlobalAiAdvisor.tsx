@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react"
-import { useLocation } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 import { AdvisorFloatingButton } from "./components/AdvisorFloatingButton"
-import { AdvisorAgentPanel } from "./components/AdvisorAgentPanel"
 import { AdvisorFloatingButton as GuestAdvisorFloatingButton } from "../../components/advisor/AdvisorFloatingButton"
 import { AdvisorMobilePanel } from "../../components/advisor/AdvisorMobilePanel"
 import type { AdvisorScreen } from "../../components/advisor/advisor.types"
@@ -10,6 +9,7 @@ import "./aiAdvisor.css"
 import "../../components/advisor/advisor.css"
 
 export function GlobalAiAdvisor() {
+  const navigate = useNavigate()
   const location = useLocation()
   const [isLoggedIn, setIsLoggedIn] = useState(() => Boolean(getAccessToken()))
   const [open, setOpen] = useState(false)
@@ -33,11 +33,31 @@ export function GlobalAiAdvisor() {
     setScreen("home")
   }, [isLoggedIn])
 
+  const activeAdvisorRoute =
+    location.pathname === "/advisor" ||
+    location.pathname === "/ai-advisor" ||
+    location.pathname === "/ai"
+
   if (isLoggedIn) {
     return (
       <>
-        <AdvisorFloatingButton open={open} onClick={() => setOpen((v) => !v)} />
-        <AdvisorAgentPanel open={open} onClose={() => setOpen(false)} />
+        <AdvisorFloatingButton
+          open={activeAdvisorRoute}
+          onClick={() => {
+            if (!activeAdvisorRoute) {
+              const query = new URLSearchParams(location.search)
+              const analysisId =
+                query.get("analysisId") ||
+                query.get("analysis_id") ||
+                location.pathname.match(/^\/analysis\/([^/]+)\//)?.[1] ||
+                ""
+              const path = analysisId
+                ? `/advisor?analysisId=${encodeURIComponent(analysisId)}`
+                : "/advisor"
+              navigate(path)
+            }
+          }}
+        />
       </>
     )
   }

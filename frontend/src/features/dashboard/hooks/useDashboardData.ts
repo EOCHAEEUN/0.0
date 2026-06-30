@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   fetchDashboardOnboarding,
   getStoredDashboardAnalysisResult,
@@ -19,12 +19,16 @@ export type DashboardDataState = {
   refetch: () => Promise<void>
 }
 
+type UseDashboardDataOptions = {
+  preferredAnalysisId?: string
+}
+
 function getErrorMessage(error: unknown) {
   if (error instanceof Error) return error.message
   return "대시보드 데이터를 불러오지 못했습니다."
 }
 
-export function useDashboardData(): DashboardDataState {
+export function useDashboardData(options?: UseDashboardDataOptions): DashboardDataState {
   const [onboarding, setOnboarding] =
     useState<DashboardOnboardingMeResponse | null>(null)
   const [analysis, setAnalysis] = useState<DashboardAnalysisStorage | null>(() =>
@@ -32,8 +36,11 @@ export function useDashboardData(): DashboardDataState {
   )
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const requestSequenceRef = useRef(0)
 
   const refetch = useCallback(async () => {
+    const requestSequence = requestSequenceRef.current + 1
+    requestSequenceRef.current = requestSequence
     setLoading(true)
     setError(null)
 
@@ -43,6 +50,7 @@ export function useDashboardData(): DashboardDataState {
         Promise.resolve(getStoredDashboardAnalysisResult()),
       ])
 
+      if (requestSequence !== requestSequenceRef.current) return
       setOnboarding(nextOnboarding)
       setAnalysis(nextAnalysis)
 
@@ -65,9 +73,10 @@ export function useDashboardData(): DashboardDataState {
         })
       }
     } catch (nextError) {
+      if (requestSequence !== requestSequenceRef.current) return
       setError(getErrorMessage(nextError))
-      setAnalysis(getStoredDashboardAnalysisResult())
     } finally {
+      if (requestSequence !== requestSequenceRef.current) return
       setLoading(false)
     }
   }, [])
@@ -77,8 +86,13 @@ export function useDashboardData(): DashboardDataState {
   }, [refetch])
 
   const dashboard = useMemo(
-    () => mapDashboardData({ onboarding, analysis }),
-    [onboarding, analysis],
+    () =>
+      mapDashboardData({
+        onboarding,
+        analysis,
+        preferredAnalysisId: options?.preferredAnalysisId,
+      }),
+    [onboarding, analysis, options?.preferredAnalysisId],
   )
 
   return {

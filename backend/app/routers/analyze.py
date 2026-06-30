@@ -6,6 +6,7 @@ import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from app.agents.policy import (
     evaluate_and_rerank_with_llm,
@@ -28,6 +29,128 @@ from app.tools.roi_calc import calculate_roi
 
 
 router = APIRouter()
+
+
+class RoiSimulationRequest(BaseModel):
+    company_id: str
+    equipment_id: str
+    analysis_id: str | None = None
+    scenario_a_investment_manwon: int | None = None
+    scenario_b_investment_manwon: int | None = None
+    energy_cost_annual: int | None = None
+    maintenance_cost_annual: int | None = None
+
+
+@router.post("/roi/simulate")
+async def simulate_roi(
+    body: RoiSimulationRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    db = get_db()
+
+    company_row = (
+        db.table("company")
+        .select("company_id,user_id")
+        .eq("company_id", body.company_id)
+        .eq("user_id", current_user.id)
+        .limit(1)
+        .execute()
+    )
+    if not company_row.data:
+        raise HTTPException(status_code=404, detail="기업 정보를 찾을 수 없습니다.")
+
+    equipment_result = (
+        db.table("equipment")
+        .select("*")
+        .eq("company_id", body.company_id)
+        .eq("equipment_id", body.equipment_id)
+        .limit(1)
+        .execute()
+    )
+    if not equipment_result.data:
+        raise HTTPException(status_code=404, detail="설비 정보를 찾을 수 없습니다.")
+
+    equipment_row = equipment_result.data[0]
+    energy_value = (
+        body.energy_cost_annual
+        if body.energy_cost_annual is not None
+        else equipment_row.get("energy_cost_annual")
+    )
+    maintenance_value = (
+        body.maintenance_cost_annual
+        if body.maintenance_cost_annual is not None
+        else equipment_row.get("maintenance_cost_annual")
+    )
+    scenario_a_investment = (
+        body.scenario_a_investment_manwon
+        if body.scenario_a_investment_manwon is not None
+        else equipment_row.get("scenario_a_investment_manwon")
+    )
+    scenario_b_investment = (
+        body.scenario_b_investment_manwon
+        if body.scenario_b_investment_manwon is not None
+        else equipment_row.get("scenario_b_investment_manwon")
+    )
+
+    simulation_equipment = EquipmentInput(
+        name=equipment_row.get("name", ""),
+        category=equipment_row.get("category", ""),
+        age_years=equipment_row.get("age_years", 0),
+        energy_cost_annual=energy_value,
+        defect_rate=equipment_row.get("defect_rate"),
+        maintenance_cost_annual=maintenance_value,
+        current_capacity_value=equipment_row.get("current_capacity_value"),
+        production_qty=equipment_row.get("production_qty"),
+        process=equipment_row.get("process"),
+        contribution_margin_won=equipment_row.get("contribution_margin_won"),
+        scenario_a_investment_manwon=scenario_a_investment,
+        scenario_b_investment_manwon=scenario_b_investment,
+    )
+
+    policy_applications = None
+    if body.analysis_id:
+        roi_row = (
+            db.table("roi_output")
+            .select("id,company_id,equipment_id,roi_data")
+            .eq("id", body.analysis_id)
+            .eq("company_id", body.company_id)
+            .eq("equipment_id", body.equipment_id)
+            .limit(1)
+            .execute()
+        )
+        if roi_row.data:
+            roi_data = _as_dict(roi_row.data[0].get("roi_data"))
+            roi_policy_applications = _as_dict(roi_data.get("policy_applications"))
+            if roi_policy_applications:
+                policy_applications = {
+                    "scenario_a": _as_dict(roi_policy_applications.get("scenario_a")),
+                    "scenario_b": _as_dict(roi_policy_applications.get("scenario_b")),
+                }
+
+    try:
+        energy_provided = energy_value is not None and float(energy_value) > 0
+    except (TypeError, ValueError):
+        energy_provided = False
+
+    try:
+        simulated = calculate_roi(
+            simulation_equipment,
+            energy_provided=energy_provided,
+            policy_applications=policy_applications,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return {
+        "success": True,
+        "data": {
+            "analysis_id": body.analysis_id,
+            "company_id": body.company_id,
+            "equipment_id": body.equipment_id,
+            "simulated": True,
+            "roi_result": simulated,
+        },
+    }
 
 
 # ============================================================================

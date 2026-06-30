@@ -76,12 +76,8 @@ export function ApplicationDraftWorkspaceView({
 
           <ApplicationDraftPdfPreview
             model={draft}
-            scenarioLabel={draft.scenarioLabel}
-            expectedBenefits={draft.expectedBenefits}
             draftStatus={draft.draftStatus}
-            onSaveDraft={draft.handleSaveDraft}
             onPrepareDownload={draft.handlePrepareDownload}
-            onGoSupportProjects={() => navigate("/support-projects")}
           />
 
           <ApplicationDraftChecklistDialog

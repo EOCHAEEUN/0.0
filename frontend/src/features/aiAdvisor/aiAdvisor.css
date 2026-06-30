@@ -493,3 +493,21 @@
     grid-template-columns: 1fr;
   }
 }
+
+.ff-ai-advisor-chip {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid #d0d5dd;
+  background: #ffffff;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.ff-ai-advisor-chip.is-active {
+  border-color: #344ba0;
+  background: #eef2ff;
+  color: #1d2d6d;
+}

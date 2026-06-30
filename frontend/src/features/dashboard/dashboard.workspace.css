@@ -698,6 +698,12 @@
   padding-top: 16px;
 }
 
+.ff-deadline-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .ff-deadline-empty p {
   margin: 0;
   color: #64748b;
@@ -974,6 +980,43 @@
   white-space: nowrap;
 }
 
+.ff-roi-history-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+}
+
+.ff-roi-history-result-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 132px;
+  min-width: 132px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid #123b6d;
+  background: #123b6d;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 900;
+  white-space: nowrap;
+  justify-self: end;
+  align-self: center;
+  transition: background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ff-roi-history-result-btn:hover {
+  background: #1a4f8a;
+  transform: translateY(-1px);
+}
+
+.ff-roi-history-result-btn:focus-visible {
+  outline: 2px solid #7aa7d9;
+  outline-offset: 2px;
+}
+
 .ff-analysis-empty {
   display: grid;
   justify-items: center;
@@ -997,6 +1040,8 @@
 }
 
 .ff-all-analysis-link {
+  display: inline-flex;
+  align-items: center;
   justify-self: start;
   min-height: 36px;
   padding: 0 12px;
@@ -1005,6 +1050,7 @@
   color: #123b6d;
   font-size: 13px;
   font-weight: 900;
+  text-decoration: none;
 }
 
 .ff-quick-text-links {
@@ -1081,6 +1127,12 @@
   .ff-my-analysis-section header button {
     width: 100%;
     justify-content: center;
+  }
+
+  .ff-roi-history-row .ff-roi-history-result-btn {
+    width: 128px;
+    min-width: 120px;
+    justify-self: start;
   }
 }
 

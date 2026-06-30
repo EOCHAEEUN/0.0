@@ -40,6 +40,11 @@ export type DashboardDeadlineList = {
   subtitle: string
   viewAllLabel: string
   emptyMessage: string
+  emptyState?: "none" | "snapshot_missing"
+  primaryActionLabel?: string
+  primaryActionPath?: string
+  secondaryActionLabel?: string
+  secondaryActionPath?: string
   items: DashboardDeadlineListItem[]
 }
 
@@ -122,6 +127,7 @@ export type DashboardViewModel = {
 type MapDashboardDataParams = {
   onboarding: DashboardOnboardingMeResponse | null
   analysis: DashboardAnalysisStorage | null
+  preferredAnalysisId?: string
 }
 
 function compactText(value: unknown) {
@@ -266,6 +272,67 @@ function normalizePolicies(analysis: DashboardAnalysisStorage | null) {
   )
 }
 
+function getRoiOutputAnalysisId(
+  roiOutput: DashboardOnboardingMeResponse["latest_roi_output"],
+) {
+  return (
+    compactText(roiOutput?.analysis_id) ||
+    compactText((roiOutput as { analysisId?: string } | null)?.analysisId) ||
+    compactText(roiOutput?.id)
+  )
+}
+
+function getSnapshotPolicies(
+  roiOutput: DashboardOnboardingMeResponse["latest_roi_output"],
+  analysisId: string,
+) {
+  const snapshot = readRecord(roiOutput?.policy_snapshot)
+  if (!snapshot) return []
+
+  const snapshotAnalysisId = compactText(snapshot.analysis_id)
+  if (analysisId && snapshotAnalysisId && snapshotAnalysisId !== analysisId) return []
+
+  const snapshotPolicies = snapshot.policies
+  if (!Array.isArray(snapshotPolicies)) return []
+  return snapshotPolicies as DashboardMatchedPolicyContract[]
+}
+
+function isPolicySnapshotMissing(
+  roiOutput: DashboardOnboardingMeResponse["latest_roi_output"],
+  analysisId: string,
+) {
+  if (!analysisId) return false
+  const snapshot = readRecord(roiOutput?.policy_snapshot)
+  if (!snapshot) return true
+  if (!snapshot.snapshot_version) return true
+  if (!Array.isArray(snapshot.policies)) return true
+  return false
+}
+
+function getMatchedPoliciesFromOnboarding(
+  onboarding: DashboardOnboardingMeResponse | null | undefined,
+  analysisId: string,
+  equipmentId: string,
+) {
+  const matchedPolicies = onboarding?.matched_policies ?? []
+  if (!Array.isArray(matchedPolicies) || matchedPolicies.length === 0) return []
+
+  if (analysisId) {
+    const analysisScoped = matchedPolicies.filter(
+      (policy) => compactText(policy.analysis_id) === analysisId,
+    )
+    if (analysisScoped.length > 0) return analysisScoped
+  }
+
+  if (equipmentId) {
+    return matchedPolicies.filter(
+      (policy) => compactText(policy.equipment_id) === equipmentId,
+    )
+  }
+
+  return matchedPolicies
+}
+
 function mapRoiOutputToAnalysis(
   roiOutput: DashboardOnboardingMeResponse["latest_roi_output"],
   onboarding: DashboardOnboardingMeResponse | null | undefined,
@@ -273,16 +340,22 @@ function mapRoiOutputToAnalysis(
   if (!roiOutput?.roi_data) return null
 
   const equipments = onboarding?.equipments ?? []
+  const analysisId = getRoiOutputAnalysisId(roiOutput)
   const equipmentId = compactText(roiOutput.equipment_id)
   const equipment = equipments.find((item) =>
     [item.equipment_id, item.id].some((id) => compactText(id) === equipmentId),
   )
-  const matchedPolicies = (onboarding?.matched_policies ?? []).filter((policy) =>
-    !equipmentId || compactText(policy.equipment_id) === equipmentId,
-  )
+  const snapshotPolicies = getSnapshotPolicies(roiOutput, analysisId)
+  const policySnapshotMissing = isPolicySnapshotMissing(roiOutput, analysisId)
+  const matchedPolicies =
+    snapshotPolicies.length > 0
+      ? snapshotPolicies
+      : analysisId
+        ? []
+        : getMatchedPoliciesFromOnboarding(onboarding, analysisId, equipmentId)
 
   return {
-    id: compactText(roiOutput.id) || compactText(roiOutput.analysis_id),
+    id: analysisId,
     company_id: roiOutput.company_id,
     equipment_id: equipmentId,
     company: onboarding?.company ?? null,
@@ -292,6 +365,7 @@ function mapRoiOutputToAnalysis(
     roi_data: roiOutput.roi_data,
     matched_policies: matchedPolicies,
     createdAt: roiOutput.created_at,
+    policy_snapshot_missing: policySnapshotMissing,
   } as DashboardAnalysisStorage
 }
 
@@ -472,7 +546,26 @@ function mapDeadlineList(
   policies: DashboardMatchedPolicyContract[],
   priorityPolicyId: string | null,
   analysisId: string,
+  options?: {
+    snapshotMissing?: boolean
+    reanalysisPath?: string
+  },
 ): DashboardDeadlineList {
+  if (options?.snapshotMissing) {
+    return {
+      title: "마감 일정",
+      subtitle: "정책 이력이 없어 마감 일정을 확인할 수 없습니다.",
+      viewAllLabel: "최신 지원사업 보기",
+      emptyMessage: "정책 이력이 없어 마감 일정을 확인할 수 없습니다.",
+      emptyState: "snapshot_missing",
+      primaryActionLabel: "투자 조건 다시 설정",
+      primaryActionPath: options.reanalysisPath || "/analysis/new",
+      secondaryActionLabel: "최신 지원사업 보기",
+      secondaryActionPath: "/support-projects",
+      items: [],
+    }
+  }
+
   const dated = policies
     .map((policy) => {
       const raw = getPolicyDateValue(policy)
@@ -508,6 +601,7 @@ function mapDeadlineList(
     subtitle,
     viewAllLabel: `전체 ${formatCount(policies.length)} 보기`,
     emptyMessage: "현재 확인 가능한 마감일이 있는 매칭 공고가 없습니다.",
+    emptyState: "none",
     items: visibleItems.map(({ policy, raw, daysRemaining }) => {
       const policyId = getPolicyId(policy)
       return {
@@ -748,13 +842,16 @@ function mapWorkspace(
   equipments: DashboardEquipmentContract[],
 ): DashboardWorkspace {
   const analysisRecord = readRecord(analysis)
+  const isSnapshotMissingLegacy = Boolean(analysis?.policy_snapshot_missing)
   const policies = normalizePolicies(analysis)
   const matchedCount = policies.length
   const status = getAnalysisStatus(analysis, matchedCount)
   const analysisId = getAnalysisId(analysis)
   const equipmentName = getEquipmentName(analysis, equipments)
   const priorityPolicy = getPriorityPolicy(policies)
-  const priorityPolicyTitle = compactText(priorityPolicy?.title) || "공고 확인 필요"
+  const priorityPolicyTitle = isSnapshotMissingLegacy
+    ? "정책 이력 없음"
+    : compactText(priorityPolicy?.title) || "공고 확인 필요"
   const priorityPolicyId = getPolicyId(priorityPolicy)
   const nearestDeadline = getNearestDeadline(policies)
   const deadlinePolicy = nearestDeadline?.policy ?? priorityPolicy
@@ -785,19 +882,29 @@ function mapWorkspace(
     findNumberByKeys(roiData, ["payback_years", "payback_months", "payback_period_months"])
   const progress = getProgressPercent(analysis)
   const policySummary = getPolicySummary(analysis, matchedCount)
-  const deadlineList = mapDeadlineList(policies, priorityPolicyId, analysisId)
+  const deadlineList = mapDeadlineList(policies, priorityPolicyId, analysisId, {
+    snapshotMissing: isSnapshotMissingLegacy,
+    reanalysisPath: draftPath,
+  })
   const companyName = getCompanyName(company)
   const industryLabel = getIndustryLabel(company)
   const regionLabel = getRegionLabel(company)
   const urgentActionCount = deadlineList.items.filter(
     (item) => item.urgency === "urgent",
   ).length
-  const actionCount = urgentActionCount > 0 ? urgentActionCount : status === "empty" ? 0 : 1
+  const actionCount = isSnapshotMissingLegacy
+    ? 0
+    : urgentActionCount > 0
+      ? urgentActionCount
+      : status === "empty"
+        ? 0
+        : 1
   const equipmentCount = equipments.length
   const priorityEquipmentCount = status === "empty" ? 0 : equipmentCount
   const recentAnalysisCount = analysisId ? 1 : 0
-  const nearestDeadlineSummary =
-    typeof daysRemaining === "number"
+  const nearestDeadlineSummary = isSnapshotMissingLegacy
+    ? "정책 이력이 없어 마감 일정을 확인할 수 없습니다."
+    : typeof daysRemaining === "number"
       ? `D-${Math.max(0, daysRemaining)} 공고 조건 확인`
       : "확인할 마감 일정 없음"
   const briefingTitle = companyName
@@ -875,6 +982,17 @@ function mapWorkspace(
     hasMoreAnalyses: false,
   }
 
+  if (isSnapshotMissingLegacy) {
+    return {
+      ...completedWorkspace,
+      actionMessage: "이 분석은 정책 이력 저장 전 생성되었습니다.",
+      engiMessage:
+        "Engi: 정책 이력이 없어 당시 매칭 공고 마감일을 복원할 수 없습니다. 재분석 후 최신 정책 이력을 저장해 주세요.",
+      nextStepText: "다음 단계: 투자 조건 다시 설정 또는 최신 지원사업 확인",
+      summaryStatusText: "분석 완료 · 정책 이력 없음",
+    }
+  }
+
   if (status === "empty") {
     return {
       ...completedWorkspace,
@@ -939,12 +1057,93 @@ function mapAnalysisRows(
   return [row]
 }
 
+function normalizeAnalysisId(value: unknown) {
+  return compactText(value)
+}
+
+function findAnalysisById(
+  analyses: DashboardAnalysisStorage[],
+  analysisId: string,
+) {
+  if (!analysisId) return null
+  return analyses.find((item) => getAnalysisId(item) === analysisId) ?? null
+}
+
+function getOnboardingPreferredAnalysisId(
+  onboarding: DashboardOnboardingMeResponse | null,
+) {
+  return (
+    normalizeAnalysisId(onboarding?.active_analysis_id) ||
+    normalizeAnalysisId(onboarding?.activeAnalysisId) ||
+    normalizeAnalysisId(onboarding?.latest_analysis_id) ||
+    normalizeAnalysisId(onboarding?.latestAnalysisId)
+  )
+}
+
+function getAnalysisTimestamp(analysis: DashboardAnalysisStorage | null) {
+  if (!analysis) return Number.NEGATIVE_INFINITY
+  const record = readRecord(analysis)
+  const raw =
+    compactText(record?.updated_at) ||
+    compactText(record?.updatedAt) ||
+    compactText(record?.created_at) ||
+    compactText(record?.createdAt) ||
+    compactText(analysis.roi_output?.created_at)
+  if (!raw) return Number.NEGATIVE_INFINITY
+  const parsed = Date.parse(raw)
+  return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY
+}
+
+function getLatestAnalysis(analyses: DashboardAnalysisStorage[]) {
+  if (analyses.length === 0) return null
+  return [...analyses].sort(
+    (left, right) => getAnalysisTimestamp(right) - getAnalysisTimestamp(left),
+  )[0]
+}
+
+function selectEffectiveAnalysis(params: {
+  preferredAnalysisId?: string
+  storedAnalysis: DashboardAnalysisStorage | null
+  onboarding: DashboardOnboardingMeResponse | null
+  serverAnalyses: DashboardAnalysisStorage[]
+}) {
+  const { preferredAnalysisId, storedAnalysis, onboarding, serverAnalyses } = params
+  const routeAnalysisId = normalizeAnalysisId(preferredAnalysisId)
+  const storedAnalysisId = getAnalysisId(storedAnalysis)
+  const onboardingPreferredId = getOnboardingPreferredAnalysisId(onboarding)
+
+  const routeMatched = findAnalysisById(serverAnalyses, routeAnalysisId)
+  if (routeMatched) return routeMatched
+  if (routeAnalysisId && storedAnalysisId === routeAnalysisId && storedAnalysis) {
+    return storedAnalysis
+  }
+
+  const storedMatched = findAnalysisById(serverAnalyses, storedAnalysisId)
+  if (storedMatched) return storedMatched
+  if (storedAnalysisId && storedAnalysis) return storedAnalysis
+
+  const onboardingMatched = findAnalysisById(serverAnalyses, onboardingPreferredId)
+  if (onboardingMatched) return onboardingMatched
+
+  if (!routeAnalysisId && !storedAnalysisId && !onboardingPreferredId) {
+    return getLatestAnalysis(serverAnalyses)
+  }
+
+  return storedAnalysis ?? getLatestAnalysis(serverAnalyses)
+}
+
 export function mapDashboardData({
   onboarding,
   analysis,
+  preferredAnalysisId,
 }: MapDashboardDataParams): DashboardViewModel {
   const serverAnalyses = getServerAnalyses(onboarding)
-  const effectiveAnalysis = serverAnalyses[0] ?? analysis
+  const effectiveAnalysis = selectEffectiveAnalysis({
+    preferredAnalysisId,
+    storedAnalysis: analysis,
+    onboarding,
+    serverAnalyses,
+  })
   const company = onboarding?.company ?? effectiveAnalysis?.company ?? null
   const equipments = normalizeEquipments(onboarding, effectiveAnalysis)
   const workspace = mapWorkspace(company, effectiveAnalysis, equipments)

@@ -14,8 +14,18 @@ def _normalize_history(items):
         content = str(row.get("content") or "").strip()
         if role not in {"user", "assistant"} or not content:
             continue
-        normalized.append({"role": role, "content": content})
+        created_at = str(row.get("created_at") or "").strip()
+        item = {"role": role, "content": content}
+        if created_at:
+            item["created_at"] = created_at
+        normalized.append(item)
     return normalized
+
+
+def _extract_chat_id(row):
+    item = row if isinstance(row, dict) else {}
+    chat_id = str(item.get("chat_id") or "").strip()
+    return chat_id
 
 
 def response_node(state: FactofitState) -> FactofitState:
@@ -40,10 +50,23 @@ def response_node(state: FactofitState) -> FactofitState:
     company_id = str(company.company_id) if company and company.company_id else None
 
     persisted_history = _normalize_history(state.get("chat_history", []))
+    now_iso = datetime.now().isoformat()
     if state.get("user_query"):
-        persisted_history.append({"role": "user", "content": state.get("user_query", "")})
+        persisted_history.append(
+            {
+                "role": "user",
+                "content": state.get("user_query", ""),
+                "created_at": now_iso,
+            }
+        )
     if state.get("final_response"):
-        persisted_history.append({"role": "assistant", "content": state.get("final_response", "")})
+        persisted_history.append(
+            {
+                "role": "assistant",
+                "content": state.get("final_response", ""),
+                "created_at": datetime.now().isoformat(),
+            }
+        )
 
     try:
         current_chat_id = str(state.get("chat_id") or "").strip()
@@ -65,7 +88,9 @@ def response_node(state: FactofitState) -> FactofitState:
                 .limit(1)
                 .execute()
             )
-            if existing_row.data:
+            row_for_update = existing_row.data[0] if existing_row.data else None
+
+            if row_for_update:
                 update_result = (
                     supabase.table("chat_history")
                     .update(
@@ -73,6 +98,7 @@ def response_node(state: FactofitState) -> FactofitState:
                             **payload,
                             # 프론트가 현재 대화 전체 history를 함께 보내므로, 해당 snapshot으로 세션을 갱신한다.
                             "chat_history": persisted_history[-60:],
+                            "created_at": datetime.now().isoformat(),
                         }
                     )
                     .eq("chat_id", current_chat_id)
@@ -80,7 +106,7 @@ def response_node(state: FactofitState) -> FactofitState:
                     .execute()
                 )
                 if update_result.data:
-                    state["chat_id"] = update_result.data[0].get("chat_id", current_chat_id)
+                    state["chat_id"] = _extract_chat_id(update_result.data[0]) or current_chat_id
                 else:
                     state["chat_id"] = current_chat_id
             else:
@@ -92,7 +118,9 @@ def response_node(state: FactofitState) -> FactofitState:
                     }
                 ).execute()
                 if insert_result.data:
-                    state["chat_id"] = insert_result.data[0].get("chat_id")
+                    state["chat_id"] = _extract_chat_id(insert_result.data[0]) or current_chat_id
+                else:
+                    state["chat_id"] = current_chat_id
         else:
             insert_result = supabase.table("chat_history").insert(
                 {
@@ -102,7 +130,7 @@ def response_node(state: FactofitState) -> FactofitState:
                 }
             ).execute()
             if insert_result.data:
-                state["chat_id"] = insert_result.data[0].get("chat_id")
+                state["chat_id"] = _extract_chat_id(insert_result.data[0])
     except Exception as e:
         print(f"chat_history save failed: {e}")
 

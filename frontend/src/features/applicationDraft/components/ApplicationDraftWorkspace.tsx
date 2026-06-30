@@ -18,6 +18,8 @@ export function ApplicationDraftWorkspace({
   onGoRoi: () => void
   onOpenChecklist: () => void
 }) {
+  const isSnapshotDraft = Boolean(model.analysisData.draft_api_data?.analysis_id)
+
   return (
     <section className="ff-draft-workspace">
       <div className="ff-workspace-head">
@@ -142,11 +144,19 @@ export function ApplicationDraftWorkspace({
             </div>
             <div>
               <span>예상 지원금</span>
-              <strong>{formatManwon(model.subsidyManwon)}</strong>
+              <strong>
+                {isSnapshotDraft && model.subsidyManwon === null
+                  ? "지원금 확인 필요"
+                  : formatManwon(model.subsidyManwon)}
+              </strong>
             </div>
             <div>
               <span>예상 회수기간</span>
-              <strong>{formatMonthlyPayback(model.paybackMonths)}</strong>
+              <strong>
+                {isSnapshotDraft && model.paybackMonths === null
+                  ? "분석 결과 없음"
+                  : formatMonthlyPayback(model.paybackMonths)}
+              </strong>
             </div>
           </div>
 

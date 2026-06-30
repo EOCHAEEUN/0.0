@@ -4,6 +4,7 @@ import MainPage from "./pages/MainPage"
 import LoginPage from "./pages/LoginPage"
 import DashboardPage from "./pages/DashboardPage"
 import RoiPage from "./pages/RoiPage"
+import RoiHistoryPage from "./pages/RoiHistoryPage"
 import ApplicationDraftPage from "./pages/ApplicationDraftPage"
 import SupportProjectsPage from "./pages/SupportProjectsPage"
 import SupportDetailPage from "./pages/SupportDetailPage"
@@ -59,6 +60,7 @@ function App() {
 
           {/* ROI 분석 */}
           <Route path="/roi" element={<RoiPage />} />
+          <Route path="/roi/history" element={<RoiHistoryPage />} />
 
           {/* 투자 분석 결과 */}
           <Route path="/analysis/:id/result" element={<AnalysisResultPage />} />

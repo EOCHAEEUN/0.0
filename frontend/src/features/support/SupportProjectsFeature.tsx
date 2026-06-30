@@ -282,12 +282,14 @@ export default function SupportProjectsFeature() {
             {analysisIdFromQuery ? "← 투자 검토 결과로 돌아가기" : "← 대시보드로 돌아가기"}
           </button>
 
-          <SupportWorkflowHero
-            policyCounters={policyCounters}
-            equipmentName={selectedEquipmentContext.equipmentName}
-            currentAvailableCount={policySummary.activePolicyCount}
-            hasCurrentAvailableCount={Boolean(policySummary.updatedAt)}
-          />
+          {!isSnapshotMissingLegacy && (
+            <SupportWorkflowHero
+              policyCounters={policyCounters}
+              equipmentName={selectedEquipmentContext.equipmentName}
+              currentAvailableCount={policySummary.activePolicyCount}
+              hasCurrentAvailableCount={Boolean(policySummary.updatedAt)}
+            />
+          )}
 
           {policyState === "loading" && <LoadingPolicyState />}
 
@@ -310,9 +312,7 @@ export default function SupportProjectsFeature() {
               <span className="badge orange">정책 이력 없음</span>
               <h2>이 분석은 정책 이력 저장 전 생성되었습니다.</h2>
               <p>
-                정확한 지원사업 이력을 보려면 투자 조건을 다시 분석해 주세요.
-                <br />
-                새 분석에서는 정책 추천 결과가 함께 저장됩니다.
+                당시 매칭된 정책 정보를 복원할 수 없어, 현재 분석 결과와 정책 지원사업을 정확히 연결할 수 없습니다.
               </p>
               <div style={{ marginTop: "24px", display: "flex", gap: "12px", flexWrap: "wrap" }}>
                 <button

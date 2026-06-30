@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom"
 import engiBot from "../assets/advisor/engi-bot-transparent.png"
 import {
+  createAdvisorChatSession,
   fetchAdvisorChatSessionDetail,
   fetchAdvisorChatSessions,
   requestAdvisorAnswer,
@@ -94,6 +95,35 @@ function readStoredAnalysisId() {
   }
 }
 
+function readAuthUserId() {
+  try {
+    const raw = window.localStorage.getItem("factofit_auth_session")
+    if (!raw) return ""
+    const parsed = asRecord(JSON.parse(raw))
+    return readText(parsed.userId, parsed.user_id, parsed.id)
+  } catch {
+    return ""
+  }
+}
+
+function readLoginTokenMarker() {
+  try {
+    const token =
+      window.localStorage.getItem("factofit_access_token") ||
+      window.localStorage.getItem("access_token") ||
+      ""
+    if (!token) return "anonymous"
+    return token.slice(-12)
+  } catch {
+    return "anonymous"
+  }
+}
+
+function buildActiveSessionStorageKey(companyId: string, userId: string, tokenMarker: string) {
+  if (!companyId) return ""
+  return `advisor.activeSession.${companyId}.${userId || "unknown"}.${tokenMarker}`
+}
+
 function mapContexts(onboarding: DashboardOnboardingMeResponse | null) {
   const company = asRecord(onboarding?.company)
   const companyId = readText(company.company_id)
@@ -159,6 +189,7 @@ export default function AiAdvisorPage() {
   const location = useLocation()
   const [searchParams] = useSearchParams()
   const messageEndRef = useRef<HTMLDivElement | null>(null)
+  const hydratedSessionRef = useRef("")
 
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState("")
@@ -198,6 +229,12 @@ export default function AiAdvisorPage() {
   const companyId = useMemo(
     () => readText(selectedContext?.companyId, asRecord(onboarding?.company).company_id),
     [onboarding, selectedContext?.companyId],
+  )
+  const userId = useMemo(() => readAuthUserId(), [])
+  const tokenMarker = useMemo(() => readLoginTokenMarker(), [])
+  const activeSessionStorageKey = useMemo(
+    () => buildActiveSessionStorageKey(companyId, userId, tokenMarker),
+    [companyId, tokenMarker, userId],
   )
 
   const filteredContexts = useMemo(() => {
@@ -248,19 +285,107 @@ export default function AiAdvisorPage() {
 
   useEffect(() => {
     if (!companyId) return
+    let cancelled = false
     setSessionsLoading(true)
     setSessionsError("")
     void fetchAdvisorChatSessions(companyId)
-      .then((items) => setSessions(items))
+      .then(async (items) => {
+        if (cancelled) return
+        let nextItems = items
+        if (nextItems.length === 0) {
+          const created = await createAdvisorChatSession({
+            companyId,
+            analysisId: selectedContext?.analysisId,
+            equipmentId: selectedContext?.equipmentId || selectedEquipmentId,
+          })
+          const createdSessionId = readText(created?.session_id, created?.chat_id)
+          if (createdSessionId) {
+            nextItems = await fetchAdvisorChatSessions(companyId)
+          }
+        }
+        setSessions(nextItems)
+        const storedSessionId = activeSessionStorageKey
+          ? window.localStorage.getItem(activeSessionStorageKey) || ""
+          : ""
+        const preferredSession =
+          nextItems.find((session) => session.session_id === storedSessionId) ||
+          nextItems.find((session) => session.chat_id === storedSessionId) ||
+          nextItems[0]
+        if (preferredSession) {
+          setActiveChatId(preferredSession.session_id || preferredSession.chat_id)
+        }
+      })
       .catch((error) => {
+        if (cancelled) return
         setSessionsError(error instanceof Error ? error.message : "대화 내역 조회 실패")
       })
-      .finally(() => setSessionsLoading(false))
-  }, [companyId])
+      .finally(() => {
+        if (!cancelled) setSessionsLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    activeSessionStorageKey,
+    companyId,
+    selectedContext?.analysisId,
+    selectedContext?.equipmentId,
+    selectedEquipmentId,
+  ])
+
+  useEffect(() => {
+    if (!activeSessionStorageKey) return
+    if (!activeChatId) {
+      window.localStorage.removeItem(activeSessionStorageKey)
+      return
+    }
+    window.localStorage.setItem(activeSessionStorageKey, activeChatId)
+  }, [activeChatId, activeSessionStorageKey])
 
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
   }, [messages, equipmentSelectionCards])
+
+  useEffect(() => {
+    if (!companyId || !activeChatId) return
+    if (hydratedSessionRef.current === activeChatId) return
+    hydratedSessionRef.current = activeChatId
+    void fetchAdvisorChatSessionDetail(companyId, activeChatId)
+      .then((data) => {
+        const historyMessages = toMessageListFromSession(data)
+        if (historyMessages.length > 0) {
+          setMessages(historyMessages)
+        }
+      })
+      .catch(() => {
+        // 세션 상세 로딩 실패는 대화 목록 오류 처리와 분리한다.
+      })
+  }, [activeChatId, companyId])
+
+  const reloadSessions = async () => {
+    if (!companyId) return
+    const items = await fetchAdvisorChatSessions(companyId)
+    setSessions(items)
+  }
+
+  const ensureActiveSessionId = async () => {
+    if (activeChatId) return activeChatId
+    if (!companyId) return ""
+
+    const created = await createAdvisorChatSession({
+      companyId,
+      analysisId: selectedContext?.analysisId,
+      equipmentId: selectedContext?.equipmentId || selectedEquipmentId,
+    })
+    const sessionId = readText(created?.session_id, created?.chat_id)
+    if (!sessionId) {
+      throw new Error("새 대화 세션을 생성하지 못했습니다.")
+    }
+    setActiveChatId(sessionId)
+    await reloadSessions()
+    return sessionId
+  }
 
   const requestChat = async (
     question: string,
@@ -271,6 +396,7 @@ export default function AiAdvisorPage() {
     setLastFailedQuestion("")
     setSending(true)
     try {
+      const sessionId = await ensureActiveSessionId()
       const history = historyOverride ?? messages
       const response = await requestAdvisorAnswer(
         question,
@@ -285,7 +411,8 @@ export default function AiAdvisorPage() {
             selectedContext?.equipmentId ||
             selectedEquipmentId,
           analysisId: selectedContext?.analysisId,
-          chatId: activeChatId || undefined,
+          chatId: sessionId || undefined,
+          sessionId: sessionId || undefined,
         },
       )
       setMessages((prev) => [
@@ -293,11 +420,8 @@ export default function AiAdvisorPage() {
         { id: crypto.randomUUID(), role: "assistant", content: response.text },
       ])
       setEquipmentSelectionCards(extractEquipmentSelection(response.cards))
-      setActiveChatId(response.chatId || "")
-      if (companyId) {
-        const nextSessions = await fetchAdvisorChatSessions(companyId)
-        setSessions(nextSessions)
-      }
+      setActiveChatId((prev) => response.chatId || sessionId || prev)
+      await reloadSessions()
     } catch (error) {
       setChatError(
         error instanceof Error
@@ -348,12 +472,22 @@ export default function AiAdvisorPage() {
   const openSession = async (session: AdvisorChatSessionItem) => {
     if (!companyId) return
     try {
-      const data = await fetchAdvisorChatSessionDetail(companyId, session.chat_id)
+      const targetSessionId = session.session_id || session.chat_id
+      const data = await fetchAdvisorChatSessionDetail(companyId, targetSessionId)
       const historyMessages = toMessageListFromSession(data)
       if (historyMessages.length > 0) {
         setMessages(historyMessages)
+      } else {
+        setMessages([
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: "새 대화를 시작해보세요.",
+          },
+        ])
       }
-      setActiveChatId(session.chat_id)
+      hydratedSessionRef.current = targetSessionId
+      setActiveChatId(targetSessionId)
       setChatError("")
       setEquipmentSelectionCards([])
     } catch (error) {
@@ -361,20 +495,33 @@ export default function AiAdvisorPage() {
     }
   }
 
-  const startNewChat = () => {
-    setMessages([
-      {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: "새 대화를 시작합니다. 궁금한 내용을 편하게 물어보세요.",
-      },
-    ])
-    setActiveChatId("")
+  const startNewChat = async () => {
+    if (!companyId) return
     setChatError("")
     setLastFailedQuestion("")
     setEquipmentSelectionCards([])
-    setSnapshotPolicies([])
-    setSnapshotLegacy(false)
+    try {
+      const created = await createAdvisorChatSession({
+        companyId,
+        analysisId: selectedContext?.analysisId,
+        equipmentId: selectedContext?.equipmentId || selectedEquipmentId,
+      })
+      const nextSessionId = readText(created?.session_id, created?.chat_id)
+      hydratedSessionRef.current = nextSessionId
+      setActiveChatId(nextSessionId)
+      setMessages([
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: "새 대화를 시작합니다. 궁금한 내용을 편하게 물어보세요.",
+        },
+      ])
+      setSnapshotPolicies([])
+      setSnapshotLegacy(false)
+      await reloadSessions()
+    } catch (error) {
+      setSessionsError(error instanceof Error ? error.message : "새 대화 생성 실패")
+    }
   }
 
   const loadSnapshotPolicies = async () => {
@@ -637,22 +784,39 @@ export default function AiAdvisorPage() {
                 }}
               >
                 <h3 style={{ margin: 0 }}>내 대화 내역</h3>
-                <button type="button" className="ff-support-btn ghost" onClick={startNewChat}>
+                <button type="button" className="ff-support-btn ghost" onClick={() => void startNewChat()}>
                   새 대화
                 </button>
               </div>
               {sessionsLoading && <p>대화 내역 조회 중...</p>}
-              {sessionsError && <p style={{ color: "#b42318" }}>{sessionsError}</p>}
+              {sessionsError && (
+                <div style={{ display: "grid", gap: 6 }}>
+                  <p style={{ color: "#b42318", margin: 0 }}>{sessionsError}</p>
+                  <button
+                    type="button"
+                    className="ff-support-btn ghost"
+                    onClick={() => {
+                      setSessionsError("")
+                      void reloadSessions().catch((error) =>
+                        setSessionsError(error instanceof Error ? error.message : "대화 내역 조회 실패"),
+                      )
+                    }}
+                  >
+                    다시 불러오기
+                  </button>
+                </div>
+              )}
               {!sessionsLoading && sessions.length === 0 && <p>저장된 대화가 없습니다.</p>}
               <div style={{ display: "grid", gap: 8 }}>
                 {sessions.map((session) => (
                   <button
-                    key={session.chat_id}
+                    key={session.session_id || session.chat_id}
                     type="button"
                     className="ff-support-btn ghost"
                     style={{
                       textAlign: "left",
-                      borderColor: activeChatId === session.chat_id ? "#344ba0" : undefined,
+                      borderColor:
+                        activeChatId === (session.session_id || session.chat_id) ? "#344ba0" : undefined,
                     }}
                     onClick={() => void openSession(session)}
                   >
@@ -662,7 +826,7 @@ export default function AiAdvisorPage() {
                         {session.preview || "(미리보기 없음)"}
                       </span>
                       <span style={{ display: "block", color: "#667085", fontSize: 11, marginTop: 4 }}>
-                        {formatDateTime(session.created_at)} ·{" "}
+                        {formatDateTime(session.updated_at || session.created_at)} ·{" "}
                         {session.analysis_id ? "분석 상담" : "일반 상담"}
                       </span>
                     </div>

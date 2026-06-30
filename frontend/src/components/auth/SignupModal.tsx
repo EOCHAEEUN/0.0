@@ -11,14 +11,13 @@ import { useNavigate } from "react-router-dom"
 import "./SignupModal.css"
 import AccountSection from "./signup/components/AccountSection"
 import AgreementBox from "./signup/components/AgreementBox"
-import CompanyInfoSection from "./signup/components/CompanyInfoSection"
 import UserInfoSection from "./signup/components/UserInfoSection"
 import {
+  clearUserOnboardingData,
   markJustSignedUp,
   resolvePostLoginPath,
   updateUserOnboardingState,
 } from "../../features/onboarding/onboardingState"
-import { COMPANY_TYPE_PLACEHOLDER } from "./signup/signup.constants"
 import type { SignupModalProps } from "./signup/signup.types"
 import { useSignupForm } from "./signup/useSignupForm"
 
@@ -31,70 +30,8 @@ type SignupNotice = {
 
 function isFilled(value: unknown) {
   if (value === null || value === undefined) return false
-
-  if (Array.isArray(value)) {
-    return value.some((item) => String(item ?? "").trim().length > 0)
-  }
-
+  if (Array.isArray(value)) return value.some((item) => String(item ?? "").trim().length > 0)
   return String(value).trim().length > 0
-}
-
-function getIndustryName(row: unknown) {
-  if (!row || typeof row !== "object") return ""
-
-  const item = row as Record<string, unknown>
-
-  return String(
-    item.industryName ??
-      item.industry_name ??
-      item.name ??
-      item.label ??
-      "",
-  ).trim()
-}
-
-function getIndustryCode(row: unknown) {
-  if (!row || typeof row !== "object") return ""
-
-  const item = row as Record<string, unknown>
-
-  return String(
-    item.industryCode ??
-      item.industry_code ??
-      item.code ??
-      item.value ??
-      "",
-  ).trim()
-}
-
-function getIndustryRequiredStatus(rows: unknown) {
-  if (!Array.isArray(rows)) {
-    return {
-      hasCompleteIndustry: false,
-      hasIndustryName: false,
-      hasIndustryCode: false,
-    }
-  }
-
-  const hasCompleteIndustry = rows.some((row) => {
-    const industryName = getIndustryName(row)
-    const industryCode = getIndustryCode(row)
-
-    return industryName.length > 0 && industryCode.length > 0
-  })
-
-  const hasIndustryName = rows.some((row) => getIndustryName(row).length > 0)
-  const hasIndustryCode = rows.some((row) => getIndustryCode(row).length > 0)
-
-  return {
-    hasCompleteIndustry,
-    hasIndustryName,
-    hasIndustryCode,
-  }
-}
-
-function normalizeText(value: string) {
-  return value.replace(/\s+/g, "").toLowerCase()
 }
 
 function isPasswordRequirementPassed(
@@ -111,7 +48,6 @@ function isPasswordRequirementPassed(
         if (item && typeof item === "object" && "valid" in item) {
           return Boolean((item as { valid?: unknown }).valid)
         }
-
         return Boolean(item)
       })
     }
@@ -119,12 +55,10 @@ function isPasswordRequirementPassed(
 
   if (passwordChecks && typeof passwordChecks === "object") {
     const values = Object.values(passwordChecks as Record<string, unknown>)
-
-    if (values.length > 0) {
-      return values.every(Boolean)
-    }
+    if (values.length > 0) return values.every(Boolean)
   }
 
+  const normalizeText = (v: string) => v.replace(/\s+/g, "").toLowerCase()
   const labelText = normalizeText(String(passwordLabel ?? ""))
   const levelText = normalizeText(String(passwordLevel ?? ""))
 
@@ -139,12 +73,13 @@ function isPasswordRequirementPassed(
   }
 
   const levelNumber = Number(passwordLevel)
-
-  if (Number.isFinite(levelNumber)) {
-    return levelNumber >= 2
-  }
+  if (Number.isFinite(levelNumber)) return levelNumber >= 2
 
   return true
+}
+
+function normalizeText(value: string) {
+  return value.replace(/\s+/g, "").toLowerCase()
 }
 
 function isEmailVerificationTarget(target: EventTarget | null) {
@@ -156,9 +91,7 @@ function isEmailVerificationTarget(target: EventTarget | null) {
 
   if (closeButton || loginButton || noticeCloseButton) return true
 
-  const interactive = target.closest(
-    "input, textarea, select, button, a",
-  ) as HTMLElement | null
+  const interactive = target.closest("input, textarea, select, button, a") as HTMLElement | null
 
   if (!interactive) return true
 
@@ -225,6 +158,8 @@ export default function SignupModal({
   const navigate = useNavigate()
 
   const handleSignupComplete = () => {
+    // 신규 사용자 전용 초기 상태: 이전 사용자 데이터 완전 제거 후 새 상태 기록
+    clearUserOnboardingData()
     markJustSignedUp()
     updateUserOnboardingState({
       companyProfileStatus: "not_started",
@@ -262,72 +197,20 @@ export default function SignupModal({
         form.passwordLabel,
       ) ||
       !isFilled(form.passwordCheck) ||
-      (isFilled(form.password) &&
-        isFilled(form.passwordCheck) &&
-        !form.isPasswordMatched)
+      (isFilled(form.password) && isFilled(form.passwordCheck) && !form.isPasswordMatched)
     ) {
       missing.push("비밀번호")
     }
 
-    if (!isFilled(form.userName)) {
-      missing.push("이름")
-    }
-
-    if (!isFilled(form.phone)) {
-      missing.push("연락처")
-    }
-
-    if (!isFilled(form.companyName)) {
-      missing.push("기업명")
-    }
-
-    const industryStatus = getIndustryRequiredStatus(form.industryRows)
-
-    if (!industryStatus.hasCompleteIndustry) {
-      if (!industryStatus.hasIndustryName) {
-        missing.push("업종명")
-      }
-
-      if (!industryStatus.hasIndustryCode) {
-        missing.push("업종코드")
-      }
-
-      if (
-        industryStatus.hasIndustryName &&
-        industryStatus.hasIndustryCode &&
-        !industryStatus.hasCompleteIndustry
-      ) {
-        missing.push("업종명/업종코드")
-      }
-    }
-
-    if (!isFilled(form.region)) {
-      missing.push("지역")
-    }
-
-    if (
-      !isFilled(form.companyType) ||
-      form.companyType === COMPANY_TYPE_PLACEHOLDER ||
-      form.companyType === "선택"
-    ) {
-      missing.push("기업 규모")
-    }
-
-    if (!form.agreeService) {
-      missing.push("서비스 이용약관 동의")
-    }
-
-    if (!form.agreePrivacy) {
-      missing.push("개인정보 수집·이용 동의")
-    }
+    if (!isFilled(form.userName)) missing.push("이름")
+    if (!isFilled(form.phone)) missing.push("연락처")
+    if (!form.agreeService) missing.push("서비스 이용약관 동의")
+    if (!form.agreePrivacy) missing.push("개인정보 수집·이용 동의")
 
     return missing
   }, [
     form.agreePrivacy,
     form.agreeService,
-    form.companyName,
-    form.companyType,
-    form.industryRows,
     form.isPasswordMatched,
     form.password,
     form.passwordCheck,
@@ -335,25 +218,20 @@ export default function SignupModal({
     form.passwordLabel,
     form.passwordLevel,
     form.phone,
-    form.region,
     form.userName,
   ])
 
   const defaultLockedNotice = useMemo<SignupNotice | null>(() => {
     if (isSignupUnlocked || isLockNoticeDismissed) return null
-
     return {
       type: "lock",
       title: "이메일 인증을 먼저 완료해주세요.",
-      message:
-        "인증번호 확인 후 비밀번호, 사용자 정보, 기업 정보 입력이 활성화됩니다.",
+      message: "인증번호 확인 후 비밀번호, 이름, 연락처 입력이 활성화됩니다.",
     }
   }, [isLockNoticeDismissed, isSignupUnlocked])
 
   const lockNotice =
-    !isSignupUnlocked && signupNotice?.type === "lock"
-      ? signupNotice
-      : defaultLockedNotice
+    !isSignupUnlocked && signupNotice?.type === "lock" ? signupNotice : defaultLockedNotice
 
   const requiredNotice =
     isSignupUnlocked && signupNotice?.type === "required" ? signupNotice : null
@@ -363,23 +241,17 @@ export default function SignupModal({
     setSignupNotice({
       type: "lock",
       title: "이메일 인증이 필요합니다.",
-      message:
-        "이메일 인증번호를 확인한 뒤 나머지 필수 정보를 입력할 수 있습니다.",
+      message: "이메일 인증번호를 확인한 뒤 나머지 필수 정보를 입력할 수 있습니다.",
     })
   }
 
   const closeLockNotice = () => {
     setIsLockNoticeDismissed(true)
-
-    if (signupNotice?.type === "lock") {
-      setSignupNotice(null)
-    }
+    if (signupNotice?.type === "lock") setSignupNotice(null)
   }
 
   const closeRequiredNotice = () => {
-    if (signupNotice?.type === "required") {
-      setSignupNotice(null)
-    }
+    if (signupNotice?.type === "required") setSignupNotice(null)
   }
 
   const handleLockedInteraction = (
@@ -389,17 +261,13 @@ export default function SignupModal({
       | KeyboardEvent<HTMLElement>,
   ) => {
     if (isSignupUnlocked) return
-
     if (isEmailVerificationTarget(event.target)) return
 
     event.preventDefault()
     event.stopPropagation()
 
     const activeElement = document.activeElement
-
-    if (activeElement instanceof HTMLElement) {
-      activeElement.blur()
-    }
+    if (activeElement instanceof HTMLElement) activeElement.blur()
 
     showLockedNotice()
   }
@@ -414,11 +282,9 @@ export default function SignupModal({
       setSignupNotice({
         type: "required",
         title: "필수 정보를 먼저 입력해주세요.",
-        message:
-          "회원가입을 완료하려면 계정 정보와 기업 정보의 필수 항목이 필요합니다.\n입력이 필요한 항목을 확인한 뒤 다시 회원가입 완료를 눌러주세요.",
+        message: "회원가입을 완료하려면 아래 항목을 확인해주세요.",
         items: missingRequiredItems,
       })
-
       return
     }
 
@@ -429,9 +295,7 @@ export default function SignupModal({
   return (
     <div className="ff-signup-overlay">
       <section
-        className={`ff-signup-panel ${
-          isSignupUnlocked ? "" : "ff-signup-panel--email-locked"
-        }`}
+        className={`ff-signup-panel ${isSignupUnlocked ? "" : "ff-signup-panel--email-locked"}`}
         onClick={(event) => event.stopPropagation()}
         onClickCapture={handleLockedInteraction}
         onFocusCapture={handleLockedInteraction}
@@ -443,13 +307,15 @@ export default function SignupModal({
 
         <header className="ff-signup-header">
           <h2>회원가입</h2>
-          <p>필수 정보를 입력하면 FactoFit 맞춤형 추천을 시작할 수 있습니다.</p>
+          <p>간단한 계정 생성 후, 우리 기업에 맞는 투자 분석을 시작해보세요.</p>
+          <p className="ff-signup-header-sub">
+            가입 후 기업 정보를 입력하면 ROI 분석과 투자 관리에 필요한 맞춤 결과를 받아볼 수 있습니다.
+          </p>
 
-          <div className="ff-signup-guide">
-            <span>
-              <b>*</b> 필수 입력
-            </span>
-            <span>선택 정보는 지원사업 조건 매칭에 활용됩니다.</span>
+          <div className="ff-signup-badges">
+            <span className="ff-signup-badge">1분 안에 가입 완료</span>
+            <span className="ff-signup-badge ff-signup-badge--required">필수 정보 입력</span>
+            <span className="ff-signup-badge ff-signup-badge--muted">기업 정보는 가입 후 입력</span>
           </div>
         </header>
 
@@ -464,7 +330,6 @@ export default function SignupModal({
                 <strong>{lockNotice.title}</strong>
                 <p>{lockNotice.message}</p>
               </div>
-
               <button
                 type="button"
                 className="ff-signup-notice-close"
@@ -511,28 +376,6 @@ export default function SignupModal({
               onPhoneChange={form.handlePhoneChange}
             />
 
-            <CompanyInfoSection
-              companyName={form.companyName}
-              industryRows={form.industryRows}
-              openIndustryRowId={form.openIndustryRowId}
-              businessNumber={form.businessNumber}
-              region={form.region}
-              companyType={form.companyType}
-              mainPurpose={form.mainPurpose}
-              getFilteredIndustries={form.getFilteredIndustries}
-              onCompanyNameChange={form.setCompanyName}
-              onOpenIndustrySuggestion={form.handleOpenIndustrySuggestion}
-              onIndustryNameChange={form.handleIndustryNameChange}
-              onIndustryCodeChange={form.handleIndustryCodeChange}
-              onSelectIndustry={form.handleSelectIndustry}
-              onAddIndustryRow={form.handleAddIndustryRow}
-              onRemoveIndustryRow={form.handleRemoveIndustryRow}
-              onBusinessNumberChange={form.handleBusinessNumberChange}
-              onRegionChange={form.setRegion}
-              onCompanyTypeChange={form.setCompanyType}
-              onMainPurposeChange={form.setMainPurpose}
-            />
-
             <AgreementBox
               agreeService={form.agreeService}
               agreePrivacy={form.agreePrivacy}
@@ -562,7 +405,6 @@ export default function SignupModal({
                 <strong>{requiredNotice.title}</strong>
                 <p>{requiredNotice.message}</p>
               </div>
-
               <button
                 type="button"
                 className="ff-signup-notice-close"
@@ -572,7 +414,6 @@ export default function SignupModal({
                 ×
               </button>
             </div>
-
             {requiredNotice.items && requiredNotice.items.length > 0 && (
               <ul className="ff-signup-required-popover__list">
                 {requiredNotice.items.slice(0, 10).map((item) => (
@@ -585,9 +426,7 @@ export default function SignupModal({
 
         <button
           type="button"
-          className={`ff-signup-submit ${
-            isSignupUnlocked ? "" : "ff-signup-submit--locked"
-          }`}
+          className={`ff-signup-submit ${isSignupUnlocked ? "" : "ff-signup-submit--locked"}`}
           onClick={handleSubmit}
           disabled={form.isSubmitting}
           aria-disabled={!isSignupUnlocked || form.isSubmitting}

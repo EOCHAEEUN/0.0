@@ -1,4 +1,4 @@
-import type { AdvisorMessage } from "./aiAdvisor.contract"
+import type { AdvisorApiResponse, AdvisorMessage } from "./aiAdvisor.contract"
 
 const API_BASE_URL = (
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
@@ -12,6 +12,11 @@ function getAccessToken() {
     window.localStorage.getItem("token") ||
     ""
   )
+}
+
+function getCompanyId(): string {
+  if (typeof window === "undefined") return ""
+  return window.localStorage.getItem("factofit_company_id") ?? ""
 }
 
 function buildHeaders() {
@@ -36,13 +41,23 @@ export function toAdvisorChatHistory(
 export async function requestAdvisorAnswer(
   message: string,
   history?: { role: string; content: string }[],
-) {
+  options?: {
+    companyId?: string
+    selectedEquipmentId?: string
+    policyIntentChoice?: string
+  },
+): Promise<AdvisorApiResponse> {
+  const { companyId, selectedEquipmentId, policyIntentChoice } = options ?? {}
+
   const response = await fetch(`${API_BASE_URL}/chat`, {
     method: "POST",
     headers: buildHeaders(),
     body: JSON.stringify({
+      company_id: companyId ?? getCompanyId(),
       message,
-      history: history ?? [],
+      chat_history: history ?? [],
+      selected_equipment_id: selectedEquipmentId ?? "",
+      policy_intent_choice: policyIntentChoice ?? "",
       source: "global_ai_advisor",
     }),
   })
@@ -57,13 +72,24 @@ export async function requestAdvisorAnswer(
     )
   }
 
-  return (
+  const answer =
     payload?.data?.answer ||
     payload?.answer ||
+    payload?.response ||
     payload?.final_response ||
     payload?.message ||
     "AI 답변을 불러왔지만 표시할 문장이 없습니다."
-  )
+
+  return {
+    text: answer,
+    intent: payload?.intent ?? "",
+    cards: payload?.cards ?? [],
+    matchedPolicies: payload?.matched_policies ?? [],
+    selectedEquipmentForPolicy: payload?.selected_equipment_for_policy ?? null,
+    nextQuestions: payload?.next_questions ?? [],
+    chatId: payload?.chat_id ?? null,
+    raw: payload,
+  }
 }
 
 export function buildLocalAdvisorResponse(text: string): AdvisorMessage {

@@ -1,4 +1,4 @@
-﻿# app/routers/chat.py
+# app/routers/chat.py
 from fastapi import APIRouter
 from pydantic import BaseModel
 
@@ -143,7 +143,7 @@ async def chat(req: ChatRequest):
             "safety_dashboard": None,
             "matched_policies": [],
             "selected_policy": None,
-            "selected_equipment_for_policy": selected_equipment_for_policy or None, 
+            "selected_equipment_for_policy": selected_equipment_for_policy or None,
             "roi_result": None,
             "draft_result": None,
             "draft_context": None,
@@ -206,7 +206,7 @@ async def chat(req: ChatRequest):
                 ]
             else:
                 cards = []
-                
+
         else:
             cards = []
 
@@ -219,12 +219,12 @@ async def chat(req: ChatRequest):
             "next_questions": [],
             "chat_id": result.get("chat_id", ""),
         }
-    
+
     except Exception as e:
         print(f"❌ 채팅 에러: {e}")
         import traceback
         traceback.print_exc()
-        
+
         return {
             "intent": "general",
             "response": f"에러 발생: {str(e)}",

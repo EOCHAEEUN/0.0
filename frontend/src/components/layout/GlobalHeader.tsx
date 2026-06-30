@@ -1,5 +1,8 @@
 import { useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
+import { clearAuthSession } from "../../services/auth"
+import { clearUserOnboardingData } from "../../features/onboarding/onboardingState"
+import { resolveRoiNavigationPath } from "../../features/roi/roiNavigation"
 
 // ─── 네비게이션 메뉴 정의 ───────────────────────────────────────────────────
 
@@ -45,6 +48,19 @@ const NAV_ITEMS: NavItem[] = [
 // ─── active 판별 ─────────────────────────────────────────────────────────────
 
 function isItemActive(item: NavItem, pathname: string): boolean {
+  const isPolicyAnalysisPath = /^\/analysis\/[^/]+\/policies(?:\/.*)?$/.test(pathname)
+  const isRoiAnalysisPath =
+    pathname === "/roi" ||
+    pathname.startsWith("/roi/") ||
+    pathname === "/analysis/new" ||
+    pathname.startsWith("/analysis/new/") ||
+    pathname === "/analysis/review" ||
+    pathname.startsWith("/analysis/review/") ||
+    /^\/analysis\/[^/]+(?:\/result)?$/.test(pathname)
+
+  if (item.label === "지원사업 추천" && isPolicyAnalysisPath) return true
+  if (item.label === "ROI 분석") return isRoiAnalysisPath
+
   return item.matchPrefixes.some((prefix) => {
     if (prefix === "/") return pathname === "/"
     return (
@@ -93,6 +109,20 @@ export default function GlobalHeader() {
   const navigate = useNavigate()
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
+
+  const handleLogout = () => {
+    clearUserOnboardingData()
+    clearAuthSession()
+    navigate("/", { replace: true })
+  }
+
+  const handleNavigation = async (item: NavItem) => {
+    if (item.label === "ROI 분석") {
+      navigate(await resolveRoiNavigationPath(location.pathname, location.search))
+      return
+    }
+    navigate(item.path)
+  }
 
   const isEngiActive =
     location.pathname === "/advisor" ||
@@ -202,7 +232,7 @@ export default function GlobalHeader() {
                 key={item.path}
                 type="button"
                 id={`ff-nav-${item.path.replace(/\//g, "").replace(/-/g, "_") || "dashboard"}`}
-                onClick={() => navigate(item.path)}
+                onClick={() => void handleNavigation(item)}
                 aria-current={active ? "page" : undefined}
                 style={{
                   position: "relative",
@@ -310,6 +340,36 @@ export default function GlobalHeader() {
             👤
           </button>
 
+          {/* 로그아웃 */}
+          <button
+            type="button"
+            id="ff-header-logout"
+            onClick={handleLogout}
+            style={{
+              height: "34px",
+              padding: "0 12px",
+              borderRadius: "999px",
+              border: "1px solid rgba(255,255,255,0.14)",
+              background: "none",
+              color: "rgba(203,213,225,0.7)",
+              fontSize: "12px",
+              fontWeight: 700,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+              transition: "background 0.15s, color 0.15s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(239,68,68,0.12)"
+              e.currentTarget.style.color = "#fca5a5"
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "none"
+              e.currentTarget.style.color = "rgba(203,213,225,0.7)"
+            }}
+          >
+            로그아웃
+          </button>
+
           {/* 모바일 햄버거 — 640px 이하에서만 CSS로 노출 */}
           <button
             type="button"
@@ -368,7 +428,7 @@ export default function GlobalHeader() {
                   key={item.path}
                   type="button"
                   onClick={() => {
-                    navigate(item.path)
+                    void handleNavigation(item)
                     setMobileOpen(false)
                   }}
                   style={{

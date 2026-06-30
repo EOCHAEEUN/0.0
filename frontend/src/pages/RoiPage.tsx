@@ -1,7 +1,10 @@
 import { useState } from "react"
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom"
-import { Landmark, Zap, Leaf, ShieldCheck, ChevronRight, ArrowLeft, Settings } from "lucide-react"
+import { fetchAnalysisEntryContext } from "../features/onboarding/onboardingAnalysisApi"
 import { getAnalysisResult } from "../features/onboarding/onboardingState"
+import { hydrateAccountData } from "../services/accountHydration"
+import { Landmark, Zap, Leaf, ShieldCheck, ChevronRight, ArrowLeft, SlidersHorizontal } from "lucide-react"
+import engiBot from "../assets/advisor/engi-bot-transparent.png"
 
 // ── data helpers (unchanged) ──────────────────────────────────────────────────
 function asRecord(v: unknown): Record<string, unknown> {
@@ -12,6 +15,15 @@ function getNum(rec: Record<string, unknown>, ...keys: string[]): number | null 
   for (const k of keys) {
     const v = rec[k]
     if (typeof v === "number" && Number.isFinite(v) && v > 0) return v
+  }
+  return null
+}
+
+// 0도 유효한 숫자로 처리 (지원금 0원 = "지원 없음"을 명시적으로 구분)
+function getNumAllowZero(rec: Record<string, unknown>, ...keys: string[]): number | null {
+  for (const k of keys) {
+    const v = rec[k]
+    if (typeof v === "number" && Number.isFinite(v) && v >= 0) return v
   }
   return null
 }
@@ -30,26 +42,42 @@ function getScenario(r: Record<string, unknown>, k: "a" | "b") {
   return asRecord(r[`scenario_${k}`] ?? r[`scenario${k.toUpperCase()}`])
 }
 
-function normalizeRec(val: unknown): "a" | "b" {
+function normalizeRec(val: unknown): "a" | "b" | null {
   const s = String(val ?? "").trim().toUpperCase().replace(/[\s_-]/g, "")
-  return s === "B" || s === "SCENARIOB" ? "b" : "a"
+  if (s === "A" || s === "SCENARIOA") return "a"
+  if (s === "B" || s === "SCENARIOB") return "b"
+  return null
 }
 
 interface ScenarioMetrics {
   investment: number | null
   subsidy: number | null
+  subsidyRaw: number | null   // 0 포함 실제 지원금
+  subsidyStatus: string | null
   net: number | null
   saving: number | null
   roi: number | null
   payback: number | null
 }
 
+function getPolicyApplication(rec: Record<string, unknown>): { status: string | null; amount: number | null } {
+  const pa = rec.policy_application
+  if (!pa || typeof pa !== "object" || Array.isArray(pa)) return { status: null, amount: null }
+  const paRec = pa as Record<string, unknown>
+  const status = typeof paRec.status === "string" ? paRec.status : null
+  const amount = getNumAllowZero(paRec, "applied_support_manwon")
+  return { status, amount }
+}
+
 function buildMetrics(rec: Record<string, unknown>): ScenarioMetrics {
+  const pa = getPolicyApplication(rec)
   return {
     investment: getNum(rec, "investment_manwon"),
     subsidy: getNum(rec, "subsidy_manwon"),
+    subsidyRaw: getNumAllowZero(rec, "subsidy_manwon"),
+    subsidyStatus: pa.status,
     net: getNum(rec, "net_investment_manwon", "net_cost_manwon"),
-    saving: getNum(rec, "annual_saving_manwon", "saving_manwon"),
+    saving: getNum(rec, "annual_net_benefit_manwon", "annual_saving_manwon", "saving_manwon"),
     roi: getNum(rec, "roi_pct", "roi_percent"),
     payback: getNum(rec, "payback_years", "paybackYears"),
   }
@@ -60,6 +88,95 @@ function extractPriorityPolicyId(policies: unknown): string | null {
   const first = policies[0] as Record<string, unknown>
   const id = first.policyId ?? first.policy_id ?? first.policyID ?? first.id
   return id ? String(id) : null
+}
+
+function extractPriorityPolicyName(policies: unknown): string {
+  if (!Array.isArray(policies) || policies.length === 0) return ""
+  const first = policies[0] as Record<string, unknown>
+  const metadata = asRecord(first.metadata)
+  return String(
+    first.title ??
+      first.policy_title ??
+      first.name ??
+      metadata.title ??
+      metadata.policy_title ??
+      metadata.name ??
+      "",
+  ).trim()
+}
+
+function formatSubsidyDisplay(m: ScenarioMetrics): string {
+  const s = m.subsidyStatus
+  if (s === "applied" || s === "estimated") {
+    if (m.subsidyRaw !== null && m.subsidyRaw > 0) {
+      return `${Math.round(m.subsidyRaw).toLocaleString("ko-KR")}만원`
+    }
+    return "지원금 미반영"
+  }
+  if (s === "terms_missing") return "지원율 확인 필요"
+  if (s === "no_policy") return "매칭 정책 없음"
+  if (s === "invalid_investment") return "투자금 확인 필요"
+  if (m.subsidyRaw !== null && m.subsidyRaw > 0) {
+    return `${Math.round(m.subsidyRaw).toLocaleString("ko-KR")}만원`
+  }
+  return "지원금 미반영"
+}
+
+function getHeroText(
+  recLabel: string,
+  subsidyStatus: string | null,
+  subsidyRaw: number | null,
+  hasRecommendation: boolean,
+): { main: string; sub: string | null } {
+  if (!hasRecommendation) {
+    return {
+      main: "정책 조건 및 운영비 입력 후 최종 투자안을 산정할 수 있습니다.",
+      sub: "A/B안의 투자금, 실투자금, 연간 순편익 조건을 확인하면 ROI와 회수기간을 계산할 수 있습니다.",
+    }
+  }
+  if ((subsidyStatus === "applied" || subsidyStatus === "estimated") && subsidyRaw !== null && subsidyRaw > 0) {
+    return { main: `지원사업 반영 시, ${recLabel}을 우선 검토하세요.`, sub: null }
+  }
+  if (subsidyStatus === "terms_missing") {
+    return {
+      main: `정책 조건 확인 후, ${recLabel}을 우선 검토하세요.`,
+      sub: "매칭 정책의 지원율 확인 후 최종 ROI가 다시 계산됩니다.",
+    }
+  }
+  return {
+    main: `현재 입력 기준, ${recLabel}을 우선 검토하세요.`,
+    sub: "현재 ROI는 지원금 미반영 기준입니다.",
+  }
+}
+
+function getAiSummary(
+  roiResult: Record<string, unknown>,
+  rec: "a" | "b" | null,
+): { summary: string; bullets: string[] } {
+  if (rec === null) {
+    return {
+      summary: "정책 지원율 또는 투자 조건을 확인한 뒤 최종 추천안을 산정할 수 있습니다.",
+      bullets: [],
+    }
+  }
+  const ai = roiResult.ai_recommendation
+  if (ai && typeof ai === "object" && !Array.isArray(ai)) {
+    const aiRec = ai as Record<string, unknown>
+    const summary = typeof aiRec.summary === "string" && aiRec.summary.trim() ? aiRec.summary.trim() : null
+    const bullets = Array.isArray(aiRec.reason_bullets)
+      ? (aiRec.reason_bullets as unknown[])
+          .filter((b): b is string => typeof b === "string" && b.trim().length > 0)
+          .slice(0, 3)
+      : []
+    if (summary) return { summary, bullets }
+  }
+  return {
+    summary:
+      rec === "a"
+        ? "A안은 설비 노후도와 연간 총 절감 효과를 고려한 우선 검토안입니다."
+        : "B안은 초기 투자 부담과 회수기간을 고려한 우선 검토안입니다.",
+    bullets: [],
+  }
 }
 
 type JudgmentLevel = "높음" | "보통" | "낮음"
@@ -133,36 +250,83 @@ export default function RoiPage() {
   const result = getAnalysisResult(analysisId)
 
   const [selectedScen, setSelectedScen] = useState<"a" | "b" | null>(null)
+  const [reanalysisError, setReanalysisError] = useState("")
+  const [isResolvingReanalysis, setIsResolvingReanalysis] = useState(false)
 
   if (!result) return <Navigate to="/analysis/new" replace />
 
+  const resultRecord = result as Record<string, unknown>
   const roiResult = asRecord(result.roiResult)
-  const rec = normalizeRec(roiResult.recommended)
-  const scenarioA = getScenario(roiResult, "a")
-  const scenarioB = getScenario(roiResult, "b")
+  const rec = normalizeRec(roiResult.recommended ?? resultRecord.recommendedScenario)
+  const topLevelRoi = (result as Record<string, unknown>).roiPct as number ?? null
+  const topLevelPayback = (result as Record<string, unknown>).paybackYears as number ?? null
+  const fallbackScenario =
+    topLevelRoi !== null || topLevelPayback !== null
+      ? {
+        roi_pct: topLevelRoi,
+        payback_years: topLevelPayback,
+      }
+      : {}
+  const scenarioA = Object.keys(getScenario(roiResult, "a")).length > 0
+    ? getScenario(roiResult, "a")
+    : rec === "a"
+      ? fallbackScenario
+      : {}
+  const scenarioB = Object.keys(getScenario(roiResult, "b")).length > 0
+    ? getScenario(roiResult, "b")
+    : rec === "b"
+      ? fallbackScenario
+      : {}
   const hasB = Object.keys(scenarioB).length > 0
   const mA = buildMetrics(scenarioA)
   const mB = buildMetrics(scenarioB)
-  const mRec = rec === "b" ? mB : mA
+  const hasRecommendation = rec !== null || topLevelRoi !== null || topLevelPayback !== null
+  const mRec = rec === "b" ? mB : rec === "a" ? mA : null
+  const mRecFallback = mRec ?? mA
 
-  const roi = mRec.roi ?? (result as Record<string, unknown>).roiPct as number ?? null
-  const payback = mRec.payback ?? (result as Record<string, unknown>).paybackYears as number ?? null
+  const roi = mRec?.roi ?? topLevelRoi
+  const payback = mRec?.payback ?? topLevelPayback
   const draftId = analysisId || (result as Record<string, unknown>).id || "latest"
+  const resultEquipment = asRecord(resultRecord.equipment)
+  const resultAnalysisInput = asRecord(resultRecord.analysisInput ?? resultRecord.analysis_input)
+  const resultEquipmentId = String(
+    resultRecord.equipmentId ??
+      resultRecord.equipment_id ??
+      resultEquipment.equipment_id ??
+      resultEquipment.equipmentId ??
+      resultEquipment.id ??
+      resultAnalysisInput.equipment_id ??
+      resultAnalysisInput.equipmentId ??
+      "",
+  )
+  const matchedPolicyCount = Number((result as Record<string, unknown>).matchedPolicies || 0)
+  const recommendation = String((result as Record<string, unknown>).recommendation || "")
+  const recommendationDetail = String(
+    (result as Record<string, unknown>).recommendationDetail || "",
+  )
+  const canonicalPolicies = Array.isArray((result as Record<string, unknown>).policies)
+    ? ((result as Record<string, unknown>).policies as unknown[])
+    : []
+  const priorityPolicyName =
+    extractPriorityPolicyName(canonicalPolicies) ||
+    String((result as Record<string, unknown>).priorityPolicyName || "")
 
-  const recLabel = rec === "b" ? "B안 · 부분 교체" : "A안 · 전체 교체"
-  const recShort = rec === "b" ? "B안" : "A안"
-  const aIsRec = rec === "a"
-  const bIsRec = rec === "b"
+  const recLabel = rec === "b" ? "B안 · 부분 교체" : rec === "a" ? "A안 · 전체 교체" : "A/B안"
+  const recShort = rec === "b" ? "B안" : rec === "a" ? "A안" : "투자안"
 
-  const priorityPolicyId = extractPriorityPolicyId((result as Record<string, unknown>).policies)
+  const priorityPolicyId = extractPriorityPolicyId(canonicalPolicies)
+  const supportProjectsPath = `/support-projects?analysisId=${encodeURIComponent(String(draftId))}`
+  const priorityPolicyPath = priorityPolicyId
+    ? `/support-projects?analysisId=${encodeURIComponent(String(draftId))}&policyId=${encodeURIComponent(priorityPolicyId)}`
+    : supportProjectsPath
 
   const subsidyRatio =
-    mRec.subsidy !== null && mRec.investment !== null && mRec.investment > 0
-      ? mRec.subsidy / mRec.investment
+    mRecFallback.subsidy !== null && mRecFallback.investment !== null && mRecFallback.investment > 0
+      ? mRecFallback.subsidy / mRecFallback.investment
       : null
   const savingRatio =
-    mRec.saving !== null && mRec.investment !== null && mRec.investment > 0
-      ? mRec.saving / mRec.investment
+    mRecFallback.saving !== null && mRecFallback.investment !== null && mRecFallback.investment > 0
+      ? mRecFallback.saving / mRecFallback.investment
       : null
 
   const subsidyLevel: JudgmentLevel =
@@ -186,14 +350,90 @@ export default function RoiPage() {
     mA.payback !== null && mB.payback !== null
       ? Math.abs(mA.payback - mB.payback).toFixed(1)
       : null
-  const higherRoiIsA = mA.roi !== null && mB.roi !== null && mA.roi >= mB.roi
+  const heroText = getHeroText(recLabel, mRecFallback.subsidyStatus, mRecFallback.subsidyRaw, hasRecommendation)
+  const aiSummary = getAiSummary(roiResult, rec)
+
+  const handleReanalysis = async () => {
+    setReanalysisError("")
+    setIsResolvingReanalysis(true)
+    try {
+      let resolvedEquipmentId = resultEquipmentId
+      let resolvedAnalysisId = String(draftId)
+
+      if (!resolvedEquipmentId || resolvedEquipmentId === resolvedAnalysisId) {
+        await hydrateAccountData()
+        const refreshedResult = getAnalysisResult()
+        const context = await fetchAnalysisEntryContext()
+        resolvedEquipmentId =
+          String(refreshedResult?.equipmentId ?? "") ||
+          resolvedEquipmentId ||
+          context.latestEquipmentId
+        if (
+          resolvedEquipmentId === resolvedAnalysisId ||
+          !resolvedAnalysisId
+        ) {
+          resolvedAnalysisId =
+            String(refreshedResult?.id ?? "") || context.latestAnalysisId
+        }
+      }
+
+      if (!resolvedEquipmentId || !resolvedAnalysisId || resolvedEquipmentId === resolvedAnalysisId) {
+        console.error("재분석에 필요한 equipmentId 또는 analysisId를 구분할 수 없습니다.", {
+          result,
+          resolvedEquipmentId,
+          resolvedAnalysisId,
+        })
+        setReanalysisError(
+          "설비 정보를 찾을 수 없어 분석 조건을 불러오지 못했습니다. 설비 관리에서 다시 분석을 시작해 주세요.",
+        )
+        return
+      }
+
+      navigate(
+        `/analysis/new?mode=reanalysis&equipmentId=${encodeURIComponent(resolvedEquipmentId)}&parentAnalysisId=${encodeURIComponent(resolvedAnalysisId)}`,
+      )
+    } catch (error) {
+      console.error("재분석 정보 확인에 실패했습니다.", error)
+      setReanalysisError(
+        "설비 정보를 확인하지 못했습니다. 잠시 후 다시 시도하거나 설비 관리에서 분석을 시작해 주세요.",
+      )
+    } finally {
+      setIsResolvingReanalysis(false)
+    }
+  }
 
   return (
     <main className="page">
+      <style>{`
+        @media (max-width: 980px) {
+          .roi-result-hero-grid {
+            grid-template-columns: 1fr !important;
+            gap: 28px !important;
+            padding: 36px 28px !important;
+          }
+          .roi-result-hero-bot {
+            position: static !important;
+            width: 128px !important;
+            margin: 18px 28px 0 auto !important;
+            display: block !important;
+          }
+          .roi-result-hero-grid > div:last-child {
+            padding-top: 0 !important;
+          }
+        }
+        @media (max-width: 620px) {
+          .roi-result-hero-grid > div:last-child {
+            grid-template-columns: 1fr !important;
+          }
+          .roi-result-hero-grid button {
+            width: 100%;
+          }
+        }
+      `}</style>
       <section className="section white">
         <div
           style={{
-            width: "min(1080px, calc(100% - 40px))",
+            width: "min(1350px, calc(100% - 44px))",
             margin: "0 auto",
             paddingTop: "28px",
             paddingBottom: "80px",
@@ -202,19 +442,41 @@ export default function RoiPage() {
           {/* ── 1. 네이비 Hero ─────────────────────────────────────────────── */}
           <div
             style={{
-              background: C.navy,
-              borderRadius: "20px",
+              position: "relative",
+              background:
+                "radial-gradient(circle at 86% 20%, rgba(255,255,255,0.16), transparent 23%), linear-gradient(124deg, #0f1d35 0%, #142038 58%, #273348 100%)",
+              borderRadius: "24px",
               overflow: "hidden",
-              marginBottom: "28px",
+              marginBottom: "36px",
+              minHeight: "486px",
+              boxShadow: "0 26px 60px rgba(15,29,53,0.16)",
             }}
           >
+            <img
+              className="roi-result-hero-bot"
+              src={engiBot}
+              alt=""
+              aria-hidden="true"
+              style={{
+                position: "absolute",
+                top: "72px",
+                right: "56px",
+                width: "min(172px, 18vw)",
+                height: "auto",
+                objectFit: "contain",
+                filter: "drop-shadow(0 18px 28px rgba(0,0,0,0.28))",
+                zIndex: 1,
+              }}
+            />
             {/* top bar */}
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
-                padding: "18px 32px 0",
+                padding: "25px 40px 0",
+                position: "relative",
+                zIndex: 2,
               }}
             >
               <button
@@ -236,60 +498,67 @@ export default function RoiPage() {
                 <ArrowLeft size={14} />
                 내 투자 분석
               </button>
-              <button
-                type="button"
-                onClick={() => navigate(`/analysis/new?draftId=${draftId}`)}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  height: "34px",
-                  padding: "0 14px",
-                  borderRadius: "8px",
-                  border: "1px solid rgba(255,255,255,0.18)",
-                  background: "transparent",
-                  color: "rgba(255,255,255,0.6)",
-                  fontSize: "12px",
-                  fontWeight: 800,
-                  cursor: "pointer",
-                }}
-              >
-                <Settings size={13} />
-                분석 가정 수정
-              </button>
             </div>
+
+            {reanalysisError && (
+              <p
+                role="alert"
+                style={{ color: "#fecaca", fontSize: "13px", fontWeight: 800, padding: "0 32px 18px" }}
+              >
+                {reanalysisError}
+              </p>
+            )}
 
             {/* hero body */}
             <div
+              className="roi-result-hero-grid"
               style={{
                 display: "grid",
-                gridTemplateColumns: "minmax(0,1fr) minmax(0,380px)",
-                gap: "40px",
-                padding: "28px 32px 36px",
+                gridTemplateColumns: "minmax(0,1fr) minmax(360px,475px)",
+                gap: "56px",
+                padding: "46px 40px 42px",
                 alignItems: "center",
+                position: "relative",
+                zIndex: 2,
               }}
             >
               {/* left */}
               <div>
                 <p
                   style={{
-                    color: "rgba(255,255,255,0.36)",
-                    fontSize: "11px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    minHeight: "32px",
+                    padding: "0 17px",
+                    borderRadius: "999px",
+                    border: "1px solid rgba(255,235,174,0.38)",
+                    color: "#fff2b6",
+                    fontSize: "13px",
                     fontWeight: 900,
-                    letterSpacing: "0.16em",
-                    marginBottom: "14px",
+                    letterSpacing: "0.08em",
+                    marginBottom: "18px",
                   }}
                 >
-                  ROI ANALYSIS
+                  FACTOFIT AI ENGI
+                </p>
+                <p
+                  style={{
+                    color: "rgba(255,255,255,0.46)",
+                    fontSize: "15px",
+                    fontWeight: 900,
+                    marginBottom: "18px",
+                  }}
+                >
+                  ROI 분석 결과
                 </p>
                 <h1
                   style={{
                     color: "#ffffff",
-                    fontSize: "clamp(22px,2.6vw,30px)",
-                    fontWeight: 900,
-                    lineHeight: 1.2,
-                    letterSpacing: "-0.03em",
-                    marginBottom: "14px",
+                    fontSize: "clamp(34px,4.1vw,46px)",
+                    fontWeight: 950,
+                    lineHeight: 1.16,
+                    letterSpacing: "-0.05em",
+                    marginBottom: "20px",
                   }}
                 >
                   {(result as Record<string, unknown>).equipmentName as string || "검토 설비"} 투자 검토
@@ -297,47 +566,92 @@ export default function RoiPage() {
                 <p
                   style={{
                     color: "#93c5fd",
-                    fontSize: "clamp(14px,1.5vw,17px)",
-                    fontWeight: 900,
+                    fontSize: "clamp(18px,2vw,24px)",
+                    fontWeight: 950,
                     lineHeight: 1.45,
-                    marginBottom: "10px",
+                    marginBottom: heroText.sub ? "14px" : "28px",
                   }}
                 >
-                  지원사업 반영 시, <strong style={{ color: "#bfdbfe" }}>{recLabel}</strong>을 우선 검토하세요.
+                  {heroText.main}
                 </p>
-                <p
+                {heroText.sub && (
+                  <p
+                    style={{
+                      color: "rgba(255,255,255,0.5)",
+                      fontSize: "clamp(16px,1.55vw,19px)",
+                      lineHeight: 1.7,
+                      fontWeight: 850,
+                      maxWidth: "600px",
+                      marginBottom: "26px",
+                    }}
+                  >
+                    {heroText.sub}
+                  </p>
+                )}
+                <div
                   style={{
-                    color: "rgba(255,255,255,0.5)",
-                    fontSize: "14px",
-                    lineHeight: 1.7,
-                    fontWeight: 800,
-                    maxWidth: "400px",
-                    marginBottom: "22px",
-                  }}
-                >
-                  지원금 반영 효과와 설비 개선 범위를 함께 고려했을 때 현재 조건에서는 {recShort}이 더 적합합니다.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => navigate(`/analysis/${draftId}/policies`)}
-                  style={{
-                    display: "inline-flex",
+                    display: "flex",
                     alignItems: "center",
-                    gap: "6px",
-                    height: "44px",
-                    padding: "0 20px",
-                    borderRadius: "10px",
-                    border: 0,
-                    background: C.blue,
-                    color: "#ffffff",
-                    fontSize: "14px",
-                    fontWeight: 900,
-                    cursor: "pointer",
+                    gap: "12px",
+                    flexWrap: "wrap",
+                    marginTop: heroText.sub ? 0 : "4px",
                   }}
                 >
-                  지원사업 상세보기
-                  <ChevronRight size={15} />
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate(supportProjectsPath)}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      minHeight: "48px",
+                      padding: "0 22px",
+                      borderRadius: "10px",
+                      border: 0,
+                      background: C.blue,
+                      color: "#ffffff",
+                      fontSize: "16px",
+                      fontWeight: 900,
+                      cursor: "pointer",
+                    }}
+                  >
+                    지원사업 상세보기
+                    <ChevronRight size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleReanalysis()}
+                    disabled={isResolvingReanalysis}
+                    onMouseEnter={(event) => {
+                      event.currentTarget.style.background = "#E7902A"
+                      event.currentTarget.style.borderColor = "#E7902A"
+                    }}
+                    onMouseLeave={(event) => {
+                      event.currentTarget.style.background = "#F4A340"
+                      event.currentTarget.style.borderColor = "#F4A340"
+                    }}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      minHeight: "48px",
+                      padding: "0 22px",
+                      borderRadius: "10px",
+                      border: "1px solid #F4A340",
+                      background: "#F4A340",
+                      color: "#16213E",
+                      fontSize: "16px",
+                      fontWeight: 900,
+                      cursor: isResolvingReanalysis ? "wait" : "pointer",
+                      opacity: isResolvingReanalysis ? 0.82 : 1,
+                    }}
+                  >
+                    <SlidersHorizontal size={16} />
+                    {isResolvingReanalysis ? "설비 정보 확인 중..." : "투자 조건 다시 설정"}
+                  </button>
+                </div>
               </div>
 
               {/* right: 2×2 KPI */}
@@ -345,30 +659,33 @@ export default function RoiPage() {
                 style={{
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr",
-                  gap: "12px",
+                  gap: "14px",
+                  alignSelf: "end",
+                  paddingTop: "120px",
                 }}
               >
                 {[
-                  { label: "예상 ROI", value: fmtPct(roi), accent: "#93c5fd" },
-                  { label: "예상 회수기간", value: fmtYrs(payback), accent: "#93c5fd" },
-                  { label: "실부담금", value: fmtWon(mRec.net), sub: "지원금 차감 후" },
-                  { label: "적용 가능 지원금", value: fmtWon(mRec.subsidy), accent: "#86efac" },
+                  { label: "예상 ROI", value: hasRecommendation ? fmtPct(roi) : "산정 보류", accent: "#93c5fd" },
+                  { label: "예상 회수기간", value: hasRecommendation ? fmtYrs(payback) : "산정 보류", accent: "#93c5fd" },
+                  { label: "실부담금", value: hasRecommendation ? fmtWon(mRec?.net ?? null) : "조건 확인 필요", sub: "지원금 차감 후" },
+                  { label: "적용 가능 지원금", value: formatSubsidyDisplay(mRecFallback), accent: "#86efac" },
                 ].map((kpi) => (
                   <div
                     key={kpi.label}
                     style={{
                       background: "rgba(255,255,255,0.07)",
                       border: "1px solid rgba(255,255,255,0.12)",
-                      borderRadius: "14px",
-                      padding: "18px 16px",
+                      borderRadius: "10px",
+                      padding: "22px 20px",
+                      minHeight: "96px",
                     }}
                   >
                     <p
                       style={{
                         color: "rgba(255,255,255,0.45)",
-                        fontSize: "12px",
-                        fontWeight: 800,
-                        marginBottom: "8px",
+                        fontSize: "14px",
+                        fontWeight: 900,
+                        marginBottom: "12px",
                       }}
                     >
                       {kpi.label}
@@ -376,9 +693,9 @@ export default function RoiPage() {
                     <p
                       style={{
                         color: kpi.accent ?? "#ffffff",
-                        fontSize: "clamp(18px,2vw,24px)",
-                        fontWeight: 900,
-                        letterSpacing: "-0.03em",
+                        fontSize: "clamp(28px,3vw,34px)",
+                        fontWeight: 950,
+                        letterSpacing: "-0.05em",
                         lineHeight: 1,
                         marginBottom: kpi.sub ? "6px" : 0,
                       }}
@@ -524,7 +841,9 @@ export default function RoiPage() {
                   const isActive = activeScen === sId
                   const m = sId === "a" ? mA : mB
                   const label = sId === "a" ? "A안 · 전체 교체" : "B안 · 부분 교체"
-                  const subLabel = isRec ? "우선 검토" : "초기 비용 대안"
+                  const subLabel = hasRecommendation
+                    ? (isRec ? "우선 검토" : "초기 비용 대안")
+                    : (sId === "a" ? "전체 교체안" : "부분 교체안")
 
                   return (
                     <button
@@ -602,7 +921,7 @@ export default function RoiPage() {
                       >
                         {[
                           { label: "총 투자금", value: fmtWon(m.investment) },
-                          { label: "적용 가능 지원금", value: fmtWon(m.subsidy), color: C.green },
+                          { label: "적용 가능 지원금", value: formatSubsidyDisplay(m), color: C.green },
                           { label: "실부담금", value: fmtWon(m.net) },
                           { label: "연간 순편익", value: fmtWon(m.saving) },
                         ].map((row) => (
@@ -673,6 +992,11 @@ export default function RoiPage() {
                           </p>
                         </div>
                       </div>
+                      {!hasRecommendation && (
+                        <p style={{ color: C.muted, fontSize: "11px", fontWeight: 800, textAlign: "center", marginTop: "10px" }}>
+                          운영비 또는 정책 지원조건 확인 후 계산됩니다.
+                        </p>
+                      )}
                     </button>
                   )
                 })}
@@ -695,7 +1019,7 @@ export default function RoiPage() {
                       marginBottom: "10px",
                     }}
                   >
-                    핵심 요약
+                    {hasRecommendation ? "핵심 요약" : "계산 조건 확인 필요"}
                   </p>
                   <p
                     style={{
@@ -703,13 +1027,31 @@ export default function RoiPage() {
                       fontSize: "14px",
                       fontWeight: 800,
                       lineHeight: 1.6,
-                      marginBottom: "18px",
+                      marginBottom: aiSummary.bullets.length > 0 ? "10px" : "18px",
                     }}
                   >
-                    {higherRoiIsA
-                      ? "A안은 지원금 증가를 통해 초기 부담을 낮추고 장기 수익성도 더 높습니다."
-                      : "B안은 초기 투자 부담을 낮추고 단기 회수에 유리한 선택지입니다."}
+                    {aiSummary.summary}
                   </p>
+                  {aiSummary.bullets.length > 0 && (
+                    <ul
+                      style={{
+                        paddingLeft: "16px",
+                        margin: "0 0 18px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "4px",
+                      }}
+                    >
+                      {aiSummary.bullets.map((bullet) => (
+                        <li
+                          key={bullet}
+                          style={{ color: C.muted, fontSize: "12px", fontWeight: 800, lineHeight: 1.55 }}
+                        >
+                          {bullet}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
 
                   <div
                     style={{
@@ -720,6 +1062,11 @@ export default function RoiPage() {
                       gap: "14px",
                     }}
                   >
+                    {!hasRecommendation && (
+                      <p style={{ color: C.muted, fontSize: "12px", fontWeight: 800, lineHeight: 1.6 }}>
+                        A/B안의 투자금·실투자금·연간 순편익이 모두 확인되면 ROI 비교가 가능합니다.
+                      </p>
+                    )}
                     {roiDiff && (
                       <div>
                         <p
@@ -809,7 +1156,7 @@ export default function RoiPage() {
                 <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
                   <button
                     type="button"
-                    onClick={() => navigate(`/analysis/${draftId}/policies`)}
+                    onClick={() => navigate(supportProjectsPath)}
                     style={{
                       display: "inline-flex",
                       alignItems: "center",
@@ -826,7 +1173,7 @@ export default function RoiPage() {
                     }}
                   >
                     맞춤 지원사업
-                    {(result as Record<string, unknown>).matchedPolicies as number > 0
+                    {Number((result as Record<string, unknown>).matchedPolicies) > 0
                       ? ` ${(result as Record<string, unknown>).matchedPolicies}건`
                       : ""}{" "}
                     보기
@@ -835,7 +1182,7 @@ export default function RoiPage() {
                   {priorityPolicyId && (
                     <button
                       type="button"
-                      onClick={() => navigate(`/analysis/${draftId}/policies/${priorityPolicyId}`)}
+                      onClick={() => navigate(priorityPolicyPath)}
                       style={{
                         height: "44px",
                         padding: "0 20px",
@@ -855,7 +1202,7 @@ export default function RoiPage() {
               </div>
 
               {/* right: 정책 카드 */}
-              {(result as Record<string, unknown>).priorityPolicyName && (
+              {priorityPolicyName && (
                 <div
                   style={{
                     background: "#ffffff",
@@ -897,11 +1244,11 @@ export default function RoiPage() {
                       marginBottom: "10px",
                     }}
                   >
-                    {(result as Record<string, unknown>).priorityPolicyName as string}
+                    {priorityPolicyName}
                   </p>
                   <p style={{ color: C.muted, fontSize: "12px", fontWeight: 800 }}>
                     내 기업·설비 조건 매칭{" "}
-                    {(result as Record<string, unknown>).matchedPolicies as number > 0
+                    {matchedPolicyCount > 0
                       ? `${(result as Record<string, unknown>).matchedPolicies}건`
                       : ""}{" "}
                     중 우선 검토{" "}
@@ -919,10 +1266,10 @@ export default function RoiPage() {
             <Accordion title="비용 산정 기준 보기">
               <div style={{ display: "flex", flexDirection: "column" }}>
                 {[
-                  { label: "총 투자금 (추천 시나리오)", value: fmtWon(mRec.investment) },
-                  { label: "적용 가능 지원금", value: fmtWon(mRec.subsidy) },
-                  { label: "실부담금 (지원금 차감)", value: fmtWon(mRec.net) },
-                  { label: "연간 순편익 (절감 기준)", value: fmtWon(mRec.saving) },
+                  { label: "총 투자금 (추천 시나리오)", value: fmtWon(mRecFallback.investment) },
+                  { label: "적용 가능 지원금", value: formatSubsidyDisplay(mRecFallback) },
+                  { label: "실부담금 (지원금 차감)", value: fmtWon(mRecFallback.net) },
+                  { label: "연간 순편익 (절감 기준)", value: fmtWon(mRecFallback.saving) },
                   { label: "예상 ROI", value: fmtPct(roi) },
                   { label: "예상 회수기간", value: fmtYrs(payback) },
                 ].map((row) => (
@@ -954,8 +1301,8 @@ export default function RoiPage() {
             </Accordion>
 
             <Accordion title="AI 판단 상세 근거 보기">
-              {(result as Record<string, unknown>).recommendation && (
-                <div style={{ marginBottom: (result as Record<string, unknown>).recommendationDetail ? "18px" : 0 }}>
+              {recommendation && (
+                <div style={{ marginBottom: recommendationDetail ? "18px" : 0 }}>
                   <p
                     style={{
                       color: C.blue,
@@ -968,11 +1315,11 @@ export default function RoiPage() {
                     추천 요약
                   </p>
                   <p style={{ color: "#1e3a6f", fontSize: "14px", fontWeight: 800, lineHeight: 1.75 }}>
-                    {(result as Record<string, unknown>).recommendation as string}
+                    {recommendation}
                   </p>
                 </div>
               )}
-              {(result as Record<string, unknown>).recommendationDetail && (
+              {recommendationDetail && (
                 <div>
                   <p
                     style={{
@@ -986,12 +1333,11 @@ export default function RoiPage() {
                     상세 근거
                   </p>
                   <p style={{ color: C.muted, fontSize: "14px", fontWeight: 800, lineHeight: 1.75 }}>
-                    {(result as Record<string, unknown>).recommendationDetail as string}
+                    {recommendationDetail}
                   </p>
                 </div>
               )}
-              {!(result as Record<string, unknown>).recommendation &&
-                !(result as Record<string, unknown>).recommendationDetail && (
+              {!recommendation && !recommendationDetail && (
                   <p style={{ color: "#94a3b8", fontSize: "14px", fontWeight: 800 }}>
                     상세 근거 데이터가 없습니다.
                   </p>

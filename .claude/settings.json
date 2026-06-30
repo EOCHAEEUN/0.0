@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"c:\\\\Users\\\\Donga\\\\Desktop\\\\EOCHAEEUN\\\\0.0\" diff HEAD -- backend/app/routers/analyze.py)",
+      "Bash(git -C \"c:\\\\Users\\\\Donga\\\\Desktop\\\\EOCHAEEUN\\\\0.0\" diff HEAD -- backend/app/routers/onboarding.py)",
+      "Bash(grep -rn \"navigate.*\\\\/\\\\|window\\\\.location.*main\\\\|window\\\\.location.*login\\\\|isLogin\\\\|isAuthenticated\\\\|useAuth\\\\|PrivateRoute\\\\|RequireAuth\" \"c:\\\\Users\\\\Donga\\\\Desktop\\\\EOCHAEEUN\\\\0.0\\\\frontend\\\\src\\\\pages\\\\LoginPage.tsx\" \"c:\\\\Users\\\\Donga\\\\Desktop\\\\EOCHAEEUN\\\\0.0\\\\frontend\\\\src\\\\pages\\\\DashboardPage.tsx\")",
+      "Bash(grep -rn \"\\\\/main\\\\|to.*main\\\\|navigate.*main\\\\|window\\\\.location.*main\\\\|isAuth\\\\|AuthGuard\\\\|resolvePostLogin\" \"c:\\\\Users\\\\Donga\\\\Desktop\\\\EOCHAEEUN\\\\0.0\\\\frontend\\\\src\" --include=\"*.tsx\" --include=\"*.ts\")",
+      "PowerShell(Invoke-WebRequest -Uri \"http://127.0.0.1:8000/api/health\" -UseBasicParsing -TimeoutSec 5 2>&1)",
+      "PowerShell(Get-Process -Id 34524, 43488 -ErrorAction SilentlyContinue)",
+      "PowerShell(Invoke-WebRequest -Uri \"http://127.0.0.1:8000/api/auth/login\" -Method POST -ContentType \"application/json\" -Body '{\"email\":\"fishiseo@gmail.com\",\"password\":\"test\"}' -UseBasicParsing -TimeoutSec 5 2>&1)",
+      "PowerShell(Get-Process -Name python -ErrorAction SilentlyContinue)",
+      "PowerShell(Stop-Process -Force)",
+      "PowerShell($pids = \\(netstat -ano | Select-String \":8000\" | ForEach-Object { \\($_ -split '\\\\s+'\\)[-1] } | Sort-Object -Unique\\); foreach \\($p in $pids\\) { if \\($p -match '^\\\\d+$' -and $p -ne '0'\\) { taskkill /PID $p /F 2>$null } }; Start-Sleep -Seconds 2; netstat -ano | findstr \":8000\")",
+      "PowerShell($pids = \\(netstat -ano | Select-String \":8000\" | ForEach-Object { \\($_ -split '\\\\s+'\\)[-1] } | Where-Object { $_ -match '^\\\\d+$' -and $_ -ne '0' } | Sort-Object -Unique\\); foreach \\($p in $pids\\) { taskkill /PID $p /F 2>$null }; Start-Sleep -Seconds 2; cd \"c:\\\\Users\\\\Donga\\\\Desktop\\\\EOCHAEEUN\\\\0.0\\\\backend\"; Start-Process python -ArgumentList \"-m uvicorn app.main:app --host 0.0.0.0 --port 8000\" -WindowStyle Hidden; Start-Sleep -Seconds 5; netstat -ano | findstr \":8000\")",
+      "Bash(git -C 'c:\\\\Users\\\\Donga\\\\Desktop\\\\EOCHAEEUN\\\\0.0' add backend/app/agents/info_collector.py backend/app/agents/router.py backend/app/core/llm.py backend/app/graph.py backend/app/main.py backend/app/models/equipment.py backend/app/prompts/info_collector.py backend/app/routers/analyze.py backend/app/routers/onboarding.py backend/app/tools/roi_calc.py frontend/src/App.tsx frontend/src/components/auth/SignupModal.tsx frontend/src/components/auth/signup/signup.types.ts frontend/src/components/auth/signup/useSignupForm.ts frontend/src/components/dashboard/EquipmentStatusList.tsx frontend/src/components/layout/AuthenticatedLayout.tsx frontend/src/components/layout/GlobalHeader.tsx frontend/src/factofit.css frontend/src/features/aiAdvisor/aiAdvisor.api.ts frontend/src/features/aiAdvisor/aiAdvisor.css frontend/src/features/aiAdvisor/components/AdvisorFloatingButton.tsx frontend/src/features/auth/login/hooks/useLoginForm.ts frontend/src/features/dashboard/DashboardFeature.tsx frontend/src/features/dashboard/dashboard.api.ts frontend/src/features/dashboard/dashboard.contract.ts frontend/src/features/dashboard/dashboard.parts.ts frontend/src/features/dashboard/hooks/useDashboardData.ts frontend/src/features/dashboard/mappers/dashboardMapper.ts frontend/src/features/onboarding/ frontend/src/features/roi/RoiFeature.tsx frontend/src/features/roi/components/RoiPageSections.tsx frontend/src/features/roi/components/RoiResultSections.tsx frontend/src/features/roi/roi.contract.ts frontend/src/features/roi/roi.utils.ts frontend/src/features/safety/SafetyFeature.tsx frontend/src/features/support/ frontend/src/index.css frontend/src/pages/RoiPage.tsx frontend/src/pages/SupportProjectsPage.tsx frontend/src/styles/factofit/00-foundation-global.css frontend/src/assets/advisor/)",
+      "Bash(git -C 'c:\\\\Users\\\\Donga\\\\Desktop\\\\EOCHAEEUN\\\\0.0' commit -m ' *)",
+      "Bash(git -C \"c:\\\\Users\\\\Donga\\\\Desktop\\\\EOCHAEEUN\\\\0.0\" push origin eochaeeun/uiux-experiment-20260625)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess | ForEach-Object { Write-Host \"PID: $_\" })",
+      "PowerShell(taskkill /PID 53812 /F)",
+      "Bash(nohup python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload)",
+      "Bash(curl -s http://localhost:8000/docs)",
+      "PowerShell(Start-Process -NoNewWindow -FilePath \"python\" -ArgumentList \"-m\", \"uvicorn\", \"app.main:app\", \"--host\", \"0.0.0.0\", \"--port\", \"8000\", \"--reload\" -WorkingDirectory \"c:\\\\Users\\\\Donga\\\\Desktop\\\\EOCHAEEUN\\\\0.0\\\\backend\")",
+      "PowerShell(Start-Sleep -Seconds 3; try { $r = Invoke-WebRequest -Uri \"http://localhost:8000/docs\" -TimeoutSec 5 -ErrorAction Stop; Write-Host \"백엔드 정상 응답: $\\($r.StatusCode\\)\" } catch { Write-Host \"아직 기동 중...\" })",
+      "PowerShell(Start-Sleep -Seconds 5; try { $r = Invoke-WebRequest -Uri \"http://localhost:8000/docs\" -TimeoutSec 5 -ErrorAction Stop; Write-Host \"백엔드 정상: $\\($r.StatusCode\\)\" } catch { Write-Host \"백엔드 응답 없음: $\\($_.Exception.Message\\)\" })",
+      "PowerShell(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue)",
+      "Bash(python -m py_compile backend/app/tools/roi_calc.py)",
+      "Bash(python -c ' *)"
+    ]
+  }
+}

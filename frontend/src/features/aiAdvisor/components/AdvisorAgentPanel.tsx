@@ -76,7 +76,7 @@ export function AdvisorAgentPanel({
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          text: answer,
+          text: answer.text,
         },
       ])
     } catch (error) {

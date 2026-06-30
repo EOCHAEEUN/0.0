@@ -4,15 +4,27 @@ type Step = {
 
 type OnboardingStepperProps = {
   currentStep: 1 | 2 | 3
+  variant?: "analysis" | "setup"
 }
 
-const steps: Step[] = [
+const analysisSteps: Step[] = [
   { label: "기업 정보" },
   { label: "투자 조건" },
   { label: "검토 결과" },
 ]
 
-export function OnboardingStepper({ currentStep }: OnboardingStepperProps) {
+const setupSteps: Step[] = [
+  { label: "기업 정보" },
+  { label: "설비 정보" },
+  { label: "등록 완료" },
+]
+
+export function OnboardingStepper({
+  currentStep,
+  variant = "analysis",
+}: OnboardingStepperProps) {
+  const steps = variant === "setup" ? setupSteps : analysisSteps
+
   return (
     <ol className="ff-onboarding-stepper" aria-label="온보딩 진행 단계">
       {steps.map((step, index) => {

@@ -67,6 +67,9 @@ export type DashboardWorkspace = {
   industryLabel: string
   regionLabel: string
   actionCount: number
+  equipmentCount: number
+  priorityEquipmentCount: number
+  recentAnalysisCount: number
   nearestDeadlineSummary: string
   briefingTitle: string
   recentStatusMessage: string
@@ -261,6 +264,48 @@ function normalizePolicies(analysis: DashboardAnalysisStorage | null) {
       : null) ??
     []
   )
+}
+
+function mapRoiOutputToAnalysis(
+  roiOutput: DashboardOnboardingMeResponse["latest_roi_output"],
+  onboarding: DashboardOnboardingMeResponse | null | undefined,
+): DashboardAnalysisStorage | null {
+  if (!roiOutput?.roi_data) return null
+
+  const equipments = onboarding?.equipments ?? []
+  const equipmentId = compactText(roiOutput.equipment_id)
+  const equipment = equipments.find((item) =>
+    [item.equipment_id, item.id].some((id) => compactText(id) === equipmentId),
+  )
+  const matchedPolicies = (onboarding?.matched_policies ?? []).filter((policy) =>
+    !equipmentId || compactText(policy.equipment_id) === equipmentId,
+  )
+
+  return {
+    id: compactText(roiOutput.id) || compactText(roiOutput.analysis_id),
+    company_id: roiOutput.company_id,
+    equipment_id: equipmentId,
+    company: onboarding?.company ?? null,
+    equipment: equipment ?? null,
+    equipments,
+    roi_output: roiOutput,
+    roi_data: roiOutput.roi_data,
+    matched_policies: matchedPolicies,
+    createdAt: roiOutput.created_at,
+  } as DashboardAnalysisStorage
+}
+
+function getServerAnalyses(onboarding: DashboardOnboardingMeResponse | null | undefined) {
+  const roiOutputs =
+    onboarding?.roi_outputs && onboarding.roi_outputs.length > 0
+      ? onboarding.roi_outputs
+      : onboarding?.latest_roi_output
+        ? [onboarding.latest_roi_output]
+        : []
+
+  return roiOutputs
+    .map((roiOutput) => mapRoiOutputToAnalysis(roiOutput, onboarding))
+    .filter((analysis): analysis is DashboardAnalysisStorage => analysis !== null)
 }
 
 function getRoiData(analysis: DashboardAnalysisStorage | null) {
@@ -485,6 +530,8 @@ function getAnalysisId(analysis: DashboardAnalysisStorage | null) {
   return (
     compactText(record?.id) ||
     compactText(record?.analysis_id) ||
+    compactText(analysis?.roi_output?.id) ||
+    compactText(analysis?.roi_output?.analysis_id) ||
     compactText(record?.draft_id) ||
     ""
   )
@@ -719,7 +766,15 @@ function mapWorkspace(
       ? getPolicyDetailPath(analysisId, priorityPolicy)
       : `/analysis/${analysisId}/policies`
     : "/support-projects"
-  const draftPath = analysisId ? `/analysis/new?draftId=${analysisId}` : "/analysis/new"
+  const analysisEquipmentId = compactText(
+    analysisRecord?.equipmentId ??
+      analysisRecord?.equipment_id ??
+      analysisRecord?.selected_equipment_id,
+  )
+  const draftPath =
+    analysisId && analysisEquipmentId
+      ? `/analysis/new?mode=reanalysis&equipmentId=${encodeURIComponent(analysisEquipmentId)}&parentAnalysisId=${encodeURIComponent(analysisId)}`
+      : "/analysis/new"
   const roiData = getRoiData(analysis)
   const roi =
     findNumberByKeys(analysisRecord, ["roiPct", "roiPercent"]) ??
@@ -738,6 +793,9 @@ function mapWorkspace(
     (item) => item.urgency === "urgent",
   ).length
   const actionCount = urgentActionCount > 0 ? urgentActionCount : status === "empty" ? 0 : 1
+  const equipmentCount = equipments.length
+  const priorityEquipmentCount = status === "empty" ? 0 : equipmentCount
+  const recentAnalysisCount = analysisId ? 1 : 0
   const nearestDeadlineSummary =
     typeof daysRemaining === "number"
       ? `D-${Math.max(0, daysRemaining)} 공고 조건 확인`
@@ -771,6 +829,9 @@ function mapWorkspace(
     industryLabel,
     regionLabel,
     actionCount,
+    equipmentCount,
+    priorityEquipmentCount,
+    recentAnalysisCount,
     nearestDeadlineSummary,
     briefingTitle,
     recentStatusMessage: `${equipmentName} 분석이 완료됐어요.`,
@@ -882,10 +943,18 @@ export function mapDashboardData({
   onboarding,
   analysis,
 }: MapDashboardDataParams): DashboardViewModel {
-  const company = onboarding?.company ?? analysis?.company ?? null
-  const equipments = normalizeEquipments(onboarding, analysis)
-  const workspace = mapWorkspace(company, analysis, equipments)
-  const analyses = mapAnalysisRows(workspace, analysis).slice(0, 5)
+  const serverAnalyses = getServerAnalyses(onboarding)
+  const effectiveAnalysis = serverAnalyses[0] ?? analysis
+  const company = onboarding?.company ?? effectiveAnalysis?.company ?? null
+  const equipments = normalizeEquipments(onboarding, effectiveAnalysis)
+  const workspace = mapWorkspace(company, effectiveAnalysis, equipments)
+  const analyses = (
+    serverAnalyses.length > 0
+      ? serverAnalyses.flatMap((item) =>
+          mapAnalysisRows(mapWorkspace(company, item, equipments), item),
+        )
+      : mapAnalysisRows(workspace, effectiveAnalysis)
+  ).slice(0, 5)
 
   return {
     companyRows: mapCompanyRows(company),
@@ -893,8 +962,9 @@ export function mapDashboardData({
     workspace: {
       ...workspace,
       analyses,
-      hasMoreAnalyses: analyses.length > 5,
+      recentAnalysisCount: serverAnalyses.length || workspace.recentAnalysisCount,
+      hasMoreAnalyses: serverAnalyses.length > 5,
     },
-    isFallback: !analysis,
+    isFallback: !effectiveAnalysis,
   }
 }

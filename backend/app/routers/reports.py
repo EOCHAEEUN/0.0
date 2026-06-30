@@ -2,7 +2,7 @@ from typing import Literal
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
 from app.core.auth import get_current_user
@@ -17,6 +17,12 @@ from app.services.application_report import (
 
 
 router = APIRouter()
+
+SNAPSHOT_EMPTY_MESSAGE = "이 분석에는 저장된 정책 스냅샷이 없습니다. 해당 시점 정책을 조회할 수 없습니다."
+SNAPSHOT_POLICY_NOT_FOUND_MESSAGE = (
+    "이 분석의 저장된 정책 스냅샷에서 요청한 정책을 찾을 수 없습니다."
+)
+ANALYSIS_NOT_FOUND_MESSAGE = "분석 결과를 찾을 수 없습니다."
 
 
 class ApplicationReportRequest(BaseModel):
@@ -42,6 +48,7 @@ async def _generate_application_report_response(
             body.company_id,
             body.equipment_id,
             body.policy_id,
+            analysis_id=body.analysis_id,
             user_id=current_user.id,
             tone=body.tone,
         )
@@ -56,7 +63,35 @@ async def _generate_application_report_response(
             tone=body.tone,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        message = str(exc)
+        if body.analysis_id:
+            if "저장된 정책 정보 없음" in message:
+                return JSONResponse(
+                    status_code=409,
+                    content={
+                        "success": False,
+                        "message": SNAPSHOT_EMPTY_MESSAGE,
+                        "error_code": "POLICY_SNAPSHOT_MISSING",
+                    },
+                )
+            if "저장된 정책 정보에서 요청한 정책을 찾을 수 없습니다." in message:
+                return JSONResponse(
+                    status_code=409,
+                    content={
+                        "success": False,
+                        "message": SNAPSHOT_POLICY_NOT_FOUND_MESSAGE,
+                        "error_code": "POLICY_SNAPSHOT_POLICY_NOT_FOUND",
+                    },
+                )
+            if "분석 이력을 찾을 수 없습니다." in message:
+                return JSONResponse(
+                    status_code=404,
+                    content={
+                        "success": False,
+                        "message": ANALYSIS_NOT_FOUND_MESSAGE,
+                    },
+                )
+        raise HTTPException(status_code=404, detail=message) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=500,

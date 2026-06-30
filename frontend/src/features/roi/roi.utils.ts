@@ -27,7 +27,12 @@ export function normalizeNumberString(value: string | number | undefined | null)
 }
 
 export function toNumber(value: string | number | undefined | null, fallback = 0) {
-  const num = Number(normalizeNumberString(value))
+  // null/undefined → fallback (String(null ?? "") = "" → Number("") = 0 이 finite이므로 명시 처리)
+  if (value === null || value === undefined) return fallback
+  const str = normalizeNumberString(value)
+  // 빈 문자열 → fallback (Number("") = 0 이 finite이지만 "입력 없음"으로 처리)
+  if (!str) return fallback
+  const num = Number(str)
   return Number.isFinite(num) ? num : fallback
 }
 
@@ -471,23 +476,39 @@ export function mergeApiScenarios(localScenarios: ScenarioCard[], apiData: RoiAp
     if (!api) return local
 
     const investment = toNumber(api.investment_manwon, local.investmentManwon)
-    const subsidy = toNumber(api.subsidy_manwon, local.subsidyManwon)
-    const netInvestment = toNumber(api.net_investment_manwon, investment - subsidy)
-    const annualNetBenefit = toNumber(
-      api.annual_net_benefit_manwon,
-      local.annualNetBenefitManwon,
-    )
 
-    // payback_years: API null/0 = 유효한 회수기간 없음 → null(→'-') 그대로 사용.
-    // API 시나리오가 존재할 때 로컬 fallback을 쓰면 "ROI=0% + 회수기간=3년" 같은
-    // 논리 모순이 생기므로 fallback을 제거한다.
+    // 지원금: API 값이 존재하면 사용(투자금 상한 적용), 없으면 로컬 추정값
+    const rawSubsidy = api.subsidy_manwon != null ? toNumber(api.subsidy_manwon) : null
+    const subsidy = rawSubsidy !== null
+      ? Math.min(rawSubsidy, investment)  // 지원금은 투자금 초과 불가
+      : local.subsidyManwon
+
+    // 실투자금: API net_investment_manwon이 있으면 사용, 없으면 investment - subsidy
+    const apiNetRaw = api.net_investment_manwon != null ? toNumber(api.net_investment_manwon) : null
+    const netInvestment = apiNetRaw !== null
+      ? Math.max(apiNetRaw, 0)
+      : Math.max(investment - subsidy, 0)
+
+    // 연간 순편익: API annual_net_benefit_manwon이 있으면 사용, 없으면 로컬 계산값
+    const apiAnnualBenefitRaw = api.annual_net_benefit_manwon != null
+      ? toNumber(api.annual_net_benefit_manwon)
+      : null
+    let annualNetBenefit = apiAnnualBenefitRaw !== null
+      ? apiAnnualBenefitRaw
+      : local.annualNetBenefitManwon
+
+    // payback_years: 0 이하 → 계산 불가(null). 로컬 fallback 금지 (논리 모순 방지)
     const apiPayback =
       typeof api.payback_years === "number" && api.payback_years > 0
         ? roundTo(api.payback_years, 1)
         : null
 
-    // roi_pct: 0.0은 유효한 백엔드 값(절감 없음 → ROI 0%)이므로 그대로 표시한다.
-    // 필드가 완전히 없을 때(undefined/null)만 로컬 추정치로 fallback.
+    // 연간 순편익이 없고 payback에서 역산 가능하면 역산
+    if (annualNetBenefit <= 0 && apiPayback && apiPayback > 0 && netInvestment > 0) {
+      annualNetBenefit = roundTo(netInvestment / apiPayback, 0)
+    }
+
+    // roi_pct: null/undefined → 로컬 추정값 fallback. 0은 유효값(절감 없음)
     const apiRoiRaw =
       api.roi_pct !== undefined && api.roi_pct !== null ? Number(api.roi_pct) : null
     const roiPct =
@@ -496,33 +517,24 @@ export function mergeApiScenarios(localScenarios: ScenarioCard[], apiData: RoiAp
         : local.roiPct
 
     const breakdown = api.breakdown ?? null
-    const energySaving = toNumber(
-      breakdown?.energy_saving_manwon,
-      local.energySavingManwon,
-    )
-    const maintenanceSaving = toNumber(
-      breakdown?.maintenance_saving_manwon,
-      local.maintenanceSavingManwon,
-    )
-    const defectSaving = toNumber(
-      breakdown?.defect_saving_manwon,
-      local.defectSavingManwon,
-    )
+    const energySaving = toNumber(breakdown?.energy_saving_manwon, local.energySavingManwon)
+    const maintenanceSaving = toNumber(breakdown?.maintenance_saving_manwon, local.maintenanceSavingManwon)
+    const defectSaving = toNumber(breakdown?.defect_saving_manwon, local.defectSavingManwon)
 
-    if (import.meta.env.DEV) {
-      console.debug("[mergeApiScenarios] scenario", local.id, {
-        api_investment_manwon: api.investment_manwon,
-        api_subsidy_manwon: api.subsidy_manwon,
-        api_net_investment_manwon: api.net_investment_manwon,
-        api_annual_net_benefit_manwon: api.annual_net_benefit_manwon,
-        api_payback_years: api.payback_years,
-        api_roi_pct: api.roi_pct,
-        mapped_paybackYears: apiPayback,
-        mapped_roiPct: roiPct,
-        mapped_annualNetBenefit: annualNetBenefit,
-        mapped_netInvestment: Math.max(netInvestment, 0),
-      })
-    }
+    console.log(`[ROI DEBUG] ${local.id}안 support calculation`, {
+      totalInvestment: investment,
+      rawSubsidy: api.subsidy_manwon,
+      subsidyCapped: rawSubsidy !== null && rawSubsidy > investment,
+      actualSupport: subsidy,
+      netInvestment,
+    })
+    console.log(`[ROI DEBUG] ${local.id}안 annual benefit`, {
+      fromApi: api.annual_net_benefit_manwon,
+      fromLocal: local.annualNetBenefitManwon,
+      derived: annualNetBenefit,
+      paybackYears: apiPayback,
+      roiPct,
+    })
 
     const apiAssumptions = api.assumptions
       ? {
@@ -536,7 +548,7 @@ export function mergeApiScenarios(localScenarios: ScenarioCard[], apiData: RoiAp
       title: typeof api.label === "string" && api.label.trim() ? api.label.trim() : local.title,
       investmentManwon: investment,
       subsidyManwon: subsidy,
-      netInvestmentManwon: Math.max(netInvestment, 0),
+      netInvestmentManwon: netInvestment,
       energySavingManwon: Math.max(energySaving, 0),
       maintenanceSavingManwon: Math.max(maintenanceSaving, 0),
       defectSavingManwon: Math.max(defectSaving, 0),
@@ -650,22 +662,50 @@ export function buildScores(form: RoiFormState, scenario: ScenarioCard): ScoreSu
   }
 }
 
+function isFinanciallyValid(s: ScenarioCard) {
+  return (
+    s.netInvestmentManwon > 0 &&
+    s.annualNetBenefitManwon > 0 &&
+    s.roiPct != null &&
+    s.roiPct > 0
+  )
+}
+
 export function getRecommendedScenarioId(
   form: RoiFormState,
   scenarios: ScenarioCard[],
   apiRecommended: string,
 ): "A" | "B" {
-  if (apiRecommended === "A" || apiRecommended === "B") {
-    return apiRecommended
-  }
-
   const scenarioA = scenarios.find((item) => item.id === "A")!
   const scenarioB = scenarios.find((item) => item.id === "B")!
 
+  // API 추천안이 있으면 유효성 검사 후 채택
+  if (apiRecommended === "A" || apiRecommended === "B") {
+    const target = apiRecommended === "A" ? scenarioA : scenarioB
+    if (isFinanciallyValid(target)) {
+      console.log("[ROI DEBUG] selected recommendation", { source: "api", id: apiRecommended })
+      return apiRecommended
+    }
+  }
+
+  // 유효한 후보만 추천 대상
+  const candidates: Array<{ id: "A" | "B"; roi: number }> = []
+  if (isFinanciallyValid(scenarioA)) candidates.push({ id: "A", roi: scenarioA.roiPct ?? 0 })
+  if (isFinanciallyValid(scenarioB)) candidates.push({ id: "B", roi: scenarioB.roiPct ?? 0 })
+  console.log("[ROI DEBUG] recommendation candidates", candidates)
+
+  if (candidates.length > 0) {
+    const best = candidates.reduce((a, b) => (a.roi >= b.roi ? a : b))
+    console.log("[ROI DEBUG] selected recommendation", { source: "roi", id: best.id })
+    return best.id
+  }
+
+  // 재무적 유효 시나리오 없음 → 점수 기반 fallback
   const scoreA = buildScores(form, scenarioA).total
   const scoreB = buildScores(form, scenarioB).total
-
-  return scoreA >= scoreB ? "A" : "B"
+  const fallback = scoreA >= scoreB ? ("A" as const) : ("B" as const)
+  console.log("[ROI DEBUG] selected recommendation", { source: "score_fallback", id: fallback })
+  return fallback
 }
 
 export function getStatusLabel(scores: ScoreSummary) {

@@ -24,3 +24,14 @@ export type AdvisorStageCard = {
   title: string
   description: string
 }
+
+export type AdvisorApiResponse = {
+  text: string
+  intent: string
+  cards: unknown[]
+  matchedPolicies: unknown[]
+  selectedEquipmentForPolicy: unknown | null
+  nextQuestions: unknown[]
+  chatId: string | null
+  raw: unknown
+}

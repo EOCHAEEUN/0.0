@@ -47,9 +47,11 @@ function MetaCard({ label, value }: { label: string; value: string }) {
 export function PolicyDetailDialog({
   project,
   onClose,
+  onCreateDraft,
 }: {
   project: SupportProject | null
   onClose: () => void
+  onCreateDraft?: (project: SupportProject) => void
 }) {
   if (!project) return null
 
@@ -257,6 +259,15 @@ export function PolicyDetailDialog({
               <button className="btn dark" type="button" onClick={onClose}>
                 닫기
               </button>
+              {onCreateDraft && (
+                <button
+                  className="btn blue"
+                  type="button"
+                  onClick={() => onCreateDraft(project)}
+                >
+                  신청서 만들기
+                </button>
+              )}
               <button
                 className="btn blue"
                 type="button"

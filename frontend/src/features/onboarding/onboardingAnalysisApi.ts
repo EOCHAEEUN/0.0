@@ -4,6 +4,7 @@ import type {
   CompanyProfileDraft,
 } from "./onboardingState"
 import { ANALYSIS_RESULT_SCHEMA_VERSION } from "./onboardingState"
+import { resolveCanonicalPolicies } from "./analysisPolicySource"
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000/api"
@@ -310,6 +311,66 @@ function getRecommendationDetail(roiResult: ApiRecord) {
   return getText(ai, "summary") || getText(roiResult, "summary", "message", "recommendation")
 }
 
+function compactScenario(record: ApiRecord) {
+  const compact: ApiRecord = {}
+  const numericKeys = [
+    "investment_manwon",
+    "subsidy_manwon",
+    "net_investment_manwon",
+    "net_cost_manwon",
+    "annual_net_benefit_manwon",
+    "annual_saving_manwon",
+    "saving_manwon",
+    "roi_pct",
+    "roi_percent",
+    "payback_years",
+    "paybackYears",
+  ]
+
+  for (const key of numericKeys) {
+    const value = getNumber(record, key)
+    if (value !== null) compact[key] = value
+  }
+
+  const policyApplication = asRecord(record.policy_application)
+  const policyStatus = getText(policyApplication, "status")
+  const supportAmount = getNumber(policyApplication, "applied_support_manwon")
+  if (policyStatus || supportAmount !== null) {
+    compact.policy_application = {
+      ...(policyStatus ? { status: policyStatus } : {}),
+      ...(supportAmount !== null ? { applied_support_manwon: supportAmount } : {}),
+    }
+  }
+
+  return compact
+}
+
+function buildCompactRoiResult(roiResult: ApiRecord) {
+  const scenarioA = compactScenario(getFirstRecord(roiResult.scenario_a, roiResult.scenarioA))
+  const scenarioB = compactScenario(getFirstRecord(roiResult.scenario_b, roiResult.scenarioB))
+  const aiRecommendation = asRecord(roiResult.ai_recommendation)
+  const aiSummary = getText(aiRecommendation, "summary")
+  const aiBullets = Array.isArray(aiRecommendation.reason_bullets)
+    ? aiRecommendation.reason_bullets
+      .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+      .slice(0, 3)
+    : []
+
+  return {
+    recommended: normalizeRecommended(roiResult.recommended),
+    ...(Object.keys(scenarioA).length > 0 ? { scenario_a: scenarioA } : {}),
+    ...(Object.keys(scenarioB).length > 0 ? { scenario_b: scenarioB } : {}),
+    ...(aiSummary || aiBullets.length > 0
+      ? {
+        ai_recommendation: {
+          ...(aiSummary ? { summary: aiSummary } : {}),
+          ...(aiBullets.length > 0 ? { reason_bullets: aiBullets } : {}),
+        },
+      }
+      : {}),
+  }
+}
+
 function getRecommendationTitle(policyCount: number) {
   void policyCount
   return "현재 조건에서 투자 검토를 권장합니다."
@@ -323,8 +384,19 @@ function buildSnapshot(
   analyzeResponse: ApiRecord,
 ): AnalysisResultSnapshot {
   const data = getFirstRecord(analyzeResponse.data, analyzeResponse)
+  const savedRoiOutput = asRecord(data.roi_output)
+  const resolvedId =
+    getText(data, "analysis_id") ||
+    getText(savedRoiOutput, "id", "analysis_id", "analysisId") ||
+    id
   const roiResult = findRoiResult(analyzeResponse)
-  const policies = getFirstArray(data.matched_policies, data.policies)
+  const canonical = resolveCanonicalPolicies({
+    analysisId: resolvedId,
+    roiSnapshot: savedRoiOutput.policy_snapshot,
+    matchedPolicies: getFirstArray(data.matched_policies, data.policies),
+    allowEquipmentFallback: false,
+  })
+  const policies = canonical.policies
   const { recommended, selected, source } = getScenario(roiResult)
   const roiPct = getNumber(selected, "roi_pct", "roi_percent", "roiPercent", "roi")
   const paybackYears = getNumber(
@@ -354,7 +426,7 @@ function buildSnapshot(
 
   return {
     schemaVersion: ANALYSIS_RESULT_SCHEMA_VERSION,
-    id,
+    id: resolvedId,
     equipmentName: condition.equipmentName || "검토 설비",
     recommendation: getRecommendationTitle(policies.length),
     recommendationDetail: getRecommendationDetail(roiResult),
@@ -367,15 +439,18 @@ function buildSnapshot(
     recommendedScenario: recommended,
     companyId,
     equipmentId,
-    roiResult,
+    roiResult: buildCompactRoiResult(roiResult),
     policies,
-    policyStatus: typeof data.policy_status === "string" ? data.policy_status : undefined,
+    policyStatus:
+      getText(asRecord(savedRoiOutput.policy_snapshot), "policy_status") ||
+      (canonical.missingState === "missing" ? "missing" : "") ||
+      (typeof data.policy_status === "string" ? data.policy_status : undefined),
     policyError: typeof data.policy_error === "string" ? data.policy_error : null,
     createdAt: new Date().toISOString(),
   }
 }
 
-function buildCompanyPayload(profile: CompanyProfileDraft, condition: AnalysisConditionDraft) {
+function buildCompanyPayload(profile: CompanyProfileDraft, primaryPurpose: string[] = []) {
   const region = [profile.regionSido, profile.regionSigungu]
     .filter((value) => value.trim())
     .join(" ")
@@ -387,7 +462,7 @@ function buildCompanyPayload(profile: CompanyProfileDraft, condition: AnalysisCo
     industry_code: splitIndustryCodes(profile.industryCode),
     region: region || "지역 미입력",
     company_type: "제조업",
-    primary_purpose: condition.purpose ? [condition.purpose] : [],
+    primary_purpose: primaryPurpose,
     employee_count: parseEmployeeCount(profile.employeeRange),
     annual_revenue: 0,
   }
@@ -401,17 +476,17 @@ function buildEquipmentPayload(condition: AnalysisConditionDraft) {
   const payload = {
     name: condition.equipmentName || "검토 설비",
     category: condition.equipmentCategory || "press",
-    process: condition.purpose || null,
+    process: condition.process || condition.purpose || null,
     age_years: toNumber(condition.ageYears, 0),
     energy_cost_annual: toOptionalNumber(condition.energyCostAnnual),
-    defect_rate: null,
+    defect_rate: toOptionalNumber(condition.defectRate),
     maintenance_cost_annual: toAnnualManwonFromMonthly(condition.monthlyMaintenanceCost),
     current_capacity_value: capacity,
     production_qty:
       toFirstNumber(condition.monthlyProduction) === null
         ? null
         : Math.round((toFirstNumber(condition.monthlyProduction) ?? 0) * 12),
-    contribution_margin_won: null,
+    contribution_margin_won: toOptionalNumber(condition.contributionMarginWon),
     scenario_a_investment_manwon: investmentA,
     scenario_b_investment_manwon: investmentB,
   }
@@ -433,20 +508,83 @@ function findEquipmentId(json: ApiRecord) {
   return String(data.equipment_id ?? equipment.equipment_id ?? json.equipment_id ?? "")
 }
 
+export async function saveOnboardingCompany(
+  profile: CompanyProfileDraft,
+  primaryPurpose: string[] = [],
+) {
+  const companyPayload = buildCompanyPayload(profile, primaryPurpose)
+  let companyId = window.localStorage.getItem(COMPANY_ID_STORAGE_KEY) || ""
+
+  if (companyId) {
+    await requestJson(`/api/onboarding/company/${encodeURIComponent(companyId)}`, {
+      method: "PATCH",
+      body: JSON.stringify(companyPayload),
+    })
+  } else {
+    const companyJson = (await requestJson("/api/onboarding", {
+      method: "POST",
+      body: JSON.stringify(companyPayload),
+    })) as ApiRecord
+    companyId = findCompanyId(companyJson)
+  }
+
+  if (!companyId) {
+    throw new Error("기업 정보 저장 응답에서 company_id를 찾지 못했습니다.")
+  }
+
+  window.localStorage.setItem(COMPANY_ID_STORAGE_KEY, companyId)
+  return companyId
+}
+
+export type OnboardingEquipmentInput = {
+  name: string
+  category: string
+  ageYears: number
+  process?: string
+  energyCostAnnual?: number | null
+}
+
+export async function createOnboardingEquipment(
+  companyId: string,
+  equipment: OnboardingEquipmentInput,
+) {
+  const equipmentJson = (await requestJson(
+    `/api/onboarding/${encodeURIComponent(companyId)}/equipment`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        name: equipment.name,
+        category: equipment.category,
+        age_years: equipment.ageYears,
+        process: equipment.process?.trim() || null,
+        energy_cost_annual: equipment.energyCostAnnual ?? null,
+      }),
+    },
+  )) as ApiRecord
+  const equipmentId = findEquipmentId(equipmentJson)
+
+  if (!equipmentId) {
+    throw new Error("설비 정보 저장 응답에서 equipment_id를 찾지 못했습니다.")
+  }
+
+  window.localStorage.setItem(EQUIPMENT_ID_STORAGE_KEY, equipmentId)
+  window.localStorage.setItem(SELECTED_EQUIPMENT_ID_STORAGE_KEY, equipmentId)
+  return equipmentId
+}
+
 export async function runOnboardingAnalysis(
   id: string,
   profile: CompanyProfileDraft,
   condition: AnalysisConditionDraft,
 ) {
-  const companyPayload = buildCompanyPayload(profile, condition)
   let companyId = window.localStorage.getItem(COMPANY_ID_STORAGE_KEY) || ""
 
   if (companyId) {
     try {
-      await requestJson(`/api/onboarding/company/${encodeURIComponent(companyId)}`, {
-        method: "PATCH",
-        body: JSON.stringify(companyPayload),
-      })
+      companyId = await saveOnboardingCompany(
+        profile,
+        condition.purpose ? [condition.purpose] : [],
+      )
     } catch (error) {
       console.warn(
         "[onboarding-analysis] Existing company update failed; continuing with stored company_id.",
@@ -455,11 +593,10 @@ export async function runOnboardingAnalysis(
     }
   } else {
     try {
-      const companyJson = (await requestJson("/api/onboarding", {
-        method: "POST",
-        body: JSON.stringify(companyPayload),
-      })) as ApiRecord
-      companyId = findCompanyId(companyJson)
+      companyId = await saveOnboardingCompany(
+        profile,
+        condition.purpose ? [condition.purpose] : [],
+      )
     } catch {
       throw new Error("기업 정보 저장 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.")
     }
@@ -495,5 +632,90 @@ export async function runOnboardingAnalysis(
     method: "POST",
   })) as ApiRecord
 
-  return buildSnapshot(id, condition, companyId, equipmentId, analyzeJson)
+  return {
+    ...buildSnapshot(id, condition, companyId, equipmentId, analyzeJson),
+  }
+}
+
+export type SavedEquipment = {
+  equipmentId: string
+  name: string
+  category: string
+  purpose: string
+  process: string
+  ageYears: string
+  energyCostAnnual: string
+  monthlyMaintenanceCost: string
+  defectRate: string
+  monthlyProduction: string
+  contributionMarginWon: string
+  investmentAmount: string
+  scenarioBInvestmentManwon: string
+}
+
+function unwrapData(value: unknown) {
+  const record = asRecord(value)
+  return getFirstRecord(record.data, record)
+}
+
+function equipmentToSaved(value: unknown): SavedEquipment {
+  const item = asRecord(value)
+  const annualMaintenance = getNumber(item, "maintenance_cost_annual")
+  return {
+    equipmentId: getText(item, "equipment_id", "equipmentId"),
+    name: getText(item, "name"),
+    category: getText(item, "category"),
+    purpose: getText(item, "primary_purpose", "purpose", "process"),
+    process: getText(item, "process"),
+    ageYears: String(getNumber(item, "age_years") ?? ""),
+    energyCostAnnual: String(getNumber(item, "energy_cost_annual") ?? ""),
+    monthlyMaintenanceCost:
+      annualMaintenance === null ? "" : String(Math.round(annualMaintenance / 12)),
+    defectRate: String(getNumber(item, "defect_rate") ?? ""),
+    monthlyProduction: String(
+      (getNumber(item, "production_qty") ?? 0) > 0
+        ? Math.round((getNumber(item, "production_qty") ?? 0) / 12)
+        : "",
+    ),
+    contributionMarginWon: String(getNumber(item, "contribution_margin_won") ?? ""),
+    investmentAmount: String(getNumber(item, "scenario_a_investment_manwon") ?? ""),
+    scenarioBInvestmentManwon: String(
+      getNumber(item, "scenario_b_investment_manwon") ?? "",
+    ),
+  }
+}
+
+export async function fetchAnalysisEntryContext() {
+  const json = await requestJson("/api/onboarding/me", { method: "GET" })
+  const data = unwrapData(json)
+  const latestAnalysis = asRecord(data.latest_roi_output)
+  return {
+    companyId: getText(asRecord(data.company), "company_id"),
+    equipments: getFirstArray(data.equipments).map(equipmentToSaved),
+    latestAnalysisId: getText(latestAnalysis, "id", "analysis_id", "analysisId"),
+    latestEquipmentId: getText(latestAnalysis, "equipment_id", "equipmentId"),
+  }
+}
+
+export async function runExistingEquipmentAnalysis(
+  id: string,
+  profile: CompanyProfileDraft,
+  condition: AnalysisConditionDraft,
+  companyId: string,
+  equipmentId: string,
+) {
+  void profile
+  const equipmentPayload = buildEquipmentPayload(condition)
+  await requestJson(`/api/equipment/${encodeURIComponent(equipmentId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(equipmentPayload),
+  })
+
+  const query = new URLSearchParams({ company_id: companyId, equipment_id: equipmentId })
+  const analyzeJson = (await requestJson(`/api/analyze?${query.toString()}`, {
+    method: "POST",
+  })) as ApiRecord
+  return {
+    ...buildSnapshot(id, condition, companyId, equipmentId, analyzeJson),
+  }
 }

@@ -62,26 +62,30 @@ export default function RoiFeature() {
     const analysisId = searchParams.get("analysisId") ?? undefined
     const saved = getAnalysisResult(analysisId)
 
-    if (import.meta.env.DEV) {
-      console.debug("[RoiPage] auto-load: raw roiResult from storage", {
-        analysisId,
-        hasSnapshot: !!saved,
-        hasRoiResult: !!saved?.roiResult,
-        roiResult: saved?.roiResult,
-      })
-    }
+    console.log('[ROI DEBUG] raw saved result', {
+      analysisId,
+      hasSnapshot: !!saved,
+      hasRoiResult: !!saved?.roiResult,
+      roiResult: saved?.roiResult,
+    })
 
-    if (!saved?.roiResult) return
+    if (!saved?.roiResult) {
+      console.log('[ROI DEBUG] ⚠️ 저장된 분석 결과 없음 — localStorage에 roiResult 없음')
+      return
+    }
 
     const apiData = normalizeApiData(saved.roiResult)
 
-    if (import.meta.env.DEV) {
-      console.debug("[RoiPage] auto-load: normalized apiData", {
-        success: !!apiData,
-        scenario_a: apiData?.scenario_a,
-        scenario_b: apiData?.scenario_b,
-        recommended: apiData?.recommended,
-      })
+    console.log('[ROI DEBUG] normalizeApiData 결과', {
+      success: !!apiData,
+      scenario_a: apiData?.scenario_a,
+      scenario_b: apiData?.scenario_b,
+      recommended: apiData?.recommended,
+    })
+
+    if (!apiData) {
+      console.log('[ROI DEBUG] ⚠️ normalizeApiData가 null 반환 — roiResult 구조 확인 필요', saved.roiResult)
+      return
     }
 
     if (!apiData) return
@@ -99,32 +103,32 @@ export default function RoiFeature() {
     setSelectedScenarioId(nextRecommendedId)
     setApiStatus("success")
 
-    if (import.meta.env.DEV) {
-      const scenA = merged.scenarios.find((s) => s.id === "A")
-      const scenB = merged.scenarios.find((s) => s.id === "B")
-      console.debug("[RoiPage] auto-load: final view-model", {
-        analysisId,
-        recommended: nextRecommendedId,
-        scenario_a: scenA
-          ? {
-              roiPct: scenA.roiPct,
-              paybackYears: scenA.paybackYears,
-              annualNetBenefitManwon: scenA.annualNetBenefitManwon,
-              netInvestmentManwon: scenA.netInvestmentManwon,
-              investmentManwon: scenA.investmentManwon,
-              subsidyManwon: scenA.subsidyManwon,
-            }
-          : null,
-        scenario_b: scenB
-          ? {
-              roiPct: scenB.roiPct,
-              paybackYears: scenB.paybackYears,
-              annualNetBenefitManwon: scenB.annualNetBenefitManwon,
-              netInvestmentManwon: scenB.netInvestmentManwon,
-            }
-          : null,
-      })
-    }
+    const scenA = merged.scenarios.find((s) => s.id === "A")
+    const scenB = merged.scenarios.find((s) => s.id === "B")
+    console.log('[ROI DEBUG] 최종 화면 데이터', {
+      analysisId,
+      recommended: nextRecommendedId,
+      scenario_a: scenA
+        ? {
+            roiPct: scenA.roiPct,
+            paybackYears: scenA.paybackYears,
+            annualNetBenefitManwon: scenA.annualNetBenefitManwon,
+            netInvestmentManwon: scenA.netInvestmentManwon,
+            investmentManwon: scenA.investmentManwon,
+            subsidyManwon: scenA.subsidyManwon,
+          }
+        : null,
+      scenario_b: scenB
+        ? {
+            roiPct: scenB.roiPct,
+            paybackYears: scenB.paybackYears,
+            annualNetBenefitManwon: scenB.annualNetBenefitManwon,
+            netInvestmentManwon: scenB.netInvestmentManwon,
+            investmentManwon: scenB.investmentManwon,
+            subsidyManwon: scenB.subsidyManwon,
+          }
+        : null,
+    })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFieldChange = (key: keyof RoiFormState, value: string) => {
@@ -239,7 +243,18 @@ export default function RoiFeature() {
       const payload = buildPayload(form)
       const apiResponse = await requestRoiSimulation(payload)
       const apiData = normalizeApiData(apiResponse)
+
+      console.log("[ROI DEBUG] scenario A raw", apiData?.scenario_a)
+      console.log("[ROI DEBUG] scenario B raw", apiData?.scenario_b)
+
       const merged = mergeApiScenarios(localScenarios, apiData)
+
+      const scenA = merged.scenarios.find((s) => s.id === "A")
+      const scenB = merged.scenarios.find((s) => s.id === "B")
+      console.log("[ROI DEBUG] annual benefit", {
+        scenarioAAnnualBenefit: scenA?.annualNetBenefitManwon,
+        scenarioBAnnualBenefit: scenB?.annualNetBenefitManwon,
+      })
 
       const nextRecommendedId = getRecommendedScenarioId(
         form,

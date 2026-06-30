@@ -25,3 +25,4 @@ class FactofitState(TypedDict):
     chat_id: Optional[str]
     safety_dashboard: Optional[dict]
     options: Optional[list[dict]]
+    analysis_id: Optional[str]

@@ -6,6 +6,18 @@ from app.core.database import get_db
 from app.state import FactofitState
 
 
+def _normalize_history(items):
+    normalized = []
+    for item in items or []:
+        row = item if isinstance(item, dict) else {}
+        role = str(row.get("role") or "").strip().lower()
+        content = str(row.get("content") or "").strip()
+        if role not in {"user", "assistant"} or not content:
+            continue
+        normalized.append({"role": role, "content": content})
+    return normalized
+
+
 def response_node(state: FactofitState) -> FactofitState:
     if state.get("intent") == "general" and not state.get("final_response"):
         from app.core.llm import llm
@@ -27,22 +39,70 @@ def response_node(state: FactofitState) -> FactofitState:
     company = state.get("company_info")
     company_id = str(company.company_id) if company and company.company_id else None
 
-    try:
-        insert_result = supabase.table("chat_history").insert(
-            {
-                "company_id": company_id,
-                "intent": state.get("intent", ""),
-                "user_query": state.get("user_query", ""),
-                "chat_history": state.get("chat_history", []),
-                "roi_result": state.get("roi_result"),
-                "matched_policies": state.get("matched_policies", []),
-                "final_response": state.get("final_response", ""),
-                "created_at": datetime.now().isoformat(),
-            }
-        ).execute()
+    persisted_history = _normalize_history(state.get("chat_history", []))
+    if state.get("user_query"):
+        persisted_history.append({"role": "user", "content": state.get("user_query", "")})
+    if state.get("final_response"):
+        persisted_history.append({"role": "assistant", "content": state.get("final_response", "")})
 
-        if insert_result.data:
-            state["chat_id"] = insert_result.data[0].get("chat_id")
+    try:
+        current_chat_id = str(state.get("chat_id") or "").strip()
+        payload = {
+            "company_id": company_id,
+            "intent": state.get("intent", ""),
+            "user_query": state.get("user_query", ""),
+            "roi_result": state.get("roi_result"),
+            "matched_policies": state.get("matched_policies", []),
+            "final_response": state.get("final_response", ""),
+        }
+
+        if current_chat_id:
+            existing_row = (
+                supabase.table("chat_history")
+                .select("chat_id,chat_history")
+                .eq("chat_id", current_chat_id)
+                .eq("company_id", company_id)
+                .limit(1)
+                .execute()
+            )
+            if existing_row.data:
+                update_result = (
+                    supabase.table("chat_history")
+                    .update(
+                        {
+                            **payload,
+                            # 프론트가 현재 대화 전체 history를 함께 보내므로, 해당 snapshot으로 세션을 갱신한다.
+                            "chat_history": persisted_history[-60:],
+                        }
+                    )
+                    .eq("chat_id", current_chat_id)
+                    .eq("company_id", company_id)
+                    .execute()
+                )
+                if update_result.data:
+                    state["chat_id"] = update_result.data[0].get("chat_id", current_chat_id)
+                else:
+                    state["chat_id"] = current_chat_id
+            else:
+                insert_result = supabase.table("chat_history").insert(
+                    {
+                        **payload,
+                        "chat_history": persisted_history[-60:],
+                        "created_at": datetime.now().isoformat(),
+                    }
+                ).execute()
+                if insert_result.data:
+                    state["chat_id"] = insert_result.data[0].get("chat_id")
+        else:
+            insert_result = supabase.table("chat_history").insert(
+                {
+                    **payload,
+                    "chat_history": persisted_history[-60:],
+                    "created_at": datetime.now().isoformat(),
+                }
+            ).execute()
+            if insert_result.data:
+                state["chat_id"] = insert_result.data[0].get("chat_id")
     except Exception as e:
         print(f"chat_history save failed: {e}")
 

@@ -1,12 +1,13 @@
 # app/routers/chat.py
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app.graph import factofit_graph
 from app.state import FactofitState
 from app.core.database import get_db
+from app.core.auth import get_current_user
+from app.models.auth import CurrentUser
 from app.models.company import CompanyContext
-from app.agents.policy import policy_chat_node
 
 router = APIRouter()
 
@@ -17,6 +18,71 @@ class ChatRequest(BaseModel):
     chat_history: list[dict] = []
     selected_equipment_id: str = ""
     policy_intent_choice: str = ""
+    analysis_id: str = ""
+    source: str = ""
+    chat_id: str = ""
+
+
+def _as_dict(value):
+    return value if isinstance(value, dict) else {}
+
+
+def _as_text(value):
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _normalize_chat_history(items: list[dict]) -> list[dict]:
+    normalized = []
+    for item in items[-20:]:
+        row = _as_dict(item)
+        role = _as_text(row.get("role")).lower()
+        content = _as_text(row.get("content"))
+        if role not in {"user", "assistant"} or not content:
+            continue
+        normalized.append({"role": role, "content": content})
+    return normalized
+
+
+def _load_company_row(company_id: str):
+    return (
+        get_db()
+        .table("company")
+        .select("*")
+        .eq("company_id", company_id)
+        .limit(1)
+        .execute()
+    )
+
+
+def _ensure_company_owner(company_id: str, current_user: CurrentUser):
+    company = (
+        get_db()
+        .table("company")
+        .select("company_id,user_id")
+        .eq("company_id", company_id)
+        .eq("user_id", current_user.id)
+        .limit(1)
+        .execute()
+    )
+    if not company.data:
+        raise HTTPException(status_code=403, detail="해당 기업 대화 내역 접근 권한이 없습니다.")
+
+
+def _resolve_equipment_from_analysis(company_id: str, analysis_id: str):
+    analysis = (
+        get_db()
+        .table("roi_output")
+        .select("id,company_id,equipment_id")
+        .eq("id", analysis_id)
+        .eq("company_id", company_id)
+        .limit(1)
+        .execute()
+    )
+    if not analysis.data:
+        return ""
+    return _as_text(_as_dict(analysis.data[0]).get("equipment_id"))
 
 
 @router.post("/chat")
@@ -41,12 +107,7 @@ async def chat(req: ChatRequest):
         supabase = get_db()
 
         # company 테이블 조회
-        company_data = (
-            supabase.table("company")
-            .select("*")
-            .eq("company_id", req.company_id)
-            .execute()
-        )
+        company_data = _load_company_row(req.company_id)
 
         if company_data.data:
             data = company_data.data[0]
@@ -90,14 +151,25 @@ async def chat(req: ChatRequest):
 
         equipments = equipment_data.data if equipment_data.data else []
 
+        requested_equipment_id = _as_text(req.selected_equipment_id)
+        resolved_analysis_equipment_id = ""
+        if req.analysis_id and not requested_equipment_id:
+            # analysis_id가 있으면 해당 분석의 equipment_id를 강제 연결해 info_missing 반복을 방지한다.
+            resolved_analysis_equipment_id = _resolve_equipment_from_analysis(
+                req.company_id,
+                req.analysis_id,
+            )
+            requested_equipment_id = resolved_analysis_equipment_id
+
         # 설비 선택 로직
         # 우선순위 1: selected_equipment_id 직접 넘겨준 경우 (버튼 클릭)
+        # 우선순위 1-1: analysis_id 기반 equipment_id 자동 보완
         # 우선순위 2: 설비가 1개인 경우 자동 선택
         # 우선순위 3: 여러 개이고 선택 안 된 경우 → info_collector에서 선택 요청
 
-        if req.selected_equipment_id:
+        if requested_equipment_id:
             selected = next(
-                (eq for eq in equipments if eq.get("equipment_id") == req.selected_equipment_id),
+                (eq for eq in equipments if eq.get("equipment_id") == requested_equipment_id),
                 None
             )
             if selected:
@@ -139,7 +211,7 @@ async def chat(req: ChatRequest):
             "equipment": equipment_info,
             "equipment_id": equipment_id,
             "equipments": equipments,
-            "selected_equipment_id": req.selected_equipment_id or None,
+            "selected_equipment_id": requested_equipment_id or None,
             "safety_dashboard": None,
             "matched_policies": [],
             "selected_policy": None,
@@ -147,12 +219,13 @@ async def chat(req: ChatRequest):
             "roi_result": None,
             "draft_result": None,
             "draft_context": None,
-            "chat_history": req.chat_history[-10:],
+            "chat_history": _normalize_chat_history(req.chat_history),
             "final_response": "",
             "unsupported_equipment": False,
-            "chat_id": None,
+            "chat_id": _as_text(req.chat_id) or None,
             "options": None,
             "policy_intent_choice": req.policy_intent_choice or None,
+            "analysis_id": req.analysis_id or None,
         }
 
         result = await factofit_graph.ainvoke(initial_state)
@@ -218,6 +291,8 @@ async def chat(req: ChatRequest):
             "selected_equipment_for_policy": result.get("selected_equipment_for_policy"),
             "next_questions": [],
             "chat_id": result.get("chat_id", ""),
+            "resolved_equipment_id": requested_equipment_id,
+            "analysis_id": req.analysis_id,
         }
 
     except Exception as e:
@@ -232,3 +307,71 @@ async def chat(req: ChatRequest):
             "next_questions": [],
             "chat_id": "",
         }
+
+
+@router.get("/chat/sessions")
+def get_chat_sessions(
+    company_id: str = Query(...),
+    limit: int = Query(20, ge=1, le=100),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    _ensure_company_owner(company_id, current_user)
+    rows = (
+        get_db()
+        .table("chat_history")
+        .select("chat_id,intent,user_query,chat_history,final_response,created_at,roi_result")
+        .eq("company_id", company_id)
+        .order("created_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    sessions = []
+    for row in rows.data or []:
+        item = _as_dict(row)
+        history = item.get("chat_history") if isinstance(item.get("chat_history"), list) else []
+        history_last = history[-1] if history else {}
+        preview = _as_text(_as_dict(history_last).get("content")) or _as_text(item.get("final_response"))
+        roi_result = _as_dict(item.get("roi_result"))
+        sessions.append(
+            {
+                "chat_id": _as_text(item.get("chat_id")),
+                "intent": _as_text(item.get("intent")),
+                "title": _as_text(item.get("user_query"))[:64] or "새 상담",
+                "preview": preview[:140],
+                "created_at": _as_text(item.get("created_at")),
+                "analysis_id": _as_text(roi_result.get("analysis_id")),
+            }
+        )
+    return {"success": True, "data": sessions}
+
+
+@router.get("/chat/sessions/{chat_id}")
+def get_chat_session(
+    chat_id: str,
+    company_id: str = Query(...),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    _ensure_company_owner(company_id, current_user)
+    row = (
+        get_db()
+        .table("chat_history")
+        .select("chat_id,user_query,chat_history,final_response,created_at")
+        .eq("chat_id", chat_id)
+        .eq("company_id", company_id)
+        .limit(1)
+        .execute()
+    )
+    if not row.data:
+        raise HTTPException(status_code=404, detail="대화 내역을 찾을 수 없습니다.")
+
+    item = _as_dict(row.data[0])
+    history = _normalize_chat_history(item.get("chat_history") if isinstance(item.get("chat_history"), list) else [])
+
+    return {
+        "success": True,
+        "data": {
+            "chat_id": _as_text(item.get("chat_id")),
+            "messages": history,
+            "created_at": _as_text(item.get("created_at")),
+        },
+    }

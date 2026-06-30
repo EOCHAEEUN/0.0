@@ -6,6 +6,7 @@ import {
   ANALYSIS_RESULT_SCHEMA_VERSION,
   type CompanyProfileDraft,
 } from "../features/onboarding/onboardingState"
+import { resolveCanonicalPolicies } from "../features/onboarding/analysisPolicySource"
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000/api"
 
@@ -18,6 +19,19 @@ type ApiRecord = Record<string, unknown>
 
 function asRecord(v: unknown): ApiRecord {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as ApiRecord) : {}
+}
+
+function getPolicyTitle(policy: ApiRecord): string {
+  const metadata = asRecord(policy.metadata)
+  return String(
+    policy.title ??
+      policy.policy_title ??
+      policy.name ??
+      metadata.title ??
+      metadata.policy_title ??
+      metadata.name ??
+      "",
+  ).trim()
 }
 
 function mapEmployeeCountToRange(count: number | null | undefined): string {
@@ -72,15 +86,27 @@ function buildSnapshotFromRoiOutput(
   const roiData = asRecord(roiOutput.roi_data)
   if (!roiData || Object.keys(roiData).length === 0) return null
 
+  const analysisId = String(roiOutput.id ?? "").trim()
   const equipmentId = String(roiOutput.equipment_id ?? "")
   const matchedEquipment = equipments.find(
     (e) => String(e.equipment_id ?? "") === equipmentId,
   )
   const equipmentName = String(matchedEquipment?.name ?? roiOutput.equipment_name ?? "검토 설비")
 
-  const matchedPolicies = allPolicies.filter(
+  const analysisMatchedPolicies = allPolicies.filter(
+    (policy) => String(policy.analysis_id ?? "").trim() === analysisId,
+  )
+  const equipmentMatchedPolicies = allPolicies.filter(
     (policy) => String(policy.equipment_id ?? "") === equipmentId,
   )
+  const canonical = resolveCanonicalPolicies({
+    analysisId,
+    roiSnapshot: roiOutput.policy_snapshot,
+    matchedPolicies: analysisMatchedPolicies,
+    allowEquipmentFallback: !analysisId,
+    equipmentFallbackPolicies: equipmentMatchedPolicies,
+  })
+  const matchedPolicies = canonical.policies
 
   const recommended = String(roiData.recommended ?? "A").toUpperCase().trim()
   const recScenario = asRecord(recommended === "B" ? roiData.scenario_b : roiData.scenario_a)
@@ -104,12 +130,15 @@ function buildSnapshotFromRoiOutput(
     paybackYears,
     matchedPolicies: matchedPolicies.length,
     priorityPolicies: matchedPolicies.length > 0 ? 1 : 0,
-    priorityPolicyName: String(matchedPolicies[0]?.title ?? ""),
+    priorityPolicyName: getPolicyTitle(matchedPolicies[0] ?? {}),
     recommendedScenario: recommended,
     companyId,
     equipmentId,
     roiResult: roiData,
     policies: matchedPolicies,
+    policyStatus:
+      String(asRecord(roiOutput.policy_snapshot).policy_status ?? "").trim() || undefined,
+    policyError: canonical.missingState === "missing" ? "정책 스냅샷 없음" : null,
     createdAt: String(roiOutput.created_at ?? new Date().toISOString()),
   }
 

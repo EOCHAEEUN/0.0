@@ -176,6 +176,17 @@ function buildPersistedAnalysisResult(result: AnalysisResultSnapshot): AnalysisR
     roiResultRecord.ai_recommendation && typeof roiResultRecord.ai_recommendation === "object" && !Array.isArray(roiResultRecord.ai_recommendation)
       ? (roiResultRecord.ai_recommendation as Record<string, unknown>)
       : {}
+  const policies = Array.isArray(result.policies)
+    ? result.policies
+        .filter((item) => item && typeof item === "object" && !Array.isArray(item))
+        .slice(0, 20)
+    : []
+  const firstPolicy = (policies[0] as Record<string, unknown> | undefined) ?? {}
+  const firstPolicyTitle =
+    (typeof firstPolicy.title === "string" && firstPolicy.title.trim()) ||
+    (typeof firstPolicy.policy_title === "string" && firstPolicy.policy_title.trim()) ||
+    (typeof firstPolicy.name === "string" && firstPolicy.name.trim()) ||
+    ""
 
   return {
     schemaVersion: ANALYSIS_RESULT_SCHEMA_VERSION,
@@ -188,7 +199,7 @@ function buildPersistedAnalysisResult(result: AnalysisResultSnapshot): AnalysisR
     paybackYears: result.paybackYears,
     matchedPolicies: result.matchedPolicies,
     priorityPolicies: result.priorityPolicies,
-    priorityPolicyName: result.priorityPolicyName,
+    priorityPolicyName: firstPolicyTitle || result.priorityPolicyName,
     recommendedScenario: result.recommendedScenario,
     companyId: result.companyId,
     equipmentId: result.equipmentId,
@@ -211,6 +222,7 @@ function buildPersistedAnalysisResult(result: AnalysisResultSnapshot): AnalysisR
           : [],
       },
     },
+    policies,
     policyStatus: result.policyStatus,
     policyError: result.policyError ?? null,
     createdAt: result.createdAt,

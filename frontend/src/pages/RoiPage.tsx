@@ -90,6 +90,21 @@ function extractPriorityPolicyId(policies: unknown): string | null {
   return id ? String(id) : null
 }
 
+function extractPriorityPolicyName(policies: unknown): string {
+  if (!Array.isArray(policies) || policies.length === 0) return ""
+  const first = policies[0] as Record<string, unknown>
+  const metadata = asRecord(first.metadata)
+  return String(
+    first.title ??
+      first.policy_title ??
+      first.name ??
+      metadata.title ??
+      metadata.policy_title ??
+      metadata.name ??
+      "",
+  ).trim()
+}
+
 function formatSubsidyDisplay(m: ScenarioMetrics): string {
   const s = m.subsidyStatus
   if (s === "applied" || s === "estimated") {
@@ -289,14 +304,17 @@ export default function RoiPage() {
   const recommendationDetail = String(
     (result as Record<string, unknown>).recommendationDetail || "",
   )
-  const priorityPolicyName = String(
-    (result as Record<string, unknown>).priorityPolicyName || "",
-  )
+  const canonicalPolicies = Array.isArray((result as Record<string, unknown>).policies)
+    ? ((result as Record<string, unknown>).policies as unknown[])
+    : []
+  const priorityPolicyName =
+    extractPriorityPolicyName(canonicalPolicies) ||
+    String((result as Record<string, unknown>).priorityPolicyName || "")
 
   const recLabel = rec === "b" ? "B안 · 부분 교체" : rec === "a" ? "A안 · 전체 교체" : "A/B안"
   const recShort = rec === "b" ? "B안" : rec === "a" ? "A안" : "투자안"
 
-  const priorityPolicyId = extractPriorityPolicyId((result as Record<string, unknown>).policies)
+  const priorityPolicyId = extractPriorityPolicyId(canonicalPolicies)
   const supportProjectsPath = `/support-projects?analysisId=${encodeURIComponent(String(draftId))}`
   const priorityPolicyPath = priorityPolicyId
     ? `/support-projects?analysisId=${encodeURIComponent(String(draftId))}&policyId=${encodeURIComponent(priorityPolicyId)}`

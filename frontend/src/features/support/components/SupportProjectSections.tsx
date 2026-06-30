@@ -145,9 +145,11 @@ export function SupportWorkflowHero({
 function TopPolicyMainCard({
   topProject,
   onOpenDetail,
+  isRoiLinked = false,
 }: {
   topProject: SupportProject
   onOpenDetail: (project: SupportProject) => void
+  isRoiLinked?: boolean
 }) {
   const dDay = getDday(topProject.deadlineRaw)
   const topReason = getTopPolicyReason(topProject)
@@ -197,6 +199,26 @@ function TopPolicyMainCard({
           >
             우선 검토 정책
           </p>
+          {isRoiLinked && (
+            <p
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                height: "24px",
+                marginLeft: "8px",
+                marginBottom: "12px",
+                padding: "0 10px",
+                borderRadius: "999px",
+                border: "1px solid #bfdbfe",
+                background: "#eff6ff",
+                color: "#1d4ed8",
+                fontSize: "11px",
+                fontWeight: 900,
+              }}
+            >
+              ROI 분석 연동 정책
+            </p>
+          )}
           <div
             style={{
               display: "flex",
@@ -369,9 +391,11 @@ function CandidateRow({
 function CandidateComparison({
   projects,
   onOpenDetail,
+  isRoiLinked = false,
 }: {
   projects: SupportProject[]
   onOpenDetail: (project: SupportProject) => void
+  isRoiLinked?: boolean
 }) {
   const candidates = projects.slice(1, 5)
   if (candidates.length === 0) {
@@ -399,7 +423,7 @@ function CandidateComparison({
           다른 지원사업 비교
         </p>
         <h4 style={{ color: "#111827", fontSize: "22px", fontWeight: 900, letterSpacing: "-0.02em" }}>
-          우선순위 후보 {candidates.length}건
+          {isRoiLinked ? "추가 검토 가능 지원사업" : "우선순위 후보"} {candidates.length}건
         </h4>
       </div>
       <div>
@@ -415,6 +439,7 @@ export function SuccessHeroSection({
   topProject,
   finalRecommendedProjects,
   onOpenDetail,
+  isRoiLinked = false,
 }: {
   topProject: SupportProject
   selectedProject: SupportProject
@@ -422,11 +447,12 @@ export function SuccessHeroSection({
   finalRecommendedProjects: SupportProject[]
   policyCounters: PolicyCounters
   onOpenDetail: (project: SupportProject) => void
+  isRoiLinked?: boolean
 }) {
   return (
     <div style={{ marginTop: "10px", marginBottom: "16px", display: "grid", gap: "12px" }}>
-      <TopPolicyMainCard topProject={topProject} onOpenDetail={onOpenDetail} />
-      <CandidateComparison projects={finalRecommendedProjects} onOpenDetail={onOpenDetail} />
+      <TopPolicyMainCard topProject={topProject} onOpenDetail={onOpenDetail} isRoiLinked={isRoiLinked} />
+      <CandidateComparison projects={finalRecommendedProjects} onOpenDetail={onOpenDetail} isRoiLinked={isRoiLinked} />
     </div>
   )
 }
@@ -434,9 +460,11 @@ export function SuccessHeroSection({
 export function OtherMatchedPoliciesPanel({
   projects,
   onOpenDetail,
+  isRoiLinked = false,
 }: {
   projects: SupportProject[]
   onOpenDetail: (project: SupportProject) => void
+  isRoiLinked?: boolean
 }) {
   if (projects.length === 0) return null
 
@@ -444,7 +472,7 @@ export function OtherMatchedPoliciesPanel({
     <section style={{ border: "1px solid #e4e9f4", borderRadius: "14px", background: "#ffffff", overflow: "hidden" }}>
       <div style={{ padding: "12px 16px", borderBottom: "1px solid #edf1f7", background: "#f8faff" }}>
         <h4 style={{ color: "#1f2937", fontSize: "16px", fontWeight: 900 }}>
-          전체 매칭 후보 {projects.length}건
+          {isRoiLinked ? "추가 검토 가능 지원사업" : "전체 매칭 후보"} {projects.length}건
         </h4>
       </div>
       <div style={{ maxHeight: "260px", overflowY: "auto" }}>

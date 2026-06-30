@@ -4,6 +4,7 @@ import type {
   CompanyProfileDraft,
 } from "./onboardingState"
 import { ANALYSIS_RESULT_SCHEMA_VERSION } from "./onboardingState"
+import { resolveCanonicalPolicies } from "./analysisPolicySource"
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000/api"
@@ -389,7 +390,13 @@ function buildSnapshot(
     getText(savedRoiOutput, "id", "analysis_id", "analysisId") ||
     id
   const roiResult = findRoiResult(analyzeResponse)
-  const policies = getFirstArray(data.matched_policies, data.policies)
+  const canonical = resolveCanonicalPolicies({
+    analysisId: resolvedId,
+    roiSnapshot: savedRoiOutput.policy_snapshot,
+    matchedPolicies: getFirstArray(data.matched_policies, data.policies),
+    allowEquipmentFallback: false,
+  })
+  const policies = canonical.policies
   const { recommended, selected, source } = getScenario(roiResult)
   const roiPct = getNumber(selected, "roi_pct", "roi_percent", "roiPercent", "roi")
   const paybackYears = getNumber(
@@ -433,7 +440,11 @@ function buildSnapshot(
     companyId,
     equipmentId,
     roiResult: buildCompactRoiResult(roiResult),
-    policyStatus: typeof data.policy_status === "string" ? data.policy_status : undefined,
+    policies,
+    policyStatus:
+      getText(asRecord(savedRoiOutput.policy_snapshot), "policy_status") ||
+      (canonical.missingState === "missing" ? "missing" : "") ||
+      (typeof data.policy_status === "string" ? data.policy_status : undefined),
     policyError: typeof data.policy_error === "string" ? data.policy_error : null,
     createdAt: new Date().toISOString(),
   }

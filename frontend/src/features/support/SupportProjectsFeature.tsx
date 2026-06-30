@@ -349,11 +349,13 @@ export default function SupportProjectsFeature() {
                 finalRecommendedProjects={finalRecommendedProjects}
                 policyCounters={policyCounters}
                 onOpenDetail={setDetailProject}
+                isRoiLinked={Boolean(analysisIdFromQuery)}
               />
 
               <OtherMatchedPoliciesPanel
                 projects={otherMatchedProjects}
                 onOpenDetail={setDetailProject}
+                isRoiLinked={Boolean(analysisIdFromQuery)}
               />
             </>
           )}

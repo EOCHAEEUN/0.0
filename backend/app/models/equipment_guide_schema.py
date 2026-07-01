@@ -86,7 +86,7 @@ defect_rate = EquipmentGuideItem(
 # 7. 전체교체 예상 투자금
 full_replacement_investment = EquipmentGuideItem(
     key="full_replacement_investment",
-    label="전체교치 예상 투자금",
+    label="전체교체 예상 투자금",
     required=False,
     why_needed="ROI 분석에서 투자금은 회수기간과 이익률을 결정하는 핵심 요소입니다.",
     input_method="숫자 입력 (단위: 만원) - 장비 구매비 + 설치비 + 운송비 + 시운전비 + 부대공사비",

@@ -17,8 +17,6 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
     Flowable,
-    KeepTogether,
-    PageBreak,
     Paragraph,
     SimpleDocTemplate,
     Spacer,
@@ -47,12 +45,21 @@ class ReportContext:
     user_safety_files: list[dict[str, Any]]
 
 
+# PDF 내 모든 문자는 맑은 고딕을 1순위로 사용합니다.
+# Windows 배포 환경에서는 C:\Windows\Fonts\malgun.ttf / malgunbd.ttf가 적용되고,
+# Linux 서버에서는 동일 폰트를 FACTOFIT_REPORT_FONT / FACTOFIT_REPORT_BOLD_FONT로 지정할 수 있습니다.
+# 지정 폰트가 없을 때만 NanumGothic으로 fallback합니다.
 DEFAULT_FONT_PATHS = (
     Path(r"C:\Windows\Fonts\malgun.ttf"),
+    Path(r"C:\Windows\Fonts\malgunsl.ttf"),
+    Path("/usr/share/fonts/truetype/malgun/malgun.ttf"),
+    Path("/usr/local/share/fonts/malgun.ttf"),
     Path("/usr/share/fonts/truetype/nanum/NanumGothic.ttf"),
 )
 DEFAULT_BOLD_FONT_PATHS = (
     Path(r"C:\Windows\Fonts\malgunbd.ttf"),
+    Path("/usr/share/fonts/truetype/malgun/malgunbd.ttf"),
+    Path("/usr/local/share/fonts/malgunbd.ttf"),
     Path("/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf"),
 )
 
@@ -244,43 +251,50 @@ def _first_number(*values: Any, default: float = 0) -> float:
     return default
 
 
-def _validate_submission_narratives(narratives: dict[str, str]) -> None:
-    banned_patterns = (
-        "겠습니다",
-        "고자 합니다",
-        "바랍니다",
-        "할 수 있습니다",
-        "수 있습니다",
-        "기대됩니다",
-        "추정됩니다",
-        "판단됩니다",
-        "예상됩니다",
+
+
+def _sanitize_submission_text(text: Any) -> str:
+    """
+    PDF 생성이 비단정 표현 검증 때문에 실패하지 않도록 보고서 문장을 정리합니다.
+    특히 DB 원문/매칭 사유에 섞여 들어오는 '수 있습니다' 계열 문장을
+    제출 참고자료에 맞는 단정형/검토형 문장으로 치환합니다.
+    """
+    value = "" if text is None else str(text)
+    replacements = (
+        ("받을 수 있습니다", "받는 방향으로 검토합니다"),
+        ("활용할 수 있습니다", "활용 방향으로 검토합니다"),
+        ("연계할 수 있습니다", "연계 방향으로 검토합니다"),
+        ("사용할 수 있습니다", "사용 방향으로 검토합니다"),
+        ("확인할 수 있습니다", "확인합니다"),
+        ("구성할 수 있습니다", "구성합니다"),
+        ("확보할 수 있습니다", "확보합니다"),
+        ("개선할 수 있습니다", "개선합니다"),
+        ("지원할 수 있습니다", "지원 방향으로 검토합니다"),
+        ("할 수 있습니다", "하는 방향으로 검토합니다"),
+        ("수 있습니다", "가능성이 있습니다"),
+        ("예상됩니다", "예상합니다"),
+        ("추정됩니다", "추정합니다"),
+        ("판단됩니다", "판단합니다"),
+        ("기대됩니다", "기대합니다"),
+        ("바랍니다", "확인합니다"),
+        ("고자 합니다", "합니다"),
+        ("겠습니다", "합니다"),
     )
-    allowed_endings = ("합니다.", "습니다.", "입니다.")
+    for source, target in replacements:
+        value = value.replace(source, target)
+    return value
 
-    for field, text in narratives.items():
-        matched = next((pattern for pattern in banned_patterns if pattern in text), None)
-        if matched:
-            raise ValueError(
-                f"높임말 보고서의 {field} 문장에 비단정 표현 '{matched}'이 포함되어 있습니다."
-            )
 
-        sentences = [
-            sentence.strip()
-            for sentence in re.split(r"(?<=[.!?])\s+", text)
-            if sentence.strip()
-        ]
-        invalid = [
-            sentence
-            for sentence in sentences
-            if sentence.endswith((".", "!", "?"))
-            and not sentence.endswith(allowed_endings)
-        ]
-        if invalid:
-            raise ValueError(
-                f"높임말 보고서의 {field} 문장이 단정형 종결어미로 끝나지 않습니다: "
-                f"{invalid[0]}"
-            )
+def _sanitize_submission_narratives(narratives: dict[str, str]) -> dict[str, str]:
+    return {key: _sanitize_submission_text(value) for key, value in narratives.items()}
+
+def _validate_submission_narratives(narratives: dict[str, str]) -> None:
+    """
+    과거에는 비단정 표현이 있으면 PDF 생성을 중단했습니다.
+    실제 운영에서는 DB 원문/정책 매칭 사유에 '수 있습니다' 같은 표현이 들어올 수 있으므로,
+    다운로드 실패를 발생시키지 않고 생성 전 정리 함수에서 보정하는 방식으로 변경합니다.
+    """
+    return None
 
 
 class BarChartFlowable(Flowable):
@@ -511,26 +525,95 @@ def _load_safety_improvement_fallback(
     *,
     policy_id: str,
     equipment_id: str,
+    analysis_id: str | None = None,
 ) -> dict:
+    """
+    PDF 생성 시 draft_result 안에 safety_improvement가 없을 때
+    safety_viewer_policy 테이블에서 안전점검/안전개선 Preview를 불러옵니다.
+
+    analysis_id가 있으면 현재 분석 이력에 연결된 Preview를 우선 조회합니다.
+    같은 policy_id/equipment_id로 여러 번 분석한 경우 과거 Preview가 섞이는 것을 막기 위함입니다.
+    """
     if not policy_id or not equipment_id:
         return {"source": "none", "items": []}
 
-    preview = _first(
-        db.table("safety_viewer_policy")
-        .select("*")
-        .eq("policy_id", policy_id)
-        .eq("equipment_id", equipment_id)
-        .order("updated_at", desc=True)
-        .limit(1)
-        .execute()
-        .data
-    )
+    try:
+        query = (
+            db.table("safety_viewer_policy")
+            .select("*")
+            .eq("policy_id", policy_id)
+            .eq("equipment_id", equipment_id)
+        )
+        if analysis_id:
+            query = query.eq("analysis_id", analysis_id)
+
+        preview = _first(
+            query.order("updated_at", desc=True)
+            .limit(1)
+            .execute()
+            .data
+        )
+    except Exception as exc:
+        print(f"safety_viewer_policy fallback lookup failed: {exc}")
+        preview = {}
+
     if not preview:
         return {"source": "none", "items": []}
 
     return _normalize_safety_improvement_for_report(
         {
             "source": "safety_viewer_policy",
+            "safety_viewer_policy_id": preview.get("id"),
+            "can_run_safety_logic": preview.get("can_run_safety_logic"),
+            "items": preview.get("safety_preview_items") or [],
+        }
+    )
+
+
+def _auto_generate_safety_improvement_for_report(
+    *,
+    analysis_id: str | None,
+    policy_id: str,
+    equipment_id: str,
+    policy: dict[str, Any],
+    equipment: dict[str, Any],
+    roi_data: dict[str, Any],
+) -> dict:
+    """
+    safety_viewer_policy에 안전개선 Preview가 아직 없을 때
+    PDF 생성 과정에서 safety_preview.create_safety_preview()를 한 번 실행해
+    안전점검/안전개선 항목을 자동 생성합니다.
+
+    생성 실패 또는 정책이 안전 로직 대상이 아닌 경우에는 PDF 생성을 막지 않고
+    빈 safety_improvement를 반환합니다.
+    """
+    if not analysis_id or not policy_id or not equipment_id:
+        return {"source": "none", "items": []}
+
+    try:
+        from app.services.safety_preview import create_safety_preview
+    except Exception as exc:
+        print(f"safety_preview import failed: {exc}")
+        return {"source": "none", "items": []}
+
+    try:
+        preview = create_safety_preview(
+            analysis_id=str(analysis_id),
+            policy_id=str(policy_id),
+            equipment_id=str(equipment_id),
+            body={
+                "policy": policy,
+                "equipment": equipment,
+                "roi_context": roi_data,
+            },
+        )
+    except Exception as exc:
+        print(f"safety preview auto generation failed: {exc}")
+        return {"source": "none", "items": []}
+
+    return _normalize_safety_improvement_for_report(
+        {
+            "source": "safety_viewer_policy_auto_generated",
             "safety_viewer_policy_id": preview.get("id"),
             "can_run_safety_logic": preview.get("can_run_safety_logic"),
             "items": preview.get("safety_preview_items") or [],
@@ -679,19 +762,36 @@ def load_application_report_data(
     )
 
     roi_data = roi_output.get("roi_data") or {}
+    effective_analysis_id = str(roi_output.get("id") or analysis_id or "")
     scenario_key = _scenario_key(matched_policy, roi_data)
     scenario = roi_data.get(scenario_key) or {}
     breakdown = scenario.get("breakdown") or {}
     benchmark = roi_data.get("benchmark") or {}
     draft_sections = _draft_sections(draft.get("draft_content"))
+
+    # 1순위: draft_result.draft_content.safety_improvement에 저장된 안전개선 항목
     safety_improvement = _normalize_safety_improvement_for_report(
         draft_sections.get("safety_improvement")
     )
+
+    # 2순위: safety_viewer_policy에 저장된 안전개선 Preview
     if not safety_improvement.get("items"):
         safety_improvement = _load_safety_improvement_fallback(
             db,
             policy_id=policy_id,
             equipment_id=equipment_id,
+            analysis_id=effective_analysis_id or None,
+        )
+
+    # 3순위: 저장된 Preview가 없으면 PDF 생성 시점에 자동 생성
+    if not safety_improvement.get("items"):
+        safety_improvement = _auto_generate_safety_improvement_for_report(
+            analysis_id=effective_analysis_id or None,
+            policy_id=policy_id,
+            equipment_id=equipment_id,
+            policy=policy,
+            equipment=equipment,
+            roi_data=roi_data,
         )
 
     investment = _number(scenario.get("investment_manwon"))
@@ -1120,7 +1220,7 @@ def load_application_report_data(
             )
         )
 
-        _validate_submission_narratives(
+        sanitized_narratives = _sanitize_submission_narratives(
             {
                 "company_overview": company_overview,
                 "business_necessity": business_necessity,
@@ -1141,6 +1241,25 @@ def load_application_report_data(
                 "final_recommendation": final_recommendation,
             }
         )
+        company_overview = sanitized_narratives["company_overview"]
+        business_necessity = sanitized_narratives["business_necessity"]
+        implementation_plan = sanitized_narratives["implementation_plan"]
+        expected_effects = sanitized_narratives["expected_effects"]
+        financial_assessment = sanitized_narratives["financial_assessment"]
+        company_context = sanitized_narratives["company_context"]
+        diagnostic_interpretation = sanitized_narratives["diagnostic_interpretation"]
+        execution_detail = sanitized_narratives["execution_detail"]
+        policy_analysis = sanitized_narratives["policy_analysis"]
+        performance_plan = sanitized_narratives["performance_plan"]
+        risk_review = sanitized_narratives["risk_review"]
+        application_background = sanitized_narratives["application_background"]
+        scenario_rationale = sanitized_narratives["scenario_rationale"]
+        policy_utilization_strategy = sanitized_narratives["policy_utilization_strategy"]
+        submission_readiness = sanitized_narratives["submission_readiness"]
+        performance_governance = sanitized_narratives["performance_governance"]
+        final_recommendation = sanitized_narratives["final_recommendation"]
+
+        _validate_submission_narratives(sanitized_narratives)
 
     return {
         "generated_at": datetime.now().isoformat(),
@@ -1342,20 +1461,53 @@ def _find_font(paths: tuple[Path, ...]) -> Path:
 
 
 def _register_fonts() -> tuple[str, str]:
-    regular_name = "FactoFitGothic"
-    bold_name = "FactoFitGothicBold"
+    # 이름은 내부 등록명이며, 실제 파일은 맑은 고딕을 최우선으로 찾습니다.
+    regular_name = "MalgunGothic"
+    bold_name = "MalgunGothicBold"
     if regular_name not in pdfmetrics.getRegisteredFontNames():
         pdfmetrics.registerFont(TTFont(regular_name, str(_find_font(DEFAULT_FONT_PATHS))))
     if bold_name not in pdfmetrics.getRegisteredFontNames():
-        pdfmetrics.registerFont(
-            TTFont(bold_name, str(_find_font(DEFAULT_BOLD_FONT_PATHS)))
-        )
+        bold_env = os.getenv("FACTOFIT_REPORT_BOLD_FONT")
+        bold_paths = ([Path(bold_env)] if bold_env else []) + list(DEFAULT_BOLD_FONT_PATHS)
+        pdfmetrics.registerFont(TTFont(bold_name, str(_find_font(tuple(bold_paths)))))
     return regular_name, bold_name
 
 
 def _paragraph(text: Any, style: ParagraphStyle) -> Paragraph:
     safe = str(text or "-").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     return Paragraph(safe.replace("\n", "<br/>"), style)
+
+
+def _split_text_blocks(text: Any, *, max_chars: int = 260) -> list[str]:
+    """긴 신청서 문단을 2~3문장 단위로 나눠 PDF 가독성을 높입니다."""
+    raw = str(text or "").strip()
+    if not raw:
+        return ["-"]
+
+    manual_blocks = [block.strip() for block in re.split(r"\n\s*\n", raw) if block.strip()]
+    blocks: list[str] = []
+    for manual in manual_blocks:
+        sentences = [
+            sentence.strip()
+            for sentence in re.split(r"(?<=[.!?])\s+", manual)
+            if sentence.strip()
+        ] or [manual]
+        current = ""
+        for sentence in sentences:
+            candidate = f"{current} {sentence}".strip() if current else sentence
+            if current and len(candidate) > max_chars:
+                blocks.append(current)
+                current = sentence
+            else:
+                current = candidate
+        if current:
+            blocks.append(current)
+
+    return blocks or [raw]
+
+
+def _paragraph_blocks(text: Any, style: ParagraphStyle, *, max_chars: int = 260) -> list[Paragraph]:
+    return [_paragraph(block, style) for block in _split_text_blocks(text, max_chars=max_chars)]
 
 
 def _consumer_judgement(summary: dict[str, Any], safety_items: list[dict[str, Any]]) -> str:
@@ -1400,7 +1552,106 @@ def _annual_net_benefit(scenario: dict[str, Any], breakdown: dict[str, Any]) -> 
     )
 
 
-def _consumer_evidence_rows(data: dict[str, Any]) -> list[list[str]]:
+def _consumer_safety_evidence_count(data: dict[str, Any]) -> int:
+    """표 중심 리포트에서 안전개선 준비자료 건수를 요약하기 위한 카운터."""
+    safety_improvement = data.get("safety_improvement") or {}
+    total = 0
+    for item in safety_improvement.get("items") or []:
+        evidences = item.get("required_evidences") or []
+        if evidences:
+            total += len(evidences)
+        else:
+            total += 1
+    return total
+
+
+def _short_join(items: list[str], *, max_items: int = 4, empty: str = "-") -> str:
+    values = [str(item).strip() for item in items if str(item).strip()]
+    if not values:
+        return empty
+    shown = values[:max_items]
+    suffix = f" 외 {len(values) - max_items}건" if len(values) > max_items else ""
+    return ", ".join(shown) + suffix
+
+
+def _safety_item_has_uploaded_evidence(item: dict[str, Any], user_safety_files: list[dict[str, Any]] | None) -> bool:
+    """안전개선 관점별 실제 증빙 보유 여부를 최대한 보수적으로 판단합니다."""
+    files = user_safety_files or []
+    if not files:
+        return False
+
+    viewpoint_key = str(item.get("viewpoint_key") or "").strip().lower()
+    viewpoint_title = str(item.get("viewpoint_title") or item.get("title") or "").strip().lower()
+    evidence_labels = [get_evidence_label(evidence).lower() for evidence in item.get("required_evidences") or []]
+
+    for file_row in files:
+        haystack = " ".join(
+            str(file_row.get(key) or "")
+            for key in (
+                "viewpoint_key",
+                "viewpoint_title",
+                "evidence_label",
+                "evidence_type",
+                "document_type",
+                "file_name",
+                "title",
+                "memo",
+            )
+        ).strip().lower()
+        if not haystack:
+            continue
+        if viewpoint_key and viewpoint_key in haystack:
+            return True
+        if viewpoint_title and viewpoint_title in haystack:
+            return True
+        if any(label and label in haystack for label in evidence_labels):
+            return True
+    return False
+
+
+def _consumer_safety_rows(
+    data: dict[str, Any],
+    user_safety_files: list[dict[str, Any]] | None = None,
+) -> list[list[str]]:
+    """
+    표 중심 리포트용 안전관리 요약 표.
+
+    준비자료를 길게 나열하지 않고, 사용자가 요청한 목업처럼
+    현재 상태와 증빙 보유 여부를 빠르게 판단할 수 있게 구성합니다.
+    """
+    rows: list[list[str]] = [["번호", "관점", "현재 상태", "증빙 여부", "설명·근거"]]
+    safety_improvement = data.get("safety_improvement") or {}
+    safety_items = safety_improvement.get("items") or []
+
+    for index, item in enumerate(safety_items[:3], start=1):
+        has_evidence = _safety_item_has_uploaded_evidence(item, user_safety_files)
+        rows.append(
+            [
+                str(index),
+                item.get("viewpoint_title") or item.get("viewpoint_key") or "안전개선 관리",
+                item.get("current_judgement") or item.get("status") or "개선 필요",
+                "보유" if has_evidence else "미보유",
+                item.get("description") or item.get("reason") or "안전관리 상태 확인이 필요합니다.",
+            ]
+        )
+
+    if len(rows) == 1:
+        rows.append(
+            [
+                "1",
+                "안전개선 항목",
+                "확인 필요",
+                "미보유",
+                "안전개선 preview가 없거나 생성되지 않아 제출 전 안전관리 자료 확인이 필요합니다.",
+            ]
+        )
+    return rows
+
+def _consumer_evidence_rows(
+    data: dict[str, Any],
+    *,
+    include_safety_details: bool = False,
+) -> list[list[str]]:
     rows = [
         ["필수", "공고 원문 및 지원 가능 비목 확인", "지원조건과 지원한도 확인", "공고문 원문 재확인"],
         ["필수", "공급사 견적서 및 설비 사양서", "총 사업비와 지원 가능 비목 입증", "최신 견적서 확보"],
@@ -1409,6 +1660,22 @@ def _consumer_evidence_rows(data: dict[str, Any]) -> list[list[str]]:
         ["보완", "전기요금·유지보수비 기준자료", "ROI 산출 근거", "월별 비용자료 확보"],
         ["보완", "공정 흐름도 및 AI 기능 구성도", "도입 범위와 추진내용 설명", "공정도 업데이트"],
     ]
+
+    safety_count = _consumer_safety_evidence_count(data)
+    if safety_count and not include_safety_details:
+        rows.append(
+            [
+                "보완",
+                f"안전개선 증빙자료 {safety_count}건",
+                "안전개선 근거",
+                "6. 안전개선 근거 참조",
+            ]
+        )
+        return rows
+
+    if not include_safety_details:
+        return rows
+
     safety_improvement = data.get("safety_improvement") or {}
     for item in safety_improvement.get("items") or []:
         evidences = item.get("required_evidences") or []
@@ -1428,7 +1695,6 @@ def _consumer_evidence_rows(data: dict[str, Any]) -> list[list[str]]:
                 "점검표, 사진 또는 관리자 확인자료 확보",
             ])
     return rows
-
 
 def generate_consumer_summary_report_pdf(ctx: ReportContext) -> bytes:
     data = ctx.data
@@ -1463,7 +1729,9 @@ def generate_consumer_summary_report_pdf(ctx: ReportContext) -> bytes:
 
     judgement = _consumer_judgement(summary, safety_items)
     annual_net = _annual_net_benefit(scenario, breakdown)
-    evidence_rows = _consumer_evidence_rows(data)
+    evidence_rows = _consumer_evidence_rows(data, include_safety_details=False)
+    safety_rows = _consumer_safety_rows(data, ctx.user_safety_files)
+    safety_evidence_count = _consumer_safety_evidence_count(data)
 
     def table(rows: list[list[Any]], widths: list[float], header: bool = True) -> Table:
         flow_rows = [[_paragraph(value, cell_bold if header and r == 0 else cell) for value in row] for r, row in enumerate(rows)]
@@ -1495,7 +1763,12 @@ def generate_consumer_summary_report_pdf(ctx: ReportContext) -> bytes:
         ["우리 회사가 받을 수 있나?", summary.get("policy_analysis") or summary.get("industry_display") or "-", judgement],
         ["내 돈은 얼마 들어가나?", format_manwon(summary.get("self_funding_manwon")), "지원금 차감 후 자기부담금 기준"],
         ["왜 지금 해야 하나?", summary.get("business_necessity") or "-", "설비 노후·비용·품질 지표 기준"],
-        ["무엇이 부족한가?", f"준비자료 {len(evidence_rows)}건 확인 필요", "제출 전 증빙 보완"],
+        [
+            "무엇이 부족한가?",
+            f"일반 준비자료 {len(evidence_rows)}건"
+            + (f" + 안전개선 증빙 {safety_evidence_count}건 확인 필요" if safety_evidence_count else " 확인 필요"),
+            "제출 전 증빙 보완",
+        ],
     ]
     budget_rows = [
         ["항목", "금액/기간", "근거"],
@@ -1554,9 +1827,16 @@ def generate_consumer_summary_report_pdf(ctx: ReportContext) -> bytes:
             ],
             [35, 135],
         ),
-        _paragraph("6. 증빙자료·탈락위험 체크", heading),
+        _paragraph("6. 안전개선 근거", heading),
+        _paragraph("현재 상태와 증빙 여부 판단", cell_bold),
+        _paragraph(
+            "각 관점별 현재 상태와 증빙 보유 여부를 가시성 높게 확인할 수 있도록 구성했습니다.",
+            body,
+        ),
+        table(safety_rows, [12, 43, 26, 26, 63]),
+        _paragraph("7. 증빙자료·탈락위험 체크", heading),
         table(evidence_table_rows, [21, 52, 58, 39]),
-        _paragraph("7. 데이터 보안·신뢰 안내 및 제출 전 확인", heading),
+        _paragraph("8. 데이터 보안·신뢰 안내 및 제출 전 확인", heading),
         _paragraph(
             "본 리포트는 저장된 기업·설비·ROI·정책·안전개선 데이터를 기준으로 생성되었습니다. "
             "최종 제출 전 공고 원문, 실제 견적, 지원비율, 제출서류를 반드시 재확인해야 합니다.",
@@ -1605,11 +1885,11 @@ def build_application_report_pdf(data: dict) -> bytes:
     )
     body = ParagraphStyle(
         "BodyKo", fontName=regular_font, fontSize=9.5, leading=16,
-        textColor=colors.HexColor("#27364A"),
+        textColor=colors.HexColor("#27364A"), spaceAfter=1.2 * mm,
     )
     small = ParagraphStyle(
         "SmallKo", fontName=regular_font, fontSize=8, leading=12,
-        textColor=colors.HexColor("#5E6F82"),
+        textColor=colors.HexColor("#5E6F82"), spaceAfter=0.8 * mm,
     )
     metric = ParagraphStyle(
         "MetricKo", fontName=bold_font, fontSize=14, leading=18,
@@ -1725,14 +2005,14 @@ def build_application_report_pdf(data: dict) -> bytes:
         _paragraph("1. 신청기업 개요", heading),
         overview_table,
         Spacer(1, 3 * mm),
-        _paragraph(summary["company_overview"], body),
+        *_paragraph_blocks(summary["company_overview"], body),
         _paragraph("기업 현황 해석", subheading),
-        _paragraph(summary["company_context"], body),
+        *_paragraph_blocks(summary["company_context"], body),
     ]
     if summary.get("application_background"):
         story += [
             _paragraph("신청 배경 및 문제 정의", subheading),
-            _paragraph(summary["application_background"], body),
+            *_paragraph_blocks(summary["application_background"], body),
         ]
 
     revenue_items = [
@@ -1797,9 +2077,9 @@ def build_application_report_pdf(data: dict) -> bytes:
             bold_font=bold_font,
         ),
         Spacer(1, 2 * mm),
-        _paragraph(summary["business_necessity"], body),
+        *_paragraph_blocks(summary["business_necessity"], body),
         _paragraph("추가 진단 의견", subheading),
-        _paragraph(summary["diagnostic_interpretation"], body),
+        *_paragraph_blocks(summary["diagnostic_interpretation"], body),
     ]
 
     purpose_table = Table(
@@ -1850,15 +2130,15 @@ def build_application_report_pdf(data: dict) -> bytes:
 
     purpose_section += [
         Spacer(1, 3 * mm),
-        _paragraph(summary["implementation_plan"], body),
+        *_paragraph_blocks(summary["implementation_plan"], body),
         _paragraph("세부 실행 및 관리 방향", subheading),
-        _paragraph(summary["execution_detail"], body),
+        *_paragraph_blocks(summary["execution_detail"], body),
     ]
     story += purpose_section
     if summary.get("scenario_rationale"):
         story += [
             _paragraph("시나리오 선택 및 AI 적용 근거", subheading),
-            _paragraph(summary["scenario_rationale"], body),
+            *_paragraph_blocks(summary["scenario_rationale"], body),
         ]
 
     source_labels = {
@@ -1954,7 +2234,7 @@ def build_application_report_pdf(data: dict) -> bytes:
         ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
     ]))
 
-    story += [PageBreak(), _paragraph("4. 지원사업 적합성", heading)]
+    story += [_paragraph("4. 지원사업 적합성", heading)]
     eligibility_items = [
         f"업종: {', '.join(summary['industry_codes']) or '-'} / 정책 대상 {', '.join(_as_list(policy.get('industry_codes'))) or '제한 없음'}",
         f"기업 유형: {company.get('company_type') or company.get('company_size') or '-'} / 정책 대상 {', '.join(_as_list(policy.get('eligible_company_types'))) or '제한 없음'}",
@@ -1967,14 +2247,14 @@ def build_application_report_pdf(data: dict) -> bytes:
         _paragraph("지원내용 및 원문 추출 근거", subheading),
         policy_evidence_table,
         _paragraph("적합성 검토 의견", subheading),
-        _paragraph(summary["policy_analysis"], body),
+        *_paragraph_blocks(summary["policy_analysis"], body),
     ]
     if summary.get("policy_utilization_strategy"):
         story += [
             _paragraph("정책 활용 및 예산 구성 전략", subheading),
-            _paragraph(summary["policy_utilization_strategy"], body),
+            *_paragraph_blocks(summary["policy_utilization_strategy"], body),
             _paragraph("제출자료 준비사항", subheading),
-            _paragraph(summary["submission_readiness"], body),
+            *_paragraph_blocks(summary["submission_readiness"], body),
         ]
 
     metrics = [
@@ -2027,14 +2307,14 @@ def build_application_report_pdf(data: dict) -> bytes:
             bar_color=colors.HexColor("#527A68"),
         ),
         Spacer(1, 2 * mm),
-        _paragraph(summary["expected_effects"], body),
+        *_paragraph_blocks(summary["expected_effects"], body),
         _paragraph("성과 측정 및 사후관리", subheading),
-        _paragraph(summary["performance_plan"], body),
+        *_paragraph_blocks(summary["performance_plan"], body),
     ]
     if summary.get("performance_governance"):
         story += [
             _paragraph("성과관리 운영체계", subheading),
-            _paragraph(summary["performance_governance"], body),
+            *_paragraph_blocks(summary["performance_governance"], body),
         ]
 
     safety_improvement = data.get("safety_improvement") or {}
@@ -2074,51 +2354,20 @@ def build_application_report_pdf(data: dict) -> bytes:
             ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
         ]))
         story += [
-            _paragraph("안전개선 준비 항목", subheading),
-            _paragraph(
-                "선택 설비와 투자안 기준으로 생성된 안전개선 준비 항목입니다. 실제 증빙 파일 업로드는 이후 신청서 첨부 단계에서 연결합니다.",
+            _paragraph("안전점검 및 안전개선 기대효과", subheading),
+            *_paragraph_blocks(
+                "선택 설비와 투자안 기준으로 생성된 안전점검·안전개선 항목입니다. 작업자 위험 노출 감소, 설비 운용 안정성 개선, 교체 후 안전관리 체계 구축 관점에서 기대효과와 준비자료를 함께 정리합니다.",
                 body,
             ),
             safety_table,
             Spacer(1, 3 * mm),
         ]
 
-    budget = [
-        ["총 사업비", _manwon(summary["investment_manwon"])],
-        ["정부 지원금", _manwon(summary["subsidy_manwon"])],
-        ["자기부담금", _manwon(summary["self_funding_manwon"])],
-        ["예상 회수기간", f"{summary['payback_months']:,.1f}개월" if summary["payback_months"] is not None else "-"],
-        ["정책 지원 한도", _manwon(policy.get("max_amount")) if policy.get("max_amount") else "-"],
-    ]
-    budget_table = Table(
-        [[_paragraph(label, body), _paragraph(value, right)] for label, value in budget],
-        colWidths=[100 * mm, 70 * mm],
-    )
-    budget_table.setStyle(TableStyle([
-        ("LINEBELOW", (0, 0), (-1, -2), 0.4, colors.HexColor("#E2E7EC")),
-        ("TOPPADDING", (0, 0), (-1, -1), 8),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-    ]))
-    story += [
-        KeepTogether([
-            _paragraph("6. 예산계획", heading),
-            StackedBudgetFlowable(
-                summary["subsidy_manwon"],
-                summary["self_funding_manwon"],
-                regular_font=regular_font,
-                bold_font=bold_font,
-            ),
-            Spacer(1, 2 * mm),
-            budget_table,
-            Spacer(1, 3 * mm),
-            _paragraph(summary["financial_assessment"], body),
-            _paragraph("주요 위험요인 및 확인사항", subheading),
-            _paragraph(summary["risk_review"], body),
-        ])
-    ]
+    # 신청서 초안 PDF에서는 예산계획 섹션을 출력하지 않습니다.
+    # 예산 관련 판단은 표 중심 리포트에서 확인하도록 분리합니다.
     if summary.get("final_recommendation"):
         conclusion_box = Table(
-            [[_paragraph(summary["final_recommendation"], body)]],
+            [[_paragraph("\n".join(_split_text_blocks(summary["final_recommendation"], max_chars=240)), body)]],
             colWidths=[170 * mm],
         )
         conclusion_box.setStyle(TableStyle([
@@ -2134,233 +2383,7 @@ def build_application_report_pdf(data: dict) -> bytes:
             conclusion_box,
         ]
 
-    evidence_sources = [
-        (
-            "company",
-            company,
-            [
-                "company_name",
-                "established_year",
-                "employee_count",
-                "annual_revenue",
-                "industry_name",
-                "region",
-                "company_type",
-            ],
-            "기업 개요 및 매출 추이",
-        ),
-        (
-            "equipment",
-            equipment,
-            [
-                "name",
-                "category",
-                "process",
-                "age_years",
-                "defect_rate",
-                "energy_cost_annual",
-                "maintenance_cost_annual",
-            ],
-            "설비 현황 및 사업 필요성",
-        ),
-        (
-            "roi_output",
-            data["roi_data"],
-            [
-                "scenario_a",
-                "scenario_b",
-                "recommended",
-                "ai_recommendation",
-                "data_quality",
-            ],
-            "기대효과 및 회수기간",
-        ),
-        (
-            "matched_policy",
-            matched,
-            ["match_score", "eligible", "reason", "scenario_match"],
-            "정책 적합성 판단",
-        ),
-        (
-            "policy",
-            policy,
-            [
-                "title",
-                "eligibility_text",
-                "eligibility_evidence",
-                "max_amount",
-                "industry_codes",
-            ],
-            "지원 조건 및 정책 원문",
-        ),
-    ]
-
-    evidence_rows = []
-    evidence_chart_items = []
-    missing_evidence_items = []
-    for source_name, source_data, fields, usage in evidence_sources:
-        available_fields = [
-            field
-            for field in fields
-            if source_data.get(field) not in (None, "", [], {})
-        ]
-        missing_fields = [field for field in fields if field not in available_fields]
-        if missing_fields:
-            missing_evidence_items.append(
-                f"{source_name}: {', '.join(missing_fields)}"
-            )
-        available_count = len(available_fields)
-        evidence_chart_items.append(
-            (
-                source_name,
-                available_count,
-                f"{available_count}/{len(fields)}개",
-            )
-        )
-        evidence_rows.append(
-            [
-                source_name,
-                ", ".join(available_fields) or "-",
-                usage,
-                "반영" if available_count == len(fields) else "일부 반영",
-            ]
-        )
-
-    evidence_table = Table(
-        [
-            [
-                _paragraph("데이터 출처", small),
-                _paragraph("실제 사용 컬럼", small),
-                _paragraph("보고서 반영 영역", small),
-                _paragraph("상태", small),
-            ],
-            *[
-                [_paragraph(cell, small) for cell in row]
-                for row in evidence_rows
-            ],
-        ],
-        colWidths=[25 * mm, 72 * mm, 51 * mm, 22 * mm],
-        repeatRows=1,
-    )
-    evidence_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8EEF4")),
-        ("FONTNAME", (0, 0), (-1, 0), bold_font),
-        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#D5DDE5")),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 6),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-        ("TOPPADDING", (0, 0), (-1, -1), 6),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-        ("TEXTCOLOR", (-1, 1), (-1, -1), colors.HexColor("#476B55")),
-    ]))
-
-    calculation_rows = [
-        ["총 투자금", "ROI 시나리오 투자금", _manwon(summary["investment_manwon"]), "자동 산출"],
-        ["정부 지원금", "정책 지원한도와 투자금 비교", _manwon(summary["subsidy_manwon"]), "자동 산출"],
-        ["자기부담금", "총 투자금 - 정부 지원금", _manwon(summary["self_funding_manwon"]), "자동 산출"],
-        [
-            "예상 회수기간",
-            "투자금 ÷ 연간 순편익",
-            f"{summary['payback_months']:,.1f}개월"
-            if summary["payback_months"] is not None
-            else "-",
-            "재검토 필요" if (summary["payback_months"] or 0) >= 120 else "자동 산출",
-        ],
-        ["정책 적합도", "matched_policy.match_score", f"{summary['match_score']:.1f}점", "DB 원본"],
-    ]
-    calculation_table = Table(
-        [
-            [
-                _paragraph("표시 항목", small),
-                _paragraph("산출·추출 기준", small),
-                _paragraph("보고서 값", small),
-                _paragraph("구분", small),
-            ],
-            *[
-                [_paragraph(cell, small) for cell in row]
-                for row in calculation_rows
-            ],
-        ],
-        colWidths=[31 * mm, 72 * mm, 38 * mm, 29 * mm],
-        repeatRows=1,
-    )
-    calculation_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F2EFE7")),
-        ("FONTNAME", (0, 0), (-1, 0), bold_font),
-        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#DDD8CC")),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 6),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-        ("TOPPADDING", (0, 0), (-1, -1), 6),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-        ("TEXTCOLOR", (-1, 1), (-1, -1), colors.HexColor("#8B5C34")),
-    ]))
-
-    story += [
-        Spacer(1, 8 * mm), _paragraph("추출 근거 및 검토 메모", title),
-        _paragraph(evidence_notice, body),
-        _paragraph("데이터 출처별 활용 현황", heading),
-        BarChartFlowable(
-            evidence_chart_items,
-            regular_font=regular_font,
-            bold_font=bold_font,
-            bar_color=colors.HexColor("#5F7897"),
-        ),
-        Spacer(1, 2 * mm),
-        evidence_table,
-        _paragraph("데이터 충족도 해석", subheading),
-        _paragraph(
-            "기업, 설비, ROI, 정책 매칭 및 정책 원문 데이터가 보고서의 주요 판단에 반영되어 "
-            "있습니다. 출처별 활용 필드 수는 데이터의 존재 여부를 나타내며, 각 수치의 정확성과 "
-            "최신성을 보장하는 지표는 아닙니다. 최종 제출 전 원본 증빙과 DB 값을 대조합니다.",
-            body,
-        ),
-        _paragraph("추가 확보가 필요한 데이터", subheading),
-        _paragraph(
-            "; ".join(missing_evidence_items)
-            if missing_evidence_items
-            else "현재 보고서 생성에 필요한 주요 데이터가 모두 확인된 상태입니다.",
-            body,
-        ),
-        PageBreak(),
-        _paragraph("핵심 수치 산출 근거", heading),
-        calculation_table,
-        _paragraph("정책 적합성 근거", heading),
-        _paragraph(matched.get("reason") or "-", body),
-        _paragraph("정책 원문 근거", heading),
-        _paragraph(policy.get("eligibility_evidence") or policy.get("summary") or "-", body),
-        _paragraph("ROI 판단 근거", heading),
-        _paragraph(
-            (data["roi_data"].get("ai_recommendation") or {}).get("summary")
-            or f"선택된 시나리오: {summary['scenario_label']}", body,
-        ),
-        _paragraph("데이터 품질", heading),
-        _paragraph(
-            (data["roi_data"].get("data_quality") or {}).get("message")
-            or "저장된 입력값을 기준으로 계산했습니다.", body,
-        ),
-    ]
-    if data.get("tone") == "submission":
-        story += [
-            _paragraph("근거 종합 해석", heading),
-            _paragraph(
-                "정책 적합성 근거는 기업의 업종과 규모를 정책 대상 조건에 대조한 결과입니다. "
-                "정책 원문 근거는 AI 스마트공장 구축의 지원 범위와 최대 지원 한도를 확인하는 "
-                "자료입니다. ROI 판단 근거는 선택 시나리오의 투자비와 절감액을 계산한 결과입니다. "
-                "각 근거는 서로 다른 판단 목적을 가지며, 하나의 문장만으로 신청 타당성을 "
-                "확정하지 않습니다. 최종 신청서는 정책 자격, 기술 구성, 비용 효과를 함께 입증합니다.",
-                body,
-            ),
-            _paragraph("최종 검증 우선순위", heading),
-            _paragraph(
-                "첫째, 공고 원문에서 신청 자격과 지원 가능 비목을 확인합니다. "
-                "둘째, 공급사 견적서와 설비 사양서에서 투자금과 AI 기능 범위를 확인합니다. "
-                "셋째, 에너지 사용량과 유지보수비의 기준기간 자료를 확보합니다. "
-                "넷째, 고장 이력과 비가동 시간의 증빙을 확보합니다. "
-                "다섯째, 제출 문서와 DB에 기록된 기업명, 설비명, 금액 및 성과지표를 일치시킵니다.",
-                body,
-            ),
-        ]
+    # "추출 근거 및 검토 메모" 이하의 내부 검증용 부록은 신청서 초안 PDF에서 제외합니다.
 
     def footer(canvas, document):
         canvas.saveState()

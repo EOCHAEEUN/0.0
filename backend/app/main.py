@@ -5,7 +5,6 @@ from app.routers import (
     auth,
     chat,
     click_chat,
-    click_chat_two,
     documents,
     draft,
     industry,
@@ -56,5 +55,4 @@ app.include_router(draft.router, prefix="/api", tags=["draft"])
 app.include_router(reports.router, prefix="/api", tags=["reports"])
 app.include_router(documents.router, prefix="/api", tags=["documents"])
 app.include_router(click_chat.router)
-app.include_router(click_chat_two.router, prefix="/api", tags=["click-chat-two"])
 app.include_router(equipment_guide_router.router)

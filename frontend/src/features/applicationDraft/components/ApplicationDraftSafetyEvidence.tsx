@@ -23,10 +23,9 @@ export function ApplicationDraftSafetyEvidence({
 
       {rows.length === 0 ? (
         <div className="ff-draft-empty-state inline">
-          <p>안전개선 근거를 아직 생성하지 않았습니다.</p>
+          <p>안전개선 근거 표를 불러오지 못했습니다.</p>
           <p className="ff-draft-empty-hint">
-            safety_viewer_policy 데이터가 생성되면 이 표에 실제 관점이
-            표시됩니다.
+            정책·설비 정보가 연결되면 관점별 현재 상태와 증빙 여부가 표시됩니다.
           </p>
         </div>
       ) : (

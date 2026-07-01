@@ -1,6 +1,6 @@
 export type DraftStatus = "idle" | "saved" | "downloadReady"
 export type ScenarioKey = "A" | "B"
-export type StatusTone = "ok" | "need" | "warn"
+export type StatusTone = "ok" | "need" | "warn" | "info"
 
 export type ChecklistItem = {
   label: string

@@ -3041,6 +3041,11 @@
   color: #ffc7c4;
 }
 
+.ff-draft-judgement-badge.info {
+  background: rgba(59, 130, 246, 0.2);
+  color: #bfdbfe;
+}
+
 .ff-draft-workspace-v2 {
   display: grid;
   gap: 22px;
@@ -3197,6 +3202,29 @@
   color: #334155;
   font-weight: 700;
   line-height: 1.65;
+}
+
+.ff-draft-safety-card .ff-draft-judgement-badge.ok,
+.ff-draft-safety-card .ff-draft-evidence-badge.ok {
+  background: #e8f5ef;
+  color: #0b7a53;
+}
+
+.ff-draft-safety-card .ff-draft-judgement-badge.warn,
+.ff-draft-safety-card .ff-draft-evidence-badge.warn {
+  background: #fff1e8;
+  color: #ea580c;
+}
+
+.ff-draft-safety-card .ff-draft-judgement-badge.need,
+.ff-draft-safety-card .ff-draft-evidence-badge.need {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.ff-draft-safety-card .ff-draft-judgement-badge.info {
+  background: #eef6ff;
+  color: #2563eb;
 }
 
 .ff-draft-loading {

@@ -3,6 +3,12 @@ from __future__ import annotations
 from typing import Any, Literal
 
 from app.core.database import get_db
+from app.services.safety_preview import (
+    DEFAULT_DESCRIPTIONS,
+    DEFAULT_VIEWPOINT_KEYS,
+    VIEWPOINTS,
+    create_safety_preview,
+)
 
 
 VIEWPOINT_LABELS: dict[str, str] = {
@@ -336,13 +342,121 @@ def _evidence_status_for_viewpoint(
     return "미보유"
 
 
+def _equipment_safety_description(viewpoint_key: str, equipment: dict[str, Any]) -> str:
+    age_years = _safe_number(equipment.get("age_years"))
+    if viewpoint_key == "worker_risk_reduction" and age_years and age_years >= 8:
+        return "노후설비로 방호장치 성능 저하 우려"
+    if viewpoint_key == "operation_stability":
+        if age_years and age_years >= 5:
+            return "유지보수비 증가, 누수 이력 있음"
+        return _safe_text(
+            DEFAULT_DESCRIPTIONS.get("operation_stability"),
+            default="설비 운용 안정성 개선 근거 확인 필요",
+        )
+    if viewpoint_key == "post_install_safety_management":
+        return "교체 후 검사·교육·기록 체계 수립 필요"
+    return _safe_text(
+        DEFAULT_DESCRIPTIONS.get(viewpoint_key),
+        default="안전개선 근거 확인이 필요합니다.",
+    )
+
+
+def _build_fallback_safety_rows(
+    *,
+    equipment: dict[str, Any],
+    uploaded_files: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for index, viewpoint_key in enumerate(DEFAULT_VIEWPOINT_KEYS, start=1):
+        definition = VIEWPOINTS.get(viewpoint_key, {})
+        item = {
+            "no": index,
+            "viewpoint_key": viewpoint_key,
+            "viewpoint_title": _safe_text(
+                definition.get("title"),
+                VIEWPOINT_LABELS.get(viewpoint_key, viewpoint_key),
+            ),
+            "current_judgement": _safe_text(
+                definition.get("judgement"),
+                default="개선 필요",
+            ),
+            "description": _equipment_safety_description(viewpoint_key, equipment),
+            "required_evidences": [],
+            "matched_safety_rule_ids": [],
+        }
+        rows.append(
+            {
+                "no": index,
+                "viewpoint_key": viewpoint_key,
+                "viewpoint_label": item["viewpoint_title"],
+                "current_status": item["current_judgement"],
+                "evidence_status": _evidence_status_for_viewpoint(item, uploaded_files),
+                "description": item["description"],
+            }
+        )
+    return rows
+
+
+def _ensure_safety_viewer_policy(
+    *,
+    analysis_id: str,
+    policy_id: str,
+    equipment_id: str,
+    equipment: dict[str, Any],
+    roi_data: dict[str, Any],
+) -> dict[str, Any] | None:
+    db = get_db()
+    safety_rows = (
+        db.table("safety_viewer_policy")
+        .select("*")
+        .eq("analysis_id", str(analysis_id))
+        .eq("policy_id", policy_id)
+        .eq("equipment_id", str(equipment_id))
+        .limit(1)
+        .execute()
+        .data
+        or []
+    )
+
+    existing = safety_rows[0] if safety_rows else None
+    preview_items = _as_list((existing or {}).get("safety_preview_items"))
+    generated_viewpoints = _as_dict((existing or {}).get("generated_viewpoints"))
+    if existing and (preview_items or generated_viewpoints):
+        return existing
+
+    try:
+        preview = create_safety_preview(
+            analysis_id=str(analysis_id),
+            policy_id=policy_id,
+            equipment_id=str(equipment_id),
+            body={
+                "equipment_name": equipment.get("name"),
+                "equipment_type": equipment.get("category"),
+                "equipment": equipment,
+                "roi_context": roi_data,
+            },
+        )
+    except Exception:
+        return existing
+
+    if preview.get("safety_preview_items") or preview.get("generated_viewpoints"):
+        return preview
+    return existing or preview
+
+
 def _build_safety_rows(
     *,
     safety_viewer_policy: dict[str, Any] | None,
     uploaded_files: list[dict[str, Any]],
     safety_check_status: list[dict[str, Any]],
+    equipment: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     if not safety_viewer_policy:
+        if equipment:
+            return _build_fallback_safety_rows(
+                equipment=equipment,
+                uploaded_files=uploaded_files,
+            )
         return []
 
     preview_items = [
@@ -358,14 +472,21 @@ def _build_safety_rows(
                 "no": index + 1,
                 "viewpoint_key": key,
                 "viewpoint_title": _viewpoint_label(key, generated_viewpoints),
-                "current_judgement": "판단 정보 없음",
+                "current_judgement": VIEWPOINTS.get(key, {}).get("judgement", "판단 정보 없음"),
                 "description": _safe_text(
                     generated_viewpoints.get(key),
+                    DEFAULT_DESCRIPTIONS.get(key),
                     default="안전개선 근거를 아직 생성하지 않았습니다.",
                 ),
             }
             for index, key in enumerate(generated_viewpoints.keys())
         ]
+
+    if not preview_items and equipment:
+        return _build_fallback_safety_rows(
+            equipment=equipment,
+            uploaded_files=uploaded_files,
+        )
 
     rows: list[dict[str, Any]] = []
     for item in preview_items:
@@ -384,7 +505,10 @@ def _build_safety_rows(
 
         description = _safe_text(item.get("description"))
         if not description:
-            description = "안전개선 근거를 아직 생성하지 않았습니다."
+            description = _equipment_safety_description(
+                viewpoint_key,
+                equipment or {},
+            )
 
         rows.append(
             {
@@ -537,17 +661,13 @@ def load_application_draft_workspace(
     safety_viewer_policy: dict[str, Any] | None = None
     uploaded_files: list[dict[str, Any]] = []
     if resolved_policy_id and equipment_id:
-        safety_query = (
-            db.table("safety_viewer_policy")
-            .select("*")
-            .eq("analysis_id", str(analysis_id))
-            .eq("policy_id", resolved_policy_id)
-            .eq("equipment_id", str(equipment_id))
-            .limit(1)
+        safety_viewer_policy = _ensure_safety_viewer_policy(
+            analysis_id=str(analysis_id),
+            policy_id=resolved_policy_id,
+            equipment_id=equipment_id,
+            equipment=equipment,
+            roi_data=roi_data,
         )
-        safety_rows = safety_query.execute().data or []
-        if safety_rows:
-            safety_viewer_policy = safety_rows[0]
 
         files_query = (
             db.table("user_safety_files")
@@ -573,6 +693,7 @@ def load_application_draft_workspace(
         safety_viewer_policy=safety_viewer_policy,
         uploaded_files=uploaded_files,
         safety_check_status=safety_check_rows,
+        equipment=equipment,
     )
 
     has_evidence_files = len(uploaded_files) > 0

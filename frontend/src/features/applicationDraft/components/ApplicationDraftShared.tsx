@@ -112,6 +112,8 @@ export function JudgementStatusBadge({ status }: { status: string }) {
     normalized.includes("위험")
   ) {
     tone = "need"
+  } else if (normalized.includes("설치 후") || normalized.includes("준비 예정")) {
+    tone = "info"
   } else if (
     normalized.includes("준비") ||
     normalized.includes("예정") ||

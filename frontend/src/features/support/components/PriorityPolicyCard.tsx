@@ -1,116 +1,122 @@
+import { Building2, CalendarDays, Check, ChevronRight, FileText, Info } from "lucide-react"
+
 import type { SupportProjectsPolicyCard } from "../supportProjectsOverview.types"
-import { getDdayTone } from "../supportProjectsDday"
 import "../supportProjects.workspace.css"
 
-function scoreWidth(score: number | null) {
-  if (score === null) return 0
-  return Math.max(0, Math.min(100, score))
+function formatMainCardStatus(status: string) {
+  if (status === "우선 검토") return "신청 준비 가능"
+  return status
 }
 
-function fitTone(status: string) {
-  if (status === "적합") return "ok"
-  if (status === "검토 필요") return "warn"
-  return "neutral"
+function formatDeadlineLabel(display?: string | null, raw?: string | null) {
+  const value = (display || raw || "").trim()
+  if (!value) return "마감일 공고문 확인"
+  if (value.includes("마감")) return value
+  return `${value} 마감`
 }
 
 export function PriorityPolicyCard({
   policy,
-  priorityBadge,
-  secondaryBadge,
   onOpenDetail,
 }: {
   policy: SupportProjectsPolicyCard
-  priorityBadge: string
-  secondaryBadge: string
   onOpenDetail: (policy: SupportProjectsPolicyCard) => void
 }) {
-  const metaParts = [policy.organization, policy.support_amount_text, policy.deadline_display || policy.deadline]
+  const whyCheckItems =
+    policy.why_check_now.length > 0
+      ? policy.why_check_now
+      : [
+          policy.scenario_label
+            ? `${policy.scenario_label} 투자안과 연계 가능성이 있습니다.`
+            : "현재 투자안과 연계 가능성이 있습니다.",
+          "현재 업종과 기업 규모 조건이 대부분 맞습니다.",
+          policy.required_documents_label || "신청 전 제출서류와 지원 한도 확인 필요",
+        ]
 
   return (
-    <section className="ff-support-priority-card">
-      <div className="ff-support-priority-tabs" aria-label="정책 분류">
-        <span className="active">{priorityBadge}</span>
-        <span>{secondaryBadge}</span>
-      </div>
+    <section className="ff-support-main-priority">
+      <header className="ff-support-section-head">
+        <h2>지금 먼저 확인할 정책</h2>
+      </header>
 
-      <div className="ff-support-priority-grid">
-        <div className="ff-support-priority-main">
-          <p className="ff-support-priority-meta">
-            {metaParts.filter(Boolean).join(" · ")}
-            {policy.d_day && policy.d_day !== "-" ? (
-              <>
-                {" · "}
-                <span className={`ff-support-dday-pill ${getDdayTone(policy)}`}>{policy.d_day}</span>
-              </>
-            ) : null}
-          </p>
-          <h2>{policy.title}</h2>
-
-          {policy.tags.length > 0 ? (
-            <div className="ff-support-tag-row">
-              {policy.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className={`ff-support-tag ${tag.includes("교체") ? "accent" : ""}`}
-                >
-                  {tag}
-                </span>
-              ))}
+      <article className="ff-support-main-priority-card">
+        <div className="ff-support-main-priority-grid">
+          <div className="ff-support-main-priority-copy">
+            <div className="ff-support-priority-pill-row">
+              <span className="ff-support-priority-pill">
+                1순위 · {formatMainCardStatus(policy.application_status)}
+              </span>
+              <span className="ff-support-priority-pill">{policy.support_type_label}</span>
             </div>
-          ) : null}
 
-          <div className="ff-support-reason-box">
-            <strong>이 공고를 먼저 보는 이유</strong>
-            <p>{policy.match_reason}</p>
-          </div>
-        </div>
+            <h3>{policy.title}</h3>
 
-        <aside className="ff-support-priority-side">
-          <div className="ff-support-score-head">
-            <span>매칭 적합도</span>
-            <span className={`ff-support-fit-badge ${fitTone(policy.fit_status)}`}>
-              {policy.fit_status}
-            </span>
-          </div>
+            <div className="ff-support-main-meta-row">
+              <span>
+                <Building2 size={15} aria-hidden="true" />
+                {policy.organization}
+              </span>
+              <span>
+                <CalendarDays size={15} aria-hidden="true" />
+                {formatDeadlineLabel(policy.deadline_display, policy.deadline)}
+              </span>
+            </div>
 
-          {policy.match_score !== null ? (
-            <>
-              <strong className="ff-support-score-value gold">
-                {policy.match_score}
-                <em>/ 100</em>
-              </strong>
-              <div className="ff-support-score-bar featured">
-                <span style={{ width: `${scoreWidth(policy.match_score)}%` }} />
+            <div className="ff-support-reason-panel">
+              <div className="ff-support-reason-head">
+                <span className="ff-support-reason-icon" aria-hidden="true">
+                  <Info size={14} strokeWidth={2.4} />
+                </span>
+                <strong>추천 사유</strong>
               </div>
-            </>
-          ) : (
-            <p className="ff-support-score-missing">점수 정보 없음</p>
-          )}
+              <p>{policy.recommendation_summary || policy.match_reason}</p>
+            </div>
 
-          {policy.condition_links.length > 0 ? (
-            <div className="ff-support-condition-links">
-              <strong>현재 조건과 연결된 항목</strong>
+            <div className="ff-support-why-check">
+              <strong>Why check now?</strong>
               <ul>
-                {policy.condition_links.map((link) => (
-                  <li key={`${link.label}-${link.value}`}>
-                    <span className="ff-support-check">✓</span>
-                    <div>
-                      <em>{link.label}</em>
-                      <b>{link.value}</b>
-                    </div>
+                {whyCheckItems.map((line) => (
+                  <li key={line}>
+                    <span className="ff-support-why-check-icon" aria-hidden="true">
+                      <Check size={12} strokeWidth={3} />
+                    </span>
+                    <span>{line}</span>
                   </li>
                 ))}
               </ul>
             </div>
-          ) : null}
-        </aside>
-      </div>
+          </div>
 
-      <div className="ff-support-priority-actions">
-        <button type="button" className="ff-support-primary-btn" onClick={() => onOpenDetail(policy)}>
-          지원 조건 확인하기 →
-        </button>
-      </div>
+          <aside className="ff-support-preflight-panel">
+            <h4>신청 전 확인할 항목</h4>
+            <ul>
+              {policy.preflight_checks.map((item) => (
+                <li key={item.label}>
+                  <span>{item.label}</span>
+                  <strong>{item.value}</strong>
+                </li>
+              ))}
+            </ul>
+
+            <div className="ff-support-docs-row">
+              <FileText size={16} aria-hidden="true" />
+              <span>{policy.required_documents_label}</span>
+            </div>
+
+            <button
+              type="button"
+              className="ff-support-primary-btn wide"
+              onClick={() => onOpenDetail(policy)}
+            >
+              지원 조건 확인하기
+              <ChevronRight size={16} aria-hidden="true" />
+            </button>
+            <p className="ff-support-preflight-note">
+              조건 확인 후 신청서 작성을 이어갈 수 있습니다.
+            </p>
+          </aside>
+        </div>
+      </article>
     </section>
   )
 }

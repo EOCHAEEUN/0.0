@@ -10,6 +10,7 @@ import { getStoredCompanyId } from "../support/supportProjects.api"
 import { ApplicationDraftHero } from "./components/ApplicationDraftHero"
 import { ApplicationDraftPdfPreview } from "./components/ApplicationDraftPdfPreview"
 import { ApplicationDraftWorkspace } from "./components/ApplicationDraftWorkspace"
+import { ApplicationDraftWorkspaceLayout } from "./components/ApplicationDraftWorkspaceLayout"
 import { useApplicationDraftWorkspace } from "./hooks/useApplicationDraftWorkspace"
 
 type RoutePolicyContext = {
@@ -48,75 +49,45 @@ export function ApplicationDraftWorkspaceView({
     ? `/roi?analysisId=${encodeURIComponent(routeAnalysisId)}`
     : "/roi"
 
+  const layoutProps = {
+    analysisId: routeAnalysisId || routeState.analysisId,
+    policyId: resolvedPolicyId || routeState.policyId,
+  }
+
   if (workspace.isLoading) {
     return (
-      <main className="page ff-draft-page">
-        <section className="section white">
-          <div className="container">
-            <div className="ff-draft-loading">신청서 초안 화면을 불러오는 중...</div>
-          </div>
-        </section>
-      </main>
+      <ApplicationDraftWorkspaceLayout {...layoutProps}>
+        <div className="ff-draft-loading">신청서 초안 화면을 불러오는 중...</div>
+      </ApplicationDraftWorkspaceLayout>
     )
   }
 
   if (workspace.isAnalysisRequired) {
     return (
-      <main className="page ff-draft-page">
-        <section className="section white">
-          <div className="container">
-            <div className="ff-draft-alert warning">
-              {workspace.analysisRequiredMessage}
-            </div>
-          </div>
-        </section>
-      </main>
+      <ApplicationDraftWorkspaceLayout {...layoutProps}>
+        <div className="ff-draft-alert warning">{workspace.analysisRequiredMessage}</div>
+      </ApplicationDraftWorkspaceLayout>
     )
   }
 
   if (workspace.errorMessage) {
     return (
-      <main className="page ff-draft-page">
-        <section className="section white">
-          <div className="container">
-            <div className="ff-draft-alert warning">{workspace.errorMessage}</div>
-          </div>
-        </section>
-      </main>
+      <ApplicationDraftWorkspaceLayout {...layoutProps}>
+        <div className="ff-draft-alert warning">{workspace.errorMessage}</div>
+      </ApplicationDraftWorkspaceLayout>
     )
   }
 
   return (
-    <main className="page ff-draft-page">
-      <section className="section white">
-        <div className="container ff-draft-page-container">
-          <button
-            type="button"
-            onClick={() =>
-              isAnalysisPolicyRoute
-                ? navigate(
-                    `/analysis/${encodeURIComponent(routeAnalysisId || "")}/policies/${encodeURIComponent(resolvedPolicyId || "")}`,
-                  )
-                : navigate("/support-projects")
-            }
-            className="ff-draft-back-button"
-          >
-            {isAnalysisPolicyRoute
-              ? "← 지원사업 상세로 돌아가기"
-              : "← 지원사업 목록으로 돌아가기"}
-          </button>
+    <ApplicationDraftWorkspaceLayout {...layoutProps}>
+      <div className="ff-draft-page-container">
+        <ApplicationDraftHero model={workspace} />
 
-          <ApplicationDraftHero model={workspace} />
+        <ApplicationDraftWorkspace model={workspace} onGoRoi={() => navigate(roiPath)} />
 
-          <ApplicationDraftWorkspace
-            model={workspace}
-            onGoRoi={() => navigate(roiPath)}
-          />
-
-          <ApplicationDraftPdfPreview model={workspace} />
-        </div>
-      </section>
-    </main>
+        <ApplicationDraftPdfPreview model={workspace} />
+      </div>
+    </ApplicationDraftWorkspaceLayout>
   )
 }
 

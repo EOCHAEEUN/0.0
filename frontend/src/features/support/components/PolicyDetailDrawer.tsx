@@ -20,7 +20,7 @@ export function mapPolicyCardToSupportProject(policy: SupportProjectsPolicyCard)
     postedDate: "",
     amount: policy.support_amount_text,
     amountValueManwon: null,
-    fitScore: policy.match_score ?? 0,
+    fitScore: 0,
     category: policy.tags[0] || "",
     policyCategory: policy.tags[0] || "",
     description: policy.summary || policy.match_reason,

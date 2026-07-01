@@ -11,8 +11,8 @@ type DownloadOption = {
 }
 
 const DOWNLOAD_OPTIONS: DownloadOption[] = [
-  { key: "consumer_summary", label: "표 중심 분석 PDF" },
-  { key: "application_evidence", label: "계획서 초안 PDF" },
+  { key: "consumer_summary", label: "한눈에 보는 분석 PDF" },
+  { key: "application_evidence", label: "신청서 작성 초안 PDF" },
 ]
 
 const FALLBACK_FILENAMES: Record<ReportType, string> = {

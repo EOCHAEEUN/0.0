@@ -8,7 +8,21 @@ import { hydrateAccountData } from "../../services/accountHydration"
 export default function AuthenticatedLayout() {
   const location = useLocation()
   const isDashboardWorkspace =
-    location.pathname === "/dashboard" || location.pathname === "/equipment"
+    location.pathname === "/dashboard" ||
+    location.pathname === "/equipment" ||
+    location.pathname === "/roi" ||
+    location.pathname.startsWith("/roi/") ||
+    location.pathname === "/support-projects" ||
+    location.pathname.startsWith("/support-projects") ||
+    location.pathname === "/application-draft" ||
+    location.pathname.startsWith("/application-draft") ||
+    /\/analysis\/[^/]+\/policies\/[^/]+\/application$/.test(location.pathname) ||
+    location.pathname === "/advisor" ||
+    location.pathname.startsWith("/advisor/") ||
+    location.pathname === "/ai" ||
+    location.pathname === "/ai-advisor" ||
+    location.pathname === "/mypage" ||
+    location.pathname === "/company"
   const hasToken = !!getAccessToken()
 
   // 토큰은 있지만 기업 데이터가 없는 경우(재로그인·새 기기)만 hydrate

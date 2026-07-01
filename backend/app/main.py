@@ -14,6 +14,7 @@ from app.routers import (
     onboarding,
     reports,
     safety,
+    safety_evidence,
     safety_preview,
     support_projects,
 )
@@ -54,6 +55,7 @@ app.include_router(dashboard.router, prefix="/api", tags=["dashboard"])
 app.include_router(support_projects.router, prefix="/api", tags=["support-projects"])
 app.include_router(industry.router, prefix="/api", tags=["industry"])
 app.include_router(safety.router, prefix="/api", tags=["safety"])
+app.include_router(safety_evidence.router, prefix="/api", tags=["safety-evidence"])
 app.include_router(safety_preview.router, prefix="/api", tags=["safety-preview"])
 app.include_router(analyze.router, prefix="/api", tags=["analyze"])
 app.include_router(draft.router, prefix="/api", tags=["draft"])

@@ -1,5 +1,12 @@
 export type SupportProjectsMode = "analysis_snapshot" | "live_discovery"
 
+export type SupportProjectsFilter =
+  | "all"
+  | "priority"
+  | "documents"
+  | "closing"
+  | "finance"
+
 export type SupportProjectsCounts = {
   policy_db_total: number
   matched_total: number
@@ -7,7 +14,7 @@ export type SupportProjectsCounts = {
   closing_soon_count: number
 }
 
-export type SupportProjectsConditionLink = {
+export type SupportProjectsPreflightCheck = {
   label: string
   value: string
 }
@@ -22,22 +29,45 @@ export type SupportProjectsPolicyCard = {
   d_day: string
   days_remaining?: number | null
   is_past_deadline?: boolean
-  match_score: number | null
-  match_score_label?: string | null
-  fit_status: string
+  application_status: string
+  support_type_label: string
+  support_type_detail?: string | null
+  recommendation_summary: string
   match_reason: string
+  why_check_now: string[]
+  preflight_checks: SupportProjectsPreflightCheck[]
   support_amount_text: string
+  required_documents_label: string
+  action_label: string
   tags: string[]
-  condition_links: SupportProjectsConditionLink[]
+  condition_links: { label: string; value: string }[]
   eligible?: boolean
   scenario_label?: string | null
   url?: string | null
   summary?: string | null
+  required_documents_count?: number | null
   exists?: boolean
+}
+
+export type SupportProjectsLiveDiscovery = {
+  source: string
+  total_count: number
+  items: SupportProjectsPolicyCard[]
+  error?: string | null
+}
+
+export type SupportProjectsAnalysisContext = {
+  analysis_id: string
+  company_id: string
+  equipment_id?: string
+  equipment_name?: string
+  snapshot_status: "available" | "legacy_missing"
 }
 
 export type SupportProjectsOverviewResponse = {
   mode: SupportProjectsMode
+  policy_database_total?: number
+  analysis_context?: SupportProjectsAnalysisContext | null
   company: {
     company_id: string
     company_name: string
@@ -58,15 +88,23 @@ export type SupportProjectsOverviewResponse = {
   } | null
   counts: SupportProjectsCounts
   priority_policy: SupportProjectsPolicyCard
-  candidates: SupportProjectsPolicyCard[]
+  priority_policies: SupportProjectsPolicyCard[]
+  candidates?: SupportProjectsPolicyCard[]
   all_matched: SupportProjectsPolicyCard[]
+  live_discovery: SupportProjectsLiveDiscovery
   legacy_state?: string | null
   empty_state?: string | null
 }
 
 export type SupportProjectsViewState =
   | { kind: "loading" }
-  | { kind: "error"; message: string; status?: number; isAuthError?: boolean; previous?: SupportProjectsOverviewViewModel | null }
+  | {
+      kind: "error"
+      message: string
+      status?: number
+      isAuthError?: boolean
+      previous?: SupportProjectsOverviewViewModel | null
+    }
   | { kind: "legacy_missing"; model: SupportProjectsOverviewViewModel }
   | { kind: "empty"; model: SupportProjectsOverviewViewModel }
   | { kind: "ready"; model: SupportProjectsOverviewViewModel }
@@ -78,14 +116,15 @@ export type SupportProjectsOverviewViewModel = {
   companyName: string
   equipmentName: string
   analysisId?: string
+  heroTrustLabel: string
   heroTitle: string
   heroSubtitle: string
   counts: SupportProjectsCounts
   priorityPolicy: SupportProjectsPolicyCard | null
-  candidates: SupportProjectsPolicyCard[]
+  priorityPolicies: SupportProjectsPolicyCard[]
   allMatched: SupportProjectsPolicyCard[]
-  priorityBadge: string
-  secondaryBadge: string
+  liveDiscovery: SupportProjectsLiveDiscovery
+  analysisContext?: SupportProjectsAnalysisContext | null
   legacyState?: string | null
   emptyState?: string | null
 }

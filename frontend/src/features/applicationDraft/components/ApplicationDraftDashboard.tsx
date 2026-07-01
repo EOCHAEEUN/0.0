@@ -18,6 +18,7 @@ import engiBot from "../../../assets/advisor/engi-bot-transparent.png"
 import type { ApplicationDraftDashboardModel, DraftNavigationParams } from "../applicationDraftDashboard.utils"
 import { StatusBadge } from "./ApplicationDraftShared"
 import { useApplicationDraftDashboard } from "../hooks/useApplicationDraftDashboard"
+import { ApplicationDraftWorkspaceLayout } from "./ApplicationDraftWorkspaceLayout"
 
 function CircularProgress({ value }: { value: number }) {
   const radius = 34
@@ -105,29 +106,30 @@ export function ApplicationDraftDashboard({
   )
 
   return (
-    <main className="page ff-addash-page">
-      <section className="section ff-addash-section">
-        <div className="container ff-addash-container">
-          <SummaryBar model={model} />
-          <MetricCards model={model} />
-          <div className="ff-addash-main-grid">
-            <PrepareCard
-              model={model}
-              onStartDraft={handleStartDraft}
-              onGoRoi={() => navigate("/roi")}
-              onGoSupport={() => navigate("/support-projects")}
-            />
-            <ReadinessCard model={model} />
-          </div>
-          <DraftWorkSection
+    <ApplicationDraftWorkspaceLayout
+      analysisId={model.navigationSeed?.analysisId}
+      policyId={model.navigationSeed?.policyId}
+    >
+      <div className="ff-addash-container">
+        <SummaryBar model={model} />
+        <MetricCards model={model} />
+        <div className="ff-addash-main-grid">
+          <PrepareCard
             model={model}
-            onGeneratePdf={handleGeneratePdf}
             onStartDraft={handleStartDraft}
-            onOpenDraft={handleOpenDraft}
+            onGoRoi={() => navigate("/roi")}
+            onGoSupport={() => navigate("/support-projects")}
           />
+          <ReadinessCard model={model} />
         </div>
-      </section>
-    </main>
+        <DraftWorkSection
+          model={model}
+          onGeneratePdf={handleGeneratePdf}
+          onStartDraft={handleStartDraft}
+          onOpenDraft={handleOpenDraft}
+        />
+      </div>
+    </ApplicationDraftWorkspaceLayout>
   )
 }
 

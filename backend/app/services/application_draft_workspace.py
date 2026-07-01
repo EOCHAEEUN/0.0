@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Literal
 
 from app.core.database import get_db
@@ -9,6 +10,7 @@ from app.services.safety_preview import (
     VIEWPOINTS,
     create_safety_preview,
 )
+from app.services.safety_evidence_service import build_safety_evidence_summary
 
 
 VIEWPOINT_LABELS: dict[str, str] = {
@@ -89,11 +91,37 @@ def _snapshot_policy_by_id(
     requested = str(requested_policy_id or "").strip()
     if not requested:
         return None
+    rows = _snapshot_policy_rows(snapshot)
+    direct = next(
+        (row for row in rows if str(row.get("policy_id") or "").strip() == requested),
+        None,
+    )
+    if direct:
+        return direct
+
+    # some routes append suffixes such as ":A1", ":B1", ":1"
+    candidates = [requested]
+    candidates.append(re.sub(r":[AB](?:\d+)?$", "", requested, flags=re.IGNORECASE))
+    candidates.append(re.sub(r":\d+$", "", requested))
+    candidates.append(re.sub(r":[AB]$", "", requested, flags=re.IGNORECASE))
+
+    for candidate in candidates:
+        normalized = str(candidate or "").strip()
+        if not normalized or normalized == requested:
+            continue
+        matched = next(
+            (row for row in rows if str(row.get("policy_id") or "").strip() == normalized),
+            None,
+        )
+        if matched:
+            return matched
+
+    # last resort: requested starts with stored policy id + ":suffix"
     return next(
         (
             row
-            for row in _snapshot_policy_rows(snapshot)
-            if str(row.get("policy_id") or "").strip() == requested
+            for row in rows
+            if requested.startswith(f"{str(row.get('policy_id') or '').strip()}:")
         ),
         None,
     )
@@ -545,6 +573,71 @@ def _build_summary_paragraphs(draft_content: dict[str, Any]) -> list[str]:
     return paragraphs
 
 
+def _safety_rows_from_summary(summary: dict[str, Any] | None) -> list[dict[str, Any]]:
+    if not isinstance(summary, dict):
+        return []
+    rows: list[dict[str, Any]] = []
+    for index, viewpoint in enumerate(_as_list(summary.get("viewpoints")), start=1):
+        data = _as_dict(viewpoint)
+        rows.append(
+            {
+                "no": index,
+                "viewpoint_key": _safe_text(data.get("viewpoint_key")),
+                "viewpoint_label": _safe_text(
+                    data.get("viewpoint_title"),
+                    data.get("viewpoint_key"),
+                ),
+                "current_status": _safe_text(
+                    data.get("current_judgement"),
+                    "개선 필요",
+                ),
+                "evidence_status": _safe_text(data.get("evidence_status"), "미첨부"),
+                "description": _safe_text(data.get("description")),
+            }
+        )
+    return rows
+
+
+def _is_safety_snapshot_outdated(
+    draft_snapshot: dict[str, Any] | None,
+    live_summary: dict[str, Any] | None,
+) -> bool:
+    if not isinstance(draft_snapshot, dict) or not isinstance(live_summary, dict):
+        return False
+    if not draft_snapshot.get("snapshot_at"):
+        return False
+    if _safe_number(draft_snapshot.get("total_required_count")) != _safe_number(
+        live_summary.get("total_required_count")
+    ):
+        return True
+    if _safe_number(draft_snapshot.get("uploaded_required_count")) != _safe_number(
+        live_summary.get("uploaded_required_count")
+    ):
+        return True
+
+    draft_map = {
+        _safe_text(item.get("viewpoint_key")): _as_dict(item)
+        for item in _as_list(draft_snapshot.get("viewpoints"))
+    }
+    live_map = {
+        _safe_text(item.get("viewpoint_key")): _as_dict(item)
+        for item in _as_list(live_summary.get("viewpoints"))
+    }
+    if set(draft_map.keys()) != set(live_map.keys()):
+        return True
+    for key, live_row in live_map.items():
+        draft_row = _as_dict(draft_map.get(key))
+        if _safe_number(draft_row.get("required_count")) != _safe_number(
+            live_row.get("required_count")
+        ):
+            return True
+        if _safe_number(draft_row.get("uploaded_count")) != _safe_number(
+            live_row.get("uploaded_count")
+        ):
+            return True
+    return False
+
+
 def _verify_company_ownership(db: Any, company_id: str, user_id: str) -> dict[str, Any]:
     result = (
         db.table("company")
@@ -612,6 +705,13 @@ def load_application_draft_workspace(
         if resolved_policy_id and not legacy_missing
         else None
     )
+    if not snapshot_policy and not legacy_missing:
+        snapshot_policy = _snapshot_policy_by_id(
+            snapshot,
+            _safe_text(snapshot.get("recommended_policy_id")),
+        )
+    if snapshot_policy:
+        resolved_policy_id = _safe_text(snapshot_policy.get("policy_id"), resolved_policy_id)
 
     policy_detail: dict[str, Any] = {}
     if resolved_policy_id and not legacy_missing:
@@ -658,45 +758,26 @@ def load_application_draft_workspace(
     )
     draft_content = _as_dict((draft_row or {}).get("draft_content"))
 
-    safety_viewer_policy: dict[str, Any] | None = None
-    uploaded_files: list[dict[str, Any]] = []
+    safety_summary: dict[str, Any] | None = None
+    safety_message: str | None = None
     if resolved_policy_id and equipment_id:
-        safety_viewer_policy = _ensure_safety_viewer_policy(
-            analysis_id=str(analysis_id),
-            policy_id=resolved_policy_id,
-            equipment_id=equipment_id,
-            equipment=equipment,
-            roi_data=roi_data,
-        )
+        try:
+            safety_summary = build_safety_evidence_summary(
+                company_id=company_id,
+                analysis_id=str(analysis_id),
+                policy_id=resolved_policy_id,
+                equipment_id=str(equipment_id),
+            )
+        except Exception as exc:
+            if getattr(exc, "status_code", None) == 404:
+                safety_message = "현재 분석에 연결된 안전 증빙 기준이 아직 준비되지 않았습니다."
+            else:
+                safety_message = "증빙 현황을 불러오지 못했습니다."
 
-        files_query = (
-            db.table("user_safety_files")
-            .select("*")
-            .eq("analysis_id", str(analysis_id))
-            .eq("policy_id", resolved_policy_id)
-            .eq("equipment_id", str(equipment_id))
-        )
-        uploaded_files = files_query.execute().data or []
-
-    safety_check_rows: list[dict[str, Any]] = []
-    if equipment_id:
-        check_result = (
-            db.table("safety_check_status")
-            .select("*")
-            .eq("company_id", company_id)
-            .eq("equipment_id", equipment_id)
-            .execute()
-        )
-        safety_check_rows = check_result.data or []
-
-    safety_table_rows = _build_safety_rows(
-        safety_viewer_policy=safety_viewer_policy,
-        uploaded_files=uploaded_files,
-        safety_check_status=safety_check_rows,
-        equipment=equipment,
-    )
-
-    has_evidence_files = len(uploaded_files) > 0
+    safety_table_rows = _safety_rows_from_summary(safety_summary)
+    has_evidence_files = bool(_safe_number((safety_summary or {}).get("uploaded_required_count")))
+    draft_snapshot = _as_dict(draft_content.get("safety_evidence_snapshot"))
+    is_safety_snapshot_outdated = _is_safety_snapshot_outdated(draft_snapshot, safety_summary)
 
     readiness = {
         "company": _company_readiness(company),
@@ -767,6 +848,10 @@ def load_application_draft_workspace(
         },
         "safety": {
             "rows": safety_table_rows,
-            "has_viewer_policy": bool(safety_viewer_policy),
+            "has_viewer_policy": bool(safety_summary),
+            "message": safety_message,
+            "summary": safety_summary or None,
+            "draft_snapshot": draft_snapshot if draft_snapshot else None,
+            "is_snapshot_outdated": is_safety_snapshot_outdated,
         },
     }

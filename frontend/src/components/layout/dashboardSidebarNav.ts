@@ -52,6 +52,9 @@ export function isSidebarMainActive(key: SideNavKey, pathname: string): boolean 
     )
   }
   if (key === "support") {
+    if (/\/analysis\/[^/]+\/policies\/[^/]+\/application$/.test(pathname)) {
+      return false
+    }
     return (
       pathname.startsWith("/support-projects") ||
       pathname.startsWith("/support-detail") ||
@@ -59,7 +62,11 @@ export function isSidebarMainActive(key: SideNavKey, pathname: string): boolean 
     )
   }
   if (key === "application") {
-    return pathname.startsWith("/application-draft") || /\/application(?:\/|$)/.test(pathname)
+    return (
+      pathname.startsWith("/application-draft") ||
+      /\/analysis\/[^/]+\/policies\/[^/]+\/application$/.test(pathname) ||
+      /\/application(?:\/|$)/.test(pathname)
+    )
   }
   if (key === "advisor") {
     return (

@@ -1,7 +1,9 @@
 import type {
+  SupportProjectsLiveDiscovery,
   SupportProjectsOverviewResponse,
   SupportProjectsOverviewViewModel,
   SupportProjectsPolicyCard,
+  SupportProjectsPreflightCheck,
 } from "./supportProjectsOverview.types"
 
 function asRecord(value: unknown) {
@@ -23,6 +25,58 @@ function toNumberOrNull(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+function sanitizeWhyCheckLine(line: string) {
+  const match = line.match(/^지원 내용:\s*(.+)$/s)
+  if (!match) return line
+
+  const payload = match[1].trim()
+  if (!payload.startsWith("[") && !payload.includes('"name"') && !payload.includes("'name'")) {
+    return line
+  }
+
+  try {
+    const parsed = JSON.parse(payload) as unknown
+    if (Array.isArray(parsed)) {
+      const names = parsed
+        .map((item) => {
+          if (!item || typeof item !== "object") return pickString(item)
+          const record = item as Record<string, unknown>
+          const name = pickString(record.name)
+          const amount = pickString(record.amount)
+          return name && amount ? `${name} ${amount}` : name || amount
+        })
+        .filter(Boolean)
+      if (names.length > 0) {
+        const summary = names.slice(0, 3).join(", ") + (names.length > 3 ? " 등" : "")
+        return `지원 내용: ${summary}`
+      }
+    }
+  } catch {
+    // fall through to regex extraction
+  }
+
+  const names = [...payload.matchAll(/['"]name['"]\s*:\s*['"]([^'"]+)['"]/g)].map(
+    (entry) => entry[1],
+  )
+  if (names.length > 0) {
+    const summary = names.slice(0, 3).join(", ") + (names.length > 3 ? " 등" : "")
+    return `지원 내용: ${summary}`
+  }
+
+  return line
+}
+
+function mapPreflightChecks(raw: unknown): SupportProjectsPreflightCheck[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((item) => asRecord(item))
+    .filter((item) => pickString(item.label) && pickString(item.value))
+    .map((item) => ({
+      label: pickString(item.label),
+      value: pickString(item.value),
+    }))
+}
+
 function mapPolicyCard(raw: unknown): SupportProjectsPolicyCard | null {
   const record = asRecord(raw)
   const policyId = pickString(record.policy_id)
@@ -39,11 +93,27 @@ function mapPolicyCard(raw: unknown): SupportProjectsPolicyCard | null {
     d_day: pickString(record.d_day, "-"),
     days_remaining: toNumberOrNull(record.days_remaining),
     is_past_deadline: Boolean(record.is_past_deadline),
-    match_score: toNumberOrNull(record.match_score),
-    match_score_label: pickString(record.match_score_label) || null,
-    fit_status: pickString(record.fit_status, "조건 확인 필요"),
+    application_status: pickString(record.application_status, "조건 확인 필요"),
+    support_type_label: pickString(record.support_type_label, "지원 조건 확인 필요"),
+    support_type_detail: pickString(record.support_type_detail) || null,
+    recommendation_summary: pickString(
+      record.recommendation_summary,
+      record.match_reason,
+      "우선 검토할 지원 조건입니다.",
+    ),
     match_reason: pickString(record.match_reason),
-    support_amount_text: pickString(record.support_amount_text, "지원금 조건 확인 필요"),
+    why_check_now: Array.isArray(record.why_check_now)
+      ? record.why_check_now
+          .map((line) => sanitizeWhyCheckLine(String(line)))
+          .filter(Boolean)
+      : [],
+    preflight_checks: mapPreflightChecks(record.preflight_checks),
+    support_amount_text: pickString(record.support_amount_text, "공고문 확인 필요"),
+    required_documents_label: pickString(
+      record.required_documents_label,
+      "제출서류 공고문 확인 필요",
+    ),
+    action_label: pickString(record.action_label, "상세 보기 →"),
     tags: Array.isArray(record.tags)
       ? record.tags.map((tag) => String(tag)).filter(Boolean)
       : [],
@@ -60,7 +130,23 @@ function mapPolicyCard(raw: unknown): SupportProjectsPolicyCard | null {
     scenario_label: pickString(record.scenario_label) || null,
     url: pickString(record.url) || null,
     summary: pickString(record.summary) || null,
+    required_documents_count: toNumberOrNull(record.required_documents_count),
     exists: record.exists !== false,
+  }
+}
+
+function mapLiveDiscovery(raw: unknown): SupportProjectsLiveDiscovery {
+  const record = asRecord(raw)
+  const items = Array.isArray(record.items)
+    ? record.items
+        .map((item) => mapPolicyCard(item))
+        .filter((item): item is SupportProjectsPolicyCard => Boolean(item))
+    : []
+  return {
+    source: pickString(record.source, "current_policy_database"),
+    total_count: toNumberOrNull(record.total_count) ?? items.length,
+    items,
+    error: pickString(record.error) || null,
   }
 }
 
@@ -70,32 +156,42 @@ export function mapSupportProjectsOverview(
 ): SupportProjectsOverviewViewModel {
   const data = asRecord(raw) as SupportProjectsOverviewResponse & Record<string, unknown>
   const mode = data.mode === "analysis_snapshot" ? "analysis_snapshot" : "live_discovery"
-  const isAnalysisMode = mode === "analysis_snapshot"
+  const isAnalysisMode = mode === "analysis_snapshot" && Boolean(params.analysisId)
   const company = asRecord(data.company)
   const equipment = data.equipment ? asRecord(data.equipment) : null
   const countsRaw = asRecord(data.counts)
+  const analysisContext = data.analysis_context
+    ? (asRecord(data.analysis_context) as SupportProjectsOverviewViewModel["analysisContext"])
+    : null
 
   const counts = {
-    policy_db_total: toNumberOrNull(countsRaw.policy_db_total) ?? 0,
+    policy_db_total:
+      toNumberOrNull(data.policy_database_total) ??
+      toNumberOrNull(countsRaw.policy_db_total) ??
+      0,
     matched_total: toNumberOrNull(countsRaw.matched_total) ?? 0,
     priority_policy_count: toNumberOrNull(countsRaw.priority_policy_count) ?? 0,
     closing_soon_count: toNumberOrNull(countsRaw.closing_soon_count) ?? 0,
   }
 
   const priorityPolicy = mapPolicyCard(data.priority_policy)
-  const candidates = Array.isArray(data.candidates)
-    ? data.candidates
+  const priorityPolicies = Array.isArray(data.priority_policies)
+    ? data.priority_policies
         .map((item) => mapPolicyCard(item))
         .filter((item): item is SupportProjectsPolicyCard => Boolean(item))
-    : []
+    : Array.isArray(data.candidates)
+      ? data.candidates
+          .map((item) => mapPolicyCard(item))
+          .filter((item): item is SupportProjectsPolicyCard => Boolean(item))
+      : []
   const allMatched = Array.isArray(data.all_matched)
     ? data.all_matched
         .map((item) => mapPolicyCard(item))
         .filter((item): item is SupportProjectsPolicyCard => Boolean(item))
-    : candidates
+    : priorityPolicies
 
   const equipmentName = pickString(equipment?.name, "현재 설비")
-  const matchedCount = counts.matched_total
+  const priorityCount = counts.priority_policy_count || (priorityPolicy ? 1 : 0) + priorityPolicies.length
 
   return {
     mode,
@@ -104,16 +200,16 @@ export function mapSupportProjectsOverview(
     companyName: pickString(company.company_name, "-"),
     equipmentName,
     analysisId: params.analysisId,
-    heroTitle: `설비 정보와 투자 조건에 맞는 지원사업 ${matchedCount}건을 찾았습니다.`,
-    heroSubtitle: isAnalysisMode
-      ? "ROI 분석 당시 매칭된 정책 정보를 기준으로 우선 검토할 공고를 한눈에 정리했습니다."
-      : "정책 DB와 기업·설비·ROI 조건을 연결해 우선 검토할 공고를 한눈에 정리했습니다.",
+    heroTrustLabel: `FACTOFIT POLICY DATABASE · 제조기업 지원정책 ${counts.policy_db_total.toLocaleString("ko-KR")}건 보유`,
+    heroTitle: `지금 신청을 검토할 지원사업 ${priorityCount}건을 정리했어요`,
+    heroSubtitle:
+      "현재 설비와 투자안을 기준으로 우선 검토 정책을 정리하고, 기업 기본 조건에 맞는 추가 정책도 함께 확인할 수 있습니다.",
     counts,
     priorityPolicy,
-    candidates,
-    allMatched: allMatched.length > 0 ? allMatched : candidates,
-    priorityBadge: "우선 검토 정책",
-    secondaryBadge: isAnalysisMode ? "ROI 분석 연동 정책" : "현재 조건 기반 추천",
+    priorityPolicies,
+    allMatched: allMatched.length > 0 ? allMatched : priorityPolicies,
+    liveDiscovery: mapLiveDiscovery(data.live_discovery),
+    analysisContext,
     legacyState: pickString(data.legacy_state) || null,
     emptyState: pickString(data.empty_state) || null,
   }

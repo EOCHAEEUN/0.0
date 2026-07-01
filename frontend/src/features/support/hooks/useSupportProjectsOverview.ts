@@ -106,7 +106,12 @@ export function useSupportProjectsOverview({
         return
       }
 
-      if (!model.priorityPolicy && model.candidates.length === 0 && model.allMatched.length === 0) {
+      const hasSnapshotPolicies =
+        Boolean(model.priorityPolicy) ||
+        model.priorityPolicies.length > 0 ||
+        model.allMatched.length > 0
+
+      if (!hasSnapshotPolicies && model.liveDiscovery.items.length === 0) {
         hasRenderableDataRef.current = true
         setState({ kind: "empty", model })
         return

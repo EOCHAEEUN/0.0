@@ -27,10 +27,7 @@ export function ApplicationDraftReadinessPanel({
   return (
     <div className="ff-draft-readiness-panel">
       <div className="ff-draft-readiness-panel-head">
-        <div>
-          <h4>초안 준비 현황</h4>
-          <p>완료 항목과 수정이 필요한 항목을 구분해 보여드립니다.</p>
-        </div>
+        <h4>초안 준비 현황</h4>
         <span className="ff-draft-ai-pulse" aria-hidden="true">
           <i />
           AI 검토 진행

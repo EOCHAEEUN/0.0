@@ -1,0 +1,678 @@
+.ff-roi-workspace-content {
+  padding: 28px 32px 56px;
+  min-width: 0;
+}
+
+.ff-roi-hero {
+  position: relative;
+  background:
+    radial-gradient(circle at 78% 18%, rgba(59, 130, 246, 0.12), transparent 28%),
+    linear-gradient(135deg, #151b28 0%, #1a2233 52%, #1f2a3d 100%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 24px;
+  overflow: hidden;
+  margin-bottom: 28px;
+  min-height: 360px;
+  box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18);
+}
+
+.ff-roi-hero-error {
+  position: relative;
+  z-index: 2;
+  color: #fecaca;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 18px 36px 0;
+  margin: 0;
+}
+
+.ff-roi-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 420px);
+  gap: 40px;
+  padding: 34px 36px 34px;
+  align-items: center;
+  position: relative;
+  z-index: 2;
+}
+
+.ff-roi-hero-copy h1 {
+  margin: 0 0 16px;
+  color: #ffffff;
+  font-size: clamp(32px, 3.8vw, 44px);
+  font-weight: 950;
+  line-height: 1.18;
+  letter-spacing: -0.05em;
+}
+
+.ff-roi-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  margin-bottom: 16px;
+}
+
+.ff-roi-hero-badge svg {
+  color: #fbbf24;
+  flex-shrink: 0;
+}
+
+.ff-roi-hero-lead {
+  margin: 0 0 8px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: clamp(16px, 1.7vw, 19px);
+  font-weight: 850;
+  line-height: 1.55;
+  max-width: 560px;
+}
+
+.ff-roi-hero-sub {
+  margin: 0 0 22px;
+  color: rgba(255, 255, 255, 0.52);
+  font-size: clamp(14px, 1.45vw, 16px);
+  font-weight: 800;
+  line-height: 1.65;
+  max-width: 560px;
+}
+
+.ff-roi-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.ff-roi-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 22px;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.ff-roi-btn.primary {
+  border: 0;
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.ff-roi-btn.secondary {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(15, 23, 42, 0.42);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.ff-roi-btn:disabled {
+  opacity: 0.82;
+  cursor: wait;
+}
+
+.ff-roi-hero-kpis {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  align-self: center;
+}
+
+.ff-roi-hero-kpi {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 18px 16px;
+  min-height: 96px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.ff-roi-hero-kpi-label {
+  display: block;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+
+.ff-roi-hero-kpi-value {
+  display: block;
+  color: #ffffff;
+  font-size: clamp(26px, 2.8vw, 32px);
+  font-weight: 950;
+  letter-spacing: -0.05em;
+  line-height: 1.1;
+}
+
+.ff-roi-hero-kpi-value.is-pending-subsidy {
+  color: #4ade80;
+  font-size: clamp(20px, 2vw, 24px);
+  line-height: 1.25;
+  letter-spacing: -0.03em;
+}
+
+.ff-roi-hero-kpi-sub {
+  display: block;
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.34);
+  font-size: 11px;
+  font-weight: 800;
+  font-style: normal;
+}
+
+.ff-roi-panel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 28px;
+  margin-bottom: 24px;
+}
+
+.ff-roi-panel h2,
+.ff-roi-scenario-head h2 {
+  color: #1e293b;
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  margin: 0 0 20px;
+}
+
+.ff-roi-strategy-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.ff-roi-strategy-card {
+  background: #fafbfc;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 18px 16px;
+}
+
+.ff-roi-strategy-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #2563eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.ff-roi-strategy-card.is-purple .ff-roi-strategy-icon {
+  background: #f5f3ff;
+  color: #7c3aed;
+}
+
+.ff-roi-strategy-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.ff-roi-strategy-title-row strong {
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.ff-roi-strategy-card p {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.55;
+}
+
+.ff-roi-level-badge {
+  font-size: 11px;
+  font-weight: 900;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.ff-roi-level-badge.blue {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.ff-roi-level-badge.purple {
+  background: #ede9fe;
+  color: #7c3aed;
+}
+
+.ff-roi-scenario-section {
+  margin-bottom: 24px;
+}
+
+.ff-roi-scenario-head {
+  margin-bottom: 16px;
+}
+
+.ff-roi-scenario-head p {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+  margin: 0;
+}
+
+.ff-roi-scenario-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) minmax(260px, 300px);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.ff-roi-scenario-vs {
+  display: grid;
+  place-items: center;
+  align-self: center;
+}
+
+.ff-roi-scenario-vs span {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid #dbe3ee;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 900;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.ff-roi-scenario-card {
+  text-align: left;
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 22px;
+  cursor: pointer;
+  border: 1px solid #e2e8f0;
+  width: 100%;
+  transition: box-shadow 0.15s ease;
+}
+
+.ff-roi-scenario-card.is-recommended {
+  background: #f8faff;
+  border: 2px solid #2563eb;
+}
+
+.ff-roi-scenario-card.is-active:not(.is-recommended) {
+  border: 2px solid #2563eb;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.ff-roi-scenario-card-head h3 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 17px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.ff-roi-scenario-card-tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 900;
+  color: #64748b;
+}
+
+.ff-roi-scenario-card-tags .is-accent {
+  color: #2563eb;
+}
+
+.ff-roi-rec-badge {
+  font-size: 11px;
+  font-weight: 900;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.ff-roi-scenario-rows {
+  margin: 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ff-roi-scenario-rows div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.ff-roi-scenario-rows dt {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.ff-roi-scenario-rows dd {
+  margin: 0;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.ff-roi-scenario-rows dd.is-green {
+  color: #16a34a;
+}
+
+.ff-roi-scenario-footer {
+  padding-top: 14px;
+  border-top: 1px solid #e2e8f0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  text-align: center;
+}
+
+.ff-roi-scenario-footer span {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.ff-roi-scenario-footer strong {
+  color: #64748b;
+  font-size: clamp(20px, 2.2vw, 26px);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.ff-roi-scenario-footer strong.is-accent {
+  color: #2563eb;
+}
+
+.ff-roi-scenario-summary {
+  background: #eff6ff;
+  border: 1.5px solid rgba(37, 99, 235, 0.22);
+  border-radius: 18px;
+  padding: 22px;
+}
+
+.ff-roi-summary-eyebrow {
+  display: block;
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  margin-bottom: 10px;
+}
+
+.ff-roi-summary-text {
+  margin: 0 0 18px;
+  color: #1e293b;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.6;
+}
+
+.ff-roi-summary-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ff-roi-summary-stat {
+  background: #ffffff;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.ff-roi-summary-stat > span {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.ff-roi-summary-stat strong {
+  display: block;
+  color: #2563eb;
+  font-size: clamp(18px, 1.8vw, 22px);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.ff-roi-summary-stat em {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  font-style: normal;
+}
+
+.ff-roi-evidence-panel {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 28px 30px;
+  margin-bottom: 24px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+}
+
+.ff-roi-evidence-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.ff-roi-evidence-head h2 {
+  margin: 0;
+  color: #1e3a8a;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.ff-roi-evidence-head-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #2563eb;
+  flex-shrink: 0;
+}
+
+.ff-roi-evidence-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(260px, 340px);
+  gap: 28px;
+  align-items: start;
+}
+
+.ff-roi-evidence-eyebrow {
+  margin: 0 0 10px;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.ff-roi-evidence-eyebrow::before {
+  content: "● ";
+}
+
+.ff-roi-evidence-lead {
+  margin: 0 0 18px;
+  color: #0f172a;
+  font-size: 17px;
+  font-weight: 900;
+  line-height: 1.55;
+  letter-spacing: -0.02em;
+}
+
+.ff-roi-evidence-bullets {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ff-roi-evidence-bullets li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.65;
+}
+
+.ff-roi-evidence-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 999px;
+  background: #16a34a;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.ff-roi-evidence-metrics {
+  border: 1.5px dashed #d1d5db;
+  border-radius: 14px;
+  background: #fafbfc;
+  padding: 16px 18px;
+}
+
+.ff-roi-evidence-metrics-title {
+  margin: 0 0 14px;
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.ff-roi-evidence-metric {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.ff-roi-evidence-metric:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.ff-roi-evidence-metric span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.ff-roi-evidence-metric strong {
+  color: #1e293b;
+  font-size: 14px;
+  font-weight: 900;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.ff-roi-evidence-metric strong.is-danger {
+  color: #dc2626;
+}
+
+.ff-roi-evidence-metric strong.is-success {
+  color: #15803d;
+}
+
+@media (max-width: 1180px) {
+  .ff-roi-strategy-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ff-roi-scenario-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ff-roi-scenario-vs {
+    display: none;
+  }
+
+  .ff-roi-scenario-summary {
+    grid-column: 1 / -1;
+  }
+
+  .ff-roi-evidence-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 980px) {
+  .ff-roi-workspace-content {
+    padding: 20px 16px 40px;
+  }
+
+  .ff-roi-hero-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    padding: 32px 24px 28px;
+  }
+
+  .ff-roi-hero-kpis {
+    padding-top: 0;
+  }
+
+  .ff-roi-scenario-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .ff-roi-strategy-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ff-roi-hero-kpis {
+    grid-template-columns: 1fr;
+  }
+
+  .ff-roi-hero-actions .ff-roi-btn {
+    width: 100%;
+  }
+}

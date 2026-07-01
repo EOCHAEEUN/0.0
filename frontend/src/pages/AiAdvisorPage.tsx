@@ -1,6 +1,9 @@
+import { Send } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom"
+import { useLocation, useSearchParams } from "react-router-dom"
 import engiBot from "../assets/advisor/engi-bot-transparent.png"
+import botIcon from "../assets/advisor/factofit-ai-bot.png"
+import DashboardWorkspacePageLayout from "../components/layout/DashboardWorkspacePageLayout"
 import AdvisorQuickActions from "../features/aiAdvisor/AdvisorQuickActions"
 import AdvisorResponseCards from "../features/aiAdvisor/AdvisorResponseCards"
 import InvestmentSimulationDialog from "../features/aiAdvisor/InvestmentSimulationDialog"
@@ -21,7 +24,15 @@ type ChatMessage = {
   role: "user" | "assistant"
   content: string
   cards?: unknown[]
+  sentAt?: string
 }
+
+const SUGGESTION_CHIPS = [
+  "현재 분석 요약해줘",
+  "추천 시나리오 근거 알려줘",
+  "A안/B안 차이 쉽게 설명해줘",
+  "지금 바로 해야 할 일 정리해줘",
+] as const
 
 type EquipmentOption = {
   equipment_id: string | null
@@ -67,6 +78,21 @@ function formatPercent(value: number | null) {
   return value === null ? "-" : `${Math.round(value)}%`
 }
 
+function formatMessageTime(value?: string) {
+  if (!value) return ""
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ""
+  const hours = date.getHours()
+  const minutes = String(date.getMinutes()).padStart(2, "0")
+  const period = hours >= 12 ? "PM" : "AM"
+  const hour12 = hours % 12 || 12
+  return `${hour12}:${minutes} ${period}`
+}
+
+function nowIso() {
+  return new Date().toISOString()
+}
+
 function formatDateTime(value: string) {
   const parsed = Date.parse(value)
   if (!Number.isFinite(parsed)) return "-"
@@ -76,6 +102,20 @@ function formatDateTime(value: string) {
   ).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(
     date.getMinutes(),
   ).padStart(2, "0")}`
+}
+
+function createChatMessage(
+  role: "user" | "assistant",
+  content: string,
+  extra?: Partial<ChatMessage>,
+): ChatMessage {
+  return {
+    id: crypto.randomUUID(),
+    role,
+    content,
+    sentAt: nowIso(),
+    ...extra,
+  }
 }
 
 function analysisFromRoute(searchParams: URLSearchParams, state: unknown) {
@@ -189,7 +229,6 @@ function toMessageListFromSession(data: unknown): ChatMessage[] {
 }
 
 export default function AiAdvisorPage() {
-  const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
   const messageEndRef = useRef<HTMLDivElement | null>(null)
@@ -205,11 +244,10 @@ export default function AiAdvisorPage() {
   const [analysisSearch, setAnalysisSearch] = useState("")
 
   const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: crypto.randomUUID(),
-      role: "assistant",
-      content: "안녕하세요. 작업형 AI 어드바이저 Engi입니다. 어떤 점을 도와드릴까요?",
-    },
+    createChatMessage(
+      "assistant",
+      "안녕하세요. 작업형 AI 어드바이저 Engi입니다. 어떤 점을 도와드릴까요?",
+    ),
   ])
   const [input, setInput] = useState("")
   const [sending, setSending] = useState(false)
@@ -431,12 +469,7 @@ export default function AiAdvisorPage() {
       )
       setMessages((prev) => [
         ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: response.text,
-          cards: response.cards,
-        },
+        createChatMessage("assistant", response.text, { cards: response.cards }),
       ])
       setEquipmentSelectionCards(extractEquipmentSelection(response.cards))
       setActiveChatId((prev) => response.chatId || sessionId || prev)
@@ -467,11 +500,7 @@ export default function AiAdvisorPage() {
 
     setActionError("")
     setLoadingActionId(actionDef.id)
-    const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: "user",
-      content: actionDef.userMessage,
-    }
+    const userMessage = createChatMessage("user", actionDef.userMessage)
     const nextMessages = [...messages, userMessage]
     setMessages(nextMessages)
 
@@ -502,11 +531,7 @@ export default function AiAdvisorPage() {
   const sendChat = async () => {
     const question = input.trim()
     if (!question || sending) return
-    const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: "user",
-      content: question,
-    }
+    const userMessage = createChatMessage("user", question)
     setMessages((prev) => [...prev, userMessage])
     setInput("")
     await requestChat(question, [...messages, userMessage])
@@ -520,11 +545,7 @@ export default function AiAdvisorPage() {
   const selectEquipmentFromCard = async (equipment: EquipmentOption) => {
     if (!equipment.equipment_id || sending || loadingActionId) return
     setSelectedEquipmentId(equipment.equipment_id)
-    const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: "user",
-      content: `${equipment.name} 설비 ROI 분석`,
-    }
+    const userMessage = createChatMessage("user", `${equipment.name} 설비 ROI 분석`)
     const nextMessages = [...messages, userMessage]
     setMessages(nextMessages)
     setLoadingActionId("roi_analyze")
@@ -551,11 +572,7 @@ export default function AiAdvisorPage() {
         setMessages(historyMessages)
       } else {
         setMessages([
-          {
-            id: crypto.randomUUID(),
-            role: "assistant",
-            content: "새 대화를 시작해보세요.",
-          },
+          createChatMessage("assistant", "새 대화를 시작해보세요."),
         ])
       }
       hydratedSessionRef.current = targetSessionId
@@ -582,11 +599,7 @@ export default function AiAdvisorPage() {
       hydratedSessionRef.current = nextSessionId
       setActiveChatId(nextSessionId)
       setMessages([
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: "새 대화를 시작합니다. 궁금한 내용을 편하게 물어보세요.",
-        },
+        createChatMessage("assistant", "새 대화를 시작합니다. 궁금한 내용을 편하게 물어보세요."),
       ])
       await reloadSessions()
     } catch (error) {
@@ -594,252 +607,234 @@ export default function AiAdvisorPage() {
     }
   }
 
-  return (
-    <main className="page">
-      <section className="section white">
-        <div className="container">
-          <button
-            type="button"
-            className="ff-all-analysis-link"
-            onClick={() => navigate("/dashboard")}
-          >
-            ← 대시보드로 돌아가기
-          </button>
+  const preferredAnalysisId = useMemo(
+    () => selectedAnalysisId || analysisFromRoute(searchParams, location.state) || undefined,
+    [location.state, searchParams, selectedAnalysisId],
+  )
 
-          <div className="summary-hero-card" style={{ marginTop: 14 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-              <div>
-                <div className="screen-tag">WORKFLOW AI ADVISOR</div>
-                <h2 style={{ marginBottom: 8 }}>작업형 AI 어드바이저</h2>
-                <p className="section-desc">
-                  ROI 분석, 정책 추천, 신청서 작성을 대화로 연결합니다.
-                </p>
-              </div>
-              <img src={engiBot} alt="" style={{ width: 88, height: 88, objectFit: "contain" }} />
+  const isEmbeddedAdvisor = searchParams.get("embeddedAdvisor") === "1"
+
+  const advisorPageContent = (
+    <div
+      className={`ff-advisor-page-shell${isEmbeddedAdvisor ? " ff-advisor-page-shell--embedded" : ""}`}
+    >
+        <section className="ff-advisor-hero">
+          <div className="ff-advisor-hero-copy">
+            <span className="ff-advisor-hero-badge">WORKFLOW AI ADVISOR</span>
+            <h1>작업형 AI 어드바이저</h1>
+            <p>ROI 분석, 정책 추천, 신청서 작성을 대화로 연결합니다.</p>
+            <p className="ff-advisor-hero-sub">
+              {selectedContext
+                ? "아래 버튼은 선택한 분석의 저장 결과를 기준으로 실행됩니다."
+                : "분석이 없으면 새 투자 분석부터 시작하세요."}
+            </p>
+            {loading && <p className="ff-advisor-hero-status">상담 컨텍스트 로딩 중...</p>}
+            {loadError && <p className="ff-advisor-hero-status is-error">{loadError}</p>}
+          </div>
+          <div className="ff-advisor-hero-visual" aria-hidden="true">
+            <img src={engiBot} alt="" />
+          </div>
+        </section>
+
+        <div className="ff-advisor-page-grid">
+          <article className="ff-advisor-chat-card">
+            <div className="ff-advisor-chat-head">
+              <h3>현재 대화</h3>
+              <span className="ff-advisor-system-status">
+                <i aria-hidden="true" />
+                AI 시스템 활성화됨
+              </span>
             </div>
 
             {!loading && !loadError && (
-              <p style={{ marginTop: 10, color: "#475467", fontSize: 13 }}>
-                {selectedContext
-                  ? `${selectedContext.equipmentName} 분석 기준으로 빠른 실행 버튼을 사용할 수 있습니다.`
-                  : "분석이 없으면 새 투자 분석부터 시작하세요."}
-              </p>
-            )}
-
-            {loading && <p style={{ marginTop: 10 }}>상담 컨텍스트 로딩 중...</p>}
-            {loadError && <p style={{ marginTop: 10, color: "#b42318" }}>{loadError}</p>}
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "1.25fr 0.75fr", gap: 16 }}>
-            <article className="card" style={{ padding: 18 }}>
-              <h3 style={{ marginBottom: 8 }}>현재 대화</h3>
-
-              {!loading && !loadError && (
+              <>
                 <AdvisorQuickActions
                   hasAnalysis={Boolean(selectedContext)}
-                  analysisName={selectedContext?.equipmentName}
                   loadingActionId={loadingActionId}
                   onChangeAnalysis={() => setAnalysisPickerOpen(true)}
                   onAction={(action) => void executeAdvisorAction(action)}
                 />
-              )}
-
-              <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
-                {[
-                  "현재 분석 요약해줘",
-                  "추천 시나리오 근거 알려줘",
-                  "A안/B안 차이 쉽게 설명해줘",
-                  "지금 바로 해야 할 일 정리해줘",
-                ].map((question) => (
-                  <button
-                    key={question}
-                    type="button"
-                    className="ff-ai-advisor-chip"
-                    onClick={() => setInput(question)}
-                  >
-                    {question}
-                  </button>
-                ))}
-              </div>
-
-              <div className="ff-advisor-message-list">
-                {messages.map((message) => (
-                  <div key={message.id} className={`ff-advisor-message ${message.role}`}>
-                    {message.content}
-                    {message.role === "assistant" && message.cards && message.cards.length > 0 && (
-                      <AdvisorResponseCards
-                        cards={message.cards}
-                        analysisId={selectedContext?.analysisId}
-                      />
-                    )}
-                  </div>
-                ))}
-                <div ref={messageEndRef} />
-              </div>
-
-              {actionError && (
-                <div
-                  style={{
-                    marginTop: 8,
-                    border: "1px solid #fecdca",
-                    background: "#fef3f2",
-                    borderRadius: 10,
-                    padding: "8px 10px",
-                  }}
-                >
-                  <p style={{ margin: 0, color: "#b42318", fontWeight: 800 }}>{actionError}</p>
-                  {lastFailedAction && (
+                <div className="ff-advisor-chip-row">
+                  {SUGGESTION_CHIPS.map((question) => (
                     <button
+                      key={question}
                       type="button"
-                      className="ff-support-btn ghost"
-                      style={{ marginTop: 6 }}
-                      onClick={() => void executeAdvisorAction(lastFailedAction)}
+                      className="ff-ai-advisor-chip"
+                      onClick={() => setInput(question)}
                     >
-                      다시 시도
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {chatError && (
-                <div
-                  style={{
-                    marginTop: 8,
-                    border: "1px solid #fecdca",
-                    background: "#fef3f2",
-                    borderRadius: 10,
-                    padding: "8px 10px",
-                  }}
-                >
-                  <p style={{ margin: 0, color: "#b42318", fontWeight: 800 }}>{chatError}</p>
-                  <button
-                    type="button"
-                    className="ff-support-btn ghost"
-                    style={{ marginTop: 6 }}
-                    onClick={() => void retryChat()}
-                  >
-                    재시도
-                  </button>
-                </div>
-              )}
-
-              {equipmentSelectionCards.length > 0 && (
-                <div style={{ marginTop: 10, display: "grid", gap: 6 }}>
-                  <strong style={{ fontSize: 13 }}>설비 선택이 필요합니다.</strong>
-                  {equipmentSelectionCards.map((equipment) => (
-                    <button
-                      key={equipment.equipment_id}
-                      type="button"
-                      className="ff-support-btn ghost"
-                      onClick={() => void selectEquipmentFromCard(equipment)}
-                    >
-                      {equipment.name} · {equipment.category} · {equipment.age_years}년
+                      {question}
                     </button>
                   ))}
                 </div>
-              )}
+              </>
+            )}
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 112px", gap: 8, marginTop: 10 }}>
-                <textarea
-                  value={input}
-                  onChange={(event) => setInput(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && !event.shiftKey) {
-                      event.preventDefault()
-                      void sendChat()
-                    }
-                  }}
-                  placeholder="질문 입력 (Enter 전송 / Shift+Enter 줄바꿈)"
-                  style={{
-                    minHeight: 56,
-                    borderRadius: 12,
-                    border: "1px solid #d0d5dd",
-                    padding: "10px 12px",
-                  }}
-                />
-                <button
-                  className="btn blue"
-                  type="button"
-                  onClick={() => void sendChat()}
-                  disabled={sending}
-                >
-                  {sending ? "전송중" : "보내기"}
-                </button>
-              </div>
-            </article>
-
-            <article className="card" style={{ padding: 18 }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 10,
-                }}
-              >
-                <h3 style={{ margin: 0 }}>내 대화 내역</h3>
-                <button type="button" className="ff-support-btn ghost" onClick={() => void startNewChat()}>
-                  새 대화
-                </button>
-              </div>
-              {sessionsLoading && <p>대화 내역 조회 중...</p>}
-              {sessionsError && (
-                <div style={{ display: "grid", gap: 6 }}>
-                  <p style={{ color: "#b42318", margin: 0 }}>{sessionsError}</p>
-                  <button
-                    type="button"
-                    className="ff-support-btn ghost"
-                    onClick={() => {
-                      setSessionsError("")
-                      void reloadSessions().catch((error) =>
-                        setSessionsError(error instanceof Error ? error.message : "대화 내역 조회 실패"),
-                      )
-                    }}
-                  >
-                    다시 불러오기
-                  </button>
-                </div>
-              )}
-              {!sessionsLoading && sessions.length === 0 && <p>저장된 대화가 없습니다.</p>}
-              <div style={{ display: "grid", gap: 8 }}>
-                {sessions.map((session) => (
-                  <button
-                    key={session.session_id || session.chat_id}
-                    type="button"
-                    className="ff-support-btn ghost"
-                    style={{
-                      textAlign: "left",
-                      borderColor:
-                        activeChatId === (session.session_id || session.chat_id) ? "#344ba0" : undefined,
-                    }}
-                    onClick={() => void openSession(session)}
-                  >
-                    <div style={{ width: "100%" }}>
-                      <strong style={{ display: "block", marginBottom: 4 }}>{session.title}</strong>
-                      <span style={{ display: "block", color: "#475467", fontSize: 12 }}>
-                        {session.preview || "(미리보기 없음)"}
-                      </span>
-                      <span style={{ display: "block", color: "#667085", fontSize: 11, marginTop: 4 }}>
-                        {formatDateTime(session.updated_at || session.created_at)} ·{" "}
-                        {session.analysis_id ? "분석 상담" : "일반 상담"}
-                      </span>
+            <div className="ff-advisor-message-list">
+              {messages.map((message) =>
+                message.role === "user" ? (
+                  <div key={message.id} className="ff-advisor-message-row user">
+                    <div className="ff-advisor-message user">{message.content}</div>
+                    {message.sentAt ? (
+                      <time className="ff-advisor-message-time">{formatMessageTime(message.sentAt)}</time>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div key={message.id} className="ff-advisor-message-row assistant">
+                    <div className="ff-advisor-message-avatar">
+                      <img src={botIcon} alt="" />
+                      <span>Industrial AI</span>
                     </div>
+                    <div className="ff-advisor-message-stack">
+                      <div className="ff-advisor-message assistant">{message.content}</div>
+                      {message.cards && message.cards.length > 0 ? (
+                        <>
+                          <AdvisorResponseCards
+                            cards={message.cards}
+                            analysisId={selectedContext?.analysisId}
+                          />
+                          <div className="ff-advisor-tip-box">
+                            <strong>Tip:</strong> 응답 카드의 버튼을 누르면 해당 화면으로 바로
+                            이동할 수 있습니다.
+                          </div>
+                        </>
+                      ) : null}
+                    </div>
+                  </div>
+                ),
+              )}
+              <div ref={messageEndRef} />
+            </div>
+
+            {actionError && (
+              <div className="ff-advisor-inline-alert">
+                <p>{actionError}</p>
+                {lastFailedAction && (
+                  <button
+                    type="button"
+                    className="ff-advisor-text-btn"
+                    onClick={() => void executeAdvisorAction(lastFailedAction)}
+                  >
+                    다시 시도
+                  </button>
+                )}
+              </div>
+            )}
+
+            {chatError && (
+              <div className="ff-advisor-inline-alert">
+                <p>{chatError}</p>
+                <button type="button" className="ff-advisor-text-btn" onClick={() => void retryChat()}>
+                  재시도
+                </button>
+              </div>
+            )}
+
+            {equipmentSelectionCards.length > 0 && (
+              <div className="ff-advisor-equipment-pick">
+                <strong>설비 선택이 필요합니다.</strong>
+                {equipmentSelectionCards.map((equipment) => (
+                  <button
+                    key={equipment.equipment_id}
+                    type="button"
+                    className="ff-advisor-text-btn"
+                    onClick={() => void selectEquipmentFromCard(equipment)}
+                  >
+                    {equipment.name} · {equipment.category} · {equipment.age_years}년
                   </button>
                 ))}
               </div>
-            </article>
-          </div>
+            )}
 
-          <InvestmentSimulationDialog
-            open={simulationOpen}
-            scenarioAInvestment={selectedContext?.scenarioAInvestment ?? null}
-            scenarioBInvestment={selectedContext?.scenarioBInvestment ?? null}
-            loading={loadingActionId === "investment_simulation"}
-            onClose={() => setSimulationOpen(false)}
-            onSubmit={(input) => void handleSimulationSubmit(input)}
-          />
+            <div className="ff-advisor-composer">
+              <textarea
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault()
+                    void sendChat()
+                  }
+                }}
+                placeholder="질문 입력 (Enter 전송 / Shift+Enter 줄바꿈)"
+              />
+              <button
+                type="button"
+                className="ff-advisor-send-btn"
+                onClick={() => void sendChat()}
+                disabled={sending}
+              >
+                {sending ? "전송중" : "보내기"}
+                <Send size={15} aria-hidden="true" />
+              </button>
+            </div>
+          </article>
 
-          {analysisPickerOpen && (
+          <article className="ff-advisor-session-card">
+            <div className="ff-advisor-session-head">
+              <h3>내 대화 내역</h3>
+              <button type="button" className="ff-advisor-new-chat-btn" onClick={() => void startNewChat()}>
+                + 새 대화
+              </button>
+            </div>
+
+            {sessionsLoading && <p className="ff-advisor-muted">대화 내역 조회 중...</p>}
+            {sessionsError && (
+              <div className="ff-advisor-inline-alert">
+                <p>{sessionsError}</p>
+                <button
+                  type="button"
+                  className="ff-advisor-text-btn"
+                  onClick={() => {
+                    setSessionsError("")
+                    void reloadSessions().catch((error) =>
+                      setSessionsError(error instanceof Error ? error.message : "대화 내역 조회 실패"),
+                    )
+                  }}
+                >
+                  다시 불러오기
+                </button>
+              </div>
+            )}
+            {!sessionsLoading && sessions.length === 0 && (
+              <p className="ff-advisor-muted">저장된 대화가 없습니다.</p>
+            )}
+
+            <div className="ff-advisor-session-list">
+              {sessions.map((session) => {
+                const sessionId = session.session_id || session.chat_id
+                const isActive = activeChatId === sessionId
+                return (
+                  <button
+                    key={sessionId}
+                    type="button"
+                    className={`ff-advisor-session-item${isActive ? " is-active" : ""}`}
+                    onClick={() => void openSession(session)}
+                  >
+                    <div className="ff-advisor-session-item-top">
+                      <strong>{session.title}</strong>
+                      <time>{formatDateTime(session.updated_at || session.created_at)}</time>
+                    </div>
+                    <p>{session.preview || "(미리보기 없음)"}</p>
+                    <span className="ff-advisor-session-tag">
+                      {session.analysis_id ? "분석 상담" : "일반 상담"}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </article>
+        </div>
+
+        <InvestmentSimulationDialog
+          open={simulationOpen}
+          scenarioAInvestment={selectedContext?.scenarioAInvestment ?? null}
+          scenarioBInvestment={selectedContext?.scenarioBInvestment ?? null}
+          loading={loadingActionId === "investment_simulation"}
+          onClose={() => setSimulationOpen(false)}
+          onSubmit={(input) => void handleSimulationSubmit(input)}
+        />
+
+        {analysisPickerOpen && (
         <section className="ff-advisor-agent-shell" aria-label="분석 선택">
           <div className="ff-advisor-agent-stage" style={{ maxWidth: 720 }}>
             <header className="ff-advisor-agent-header">
@@ -892,8 +887,20 @@ export default function AiAdvisorPage() {
           </div>
         </section>
       )}
-        </div>
-      </section>
-    </main>
+    </div>
+  )
+
+  if (isEmbeddedAdvisor) {
+    return <div className="ff-advisor-embedded-page">{advisorPageContent}</div>
+  }
+
+  return (
+    <DashboardWorkspacePageLayout
+      analysisId={preferredAnalysisId}
+      pageClassName="ff-advisor-workspace-page"
+      contentClassName="ff-advisor-workspace-content"
+    >
+      {advisorPageContent}
+    </DashboardWorkspacePageLayout>
   )
 }

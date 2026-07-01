@@ -6,7 +6,6 @@ import {
 
 type AdvisorQuickActionsProps = {
   hasAnalysis: boolean
-  analysisName?: string
   loadingActionId: string | null
   onChangeAnalysis: () => void
   onAction: (action: AdvisorActionDefinition) => void
@@ -14,7 +13,6 @@ type AdvisorQuickActionsProps = {
 
 export default function AdvisorQuickActions({
   hasAnalysis,
-  analysisName,
   loadingActionId,
   onChangeAnalysis,
   onAction,
@@ -24,11 +22,11 @@ export default function AdvisorQuickActions({
     const Icon = action.icon
     const isLoading = loadingActionId === action.id
     return (
-      <div className="ff-advisor-quick-actions">
-        <div className="ff-advisor-quick-actions-title">
+      <div className="ff-advisor-quick-panel">
+        <div className="ff-advisor-quick-panel-head">
           <strong>현재 분석 빠른 실행</strong>
-          <span>분석이 없어서 새 투자 분석부터 시작합니다.</span>
         </div>
+        <p className="ff-advisor-quick-hint">분석이 없어서 새 투자 분석부터 시작합니다.</p>
         <button
           type="button"
           className="ff-advisor-action-btn is-primary"
@@ -43,20 +41,14 @@ export default function AdvisorQuickActions({
   }
 
   return (
-    <div className="ff-advisor-quick-actions">
-      <div className="ff-advisor-quick-actions-title">
+    <div className="ff-advisor-quick-panel">
+      <div className="ff-advisor-quick-panel-head">
         <strong>현재 분석 빠른 실행</strong>
-        <span>아래 버튼은 선택한 분석의 저장 결과를 기준으로 실행됩니다.</span>
-      </div>
-      <div className="ff-advisor-context-bar">
-        <span className="ff-advisor-context-label">현재 분석:</span>
-        <strong className="ff-advisor-context-name" title={analysisName}>
-          {analysisName || "선택된 분석"}
-        </strong>
         <button type="button" className="ff-advisor-context-change" onClick={onChangeAnalysis}>
           분석 변경
         </button>
       </div>
+
       <div className="ff-advisor-action-row">
         {ANALYSIS_QUICK_ACTIONS.map((action) => {
           const Icon = action.icon

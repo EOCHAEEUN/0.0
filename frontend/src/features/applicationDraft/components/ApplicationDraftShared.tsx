@@ -128,10 +128,16 @@ export function JudgementStatusBadge({ status }: { status: string }) {
 export function EvidenceStatusBadge({
   status,
 }: {
-  status: "보유" | "일부 보유" | "미보유"
+  status: "미첨부" | "일부 첨부" | "첨부됨" | "증빙 대상 없음" | string
 }) {
   const tone: StatusTone =
-    status === "보유" ? "ok" : status === "일부 보유" ? "warn" : "need"
+    status === "첨부됨"
+      ? "ok"
+      : status === "일부 첨부"
+        ? "warn"
+        : status === "증빙 대상 없음"
+          ? "info"
+          : "need"
 
   return <span className={`ff-draft-evidence-badge ${tone}`}>{status}</span>
 }

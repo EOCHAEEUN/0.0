@@ -690,7 +690,22 @@ def create_safety_preview(
     body = body or {}
     existing = _lookup_existing_preview(analysis_id, policy_id, equipment_id, investment_plan_id)
     if existing and existing.get("generation_source") == GENERATION_SOURCE:
-        return existing
+        existing_analysis_id = _first_text(existing.get("analysis_id"))
+        existing_policy_id = _first_text(existing.get("policy_id"))
+        existing_equipment_id = _first_text(existing.get("equipment_id"))
+        existing_investment_plan_id = _first_text(existing.get("investment_plan_id"))
+        requested_investment_plan_id = _first_text(investment_plan_id or "")
+        requested_equipment_id = _first_text(equipment_id)
+
+        # create 경로에서는 동일 식별자(analysis/policy/equipment/investment_plan)일 때만 재사용한다.
+        # policy 단독 fallback row(타 analysis 데이터)를 재사용하면 이후 summary 단계에서 404가 발생할 수 있다.
+        if (
+            existing_analysis_id == analysis_id
+            and existing_policy_id == policy_id
+            and existing_investment_plan_id == requested_investment_plan_id
+            and existing_equipment_id == requested_equipment_id
+        ):
+            return existing
 
     policy = _fetch_policy(policy_id) or _as_dict(body.get("policy"))
     if not _can_run(policy):

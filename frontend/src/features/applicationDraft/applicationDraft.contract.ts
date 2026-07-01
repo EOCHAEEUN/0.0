@@ -180,8 +180,48 @@ export type WorkspaceSafetyRow = {
   viewpoint_key: string
   viewpoint_label: string
   current_status: string
-  evidence_status: "보유" | "일부 보유" | "미보유"
+  evidence_status: "미첨부" | "일부 첨부" | "첨부됨" | "증빙 대상 없음" | string
   description: string
+}
+
+export type SafetyEvidenceStatus = "미첨부" | "일부 첨부" | "첨부됨" | "증빙 대상 없음"
+
+export type SafetyEvidenceFile = {
+  file_id: string
+  file_name: string
+  uploaded_at?: string | null
+  verification_status?: "not_reviewed" | "reviewed_valid" | "reviewed_rejected" | string
+}
+
+export type SafetyRequiredEvidenceItem = {
+  evidence_label: string
+  base_evidence_label?: string | null
+  safety_rule_id: string
+  evidence_type: string
+  is_uploaded: boolean
+  files: SafetyEvidenceFile[]
+}
+
+export type SafetyEvidenceViewpoint = {
+  viewpoint_key: string
+  viewpoint_title: string
+  current_judgement: string
+  description?: string
+  required_count: number
+  uploaded_count: number
+  evidence_status: SafetyEvidenceStatus
+  verification_status: string
+  required_evidences: SafetyRequiredEvidenceItem[]
+}
+
+export type SafetyEvidenceSummary = {
+  analysis_id: string
+  policy_id: string
+  equipment_id: string
+  total_required_count: number
+  uploaded_required_count: number
+  viewpoints: SafetyEvidenceViewpoint[]
+  summary_updated_at?: string
 }
 
 export type ApplicationDraftWorkspaceData = {
@@ -231,6 +271,23 @@ export type ApplicationDraftWorkspaceData = {
   safety: {
     rows: WorkspaceSafetyRow[]
     has_viewer_policy: boolean
+    message?: string | null
+    summary?: SafetyEvidenceSummary | null
+    draft_snapshot?: {
+      snapshot_at?: string | null
+      total_required_count?: number
+      uploaded_required_count?: number
+      viewpoints?: Array<{
+        viewpoint_key: string
+        viewpoint_title: string
+        required_count: number
+        uploaded_count: number
+        evidence_status: string
+        missing_labels?: string[]
+        uploaded_files?: Array<{ file_name: string; evidence_label: string }>
+      }>
+    } | null
+    is_snapshot_outdated?: boolean
   }
 }
 

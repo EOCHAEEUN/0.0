@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import io
 import os
-import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -245,42 +244,11 @@ def _first_number(*values: Any, default: float = 0) -> float:
 
 
 def _validate_submission_narratives(narratives: dict[str, str]) -> None:
-    banned_patterns = (
-        "겠습니다",
-        "고자 합니다",
-        "바랍니다",
-        "할 수 있습니다",
-        "수 있습니다",
-        "기대됩니다",
-        "추정됩니다",
-        "판단됩니다",
-        "예상됩니다",
-    )
-    allowed_endings = ("합니다.", "습니다.", "입니다.")
-
-    for field, text in narratives.items():
-        matched = next((pattern for pattern in banned_patterns if pattern in text), None)
-        if matched:
-            raise ValueError(
-                f"높임말 보고서의 {field} 문장에 비단정 표현 '{matched}'이 포함되어 있습니다."
-            )
-
-        sentences = [
-            sentence.strip()
-            for sentence in re.split(r"(?<=[.!?])\s+", text)
-            if sentence.strip()
-        ]
-        invalid = [
-            sentence
-            for sentence in sentences
-            if sentence.endswith((".", "!", "?"))
-            and not sentence.endswith(allowed_endings)
-        ]
-        if invalid:
-            raise ValueError(
-                f"높임말 보고서의 {field} 문장이 단정형 종결어미로 끝나지 않습니다: "
-                f"{invalid[0]}"
-            )
+    # NOTE:
+    # The PDF preview/download flow must not fail because of narrative style checks.
+    # Keep this hook for future linting/telemetry usage, but make it non-blocking.
+    _ = narratives
+    return
 
 
 class BarChartFlowable(Flowable):

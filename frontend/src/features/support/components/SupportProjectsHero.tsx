@@ -1,17 +1,19 @@
-import type { SupportProjectsCounts } from "../supportProjectsOverview.types"
+import type { SupportProjectsCounts, SupportProjectsFilter } from "../supportProjectsOverview.types"
 import "../supportProjects.workspace.css"
 
-function formatCount(value: number) {
-  return `${Math.max(0, value)}건`
-}
+const FILTERS: { id: SupportProjectsFilter; label: string }[] = [
+  { id: "all", label: "전체" },
+  { id: "priority", label: "우선 검토" },
+  { id: "documents", label: "서류 확인 필요" },
+  { id: "closing", label: "마감 임박" },
+  { id: "finance", label: "금융·비금융 연계" },
+]
 
 function renderHeroTitle(title: string) {
   const match = title.match(/(\d+건)/)
   if (!match || match.index === undefined) return title
-
   const before = title.slice(0, match.index)
   const after = title.slice(match.index + match[0].length)
-
   return (
     <>
       {before}
@@ -22,39 +24,49 @@ function renderHeroTitle(title: string) {
 }
 
 export function SupportProjectsHero({
+  trustLabel,
   heroTitle,
   heroSubtitle,
   counts,
+  activeFilter,
+  onFilterChange,
+  showFilters = true,
 }: {
+  trustLabel: string
   heroTitle: string
   heroSubtitle: string
   counts: SupportProjectsCounts
+  activeFilter: SupportProjectsFilter
+  onFilterChange: (filter: SupportProjectsFilter) => void
+  showFilters?: boolean
 }) {
-  const metrics = [
-    { label: "정책 DB 전체", value: formatCount(counts.policy_db_total) },
-    { label: "내 조건 매칭", value: formatCount(counts.matched_total) },
-    { label: "우선 검토 정책", value: formatCount(counts.priority_policy_count) },
-    { label: "마감임박", value: formatCount(counts.closing_soon_count) },
-  ]
-
   return (
     <section className="ff-support-hero">
-      <div className="ff-support-hero-grid">
-        <div className="ff-support-hero-copy">
-          <span className="ff-support-hero-badge">FACTOFIT AI ENGI</span>
-          <h1 className="ff-support-hero-title">{renderHeroTitle(heroTitle)}</h1>
-          <p className="ff-support-hero-subtitle">{heroSubtitle}</p>
-        </div>
-
-        <div className="ff-support-hero-metrics">
-          {metrics.map((metric) => (
-            <div key={metric.label} className="ff-support-hero-metric">
-              <span>{metric.label}</span>
-              <strong>{metric.value}</strong>
-            </div>
-          ))}
-        </div>
+      <div className="ff-support-hero-copy-block">
+        <span className="ff-support-hero-trust">{trustLabel}</span>
+        <h1 className="ff-support-hero-title">{renderHeroTitle(heroTitle)}</h1>
+        <p className="ff-support-hero-subtitle">{heroSubtitle}</p>
+        {showFilters ? (
+          <div className="ff-support-filter-row" role="tablist" aria-label="지원사업 필터">
+            {FILTERS.map((filter) => (
+              <button
+                key={filter.id}
+                type="button"
+                role="tab"
+                aria-selected={activeFilter === filter.id}
+                className={activeFilter === filter.id ? "is-active" : ""}
+                onClick={() => onFilterChange(filter.id)}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
+      <p className="ff-support-hero-footnote" aria-hidden="true">
+        정책 DB {counts.policy_db_total.toLocaleString("ko-KR")}건 · 우선 검토{" "}
+        {counts.priority_policy_count}건 · 마감 임박 {counts.closing_soon_count}건
+      </p>
     </section>
   )
 }

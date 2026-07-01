@@ -6,6 +6,7 @@ import {
 import type {
   AnalysisData,
   ApplicationDraftWorkspaceData,
+  SafetyEvidenceSummary,
   ScenarioKey,
 } from "./applicationDraft.contract"
 
@@ -136,6 +137,155 @@ export async function requestApplicationDraftGeneration(params: {
   }
 
   return data
+}
+
+export async function fetchSafetyEvidenceSummary(params: {
+  analysisId: string
+  policyId: string
+  equipmentId: string
+}) {
+  const search = new URLSearchParams({
+    analysis_id: params.analysisId,
+    policy_id: params.policyId,
+    equipment_id: params.equipmentId,
+  })
+  const accessToken = getAccessToken()
+  const response = await fetch(
+    buildApiUrl(`/safety-evidence/summary?${search.toString()}`),
+    {
+      method: "GET",
+      headers: {
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      credentials: "include",
+    },
+  )
+  const text = await response.text()
+  const payload = text ? JSON.parse(text) : null
+  if (!response.ok) {
+    throw new Error(
+      payload?.detail || payload?.message || "증빙 현황을 불러오지 못했습니다.",
+    )
+  }
+  return (payload?.data || payload) as SafetyEvidenceSummary
+}
+
+export async function uploadSafetyEvidencePdf(params: {
+  analysisId: string
+  policyId: string
+  equipmentId: string
+  viewpointKey: string
+  safetyRuleId: string
+  evidenceType: string
+  evidenceLabel: string
+  memo?: string
+  file: File
+}) {
+  const body = new FormData()
+  body.set("analysis_id", params.analysisId)
+  body.set("policy_id", params.policyId)
+  body.set("equipment_id", params.equipmentId)
+  body.set("viewpoint_key", params.viewpointKey)
+  body.set("safety_rule_id", params.safetyRuleId)
+  body.set("evidence_type", params.evidenceType)
+  body.set("evidence_label", params.evidenceLabel)
+  if (params.memo) body.set("memo", params.memo)
+  body.set("file", params.file)
+
+  const accessToken = getAccessToken()
+  const response = await fetch(buildApiUrl("/safety-evidence/upload"), {
+    method: "POST",
+    headers: {
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
+    credentials: "include",
+    body,
+  })
+  const text = await response.text()
+  const payload = text ? JSON.parse(text) : null
+  if (!response.ok) {
+    throw new Error(
+      payload?.detail || payload?.message || "증빙 파일 업로드에 실패했습니다.",
+    )
+  }
+  return payload?.data || payload
+}
+
+export async function requestSafetyEvidenceDownload(fileId: string) {
+  const accessToken = getAccessToken()
+  const response = await fetch(
+    buildApiUrl(`/safety-evidence/${encodeURIComponent(fileId)}/download`),
+    {
+      method: "GET",
+      headers: {
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      credentials: "include",
+    },
+  )
+  const text = await response.text()
+  const payload = text ? JSON.parse(text) : null
+  if (!response.ok) {
+    throw new Error(
+      payload?.detail || payload?.message || "다운로드 URL을 생성하지 못했습니다.",
+    )
+  }
+  return payload?.data || payload
+}
+
+export async function deleteSafetyEvidenceFile(fileId: string) {
+  const accessToken = getAccessToken()
+  const response = await fetch(
+    buildApiUrl(`/safety-evidence/${encodeURIComponent(fileId)}`),
+    {
+      method: "DELETE",
+      headers: {
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      credentials: "include",
+    },
+  )
+  const text = await response.text()
+  const payload = text ? JSON.parse(text) : null
+  if (!response.ok) {
+    throw new Error(payload?.detail || payload?.message || "파일 삭제에 실패했습니다.")
+  }
+  return payload?.data || payload
+}
+
+export async function generateSafetyPreviewBaseline(params: {
+  companyId: string
+  analysisId: string
+  policyId: string
+  equipmentId?: string
+}) {
+  const accessToken = getAccessToken()
+  const search = new URLSearchParams({
+    company_id: params.companyId,
+    analysis_id: params.analysisId,
+    policy_id: params.policyId,
+  })
+  if (params.equipmentId) search.set("equipment_id", params.equipmentId)
+  const response = await fetch(
+    buildApiUrl(
+      `/safety-evidence/bootstrap?${search.toString()}`,
+    ),
+    {
+      method: "POST",
+      headers: {
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      credentials: "include",
+    },
+  )
+  const text = await response.text()
+  const payload = text ? JSON.parse(text) : null
+  if (!response.ok) {
+    throw new Error(
+      payload?.detail || payload?.message || "안전 증빙 기준 생성에 실패했습니다.",
+    )
+  }
+  return payload?.data || payload
 }
 
 export async function requestApplicationDraft(

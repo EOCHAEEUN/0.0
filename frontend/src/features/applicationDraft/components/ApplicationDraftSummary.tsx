@@ -11,8 +11,8 @@ export function ApplicationDraftSummary({
   const policyLegacy = model.data?.policy?.legacy_missing
 
   return (
-    <section className="ff-card ff-draft-summary-card">
-      <div className="ff-draft-summary-grid">
+    <section className="ff-draft-summary-section">
+      <article className="ff-card ff-draft-summary-card">
         <div className="ff-draft-summary-copy">
           <span className="ff-mini-label">AI 신청서 초안</span>
           <h3>핵심 요약</h3>
@@ -54,9 +54,9 @@ export function ApplicationDraftSummary({
             </div>
           )}
         </div>
+      </article>
 
-        <ApplicationDraftScenarioSelector model={model} onGoRoi={onGoRoi} />
-      </div>
+      <ApplicationDraftScenarioSelector model={model} onGoRoi={onGoRoi} />
     </section>
   )
 }

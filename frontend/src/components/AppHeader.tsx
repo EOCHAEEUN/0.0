@@ -1,6 +1,10 @@
 import { useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
-import { resolveRoiNavigationPath } from "../features/roi/roiNavigation"
+import {
+  resolveApplicationDraftNavigationPath,
+  resolveRoiNavigationPath,
+  resolveSupportProjectsNavigationPath,
+} from "../features/roi/roiNavigation"
 
 type NavItem = {
   label: string
@@ -137,6 +141,18 @@ export default function AppHeader() {
   const handleNavigation = async (item: NavItem) => {
     if (item.label === "ROI 분석") {
       navigate(await resolveRoiNavigationPath(location.pathname, location.search))
+      return
+    }
+    if (item.label === "지원사업") {
+      navigate(
+        await resolveSupportProjectsNavigationPath(location.pathname, location.search),
+      )
+      return
+    }
+    if (item.label === "신청서 생성") {
+      navigate(
+        await resolveApplicationDraftNavigationPath(location.pathname, location.search),
+      )
       return
     }
     navigate(item.path)

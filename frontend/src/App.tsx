@@ -11,6 +11,7 @@ import SupportDetailPage from "./pages/SupportDetailPage"
 import AiAdvisorPage from "./pages/AiAdvisorPage"
 import SafetyPage from "./pages/SafetyPage"
 import MyPage from "./pages/MyPage"
+import EquipmentStatusPage from "./pages/EquipmentStatusPage"
 import GlobalAiAdvisor from "./features/aiAdvisor/GlobalAiAdvisor"
 import WelcomePage from "./features/onboarding/pages/WelcomePage"
 import CompanySetupPage from "./features/onboarding/pages/CompanySetupPage"
@@ -92,6 +93,7 @@ function App() {
           <Route path="/safety" element={<SafetyPage />} />
 
           {/* 설비 관리 / 마이페이지 */}
+          <Route path="/equipment" element={<EquipmentStatusPage />} />
           <Route path="/mypage" element={<MyPage />} />
           <Route path="/company" element={<MyPage />} />
         </Route>

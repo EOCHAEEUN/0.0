@@ -81,7 +81,7 @@ const EMPTY_DASHBOARD: DashboardViewModel = {
     engiMessage: "",
     analyses: [],
     hasMoreAnalyses: false,
-    equipmentManagePath: "/mypage",
+    equipmentManagePath: "/equipment",
     newRoiPath: "/roi",
     newAnalysisPath: "/analysis/new",
   },

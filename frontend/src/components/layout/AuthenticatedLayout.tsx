@@ -7,6 +7,8 @@ import { hydrateAccountData } from "../../services/accountHydration"
 
 export default function AuthenticatedLayout() {
   const location = useLocation()
+  const isDashboardWorkspace =
+    location.pathname === "/dashboard" || location.pathname === "/equipment"
   const hasToken = !!getAccessToken()
 
   // 토큰은 있지만 기업 데이터가 없는 경우(재로그인·새 기기)만 hydrate
@@ -37,7 +39,7 @@ export default function AuthenticatedLayout() {
           flexDirection: "column",
         }}
       >
-        <GlobalHeader />
+        {!isDashboardWorkspace && <GlobalHeader />}
         <div
           style={{
             flex: 1,
@@ -64,7 +66,7 @@ export default function AuthenticatedLayout() {
         flexDirection: "column",
       }}
     >
-      <GlobalHeader />
+      {!isDashboardWorkspace && <GlobalHeader />}
       <div
         id="ff-page-content"
         style={{

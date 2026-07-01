@@ -17,6 +17,8 @@ class ChatRequest(BaseModel):
     analysis_id: str = ""
     source: str = ""
     action: str = ""
+    policy_id: str = ""
+    simulation_input: dict = {}
     chat_id: str = ""
     session_id: str = ""
 

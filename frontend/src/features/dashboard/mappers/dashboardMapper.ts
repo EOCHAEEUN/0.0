@@ -112,6 +112,8 @@ export type DashboardWorkspace = {
   heroReason?: string
   closingSoonCount?: number
   legacyPolicyMissing?: boolean
+  priorityMetaText?: string
+  todayTaskNote?: string
 }
 
 export type CompanySummaryRow = {
@@ -539,21 +541,27 @@ function getNearestDeadline(policies: DashboardMatchedPolicyContract[]) {
   return dated[0] ?? null
 }
 
-function getPolicyDetailPath(
-  analysisId: string,
-  policy: DashboardMatchedPolicyContract | undefined,
-) {
-  const policyId = getPolicyId(policy)
-  if (!analysisId) return "/support-projects"
-  return policyId
-    ? `/analysis/${analysisId}/policies/${policyId}`
-    : `/analysis/${analysisId}/policies`
+function buildSupportProjectsPath(params: {
+  companyId?: string
+  analysisId?: string
+  equipmentId?: string
+  policyId?: string
+}) {
+  const query = new URLSearchParams()
+  if (params.companyId) query.set("company_id", params.companyId)
+  if (params.analysisId) query.set("analysis_id", params.analysisId)
+  if (params.equipmentId) query.set("equipment_id", params.equipmentId)
+  if (params.policyId) query.set("policy_id", params.policyId)
+  const suffix = query.toString()
+  return suffix ? `/support-projects?${suffix}` : "/support-projects"
 }
 
 function mapDeadlineList(
   policies: DashboardMatchedPolicyContract[],
   priorityPolicyId: string | null,
   analysisId: string,
+  companyId: string,
+  equipmentId: string,
   options?: {
     snapshotMissing?: boolean
     reanalysisPath?: string
@@ -621,7 +629,11 @@ function mapDeadlineList(
         dday: `D-${Math.max(0, daysRemaining)}`,
         urgency: daysRemaining <= 7 ? "urgent" : "upcoming",
         isPriority: Boolean(priorityPolicyId && policyId === priorityPolicyId),
-        path: getPolicyDetailPath(analysisId, policy),
+        path: buildSupportProjectsPath({
+          companyId,
+          analysisId,
+          equipmentId,
+        }),
       }
     }),
   }
@@ -857,6 +869,7 @@ function mapWorkspace(
   const analysisId = getAnalysisId(analysis)
   const equipmentName = getEquipmentName(analysis, equipments)
   const priorityPolicy = getPriorityPolicy(policies)
+  const companyId = compactText(company?.company_id)
   const priorityPolicyTitle = isSnapshotMissingLegacy
     ? "정책 이력 없음"
     : compactText(priorityPolicy?.title) || "공고 확인 필요"
@@ -866,16 +879,16 @@ function mapWorkspace(
   const deadlinePolicyId = getPolicyId(deadlinePolicy)
   const deadlineRaw = nearestDeadline?.raw || (deadlinePolicy ? getPolicyDateValue(deadlinePolicy) : "")
   const daysRemaining = deadlineRaw ? getDaysRemaining(deadlineRaw) : null
-  const policyPath = analysisId
-    ? priorityPolicyId
-      ? getPolicyDetailPath(analysisId, priorityPolicy)
-      : `/analysis/${analysisId}/policies`
-    : "/support-projects"
   const analysisEquipmentId = compactText(
     analysisRecord?.equipmentId ??
       analysisRecord?.equipment_id ??
       analysisRecord?.selected_equipment_id,
   )
+  const policyPath = buildSupportProjectsPath({
+    companyId,
+    analysisId,
+    equipmentId: analysisEquipmentId,
+  })
   const draftPath =
     analysisId && analysisEquipmentId
       ? `/analysis/new?mode=reanalysis&equipmentId=${encodeURIComponent(analysisEquipmentId)}&parentAnalysisId=${encodeURIComponent(analysisId)}`
@@ -890,10 +903,17 @@ function mapWorkspace(
     findNumberByKeys(roiData, ["payback_years", "payback_months", "payback_period_months"])
   const progress = getProgressPercent(analysis)
   const policySummary = getPolicySummary(analysis, matchedCount)
-  const deadlineList = mapDeadlineList(policies, priorityPolicyId, analysisId, {
-    snapshotMissing: isSnapshotMissingLegacy,
-    reanalysisPath: draftPath,
-  })
+  const deadlineList = mapDeadlineList(
+    policies,
+    priorityPolicyId,
+    analysisId,
+    companyId,
+    analysisEquipmentId,
+    {
+      snapshotMissing: isSnapshotMissingLegacy,
+      reanalysisPath: draftPath,
+    },
+  )
   const companyName = getCompanyName(company)
   const industryLabel = getIndustryLabel(company)
   const regionLabel = getRegionLabel(company)
@@ -1190,9 +1210,7 @@ function buildPaths(params: {
     : ""
   const analysisId = params.analysisId || ""
 
-  const equipmentManagePath = params.companyId
-    ? `/mypage?company_id=${encodeURIComponent(params.companyId)}&return_to=dashboard&focus=representative&panel=equipment`
-    : "/mypage?return_to=dashboard&focus=representative&panel=equipment"
+  const equipmentManagePath = "/equipment"
 
   const roiPath =
     analysisId
@@ -1206,10 +1224,15 @@ function buildPaths(params: {
     : equipmentManagePath
 
   const policyPath = analysisId
-    ? params.policyId
-      ? `/analysis/${encodeURIComponent(analysisId)}/policies/${encodeURIComponent(params.policyId)}`
-      : `/support-projects?analysisId=${encodeURIComponent(analysisId)}`
-    : "/support-projects"
+    ? buildSupportProjectsPath({
+        companyId: params.companyId,
+        analysisId,
+        equipmentId: params.equipmentId || undefined,
+      })
+    : buildSupportProjectsPath({
+        companyId: params.companyId,
+        equipmentId: params.equipmentId || undefined,
+      })
 
   const newAnalysisPath = params.companyId
     ? `/analysis/new?company_id=${encodeURIComponent(params.companyId)}&source=dashboard`
@@ -1258,7 +1281,11 @@ export function mapDashboardOverview(
       urgency: item.days_remaining <= 7 ? "urgent" : "upcoming",
       isPriority: Boolean(item.is_priority),
       path: item.policy_id && analysisId
-        ? `/analysis/${encodeURIComponent(analysisId)}/policies/${encodeURIComponent(item.policy_id)}`
+        ? buildSupportProjectsPath({
+            companyId,
+            analysisId,
+            equipmentId: equipmentId || undefined,
+          })
         : paths.policyPath,
     }),
   )
@@ -1355,6 +1382,8 @@ export function mapDashboardOverview(
     heroReason: hero?.reason || "",
     closingSoonCount: counts?.closing_soon ?? 0,
     legacyPolicyMissing: legacyMissing,
+    priorityMetaText: [priority?.deadline, priority?.d_day].filter(Boolean).join(" · "),
+    todayTaskNote: tasks?.summary || "Engi가 우선 행동을 정리했어요.",
   }
 
   return {

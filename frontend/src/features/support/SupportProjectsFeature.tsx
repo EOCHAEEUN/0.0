@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useState } from "react"
-import { useNavigate, useSearchParams } from "react-router-dom"
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom"
 
 import { PolicyCandidateList } from "./components/PolicyCandidateList"
 import { PolicyDetailDrawer } from "./components/PolicyDetailDrawer"
 import { PriorityPolicyCard } from "./components/PriorityPolicyCard"
 import { SupportProjectsHero } from "./components/SupportProjectsHero"
 import { useSupportProjectsOverview } from "./hooks/useSupportProjectsOverview"
+import { resolveApplicationDraftNavigationPath } from "../roi/roiNavigation"
 import type { SupportProject } from "./supportProjects.contract"
 import type { SupportProjectsPolicyCard } from "./supportProjectsOverview.types"
 import "./supportProjects.workspace.css"
@@ -56,6 +57,7 @@ function getProjectPolicyId(project: SupportProject) {
 }
 
 export default function SupportProjectsFeature() {
+  const location = useLocation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [detailPolicy, setDetailPolicy] = useState<SupportProjectsPolicyCard | null>(null)
@@ -129,7 +131,7 @@ export default function SupportProjectsFeature() {
   )
 
   const handleGoDraft = useCallback(
-    (project: SupportProject) => {
+    async (project: SupportProject) => {
       const resolvedCompanyId = pickString(companyId, readLocalStorage("factofit_company_id"))
       const resolvedEquipmentId = pickString(
         equipmentId,
@@ -137,6 +139,13 @@ export default function SupportProjectsFeature() {
         readLocalStorage("factofit_equipment_id"),
       )
       const policyId = getProjectPolicyId(project)
+      const draftNavigationPath = await resolveApplicationDraftNavigationPath(
+        location.pathname,
+        location.search,
+      )
+      const draftUrl = new URL(draftNavigationPath, window.location.origin)
+      draftUrl.searchParams.set("policyId", policyId)
+      const resolvedAnalysisId = pickString(draftUrl.searchParams.get("analysisId")) || undefined
 
       if (!resolvedCompanyId || !resolvedEquipmentId || !policyId) {
         window.alert(
@@ -168,30 +177,28 @@ export default function SupportProjectsFeature() {
       writeLocalStorage("factofit_equipment_id", resolvedEquipmentId)
       writeLocalStorage("factofit_selected_policy_id", policyId)
       writeLocalStorage("factofit_policy_id", policyId)
-      if (analysisId) {
-        writeLocalStorage("factofit_analysis_id", analysisId)
+      if (resolvedAnalysisId) {
+        writeLocalStorage("factofit_analysis_id", resolvedAnalysisId)
       } else {
         removeLocalStorage("factofit_analysis_id")
       }
       writeJsonLocalStorage("factofit_selected_project", selectedProjectForDraft)
-
-      const draftSearchParams = new URLSearchParams({ policyId })
-      if (analysisId) draftSearchParams.set("analysisId", analysisId)
+      const draftSearchParams = draftUrl.searchParams
 
       navigate(`/application-draft?${draftSearchParams.toString()}`, {
         state: {
           companyId: resolvedCompanyId,
           equipmentId: resolvedEquipmentId,
           policyId,
-          ...(analysisId ? { analysisId } : {}),
+          ...(resolvedAnalysisId ? { analysisId: resolvedAnalysisId } : {}),
           selectedProject: {
             ...selectedProjectForDraft,
-            ...(analysisId ? { analysisId } : {}),
+            ...(resolvedAnalysisId ? { analysisId: resolvedAnalysisId } : {}),
           },
         },
       })
     },
-    [analysisId, companyId, equipmentId, navigate],
+    [companyId, equipmentId, location.pathname, location.search, navigate],
   )
 
   const model =

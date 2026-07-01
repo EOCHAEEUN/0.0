@@ -1,5 +1,8 @@
 import { Link, useLocation, useNavigate } from "react-router-dom"
-import { resolveRoiNavigationPath } from "../../features/roi/roiNavigation"
+import {
+  resolveRoiNavigationPath,
+  resolveSupportProjectsNavigationPath,
+} from "../../features/roi/roiNavigation"
 
 export default function Header() {
   const location = useLocation()
@@ -7,6 +10,10 @@ export default function Header() {
 
   const handleRoiNavigation = async () => {
     navigate(await resolveRoiNavigationPath(location.pathname, location.search))
+  }
+
+  const handleSupportNavigation = async () => {
+    navigate(await resolveSupportProjectsNavigationPath(location.pathname, location.search))
   }
 
   return (
@@ -23,7 +30,9 @@ export default function Header() {
             ROI 분석
           </button>
           <Link to="/advisor">AI 어드바이저</Link>
-          <Link to="/support-projects">지원사업</Link>
+          <button type="button" onClick={() => void handleSupportNavigation()}>
+            지원사업
+          </button>
           <Link to="/safety">안전점검</Link>
         </nav>
 

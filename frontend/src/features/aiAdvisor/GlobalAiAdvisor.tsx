@@ -33,6 +33,14 @@ export function GlobalAiAdvisor() {
     setScreen("home")
   }, [isLoggedIn])
 
+  const isEquipmentPage =
+    location.pathname === "/equipment" || location.pathname.startsWith("/equipment/")
+
+  // 설비현황 페이지는 페이지 내부 EquipmentGuideChatLauncher가 챗봇을 담당
+  if (isEquipmentPage) {
+    return null
+  }
+
   const activeAdvisorRoute =
     location.pathname === "/advisor" ||
     location.pathname === "/ai-advisor" ||

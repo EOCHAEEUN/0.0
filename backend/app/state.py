@@ -1,28 +1,66 @@
-from typing import Any, TypedDict, Optional
-from app.models.company import CompanyContext
-from app.models.matched_policy import MatchedPolicy
-from app.models.equipment import EquipmentInput
+from typing import Any, Optional, TypedDict
 
-class FactofitState(TypedDict):
-    user_query: str                           # 사용자 원본 입력
-    intent: str                               # "roi" / "policy" / "draft" / "info_missing" / "general"
-    is_safe: bool                             # guard_node 통과 여부
-    company_info: Optional[CompanyContext]    # 기업 프로필 (DB에서 로드)
-    equipment: Optional[EquipmentInput]       # 설비 + ROI 입력값
-    equipment_id: Optional[str]
-    equipments: Optional[list[dict]]
-    selected_equipment_id: Optional[str]
-    policy_intent_choice: Optional[str]  # "equipment" / "general"
-    selected_equipment_for_policy: Optional[str]  # policy용 설비 선택
-    matched_policies: list[MatchedPolicy]    # policy_matching 결과
-    selected_policy: Optional[dict]
-    roi_result: Optional[dict]          # capex_advisor 계산 결과
-    draft_result: Optional[dict[str, Any]]   # application_draft result JSON
-    draft_context: Optional[dict[str, Any]]  # draft-only runtime context
-    chat_history: list[dict]                 # 이전 대화 이력 [{"role": "user/assistant", "content": "..."}]
-    final_response: str                       # response_node 최종 응답
+from app.models.company import CompanyContext
+from app.models.equipment import EquipmentInput
+from app.models.matched_policy import MatchedPolicy
+
+
+class FactofitState(TypedDict, total=False):
+    # request/session context
+    user_query: str
+    message: str
+    action: str
+    source: str
+    chat_id: str
+    session_id: str
+    user_id: str
+    company_id: str
+    analysis_id: str
+    equipment_id: str
+    policy_id: str
+    selected_equipment_id: str
+    simulation_input: dict[str, Any]
+
+    # legacy runtime context (호환 유지)
+    intent: str
+    is_safe: bool
+    company_info: Optional[CompanyContext]
+    equipment: Optional[EquipmentInput]
+    equipments: Optional[list[dict[str, Any]]]
+    policy_intent_choice: Optional[str]
+    selected_equipment_for_policy: Optional[str]
+    matched_policies: list[MatchedPolicy]
+    selected_policy: Optional[dict[str, Any]]
+    roi_result: Optional[dict[str, Any]]
+    draft_result: Optional[dict[str, Any]]
+    draft_context: Optional[dict[str, Any]]
     unsupported_equipment: bool
-    chat_id: Optional[str]
-    safety_dashboard: Optional[dict]
-    options: Optional[list[dict]]
-    analysis_id: Optional[str]
+    safety_dashboard: Optional[dict[str, Any]]
+    options: Optional[list[dict[str, Any]]]
+    chat_history: list[dict[str, Any]]
+
+    # graph orchestration
+    route: str
+    error: str
+    answer_source: str
+    used_graph: bool
+    used_llm: bool
+    used_roi_recalculation: bool
+    used_policy_matching: bool
+    persistence_status: str
+
+    # snapshots
+    company_snapshot: dict[str, Any]
+    company_equipments: list[dict[str, Any]]
+    equipment_snapshot: dict[str, Any]
+    roi_output: dict[str, Any]
+    roi_snapshot: dict[str, Any]
+    policy_snapshot: dict[str, Any]
+    draft_snapshot: dict[str, Any]
+    safety_snapshot: dict[str, Any]
+
+    # output
+    response: str
+    final_response: str
+    cards: list[dict[str, Any]]
+    metadata: dict[str, Any]

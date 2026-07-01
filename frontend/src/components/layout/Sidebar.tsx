@@ -1,4 +1,6 @@
-import { NavLink } from "react-router-dom"
+import { NavLink, useLocation, useNavigate } from "react-router-dom"
+
+import { resolveApplicationDraftNavigationPath } from "../../features/roi/roiNavigation"
 
 const menuItems = [
   { label: "홈 대시보드", path: "/" },
@@ -9,6 +11,14 @@ const menuItems = [
 ]
 
 export default function Sidebar() {
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  const handleApplicationDraftNavigation = async () => {
+    const path = await resolveApplicationDraftNavigationPath(location.pathname, location.search)
+    navigate(path)
+  }
+
   return (
     <aside className="w-64 bg-slate-900 p-5 text-white">
       <div className="mb-8">
@@ -21,22 +31,39 @@ export default function Sidebar() {
       </div>
 
       <nav className="space-y-2">
-        {menuItems.map((item) => (
-          <NavLink
-            key={item.path}
-            to={item.path}
-            className={({ isActive }) =>
-              [
-                "block rounded-xl px-4 py-3 text-sm font-bold transition",
-                isActive
+        {menuItems.map((item) =>
+          item.path === "/application-draft" ? (
+            <button
+              key={item.path}
+              type="button"
+              onClick={() => void handleApplicationDraftNavigation()}
+              className={[
+                "block w-full rounded-xl px-4 py-3 text-left text-sm font-bold transition",
+                location.pathname === "/application-draft" ||
+                location.pathname.startsWith("/application-draft/")
                   ? "bg-blue-600 text-white"
                   : "text-slate-300 hover:bg-slate-800 hover:text-white",
-              ].join(" ")
-            }
-          >
-            {item.label}
-          </NavLink>
-        ))}
+              ].join(" ")}
+            >
+              {item.label}
+            </button>
+          ) : (
+            <NavLink
+              key={item.path}
+              to={item.path}
+              className={({ isActive }) =>
+                [
+                  "block rounded-xl px-4 py-3 text-sm font-bold transition",
+                  isActive
+                    ? "bg-blue-600 text-white"
+                    : "text-slate-300 hover:bg-slate-800 hover:text-white",
+                ].join(" ")
+              }
+            >
+              {item.label}
+            </NavLink>
+          ),
+        )}
       </nav>
     </aside>
   )

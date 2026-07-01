@@ -2,7 +2,11 @@ import { useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { clearAuthSession } from "../../services/auth"
 import { clearUserOnboardingData } from "../../features/onboarding/onboardingState"
-import { resolveRoiNavigationPath } from "../../features/roi/roiNavigation"
+import {
+  resolveApplicationDraftNavigationPath,
+  resolveRoiNavigationPath,
+  resolveSupportProjectsNavigationPath,
+} from "../../features/roi/roiNavigation"
 
 // ─── 네비게이션 메뉴 정의 ───────────────────────────────────────────────────
 
@@ -119,6 +123,18 @@ export default function GlobalHeader() {
   const handleNavigation = async (item: NavItem) => {
     if (item.label === "ROI 분석") {
       navigate(await resolveRoiNavigationPath(location.pathname, location.search))
+      return
+    }
+    if (item.label === "지원사업 추천") {
+      navigate(
+        await resolveSupportProjectsNavigationPath(location.pathname, location.search),
+      )
+      return
+    }
+    if (item.label === "신청서 작성") {
+      navigate(
+        await resolveApplicationDraftNavigationPath(location.pathname, location.search),
+      )
       return
     }
     navigate(item.path)

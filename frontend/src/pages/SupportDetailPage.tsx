@@ -1,4 +1,6 @@
-import { useNavigate } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
+
+import { resolveApplicationDraftNavigationPath } from "../features/roi/roiNavigation"
 
 type Requirement = {
   label: string
@@ -128,6 +130,11 @@ function getToneSoftColor(tone: "green" | "blue" | "orange" | "red") {
 
 export default function SupportDetailPage() {
   const navigate = useNavigate()
+  const location = useLocation()
+
+  const handleApplicationDraftNavigation = async () => {
+    navigate(await resolveApplicationDraftNavigationPath(location.pathname, location.search))
+  }
 
   return (
     <main className="page">
@@ -207,7 +214,7 @@ export default function SupportDetailPage() {
                   <button
                     className="btn blue"
                     type="button"
-                    onClick={() => navigate("/application-draft")}
+                    onClick={() => void handleApplicationDraftNavigation()}
                   >
                     신청서 초안 만들기
                   </button>
@@ -629,7 +636,7 @@ export default function SupportDetailPage() {
                   <button
                     className="btn blue"
                     type="button"
-                    onClick={() => navigate("/application-draft")}
+                    onClick={() => void handleApplicationDraftNavigation()}
                   >
                     이 내용으로 신청서 초안 만들기
                   </button>

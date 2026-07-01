@@ -6,10 +6,10 @@ from app.routers import (
     auth,
     chat,
     click_chat,
-    click_chat_two,
     dashboard,
     documents,
     draft,
+    equipment_guide_router,
     industry,
     onboarding,
     reports,
@@ -58,7 +58,8 @@ app.include_router(safety_preview.router, prefix="/api", tags=["safety-preview"]
 app.include_router(analyze.router, prefix="/api", tags=["analyze"])
 app.include_router(draft.router, prefix="/api", tags=["draft"])
 app.include_router(application_draft.router, prefix="/api", tags=["application-draft"])
+app.include_router(equipment_guide_router.router, prefix="/api", tags=["equipment-guide"])
 app.include_router(reports.router, prefix="/api", tags=["reports"])
 app.include_router(documents.router, prefix="/api", tags=["documents"])
 app.include_router(click_chat.router)
-app.include_router(click_chat_two.router, prefix="/api", tags=["click-chat-two"])
+

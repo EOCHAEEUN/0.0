@@ -3,9 +3,11 @@ import botIcon from "../../../assets/advisor/engi-bot-transparent.png"
 export function AdvisorFloatingButton({
   open,
   onClick,
+  label = "Engi AI Advisor",
 }: {
   open: boolean
   onClick: () => void
+  label?: string
 }) {
   return (
     <button
@@ -16,7 +18,7 @@ export function AdvisorFloatingButton({
     >
       {!open && (
         <span className="ff-advisor-floating-label" aria-hidden="true">
-          Engi AI Advisor
+          {label}
         </span>
       )}
       <span className="ff-advisor-floating-ring">

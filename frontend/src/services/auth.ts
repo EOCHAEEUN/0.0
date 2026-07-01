@@ -48,7 +48,25 @@ export function saveAuthSession(session: AuthSession) {
 }
 
 export function getAccessToken() {
-  return localStorage.getItem("factofit_access_token")
+  const direct = localStorage.getItem("factofit_access_token")
+  if (direct?.trim()) return direct.trim()
+
+  try {
+    const raw = localStorage.getItem("factofit_auth_session")
+    if (!raw) return null
+
+    const session = JSON.parse(raw) as Record<string, unknown>
+    const sessionData = session.data as Record<string, unknown> | undefined
+    const nestedSession = session.session as Record<string, unknown> | undefined
+    const token =
+      session.access_token ??
+      sessionData?.access_token ??
+      nestedSession?.access_token
+
+    return typeof token === "string" && token.trim() ? token.trim() : null
+  } catch {
+    return null
+  }
 }
 
 async function postAuth<T>(

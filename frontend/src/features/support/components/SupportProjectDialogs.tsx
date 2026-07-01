@@ -265,7 +265,7 @@ export function PolicyDetailDialog({
                   type="button"
                   onClick={() => onCreateDraft(project)}
                 >
-                  신청서 만들기
+                  신청서 작성하기
                 </button>
               )}
               <button

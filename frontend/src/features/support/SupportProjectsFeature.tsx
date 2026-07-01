@@ -1,20 +1,14 @@
-import { useCallback, useEffect, useMemo } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 
-import { useSupportProjects } from "./hooks/useSupportProjects"
-import { PolicyDetailDialog } from "./components/SupportProjectDialogs"
-import {
-  EmptyPolicyState,
-  ErrorPolicyState,
-  LoadingPolicyState,
-} from "./components/SupportProjectStates"
-import {
-  OtherMatchedPoliciesPanel,
-  SupportWorkflowHero,
-  SuccessHeroSection,
-  backButtonStyle,
-} from "./components/SupportProjectSections"
+import { PolicyCandidateList } from "./components/PolicyCandidateList"
+import { PolicyDetailDrawer } from "./components/PolicyDetailDrawer"
+import { PriorityPolicyCard } from "./components/PriorityPolicyCard"
+import { SupportProjectsHero } from "./components/SupportProjectsHero"
+import { useSupportProjectsOverview } from "./hooks/useSupportProjectsOverview"
 import type { SupportProject } from "./supportProjects.contract"
+import type { SupportProjectsPolicyCard } from "./supportProjectsOverview.types"
+import "./supportProjects.workspace.css"
 
 function readLocalStorage(key: string) {
   try {
@@ -26,11 +20,9 @@ function readLocalStorage(key: string) {
 
 function writeLocalStorage(key: string, value: string) {
   try {
-    if (value) {
-      window.localStorage.setItem(key, value)
-    }
+    if (value) window.localStorage.setItem(key, value)
   } catch {
-    // localStorage 접근 실패 시 화면 이동만 막지 않기 위해 무시합니다.
+    // ignore
   }
 }
 
@@ -38,7 +30,7 @@ function writeJsonLocalStorage(key: string, value: unknown) {
   try {
     window.localStorage.setItem(key, JSON.stringify(value))
   } catch {
-    // localStorage 접근 실패 시 화면 이동만 막지 않기 위해 무시합니다.
+    // ignore
   }
 }
 
@@ -46,159 +38,113 @@ function removeLocalStorage(key: string) {
   try {
     window.localStorage.removeItem(key)
   } catch {
-    // localStorage 접근 실패 시 화면 이동만 막지 않기 위해 무시합니다.
+    // ignore
   }
 }
 
 function pickString(...values: unknown[]) {
   for (const value of values) {
     if (value === null || value === undefined) continue
-
     const text = String(value).trim()
     if (text) return text
   }
-
   return ""
 }
 
-function asRecord(value: unknown) {
-  return value && typeof value === "object"
-    ? (value as Record<string, unknown>)
-    : {}
-}
-
-function getProjectPolicyId(project: SupportProject | null | undefined) {
-  const source = asRecord(project)
-
-  return pickString(
-    source.policyId,
-    source.policy_id,
-    source.policyID,
-    source.rawId,
-    source.raw_id,
-    source.id,
-  )
-}
-
-function getCompanyId() {
-  return pickString(
-    readLocalStorage("factofit_company_id"),
-    readLocalStorage("company_id"),
-  )
-}
-
-function getEquipmentId(selectedEquipmentContext: unknown) {
-  const source = asRecord(selectedEquipmentContext)
-
-  return pickString(
-    source.equipmentId,
-    source.equipment_id,
-    source.selectedEquipmentId,
-    source.selected_equipment_id,
-    source.id,
-    readLocalStorage("factofit_selected_equipment_id"),
-    readLocalStorage("factofit_equipment_id"),
-    readLocalStorage("selected_equipment_id"),
-    readLocalStorage("equipment_id"),
-  )
-}
-
-function buildSelectedProjectForDraft(
-  project: SupportProject,
-  ids: {
-    companyId: string
-    equipmentId: string
-    policyId: string
-  },
-) {
-  return {
-    ...project,
-    companyId: ids.companyId,
-    company_id: ids.companyId,
-    equipmentId: ids.equipmentId,
-    equipment_id: ids.equipmentId,
-    policyId: ids.policyId,
-    policy_id: ids.policyId,
-  }
+function getProjectPolicyId(project: SupportProject) {
+  return pickString(project.rawId, (project as { policy_id?: string }).policy_id)
 }
 
 export default function SupportProjectsFeature() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const analysisIdFromQuery = useMemo(() => {
-    const value = searchParams.get("analysisId")
-    return value && value.trim() ? value.trim() : undefined
+  const [detailPolicy, setDetailPolicy] = useState<SupportProjectsPolicyCard | null>(null)
+
+  const analysisId = useMemo(() => {
+    return (
+      pickString(searchParams.get("analysis_id"), searchParams.get("analysisId")) || undefined
+    )
   }, [searchParams])
+
+  const companyId = useMemo(() => {
+    return pickString(
+      searchParams.get("company_id"),
+      searchParams.get("companyId"),
+      readLocalStorage("factofit_company_id"),
+      readLocalStorage("company_id"),
+    )
+  }, [searchParams])
+
+  const equipmentId = useMemo(() => {
+    return (
+      pickString(
+        searchParams.get("equipment_id"),
+        searchParams.get("equipmentId"),
+        readLocalStorage("factofit_selected_equipment_id"),
+        readLocalStorage("factofit_equipment_id"),
+      ) || undefined
+    )
+  }, [searchParams])
+
   const policyIdFromQuery = useMemo(() => {
-    const value = searchParams.get("policyId")
-    return value && value.trim() ? decodeURIComponent(value.trim()) : ""
+    return pickString(searchParams.get("policy_id"), searchParams.get("policyId"))
   }, [searchParams])
 
-  const {
-    selectedEquipmentContext,
-    analysisData,
-    policyState,
-    policyCards,
-    finalRecommendedProjects,
-    otherMatchedProjects,
-    policyCounters,
-    policySummary,
-    policyErrorCode,
-    selectedProject,
-    detailProject,
-    setDetailProject,
-  } = useSupportProjects({ analysisId: analysisIdFromQuery })
+  const { state, reload, recalculateLiveMatches, isRecalculating } = useSupportProjectsOverview({
+    companyId,
+    analysisId,
+    equipmentId,
+  })
 
-  const topProject = finalRecommendedProjects[0]
-  const hasPolicyCards = finalRecommendedProjects.length > 0
-  const shouldShowSuccess =
-    policyState === "success" &&
-    hasPolicyCards &&
-    Boolean(topProject) &&
-    Boolean(selectedProject)
-  const shouldShowEmpty = policyState === "empty" && !hasPolicyCards
-  const isSnapshotMissingLegacy =
-    Boolean(analysisIdFromQuery) && policyState === "error" && policyErrorCode === "POLICY_SNAPSHOT_MISSING"
+  const buildPolicyDetailPath = useCallback(
+    (policy: SupportProjectsPolicyCard) => {
+      const query = new URLSearchParams()
+      if (companyId) query.set("company_id", companyId)
+      if (analysisId) query.set("analysis_id", analysisId)
+      if (equipmentId) query.set("equipment_id", equipmentId)
+      if (policy.policy_id) query.set("policy_id", policy.policy_id)
+      return `/support-projects?${query.toString()}`
+    },
+    [analysisId, companyId, equipmentId],
+  )
 
-  useEffect(() => {
-    if (!policyIdFromQuery || policyState !== "success") return
-    const selectedByQuery =
-      policyCards.find((project) => String(project.rawId || project.id) === policyIdFromQuery) || null
-    if (selectedByQuery) {
-      setDetailProject(selectedByQuery)
+  const handleCloseDetail = useCallback(() => {
+    setDetailPolicy(null)
+    const next = new URLSearchParams(searchParams)
+    const hadPolicyInQuery = next.has("policy_id") || next.has("policyId")
+    next.delete("policy_id")
+    next.delete("policyId")
+    if (hadPolicyInQuery) {
+      const qs = next.toString()
+      navigate(qs ? `/support-projects?${qs}` : "/support-projects", { replace: true })
     }
-  }, [policyCards, policyIdFromQuery, policyState, setDetailProject])
+  }, [navigate, searchParams])
+
+  const handleOpenDetail = useCallback(
+    (policy: SupportProjectsPolicyCard) => {
+      setDetailPolicy(policy)
+      navigate(buildPolicyDetailPath(policy))
+    },
+    [buildPolicyDetailPath, navigate],
+  )
 
   const handleGoDraft = useCallback(
-    (project: SupportProject | null | undefined) => {
-      if (!project) {
-        window.alert("신청서 초안을 만들 지원사업을 먼저 선택해주세요.")
-        return
-      }
-
-      const companyId = analysisIdFromQuery
-        ? pickString(
-            analysisData.company?.company_id,
-            analysisData.equipment?.company_id,
-            getCompanyId(),
-          )
-        : getCompanyId()
-      const equipmentId = analysisIdFromQuery
-        ? pickString(
-            analysisData.equipment?.equipment_id,
-            analysisData.equipment_id,
-            getEquipmentId(selectedEquipmentContext),
-          )
-        : getEquipmentId(selectedEquipmentContext)
+    (project: SupportProject) => {
+      const resolvedCompanyId = pickString(companyId, readLocalStorage("factofit_company_id"))
+      const resolvedEquipmentId = pickString(
+        equipmentId,
+        readLocalStorage("factofit_selected_equipment_id"),
+        readLocalStorage("factofit_equipment_id"),
+      )
       const policyId = getProjectPolicyId(project)
 
-      if (!companyId || !equipmentId || !policyId) {
+      if (!resolvedCompanyId || !resolvedEquipmentId || !policyId) {
         window.alert(
           [
             "신청서 초안 생성에 필요한 값이 부족합니다.",
             "",
-            `company_id: ${companyId || "없음"}`,
-            `equipment_id: ${equipmentId || "없음"}`,
+            `company_id: ${resolvedCompanyId || "없음"}`,
+            `equipment_id: ${resolvedEquipmentId || "없음"}`,
             `policy_id: ${policyId || "없음"}`,
             "",
             "마이페이지에서 기업/설비 정보를 저장하고, ROI 분석 후 지원사업을 다시 선택해주세요.",
@@ -207,155 +153,240 @@ export default function SupportProjectsFeature() {
         return
       }
 
-      const selectedProjectForDraft = buildSelectedProjectForDraft(project, {
-        companyId,
-        equipmentId,
+      const selectedProjectForDraft = {
+        ...project,
+        companyId: resolvedCompanyId,
+        company_id: resolvedCompanyId,
+        equipmentId: resolvedEquipmentId,
+        equipment_id: resolvedEquipmentId,
         policyId,
-      })
+        policy_id: policyId,
+      }
 
-      // 신청서 페이지 새로고침/직접 진입 대비용입니다.
-      // 신청서 내용 자체는 목업이 아니라 /api/draft → DB 기준으로 생성됩니다.
-      writeLocalStorage("factofit_company_id", companyId)
-      writeLocalStorage("factofit_selected_equipment_id", equipmentId)
-      writeLocalStorage("factofit_equipment_id", equipmentId)
+      writeLocalStorage("factofit_company_id", resolvedCompanyId)
+      writeLocalStorage("factofit_selected_equipment_id", resolvedEquipmentId)
+      writeLocalStorage("factofit_equipment_id", resolvedEquipmentId)
       writeLocalStorage("factofit_selected_policy_id", policyId)
       writeLocalStorage("factofit_policy_id", policyId)
-      if (analysisIdFromQuery) {
-        writeLocalStorage("factofit_analysis_id", analysisIdFromQuery)
+      if (analysisId) {
+        writeLocalStorage("factofit_analysis_id", analysisId)
       } else {
         removeLocalStorage("factofit_analysis_id")
       }
       writeJsonLocalStorage("factofit_selected_project", selectedProjectForDraft)
 
       const draftSearchParams = new URLSearchParams({ policyId })
-      if (analysisIdFromQuery) {
-        draftSearchParams.set("analysisId", analysisIdFromQuery)
-      }
+      if (analysisId) draftSearchParams.set("analysisId", analysisId)
 
       navigate(`/application-draft?${draftSearchParams.toString()}`, {
         state: {
-          companyId,
-          company_id: companyId,
-          equipmentId,
-          equipment_id: equipmentId,
+          companyId: resolvedCompanyId,
+          equipmentId: resolvedEquipmentId,
           policyId,
-          policy_id: policyId,
-          ...(analysisIdFromQuery
-            ? { analysisId: analysisIdFromQuery, analysis_id: analysisIdFromQuery }
-            : {}),
+          ...(analysisId ? { analysisId } : {}),
           selectedProject: {
             ...selectedProjectForDraft,
-            ...(analysisIdFromQuery
-              ? { analysisId: analysisIdFromQuery, analysis_id: analysisIdFromQuery }
-              : {}),
+            ...(analysisId ? { analysisId } : {}),
           },
         },
       })
     },
-    [analysisData, analysisIdFromQuery, navigate, selectedEquipmentContext],
+    [analysisId, companyId, equipmentId, navigate],
   )
 
+  const model =
+    state.kind === "ready" ||
+    state.kind === "empty" ||
+    state.kind === "legacy_missing"
+      ? state.model
+      : null
+
+  const autoOpenPolicy = useMemo(() => {
+    if (detailPolicy) return null
+    if (!policyIdFromQuery || !model || state.kind !== "ready") return null
+    if (model.priorityPolicy?.policy_id === policyIdFromQuery) return model.priorityPolicy
+    const fromAll =
+      model.allMatched.find((item) => item.policy_id === policyIdFromQuery) ?? null
+    if (fromAll) return fromAll
+    return model.candidates.find((item) => item.policy_id === policyIdFromQuery) ?? null
+  }, [detailPolicy, model, policyIdFromQuery, state.kind])
+
+  const activeDetail = detailPolicy ?? autoOpenPolicy
+
   const reanalysisPath =
-    analysisIdFromQuery && getEquipmentId(selectedEquipmentContext)
-      ? `/analysis/new?mode=reanalysis&equipmentId=${encodeURIComponent(getEquipmentId(selectedEquipmentContext))}&parentAnalysisId=${encodeURIComponent(analysisIdFromQuery)}`
+    analysisId && equipmentId
+      ? `/analysis/new?mode=reanalysis&equipmentId=${encodeURIComponent(equipmentId)}&parentAnalysisId=${encodeURIComponent(analysisId)}`
       : "/analysis/new"
 
   return (
-    <main className="page">
-      <PolicyDetailDialog
-        project={detailProject}
-        onClose={() => setDetailProject(null)}
+    <main className="page ff-support-page">
+      <PolicyDetailDrawer
+        policy={activeDetail}
+        onClose={handleCloseDetail}
         onCreateDraft={handleGoDraft}
       />
 
-      <section className="section white">
-        <div className="container">
-          <button
-            type="button"
-            onClick={() =>
-              analysisIdFromQuery
-                ? navigate(`/analysis/${analysisIdFromQuery}/result`)
-                : navigate("/")
-            }
-            style={backButtonStyle}
-          >
-            {analysisIdFromQuery ? "← 투자 검토 결과로 돌아가기" : "← 대시보드로 돌아가기"}
-          </button>
+      <section className="ff-support-workspace">
+        <div className="ff-support-container">
+          {state.kind === "loading" && <div className="ff-support-loading">지원사업 정보를 불러오는 중입니다.</div>}
 
-          {!isSnapshotMissingLegacy && (
-            <SupportWorkflowHero
-              policyCounters={policyCounters}
-              equipmentName={selectedEquipmentContext.equipmentName}
-              currentAvailableCount={policySummary.activePolicyCount}
-              hasCurrentAvailableCount={Boolean(policySummary.updatedAt)}
-            />
-          )}
-
-          {policyState === "loading" && <LoadingPolicyState />}
-
-          {policyState === "error" && !isSnapshotMissingLegacy && (
-            <ErrorPolicyState onBackToRoi={() => navigate("/roi")} />
-          )}
-
-          {isSnapshotMissingLegacy && (
-            <section
-              style={{
-                marginTop: "28px",
-                marginBottom: "28px",
-                padding: "44px",
-                borderRadius: "30px",
-                border: "1px solid #FDBA74",
-                background: "#FFF7ED",
-                boxShadow: "0 18px 44px rgba(6,27,52,.06)",
-              }}
-            >
-              <span className="badge orange">정책 이력 없음</span>
-              <h2>이 분석은 정책 이력 저장 전 생성되었습니다.</h2>
-              <p>
-                당시 매칭된 정책 정보를 복원할 수 없어, 현재 분석 결과와 정책 지원사업을 정확히 연결할 수 없습니다.
-              </p>
-              <div style={{ marginTop: "24px", display: "flex", gap: "12px", flexWrap: "wrap" }}>
-                <button
-                  type="button"
-                  className="btn blue"
-                  onClick={() => navigate(reanalysisPath)}
-                >
-                  투자 조건 다시 설정
-                </button>
-                <button
-                  type="button"
-                  className="btn dark"
-                  onClick={() => navigate("/support-projects")}
-                >
-                  최신 지원사업 둘러보기
+          {state.kind === "error" && (
+            <section className="ff-support-state-card">
+              <span className="ff-support-badge blue">오류</span>
+              <h2>지원사업 정보를 불러오지 못했습니다</h2>
+              <p>{state.message}</p>
+              <div className="ff-support-state-actions">
+                {state.isAuthError ? (
+                  <button
+                    type="button"
+                    className="ff-support-primary-btn"
+                    onClick={() => navigate("/login")}
+                  >
+                    다시 로그인
+                  </button>
+                ) : null}
+                <button type="button" className="ff-support-secondary-btn" onClick={() => void reload()}>
+                  다시 시도
                 </button>
               </div>
             </section>
           )}
 
-          {shouldShowEmpty && (
-            <EmptyPolicyState
-              equipmentName={selectedEquipmentContext.equipmentName}
-              onBackToRoi={() => navigate("/roi")}
-            />
+          {state.kind === "legacy_missing" && model && (
+            <>
+              <SupportProjectsHero
+                heroTitle="분석 당시 정책 이력이 없습니다"
+                heroSubtitle="이 분석 결과에는 당시 매칭된 정책 스냅샷이 저장되어 있지 않습니다. 최신 정책을 과거 분석 결과처럼 보여주지 않습니다."
+                counts={model.counts}
+              />
+              <section className="ff-support-state-card">
+                <span className="ff-support-badge purple">정책 이력 없음</span>
+                <h2>분석 당시 정책 이력이 없습니다</h2>
+                <p>
+                  이 분석 결과에는 당시 매칭된 정책 스냅샷이 저장되어 있지 않습니다. 최신 정책 DB 결과를
+                  자동으로 붙이지 않습니다.
+                </p>
+                <div className="ff-support-state-actions">
+                  <button
+                    type="button"
+                    className="ff-support-primary-btn"
+                    onClick={() =>
+                      navigate(
+                        companyId
+                          ? `/support-projects?company_id=${encodeURIComponent(companyId)}`
+                          : "/support-projects",
+                      )
+                    }
+                  >
+                    최신 지원사업 탐색하기
+                  </button>
+                  <button
+                    type="button"
+                    className="ff-support-secondary-btn"
+                    onClick={() => navigate(reanalysisPath)}
+                  >
+                    ROI 분석 다시 실행하기
+                  </button>
+                </div>
+              </section>
+            </>
           )}
 
-          {shouldShowSuccess && topProject && selectedProject && (
+          {state.kind === "empty" && model && (
             <>
-              <SuccessHeroSection
-                topProject={topProject}
-                selectedProject={selectedProject}
-                equipmentContext={selectedEquipmentContext}
-                finalRecommendedProjects={finalRecommendedProjects}
-                policyCounters={policyCounters}
-                onOpenDetail={setDetailProject}
-                isRoiLinked={Boolean(analysisIdFromQuery)}
+              <SupportProjectsHero
+                heroTitle={model.heroTitle}
+                heroSubtitle={model.heroSubtitle}
+                counts={model.counts}
+              />
+              <section className="ff-support-state-card">
+                <span className="ff-support-badge blue">
+                  {model.isAnalysisMode ? "분석 연결 모드" : "일반 탐색 모드"}
+                </span>
+                <h2>
+                  {model.isAnalysisMode
+                    ? "이 분석에 연결된 지원사업이 없습니다"
+                    : "현재 조건에 맞는 지원사업을 찾지 못했습니다"}
+                </h2>
+                <p>
+                  {model.isAnalysisMode
+                    ? "저장된 policy_snapshot에 표시할 정책이 없습니다."
+                    : "기업 규모, 업종, 지역 또는 설비 정보를 보완하면 추천 정확도를 높일 수 있습니다."}
+                </p>
+                <div className="ff-support-state-actions">
+                  {!model.isAnalysisMode ? (
+                    <>
+                      <button
+                        type="button"
+                        className="ff-support-primary-btn"
+                        onClick={() =>
+                          navigate(
+                            companyId
+                              ? `/mypage?company_id=${encodeURIComponent(companyId)}`
+                              : "/mypage",
+                          )
+                        }
+                      >
+                        기업 정보 수정
+                      </button>
+                      <button
+                        type="button"
+                        className="ff-support-secondary-btn"
+                        onClick={() =>
+                          navigate(
+                            companyId
+                              ? `/mypage?company_id=${encodeURIComponent(companyId)}&panel=equipment`
+                              : "/mypage",
+                          )
+                        }
+                      >
+                        설비 정보 수정
+                      </button>
+                      <button
+                        type="button"
+                        className="ff-support-secondary-btn"
+                        onClick={() => void recalculateLiveMatches()}
+                        disabled={isRecalculating}
+                      >
+                        {isRecalculating ? "추천 계산 중..." : "최신 추천 다시 계산"}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="ff-support-secondary-btn"
+                      onClick={() => navigate(reanalysisPath)}
+                    >
+                      ROI 분석 다시 실행하기
+                    </button>
+                  )}
+                </div>
+              </section>
+            </>
+          )}
+
+          {state.kind === "ready" && model && (
+            <>
+              <SupportProjectsHero
+                heroTitle={model.heroTitle}
+                heroSubtitle={model.heroSubtitle}
+                counts={model.counts}
               />
 
-              <OtherMatchedPoliciesPanel
-                projects={otherMatchedProjects}
-                onOpenDetail={setDetailProject}
-                isRoiLinked={Boolean(analysisIdFromQuery)}
+              {model.priorityPolicy ? (
+                <PriorityPolicyCard
+                  policy={model.priorityPolicy}
+                  priorityBadge={model.priorityBadge}
+                  secondaryBadge={model.secondaryBadge}
+                  onOpenDetail={handleOpenDetail}
+                />
+              ) : null}
+
+              <PolicyCandidateList
+                candidates={model.candidates}
+                allMatched={model.allMatched}
+                matchedTotal={model.counts.matched_total}
+                onOpenDetail={handleOpenDetail}
               />
             </>
           )}

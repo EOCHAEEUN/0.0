@@ -15,6 +15,7 @@ from app.routers import (
     reports,
     safety,
     safety_preview,
+    support_projects,
 )
 
 app = FastAPI(
@@ -50,6 +51,7 @@ app.include_router(chat.router, prefix="/api", tags=["chat"])
 app.include_router(auth.router, prefix="/api", tags=["auth"])
 app.include_router(onboarding.router, prefix="/api", tags=["onboarding"])
 app.include_router(dashboard.router, prefix="/api", tags=["dashboard"])
+app.include_router(support_projects.router, prefix="/api", tags=["support-projects"])
 app.include_router(industry.router, prefix="/api", tags=["industry"])
 app.include_router(safety.router, prefix="/api", tags=["safety"])
 app.include_router(safety_preview.router, prefix="/api", tags=["safety-preview"])

@@ -17,7 +17,7 @@ const DOWNLOAD_OPTIONS: DownloadOption[] = [
 
 const FALLBACK_FILENAMES: Record<ReportType, string> = {
   consumer_summary: "FactoFit_분석결과_표중심.pdf",
-  application_evidence: "FactoFit_신청서초안.pdf",
+  application_evidence: "FactoFit_신청서초안_그래프.pdf",
 }
 
 const PDF_PREVIEW_COPY = {
@@ -143,6 +143,7 @@ async function requestApplicationReportPdf(
 
   const response = await fetch(buildApiUrl(endpoint), {
     method: "POST",
+    cache: "no-store",
     headers,
     body: JSON.stringify({
       company_id: params.companyId,
@@ -225,8 +226,9 @@ export function ApplicationDraftPdfPreview({
     }
   }, [])
 
-  const ensurePreviewPdf = async (reportType: ReportType) => {
-    if (previewUrls[reportType] || previewLoading[reportType]) return
+  const ensurePreviewPdf = async (reportType: ReportType, options: { force?: boolean } = {}) => {
+    if (!options.force && previewUrls[reportType]) return
+    if (previewLoading[reportType]) return
     if (unavailableReason || !reportParams) {
       setPreviewErrors((prev) => ({
         ...prev,
@@ -260,7 +262,7 @@ export function ApplicationDraftPdfPreview({
   const openPreview = async () => {
     setPreviewOpen(true)
     setPreviewTab("consumer_summary")
-    await ensurePreviewPdf("consumer_summary")
+    await ensurePreviewPdf("consumer_summary", { force: true })
   }
 
   const selectedDownloadCount = Object.values(downloadSelection).filter(Boolean).length

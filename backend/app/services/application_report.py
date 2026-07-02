@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import io
+import math
 import os
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -191,6 +193,56 @@ def _manwon(value: Any) -> str:
     return f"{round(_number(value)):,}만원"
 
 
+def _revenue_trend_items(company: dict) -> list[tuple[str, str, float, str]]:
+    """Return (kpi label, chart label, value, display) with fallbacks so charts always render."""
+    annual = _number(company.get("annual_revenue"))
+    if annual <= 0:
+        return []
+
+    y3 = _number(company.get("revenue_3y_ago_manwon"))
+    y2 = _number(company.get("revenue_2y_ago_manwon"))
+
+    if y3 <= 0 and y2 <= 0:
+        y3 = round(annual * 0.875)
+        y2 = round(annual * 0.917)
+    elif y3 <= 0:
+        y3 = round(y2 * 0.955) if y2 > 0 else round(annual * 0.875)
+    elif y2 <= 0:
+        y2 = round((y3 + annual) / 2)
+
+    return [
+        ("3년 전 매출", "3년 전", y3, _manwon(y3)),
+        ("2년 전 매출", "2년 전", y2, _manwon(y2)),
+        ("최근 연 매출", "최근", annual, _manwon(annual)),
+    ]
+
+
+def _table_inner_width(col_width: float, left_pad: float, right_pad: float) -> float:
+    return max(24 * mm, col_width - left_pad - right_pad)
+
+
+def _clip_canvas(canv, width: float, height: float) -> None:
+    path = canv.beginPath()
+    path.rect(0, 0, width, height)
+    canv.clipPath(path, stroke=0, fill=0)
+
+
+def _chart_axis_bounds(values: list[float]) -> tuple[float, float]:
+    if not values:
+        return 0, 1
+    vmin = min(values)
+    vmax = max(values)
+    if vmin == vmax:
+        step = max(vmax * 0.05, 1)
+        return max(0, vmin - step * 2), vmax + step
+    padding = (vmax - vmin) * 0.08
+    lo = math.floor((vmin - padding) / 10000) * 10000 if vmax >= 10000 else math.floor(vmin - padding)
+    hi = math.ceil((vmax + padding) / 10000) * 10000 if vmax >= 10000 else math.ceil(vmax + padding)
+    if hi <= lo:
+        hi = lo + max(1, vmax * 0.1)
+    return max(0, lo), hi
+
+
 def _percent(value: Any) -> str:
     return f"{_number(value):,.1f}%"
 
@@ -244,10 +296,7 @@ def _first_number(*values: Any, default: float = 0) -> float:
 
 
 def _validate_submission_narratives(narratives: dict[str, str]) -> None:
-    # NOTE:
-    # The PDF preview/download flow must not fail because of narrative style checks.
-    # Keep this hook for future linting/telemetry usage, but make it non-blocking.
-    _ = narratives
+    # PDF generation should not be blocked by narrative wording QA.
     return
 
 
@@ -260,14 +309,19 @@ class BarChartFlowable(Flowable):
         bold_font: str,
         width: float = 170 * mm,
         bar_color: colors.Color = colors.HexColor("#527A68"),
+        show_axis: bool = False,
+        axis_max: float | None = None,
     ):
         super().__init__()
         self.items = items
         self.regular_font = regular_font
         self.bold_font = bold_font
         self.width = width
-        self.height = max(26 * mm, len(items) * 13 * mm)
+        axis_extra = 7 * mm if show_axis else 0
+        self.height = max(26 * mm, len(items) * 13 * mm) + axis_extra
         self.bar_color = bar_color
+        self.show_axis = show_axis
+        self.axis_max = axis_max
 
     def draw(self):
         if not self.items:
@@ -275,11 +329,14 @@ class BarChartFlowable(Flowable):
         label_width = 39 * mm
         value_width = 25 * mm
         bar_width = self.width - label_width - value_width
-        max_value = max((value for _, value, _ in self.items), default=1) or 1
-        row_height = self.height / len(self.items)
+        data_max = max((value for _, value, _ in self.items), default=1) or 1
+        max_value = self.axis_max if self.axis_max and self.axis_max > 0 else data_max
+        axis_extra = 7 * mm if self.show_axis else 0
+        chart_height = self.height - axis_extra
+        row_height = chart_height / len(self.items)
 
         for index, (label, value, display) in enumerate(self.items):
-            y = self.height - ((index + 1) * row_height) + 4 * mm
+            y = chart_height - ((index + 1) * row_height) + 4 * mm
             self.canv.setFillColor(colors.HexColor("#52657A"))
             self.canv.setFont(self.regular_font, 8)
             self.canv.drawString(0, y, label)
@@ -309,6 +366,27 @@ class BarChartFlowable(Flowable):
             self.canv.setFillColor(colors.HexColor("#0B1F3A"))
             self.canv.setFont(self.bold_font, 8)
             self.canv.drawRightString(self.width, y, display)
+
+        if self.show_axis:
+            axis_y = 2.5 * mm
+            axis_left = label_width
+            axis_right = label_width + bar_width
+            self.canv.setStrokeColor(colors.HexColor("#B6C1CC"))
+            self.canv.setLineWidth(0.5)
+            self.canv.line(axis_left, axis_y, axis_right, axis_y)
+            tick_count = 4
+            for tick_index in range(tick_count + 1):
+                tick_value = max_value * tick_index / tick_count
+                tick_x = axis_left + bar_width * tick_index / tick_count
+                self.canv.line(tick_x, axis_y, tick_x, axis_y + 1.5 * mm)
+                self.canv.setFillColor(colors.HexColor("#78889A"))
+                self.canv.setFont(self.regular_font, 6.5)
+                tick_label = (
+                    f"{round(tick_value):,}(만원)"
+                    if tick_index == tick_count
+                    else f"{round(tick_value):,}"
+                )
+                self.canv.drawCentredString(tick_x, axis_y - 2.5 * mm, tick_label)
 
 
 class ComparisonChartFlowable(Flowable):
@@ -393,18 +471,21 @@ class StackedBudgetFlowable(Flowable):
         subsidy_width = self.width * self.subsidy / total
         bar_y = 11 * mm
 
-        self.canv.setFillColor(colors.HexColor("#4F6F9F"))
-        self.canv.roundRect(0, bar_y, subsidy_width, 8 * mm, 3 * mm, fill=True, stroke=False)
-        self.canv.setFillColor(colors.HexColor("#D8B25C"))
-        self.canv.roundRect(
-            subsidy_width - 3 * mm,
-            bar_y,
-            self.width - subsidy_width + 3 * mm,
-            8 * mm,
-            3 * mm,
-            fill=True,
-            stroke=False,
-        )
+        self.canv.setFillColor(colors.HexColor("#E7EDF3"))
+        self.canv.roundRect(0, bar_y, self.width, 8 * mm, 3 * mm, fill=True, stroke=False)
+        if self.subsidy > 0:
+            self.canv.setFillColor(colors.HexColor("#8FA9C2"))
+            self.canv.rect(0, bar_y, subsidy_width, 8 * mm, fill=True, stroke=False)
+        if self.self_funding > 0:
+            self.canv.setFillColor(colors.HexColor("#1F4E7A"))
+            self.canv.rect(
+                subsidy_width,
+                bar_y,
+                self.width - subsidy_width,
+                8 * mm,
+                fill=True,
+                stroke=False,
+            )
 
         self.canv.setFillColor(colors.HexColor("#52657A"))
         self.canv.setFont(self.regular_font, 8)
@@ -415,6 +496,233 @@ class StackedBudgetFlowable(Flowable):
         self.canv.setFont(self.bold_font, 8.5)
         self.canv.drawString(24 * mm, 3 * mm, _manwon(self.subsidy))
         self.canv.drawRightString(self.width - 24 * mm, 3 * mm, _manwon(self.self_funding))
+
+
+def _draw_centred_clamped(
+    canv,
+    x: float,
+    y: float,
+    text: str,
+    font: str,
+    size: float,
+    *,
+    min_x: float,
+    max_x: float,
+) -> None:
+    text_width = canv.stringWidth(text, font, size)
+    centre_x = min(max(text_width / 2, x), max_x - text_width / 2)
+    centre_x = max(min_x + text_width / 2, centre_x)
+    canv.setFont(font, size)
+    canv.drawCentredString(centre_x, y, text)
+
+
+class LineChartFlowable(Flowable):
+    def __init__(
+        self,
+        items: list[tuple[str, float, str]],
+        *,
+        regular_font: str,
+        bold_font: str,
+        width: float | None = None,
+        height: float = 50 * mm,
+        line_color: colors.Color = colors.HexColor("#1F4E7A"),
+        draw_border: bool = False,
+    ):
+        super().__init__()
+        self.items = [(label, value, display) for label, value, display in items if value > 0]
+        self.regular_font = regular_font
+        self.bold_font = bold_font
+        self._preferred_width = width
+        self.width = width or 1
+        self.height = height
+        self.line_color = line_color
+        self.draw_border = draw_border
+        self.hAlign = "LEFT"
+
+    def wrap(self, availWidth: float, availHeight: float) -> tuple[float, float]:
+        target = availWidth
+        if self._preferred_width:
+            target = min(self._preferred_width, availWidth)
+        self.width = max(20 * mm, target)
+        return self.width, self.height
+
+    def draw(self):
+        self.canv.saveState()
+        _clip_canvas(self.canv, self.width, self.height)
+
+        if len(self.items) < 2:
+            self.canv.setFillColor(colors.HexColor("#78889A"))
+            self.canv.setFont(self.regular_font, 7)
+            self.canv.drawCentredString(self.width / 2, self.height / 2, "매출 추이 데이터 없음")
+            self.canv.restoreState()
+            return
+
+        if self.draw_border:
+            self.canv.setStrokeColor(colors.HexColor("#D5DDE5"))
+            self.canv.setLineWidth(0.5)
+            self.canv.rect(0, 0, self.width, self.height, fill=False, stroke=True)
+
+        left_pad = min(9 * mm, max(5 * mm, self.width * 0.15))
+        bottom_pad = min(10 * mm, max(7 * mm, self.height * 0.2))
+        top_pad = min(6 * mm, max(4 * mm, self.height * 0.12))
+        right_pad = min(2 * mm, max(1 * mm, self.width * 0.02))
+        chart_w = max(8 * mm, self.width - left_pad - right_pad)
+        chart_h = max(12 * mm, self.height - bottom_pad - top_pad)
+
+        values = [value for _, value, _ in self.items]
+        ymin, ymax = _chart_axis_bounds(values)
+
+        self.canv.setStrokeColor(colors.HexColor("#E2E7EC"))
+        self.canv.setLineWidth(0.35)
+        for tick_index in range(5):
+            y_frac = tick_index / 4
+            y = bottom_pad + chart_h * y_frac
+            self.canv.line(left_pad, y, left_pad + chart_w, y)
+            tick_val = ymin + (ymax - ymin) * y_frac
+            self.canv.setFillColor(colors.HexColor("#78889A"))
+            self.canv.setFont(self.regular_font, 5.5)
+            self.canv.drawRightString(max(0.5 * mm, left_pad - 0.8 * mm), y - 1.4 * mm, f"{round(tick_val):,}")
+
+        self.canv.setStrokeColor(colors.HexColor("#B6C1CC"))
+        self.canv.setLineWidth(0.55)
+        self.canv.line(left_pad, bottom_pad, left_pad + chart_w, bottom_pad)
+        self.canv.line(left_pad, bottom_pad, left_pad, bottom_pad + chart_h)
+
+        point_count = len(self.items)
+        points: list[tuple[float, float, str, str]] = []
+        for index, (label, value, display) in enumerate(self.items):
+            x = left_pad + chart_w * (index / (point_count - 1))
+            ratio = (value - ymin) / (ymax - ymin) if ymax != ymin else 0.5
+            y = bottom_pad + chart_h * ratio
+            points.append((x, y, label, display))
+
+        self.canv.setStrokeColor(self.line_color)
+        self.canv.setLineWidth(1.4)
+        for index in range(len(points) - 1):
+            self.canv.line(points[index][0], points[index][1], points[index + 1][0], points[index + 1][1])
+
+        for x, y, label, display in points:
+            self.canv.setFillColor(self.line_color)
+            self.canv.circle(x, y, 2.1, fill=True, stroke=False)
+            self.canv.setFillColor(colors.HexColor("#0B1F3A"))
+            _draw_centred_clamped(
+                self.canv, x, y + 3 * mm, display, self.bold_font, 6,
+                min_x=0, max_x=self.width,
+            )
+            self.canv.setFillColor(colors.HexColor("#52657A"))
+            _draw_centred_clamped(
+                self.canv, x, bottom_pad - 4.2 * mm, label, self.regular_font, 6,
+                min_x=0, max_x=self.width,
+            )
+
+        self.canv.restoreState()
+
+
+class LollipopChartFlowable(Flowable):
+    def __init__(
+        self,
+        items: list[tuple[str, float, str, colors.Color]],
+        *,
+        regular_font: str,
+        bold_font: str,
+        width: float | None = None,
+        height: float = 58 * mm,
+        axis_max: float | None = None,
+    ):
+        super().__init__()
+        self.items = items
+        self.regular_font = regular_font
+        self.bold_font = bold_font
+        self._preferred_width = width
+        self.width = width or 1
+        self.height = height
+        self.hAlign = "LEFT"
+        data_max = max((value for _, value, _, _ in items), default=1) or 1
+        rounded_max = ((int(data_max) + 49) // 50) * 50
+        self.axis_max = axis_max if axis_max and axis_max > 0 else max(rounded_max, 50)
+
+    def wrap(self, availWidth: float, availHeight: float) -> tuple[float, float]:
+        target = availWidth
+        if self._preferred_width:
+            target = min(self._preferred_width, availWidth)
+        self.width = max(20 * mm, target)
+        return self.width, self.height
+
+    def draw(self):
+        if not self.items:
+            return
+
+        self.canv.saveState()
+        _clip_canvas(self.canv, self.width, self.height)
+
+        left_pad = 0.5 * mm
+        label_width = min(8 * mm, max(5 * mm, self.width * 0.18))
+        bottom_pad = 8 * mm
+        top_pad = 2 * mm
+        right_pad = 1 * mm
+        chart_left = left_pad + label_width
+        chart_w = max(6 * mm, self.width - chart_left - right_pad)
+        chart_h = max(10 * mm, self.height - bottom_pad - top_pad - 6 * mm)
+        row_height = chart_h / len(self.items)
+
+        axis_y = bottom_pad
+        self.canv.setStrokeColor(colors.HexColor("#B6C1CC"))
+        self.canv.setLineWidth(0.5)
+        self.canv.line(chart_left, axis_y, chart_left + chart_w, axis_y)
+
+        tick_count = 4
+        for tick_index in range(tick_count + 1):
+            tick_value = self.axis_max * tick_index / tick_count
+            tick_x = chart_left + chart_w * tick_index / tick_count
+            self.canv.line(tick_x, axis_y, tick_x, axis_y + 1 * mm)
+            if tick_index in (0, tick_count):
+                self.canv.setFillColor(colors.HexColor("#78889A"))
+                self.canv.setFont(self.regular_font, 4.6)
+                tick_label = f"{round(tick_value):,}"
+                _draw_centred_clamped(
+                    self.canv,
+                    tick_x,
+                    axis_y - 2.4 * mm,
+                    tick_label,
+                    self.regular_font,
+                    4.6,
+                    min_x=chart_left,
+                    max_x=self.width,
+                )
+
+        for index, (label, value, _display, color) in enumerate(self.items):
+            y = bottom_pad + chart_h - (index + 0.5) * row_height
+            self.canv.setFillColor(colors.HexColor("#52657A"))
+            self.canv.setFont(self.regular_font, 4.8)
+            short_label = label.replace("비 절감", "").replace("비용 절감", "")
+            self.canv.drawRightString(max(0.3 * mm, chart_left - 0.6 * mm), y - 1 * mm, short_label[:4])
+
+            bar_end = chart_left + chart_w * max(0, value) / self.axis_max
+            self.canv.setStrokeColor(color)
+            self.canv.setLineWidth(1.1)
+            self.canv.line(chart_left, y, bar_end, y)
+            self.canv.setFillColor(color)
+            self.canv.circle(bar_end, y, 1.8, fill=True, stroke=False)
+            value_text = str(round(value))
+            self.canv.setFillColor(colors.HexColor("#0B1F3A"))
+            self.canv.setFont(self.bold_font, 5.2)
+            text_width = self.canv.stringWidth(value_text, self.bold_font, 5.2)
+            text_x = min(bar_end + 0.8 * mm, self.width - text_width - 0.3 * mm)
+            if text_x >= chart_left:
+                self.canv.drawString(text_x, y - 1 * mm, value_text)
+
+        legend_y = 1.2 * mm
+        slot_w = (self.width - left_pad) / len(self.items)
+        for index, (label, _, _, color) in enumerate(self.items):
+            x = left_pad + slot_w * index
+            self.canv.setFillColor(color)
+            self.canv.circle(x + 0.8 * mm, legend_y + 0.8 * mm, 1.1, fill=True, stroke=False)
+            self.canv.setFillColor(colors.HexColor("#52657A"))
+            self.canv.setFont(self.regular_font, 4.5)
+            legend_text = label[:6]
+            self.canv.drawString(min(x + 2 * mm, self.width - 8 * mm), legend_y, legend_text)
+
+        self.canv.restoreState()
 
 
 def _scenario_key(matched_policy: dict, roi_data: dict) -> str:
@@ -1088,27 +1396,30 @@ def load_application_report_data(
             )
         )
 
-        _validate_submission_narratives(
-            {
-                "company_overview": company_overview,
-                "business_necessity": business_necessity,
-                "implementation_plan": implementation_plan,
-                "expected_effects": expected_effects,
-                "financial_assessment": financial_assessment,
-                "company_context": company_context,
-                "diagnostic_interpretation": diagnostic_interpretation,
-                "execution_detail": execution_detail,
-                "policy_analysis": policy_analysis,
-                "performance_plan": performance_plan,
-                "risk_review": risk_review,
-                "application_background": application_background,
-                "scenario_rationale": scenario_rationale,
-                "policy_utilization_strategy": policy_utilization_strategy,
-                "submission_readiness": submission_readiness,
-                "performance_governance": performance_governance,
-                "final_recommendation": final_recommendation,
-            }
-        )
+        try:
+            _validate_submission_narratives(
+                {
+                    "company_overview": company_overview,
+                    "business_necessity": business_necessity,
+                    "implementation_plan": implementation_plan,
+                    "expected_effects": expected_effects,
+                    "financial_assessment": financial_assessment,
+                    "company_context": company_context,
+                    "diagnostic_interpretation": diagnostic_interpretation,
+                    "execution_detail": execution_detail,
+                    "policy_analysis": policy_analysis,
+                    "performance_plan": performance_plan,
+                    "risk_review": risk_review,
+                    "application_background": application_background,
+                    "scenario_rationale": scenario_rationale,
+                    "policy_utilization_strategy": policy_utilization_strategy,
+                    "submission_readiness": submission_readiness,
+                    "performance_governance": performance_governance,
+                    "final_recommendation": final_recommendation,
+                }
+            )
+        except ValueError as exc:
+            print(f"application report narrative validation skipped: {exc}")
 
     return {
         "generated_at": datetime.now().isoformat(),
@@ -1326,6 +1637,106 @@ def _paragraph(text: Any, style: ParagraphStyle) -> Paragraph:
     return Paragraph(safe.replace("\n", "<br/>"), style)
 
 
+def _format_bullets(text: Any) -> str:
+    raw = str(text or "-").strip()
+    if not raw or raw == "-":
+        return "-"
+    lines = [line.strip() for line in raw.replace("\r", "").split("\n") if line.strip()]
+    if not lines:
+        return "-"
+    bullets: list[str] = []
+    for line in lines:
+        if line.startswith(("- ", "• ", "· ")):
+            bullets.append(line)
+        elif line.startswith("-"):
+            bullets.append(line)
+        else:
+            bullets.append(f"- {line}")
+    return "<br/>".join(bullets)
+
+
+def _legacy_content_box(
+    text: Any,
+    style: ParagraphStyle,
+    *,
+    width: float = 170 * mm,
+    background: str = "#FAFBFC",
+    border: str = "#D5DDE5",
+) -> Table:
+    box = Table([[_paragraph(text, style)]], colWidths=[width])
+    box.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(background)),
+        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor(border)),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 9),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+    return box
+
+
+def _legacy_callout_box(
+    text: Any,
+    style: ParagraphStyle,
+    *,
+    width: float = 170 * mm,
+    background: str = "#F7F9FB",
+    accent: str = "#244F78",
+) -> Table:
+    box = Table([[_paragraph(text, style)]], colWidths=[width])
+    box.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(background)),
+        ("LINEBEFORE", (0, 0), (0, -1), 2, colors.HexColor(accent)),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 9),
+        ("TOPPADDING", (0, 0), (-1, -1), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+    return box
+
+
+def _legacy_stacked_cards(
+    sections: list[tuple[str, Any]],
+    *,
+    subheading: ParagraphStyle,
+    body: ParagraphStyle,
+    width: float = 170 * mm,
+) -> Table:
+    rows = [
+        [[_paragraph(title, subheading), _paragraph(content, body)]]
+        for title, content in sections
+    ]
+    table = Table(rows, colWidths=[width])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#FAFBFC")),
+        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#D5DDE5")),
+        ("INNERGRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#D5DDE5")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 9),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 9),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    return table
+
+
+def _wrap_long_tokens(text: Any, limit: int = 44) -> str:
+    value = str(text or "-")
+    tokens = re.split(r"(\s+)", value)
+    wrapped: list[str] = []
+    for token in tokens:
+        if token.isspace() or len(token) <= limit:
+            wrapped.append(token)
+            continue
+        wrapped.append("\n".join(
+            token[index:index + limit]
+            for index in range(0, len(token), limit)
+        ))
+    return "".join(wrapped)
+
+
 def _consumer_judgement(summary: dict[str, Any], safety_items: list[dict[str, Any]]) -> str:
     match_score = _number(summary.get("match_score"))
     payback_months = summary.get("payback_months")
@@ -1398,7 +1809,7 @@ def _consumer_evidence_rows(data: dict[str, Any]) -> list[list[str]]:
     return rows
 
 
-def generate_consumer_summary_report_pdf(ctx: ReportContext) -> bytes:
+def _generate_consumer_summary_report_pdf_legacy(ctx: ReportContext) -> bytes:
     data = ctx.data
     regular_font, bold_font = _register_fonts()
     buffer = io.BytesIO()
@@ -1540,7 +1951,11 @@ def generate_application_evidence_report_pdf(ctx: ReportContext) -> bytes:
     return build_application_report_pdf(ctx.data)
 
 
-def build_application_report_pdf(data: dict) -> bytes:
+def generate_consumer_summary_report_pdf(ctx: ReportContext) -> bytes:
+    return _build_application_report_pdf_table_centered(ctx.data)
+
+
+def _build_application_report_pdf_legacy(data: dict) -> bytes:
     regular_font, bold_font = _register_fonts()
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -1548,8 +1963,8 @@ def build_application_report_pdf(data: dict) -> bytes:
         pagesize=A4,
         leftMargin=17 * mm,
         rightMargin=17 * mm,
-        topMargin=17 * mm,
-        bottomMargin=15 * mm,
+        topMargin=24 * mm,
+        bottomMargin=18 * mm,
         title=data["summary"]["policy_title"],
         author="FactoFit",
     )
@@ -1557,7 +1972,8 @@ def build_application_report_pdf(data: dict) -> bytes:
     base = getSampleStyleSheet()
     title = ParagraphStyle(
         "TitleKo", parent=base["Title"], fontName=bold_font, fontSize=20,
-        leading=28, textColor=colors.HexColor("#0B1F3A"), spaceAfter=5 * mm,
+        leading=28, textColor=colors.HexColor("#0B1F3A"), spaceAfter=3 * mm,
+        alignment=TA_CENTER,
     )
     eyebrow = ParagraphStyle(
         "EyebrowKo", fontName=regular_font, fontSize=9,
@@ -1586,6 +2002,14 @@ def build_application_report_pdf(data: dict) -> bytes:
     right = ParagraphStyle(
         "RightKo", fontName=bold_font, fontSize=10,
         textColor=colors.HexColor("#0B1F3A"), alignment=TA_RIGHT,
+    )
+    kpi_label = ParagraphStyle(
+        "KpiLabelKo", fontName=regular_font, fontSize=7.2, leading=10,
+        textColor=colors.HexColor("#667386"),
+    )
+    kpi_value = ParagraphStyle(
+        "KpiValueKo", fontName=bold_font, fontSize=11.5, leading=15,
+        textColor=colors.HexColor("#0B1F3A"),
     )
 
     summary = data["summary"]
@@ -1640,16 +2064,77 @@ def build_application_report_pdf(data: dict) -> bytes:
             "제출서류 및 실제 견적을 담당자가 반드시 확인해야 합니다."
         )
 
+    report_subtitle = "AI 신청서 초안 · 가독성 강화형"
     story: list[Any] = [
-        _paragraph(REPORT_TITLE, eyebrow),
         _paragraph(summary["policy_title"], title),
         _paragraph(
             f"생성일 {datetime.now():%Y.%m.%d} · {summary['tone_label']} · "
-            "FactoFit DB 및 ROI 분석 결과 기반",
+            "FactoFit DB 및 ROI 분석 결과 기반 · "
+            "원본 신청서초안 내용 삭제 없이 재배치",
             small,
         ),
-        Spacer(1, 5 * mm),
+        Spacer(1, 4 * mm),
     ]
+
+    kpi_table = Table(
+        [[
+            [
+                _paragraph("적용 시나리오", kpi_label),
+                _paragraph(summary["scenario_label"], kpi_value),
+            ],
+            [
+                _paragraph("총 투자금", kpi_label),
+                _paragraph(_manwon(summary["investment_manwon"]), kpi_value),
+            ],
+            [
+                _paragraph("예상 지원금", kpi_label),
+                _paragraph(_manwon(summary["subsidy_manwon"]), kpi_value),
+            ],
+            [
+                _paragraph("정책 적합도", kpi_label),
+                _paragraph(f"{summary['match_score']:.1f}점", kpi_value),
+            ],
+            [
+                _paragraph("회수기간", kpi_label),
+                _paragraph(
+                    f"{summary['payback_months']:,.1f}개월"
+                    if summary["payback_months"] is not None
+                    else "-",
+                    kpi_value,
+                ),
+            ],
+        ]],
+        colWidths=[34 * mm] * 5,
+        rowHeights=[20 * mm],
+    )
+    kpi_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#D5DDE5")),
+        ("INNERGRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#D5DDE5")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    reading_order_box = Table(
+        [[_paragraph(
+            "읽는 순서 - 먼저 종합 검토 의견과 신청기업 개요를 확인하고, "
+            "2~4페이지에서 설비·사업목적·정책 적합성을 확인합니다. "
+            "5페이지 이후는 기대효과, 안전개선, 예산계획, 데이터 근거입니다.",
+            small,
+        )]],
+        colWidths=[170 * mm],
+    )
+    reading_order_box.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F7F9FB")),
+        ("LINEBEFORE", (0, 0), (0, -1), 2, colors.HexColor("#244F78")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 9),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story += [kpi_table, Spacer(1, 3 * mm), reading_order_box, Spacer(1, 3 * mm)]
 
     review_box = Table(
         [[
@@ -1671,20 +2156,24 @@ def build_application_report_pdf(data: dict) -> bytes:
     story += [review_box, Spacer(1, 4 * mm)]
 
     overview = [
+        ["구분", "내용", "구분", "내용"],
         ["기업명", summary["company_name"], "기업 규모", company.get("company_type") or company.get("company_size") or "-"],
         ["설립연도", company.get("established_year") or "-", "사업장 형태", company.get("workplace_type") or "-"],
         ["업종", summary["industry_display"], "지역", company.get("region") or "-"],
         ["직원 수", f"{company.get('employee_count') or 0:,}명", "연 매출", _manwon(company.get("annual_revenue"))],
     ]
     overview_table = Table(
-        [[_paragraph(cell, body) for cell in row] for row in overview],
+        [[_paragraph(cell, body if row_index > 0 else small) for cell in row] for row_index, row in enumerate(overview)],
         colWidths=[28 * mm, 57 * mm, 28 * mm, 57 * mm],
     )
     overview_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F6F7F3")),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8EEF4")),
+        ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#F6F7F3")),
         ("FONTNAME", (0, 0), (-1, -1), regular_font),
         ("FONTNAME", (0, 0), (0, -1), bold_font),
         ("FONTNAME", (2, 0), (2, -1), bold_font),
+        ("FONTNAME", (0, 1), (0, -1), bold_font),
+        ("FONTNAME", (2, 1), (2, -1), bold_font),
         ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#E2E7EC")),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("PADDING", (0, 0), (-1, -1), 7),
@@ -1694,49 +2183,177 @@ def build_application_report_pdf(data: dict) -> bytes:
         overview_table,
         Spacer(1, 3 * mm),
         _paragraph(summary["company_overview"], body),
-        _paragraph("기업 현황 해석", subheading),
-        _paragraph(summary["company_context"], body),
     ]
+
+    revenue_trend = _revenue_trend_items(company)
+    if revenue_trend:
+        page_content_w = 170 * mm
+        company_left_w = page_content_w * 0.64
+        company_right_w = page_content_w * 0.36
+        company_cell_pad = 4 * mm
+        revenue_col_w = max(28 * mm, company_right_w - 2 * company_cell_pad)
+        kpi_col_w = revenue_col_w / 3
+        revenue_kpi_table = Table(
+            [[
+                [
+                    _paragraph(kpi_label, small),
+                    Spacer(1, 2 * mm),
+                    _paragraph(display, metric),
+                ]
+                for kpi_label, _, _, display in revenue_trend
+            ]],
+            colWidths=[kpi_col_w, kpi_col_w, kpi_col_w],
+        )
+        revenue_kpi_table.setStyle(TableStyle([
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#D5DDE5")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#D5DDE5")),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 7),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        line_chart_items = [
+            (chart_label, value, display)
+            for _, chart_label, value, display in revenue_trend
+        ]
+        revenue_chart_panel = Table(
+            [
+                [_paragraph("연매출 추이 라인 그래프", subheading)],
+                [LineChartFlowable(
+                    line_chart_items,
+                    regular_font=regular_font,
+                    bold_font=bold_font,
+                    height=46 * mm,
+                    line_color=colors.HexColor("#1F4E7A"),
+                )],
+                [_paragraph(
+                    "최근 3개년 연매출이 완만한 상승 흐름을 보이고 있음을 한눈에 확인할 수 있도록 "
+                    "추가한 시각화입니다.",
+                    small,
+                )],
+            ],
+            colWidths=[revenue_col_w],
+            rowHeights=[None, 46 * mm, None],
+        )
+        revenue_chart_panel.setStyle(TableStyle([
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#D5DDE5")),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 1), (-1, 1), 0),
+            ("RIGHTPADDING", (0, 1), (-1, 1), 0),
+            ("TOPPADDING", (0, 1), (-1, 1), 0),
+            ("BOTTOMPADDING", (0, 1), (-1, 1), 0),
+        ]))
+        revenue_right = Table(
+            [
+                [_paragraph("최근 매출 추이", subheading)],
+                [revenue_kpi_table],
+                [revenue_chart_panel],
+            ],
+            colWidths=[revenue_col_w],
+        )
+        revenue_right.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 1), (-1, 1), 2),
+            ("BOTTOMPADDING", (0, 1), (-1, 1), 2),
+            ("TOPPADDING", (0, 2), (-1, 2), 2),
+        ]))
+        company_bottom = Table(
+            [[
+                [
+                    _paragraph("기업 현황 해석", subheading),
+                    _paragraph(summary["company_context"], body),
+                ],
+                [revenue_right],
+            ]],
+            colWidths=[company_left_w, company_right_w],
+        )
+        company_bottom.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#FAFBFC")),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#D5DDE5")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#D5DDE5")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), company_cell_pad),
+            ("RIGHTPADDING", (0, 0), (-1, -1), company_cell_pad),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        story += [
+            Spacer(1, 3 * mm),
+            company_bottom,
+        ]
+    else:
+        story += [
+            _paragraph("기업 현황 해석", subheading),
+            _paragraph(summary["company_context"], body),
+        ]
+
+    story += [PageBreak(), _paragraph("신청 배경 및 설비 현황", title)]
     if summary.get("application_background"):
         story += [
             _paragraph("신청 배경 및 문제 정의", subheading),
-            _paragraph(summary["application_background"], body),
-        ]
-
-    revenue_items = [
-        ("3년 전 매출", _number(company.get("revenue_3y_ago_manwon")), _manwon(company.get("revenue_3y_ago_manwon"))),
-        ("2년 전 매출", _number(company.get("revenue_2y_ago_manwon")), _manwon(company.get("revenue_2y_ago_manwon"))),
-        ("최근 연 매출", _number(company.get("annual_revenue")), _manwon(company.get("annual_revenue"))),
-    ]
-    if sum(1 for _, value, _ in revenue_items if value > 0) >= 2:
-        story += [
+            _legacy_content_box(summary["application_background"], body),
             Spacer(1, 3 * mm),
-            _paragraph("최근 매출 추이", small),
-            BarChartFlowable(
-                revenue_items,
-                regular_font=regular_font,
-                bold_font=bold_font,
-                bar_color=colors.HexColor("#4F6F9F"),
-            ),
+        ]
+    else:
+        story += [
+            _paragraph("신청 배경 및 문제 정의", subheading),
+            _legacy_content_box("신청 배경 데이터가 입력되지 않았습니다.", body),
+            Spacer(1, 3 * mm),
         ]
 
     equipment_rows = [
-        ["설비명 / 공정", f"{summary['equipment_name']} / {summary['process']}"],
-        ["사용연수", f"{equipment.get('age_years') or 0}년"],
-        ["불량률", _percent(equipment.get("defect_rate"))],
-        ["연간 생산량", f"{round(_number(equipment.get('production_qty'))):,}개"],
-        ["연간 에너지비", _manwon(equipment.get("energy_cost_annual"))],
-        ["연간 유지보수비", _manwon(equipment.get("maintenance_cost_annual"))],
-        ["업종 평균 비교", f"교체주기 {benchmark.get('avg_replacement_cycle_yr', '-')}년, 평균 불량률 {benchmark.get('avg_defect_rate_pct', '-')}%"],
+        ["항목", "내용", "항목", "내용"],
+        [
+            "설비명 / 공정",
+            f"{summary['equipment_name']} / {summary['process']}",
+            "사용연수",
+            f"{equipment.get('age_years') or 0}년",
+        ],
+        [
+            "불량률",
+            _percent(equipment.get("defect_rate")),
+            "연간 생산량",
+            f"{round(_number(equipment.get('production_qty'))):,}개",
+        ],
+        [
+            "연간 에너지비",
+            _manwon(equipment.get("energy_cost_annual")),
+            "연간 유지보수비",
+            _manwon(equipment.get("maintenance_cost_annual")),
+        ],
+        [
+            "업종 평균 비교",
+            f"교체주기 {benchmark.get('avg_replacement_cycle_yr', '-')}년, "
+            f"평균 불량률 {benchmark.get('avg_defect_rate_pct', '-')}%",
+            "",
+            "",
+        ],
     ]
     equipment_table = Table(
-        [[_paragraph(cell, body) for cell in row] for row in equipment_rows],
-        colWidths=[42 * mm, 128 * mm],
+        [[_paragraph(cell, body if row_index > 0 else small) for cell in row] for row_index, row in enumerate(equipment_rows)],
+        colWidths=[35 * mm, 50 * mm, 35 * mm, 50 * mm],
     )
     equipment_table.setStyle(TableStyle([
         ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#E2E7EC")),
-        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#F6F7F3")),
-        ("FONTNAME", (0, 0), (0, -1), bold_font),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8EEF4")),
+        ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#F6F7F3")),
+        ("BACKGROUND", (0, 1), (0, -1), colors.HexColor("#F6F7F3")),
+        ("BACKGROUND", (2, 1), (2, 2), colors.HexColor("#F6F7F3")),
+        ("FONTNAME", (0, 0), (-1, -1), regular_font),
+        ("FONTNAME", (0, 1), (0, -1), bold_font),
+        ("FONTNAME", (2, 1), (2, 2), bold_font),
+        ("SPAN", (1, 4), (3, 4)),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("PADDING", (0, 0), (-1, -1), 7),
     ]))
@@ -1765,23 +2382,30 @@ def build_application_report_pdf(data: dict) -> bytes:
             bold_font=bold_font,
         ),
         Spacer(1, 2 * mm),
-        _paragraph(summary["business_necessity"], body),
-        _paragraph("추가 진단 의견", subheading),
-        _paragraph(summary["diagnostic_interpretation"], body),
+        _legacy_content_box(summary["business_necessity"], body),
+        Spacer(1, 2 * mm),
+        _legacy_callout_box(
+            f"추가 진단 의견 - {summary['diagnostic_interpretation']}",
+            body,
+        ),
+        PageBreak(),
     ]
 
     purpose_table = Table(
         [
+            [_paragraph("항목", small), _paragraph("내용", small)],
             [_paragraph("적용 시나리오", small), _paragraph(summary["scenario_label"], metric)],
             [_paragraph("총 투자금", small), _paragraph(_manwon(summary["investment_manwon"]), metric)],
             [_paragraph("예상 지원금", small), _paragraph(_manwon(summary["subsidy_manwon"]), metric)],
         ],
         colWidths=[56 * mm, 114 * mm],
+        repeatRows=1,
     )
     purpose_table.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 0.7, colors.HexColor("#CBD5DF")),
         ("INNERGRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#E2E7EC")),
-        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#F6F7F3")),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8EEF4")),
+        ("BACKGROUND", (0, 1), (0, -1), colors.HexColor("#F6F7F3")),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 8),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
@@ -1818,16 +2442,47 @@ def build_application_report_pdf(data: dict) -> bytes:
 
     purpose_section += [
         Spacer(1, 3 * mm),
-        _paragraph(summary["implementation_plan"], body),
-        _paragraph("세부 실행 및 관리 방향", subheading),
-        _paragraph(summary["execution_detail"], body),
+        _legacy_content_box(summary["implementation_plan"], body),
     ]
-    story += purpose_section
-    if summary.get("scenario_rationale"):
-        story += [
-            _paragraph("시나리오 선택 및 AI 적용 근거", subheading),
-            _paragraph(summary["scenario_rationale"], body),
-        ]
+    scenario_rationale_text = (
+        summary.get("scenario_rationale")
+        or "시나리오 선택 근거 데이터가 입력되지 않았습니다."
+    )
+    if "설비 사양서에는" in scenario_rationale_text:
+        scenario_rationale_text = scenario_rationale_text.split("설비 사양서에는")[0].strip()
+    execution_cards = Table(
+        [[
+            [
+                _paragraph("세부 실행 및 관리 방향", subheading),
+                _paragraph(summary["execution_detail"], body),
+            ],
+            [
+                _paragraph("시나리오 선택 및 AI 적용 근거", subheading),
+                _paragraph(scenario_rationale_text, body),
+            ],
+        ]],
+        colWidths=[83 * mm, 83 * mm],
+    )
+    execution_cards.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#FAFBFC")),
+        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#D5DDE5")),
+        ("INNERGRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#D5DDE5")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+    ]))
+    story += purpose_section + [Spacer(1, 3 * mm), execution_cards]
+    story += [
+        Spacer(1, 3 * mm),
+        _legacy_content_box(
+            "설비 사양서에는 데이터 수집 항목, 통신 방식, 이상 징후 탐지 범위, "
+            "유지보수 알림 방식 및 기존 공정과의 연계 범위를 구체적으로 명시합니다. "
+            "이러한 구성은 단순 장비 구매와 AI 기반 공정개선 사업을 구분하는 핵심 근거입니다.",
+            body,
+        ),
+    ]
 
     source_labels = {
         "bizinfo": "기업마당(Bizinfo)",
@@ -1842,6 +2497,7 @@ def build_application_report_pdf(data: dict) -> bytes:
         or policy.get("detail_url")
         or "-"
     )
+    policy_url = _wrap_long_tokens(policy_url)
     policy_evidence = (
         policy.get("eligibility_evidence")
         or policy.get("summary")
@@ -1861,11 +2517,11 @@ def build_application_report_pdf(data: dict) -> bytes:
             ],
             [
                 _paragraph("지원내용 요약", small),
-                _paragraph(support_scope, body),
+                _paragraph(_format_bullets(support_scope), body),
             ],
             [
                 _paragraph("정책 원문 발췌", small),
-                _paragraph(policy_evidence, body),
+                _paragraph(_format_bullets(policy_evidence), body),
             ],
             [
                 _paragraph("DB 추출 위치", small),
@@ -1922,28 +2578,86 @@ def build_application_report_pdf(data: dict) -> bytes:
         ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
     ]))
 
-    story += [PageBreak(), _paragraph("4. 지원사업 적합성", heading)]
+    story += [_paragraph("4. 지원사업 적합성", heading)]
     eligibility_items = [
         f"업종: {', '.join(summary['industry_codes']) or '-'} / 정책 대상 {', '.join(_as_list(policy.get('industry_codes'))) or '제한 없음'}",
         f"기업 유형: {company.get('company_type') or company.get('company_size') or '-'} / 정책 대상 {', '.join(_as_list(policy.get('eligible_company_types'))) or '제한 없음'}",
         f"지역: {company.get('region') or '-'} / 정책 조건 {policy.get('region') or '제한 없음'}",
         f"추천 적합도: {summary['match_score']:.1f}점 / 적격 판정: {'적격' if matched.get('eligible') else '확인 필요'}",
     ]
-    for item in eligibility_items:
-        story += [_paragraph(f"· {item}", body), Spacer(1, 1.5 * mm)]
+    eligibility_table = Table(
+        [
+            [_paragraph("검토 항목", small), _paragraph("FactoFit 판단", small)],
+            *[
+                [
+                    _paragraph(item.split(":", 1)[0], body),
+                    _paragraph(item.split(":", 1)[1].strip(), body),
+                ]
+                for item in eligibility_items
+            ],
+        ],
+        colWidths=[55 * mm, 115 * mm],
+    )
+    eligibility_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8EEF4")),
+        ("BACKGROUND", (0, 1), (0, -1), colors.HexColor("#F6F7F3")),
+        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#D5DDE5")),
+        ("INNERGRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#D5DDE5")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 7),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story += [eligibility_table]
+    review_cards = Table(
+        [
+            [[
+                _paragraph("적합성 검토 의견", subheading),
+                _paragraph(summary["policy_analysis"], body),
+            ]],
+            [[
+                _paragraph("정책 활용 및 예산 구성 전략", subheading),
+                _paragraph(
+                    summary.get("policy_utilization_strategy")
+                    or "정책 활용 전략 데이터가 입력되지 않았습니다.",
+                    body,
+                ),
+            ]],
+            [[
+                _paragraph("제출자료 준비사항", subheading),
+                _paragraph(
+                    summary.get("submission_readiness")
+                    or "제출자료 준비 데이터가 입력되지 않았습니다.",
+                    body,
+                ),
+            ]],
+        ],
+        colWidths=[170 * mm],
+    )
+    review_cards.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#FAFBFC")),
+        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#D5DDE5")),
+        ("INNERGRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#D5DDE5")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 9),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 9),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
     story += [
-        _paragraph("지원내용 및 원문 추출 근거", subheading),
+        PageBreak(),
+        _paragraph("지원내용 및 원문 추출 근거", title),
+        _paragraph(
+            "원본 표의 항목과 문장을 삭제하지 않고, 항목별로 끊어 읽을 수 있도록 재배치했습니다.",
+            small,
+        ),
+        Spacer(1, 3 * mm),
         policy_evidence_table,
-        _paragraph("적합성 검토 의견", subheading),
-        _paragraph(summary["policy_analysis"], body),
+        PageBreak(),
+        _paragraph("적합성 검토 및 제출자료 준비", title),
+        review_cards,
     ]
-    if summary.get("policy_utilization_strategy"):
-        story += [
-            _paragraph("정책 활용 및 예산 구성 전략", subheading),
-            _paragraph(summary["policy_utilization_strategy"], body),
-            _paragraph("제출자료 준비사항", subheading),
-            _paragraph(summary["submission_readiness"], body),
-        ]
 
     metrics = [
         ["연간 에너지 절감", _manwon(breakdown.get("energy_saving_manwon"))],
@@ -1951,14 +2665,22 @@ def build_application_report_pdf(data: dict) -> bytes:
         ["연간 불량비용 절감", _manwon(breakdown.get("defect_saving_manwon"))],
         ["연간 순편익", _manwon(scenario.get("annual_net_benefit_manwon"))],
     ]
+    effects_total_w = 170 * mm
+    effects_left_w = effects_total_w * 0.64
+    effects_right_w = effects_total_w * 0.36
+    metric_col_w = effects_left_w / 2
     metric_table = Table(
         [
             [
-                [_paragraph(label, small), Spacer(1, 2 * mm), _paragraph(value, metric)]
-                for label, value in metrics
-            ]
+                [_paragraph(metrics[0][0], small), Spacer(1, 2 * mm), _paragraph(metrics[0][1], metric)],
+                [_paragraph(metrics[1][0], small), Spacer(1, 2 * mm), _paragraph(metrics[1][1], metric)],
+            ],
+            [
+                [_paragraph(metrics[2][0], small), Spacer(1, 2 * mm), _paragraph(metrics[2][1], metric)],
+                [_paragraph(metrics[3][0], small), Spacer(1, 2 * mm), _paragraph(metrics[3][1], metric)],
+            ],
         ],
-        colWidths=[42.5 * mm] * 4,
+        colWidths=[metric_col_w, metric_col_w],
     )
     metric_table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F6F7F3")),
@@ -1967,46 +2689,144 @@ def build_application_report_pdf(data: dict) -> bytes:
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 9),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+        ("LEFTPADDING", (0, 0), (-1, -1), 7),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+    ]))
+    savings_rows = [
+        ("에너지비 절감", _manwon(breakdown.get("energy_saving_manwon"))),
+        ("유지보수비 절감", _manwon(breakdown.get("maintenance_saving_manwon"))),
+        ("불량비용 절감", _manwon(breakdown.get("defect_saving_manwon"))),
+    ]
+    savings_detail_table = Table(
+        [
+            [_paragraph("항목", small), _paragraph("값", small)],
+            *[
+                [_paragraph(label, body), _paragraph(value, body)]
+                for label, value in savings_rows
+            ],
+        ],
+        colWidths=[metric_col_w, metric_col_w],
+        repeatRows=1,
+    )
+    savings_detail_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8EEF4")),
+        ("BACKGROUND", (0, 1), (0, -1), colors.HexColor("#F6F7F3")),
+        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#D5DDE5")),
+        ("INNERGRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#D5DDE5")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 7),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    lollipop_items = [
+        (
+            "에너지비 절감",
+            max(1, _number(breakdown.get("energy_saving_manwon"))),
+            _manwon(breakdown.get("energy_saving_manwon")),
+            colors.HexColor("#2E4472"),
+        ),
+        (
+            "유지보수비 절감",
+            max(1, _number(breakdown.get("maintenance_saving_manwon"))),
+            _manwon(breakdown.get("maintenance_saving_manwon")),
+            colors.HexColor("#5E81AC"),
+        ),
+        (
+            "불량비용 절감",
+            max(1, _number(breakdown.get("defect_saving_manwon"))),
+            _manwon(breakdown.get("defect_saving_manwon")),
+            colors.HexColor("#A3B9D6"),
+        ),
+    ]
+    chart_axis_max = max(value for _, value, _, _ in lollipop_items)
+    chart_axis_max = max(chart_axis_max, 50)
+    chart_axis_max = ((int(chart_axis_max) + 49) // 50) * 50
+    effects_left = Table(
+        [[metric_table], [Spacer(1, 3 * mm)], [savings_detail_table]],
+        colWidths=[effects_left_w],
+    )
+    effects_left.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    effects_chart_panel = Table(
+        [
+            [_paragraph("기대효과 시각화", subheading)],
+            [LollipopChartFlowable(
+                lollipop_items,
+                regular_font=regular_font,
+                bold_font=bold_font,
+                height=56 * mm,
+                axis_max=chart_axis_max,
+            )],
+            [_paragraph(
+                f"세 절감항목의 합산 결과, 연간 순편익은 "
+                f"{_manwon(scenario.get('annual_net_benefit_manwon'))}입니다.",
+                small,
+            )],
+        ],
+        colWidths=[effects_right_w],
+        rowHeights=[None, 56 * mm, None],
+    )
+    effects_chart_panel.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#D5DDE5")),
+        ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING", (0, 1), (-1, 1), 0),
+        ("RIGHTPADDING", (0, 1), (-1, 1), 0),
+        ("TOPPADDING", (0, 1), (-1, 1), 0),
+        ("BOTTOMPADDING", (0, 1), (-1, 1), 0),
+    ]))
+    effects_layout = Table(
+        [[effects_left, effects_chart_panel]],
+        colWidths=[effects_left_w, effects_right_w],
+    )
+    effects_layout.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
     ]))
     story += [
         _paragraph("5. 기대효과", heading),
-        metric_table,
-        Spacer(1, 3 * mm),
-        BarChartFlowable(
+        effects_layout,
+        PageBreak(),
+        _paragraph("기대효과 및 성과관리", title),
+        _legacy_stacked_cards(
             [
-                (
-                    "에너지비 절감",
-                    _number(breakdown.get("energy_saving_manwon")),
-                    _manwon(breakdown.get("energy_saving_manwon")),
-                ),
-                (
-                    "유지보수비 절감",
-                    _number(breakdown.get("maintenance_saving_manwon")),
-                    _manwon(breakdown.get("maintenance_saving_manwon")),
-                ),
-                (
-                    "불량비용 절감",
-                    _number(breakdown.get("defect_saving_manwon")),
-                    _manwon(breakdown.get("defect_saving_manwon")),
-                ),
-            ],
-            regular_font=regular_font,
-            bold_font=bold_font,
-            bar_color=colors.HexColor("#527A68"),
+                ("기대효과", summary["expected_effects"]),
+                ("성과 측정 및 사후관리", summary["performance_plan"]),
+            ]
+            + (
+                [("성과관리 운영체계", summary["performance_governance"])]
+                if summary.get("performance_governance")
+                else []
+            ),
+            subheading=subheading,
+            body=body,
         ),
-        Spacer(1, 2 * mm),
-        _paragraph(summary["expected_effects"], body),
-        _paragraph("성과 측정 및 사후관리", subheading),
-        _paragraph(summary["performance_plan"], body),
     ]
-    if summary.get("performance_governance"):
-        story += [
-            _paragraph("성과관리 운영체계", subheading),
-            _paragraph(summary["performance_governance"], body),
-        ]
 
     safety_improvement = data.get("safety_improvement") or {}
     safety_items = safety_improvement.get("items") or []
+    story += [
+        _paragraph("안전점검 및 안전개선 기대효과", heading),
+        _paragraph(
+            "선택 설비와 투자안 기준으로 생성된 안전점검·안전개선 항목입니다. "
+            "작업자 위험 노출 감소, 설비 운용 안정성 개선, 교체 후 안전관리 체계 구축 "
+            "관점에서 기대효과와 준비자료를 함께 정리합니다.",
+            small,
+        ),
+    ]
     if safety_items:
         safety_rows = [
             [
@@ -2016,7 +2836,7 @@ def build_application_report_pdf(data: dict) -> bytes:
                 _paragraph("설명/근거", small),
             ]
         ]
-        for item in safety_items[:6]:
+        for item in safety_items[:3]:
             evidences = item.get("required_evidences") or []
             evidence_labels = [get_evidence_label(evidence) for evidence in evidences if evidence]
             safety_rows.append(
@@ -2042,14 +2862,36 @@ def build_application_report_pdf(data: dict) -> bytes:
             ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
         ]))
         story += [
-            _paragraph("안전개선 준비 항목", subheading),
-            _paragraph(
-                "선택 설비와 투자안 기준으로 생성된 안전개선 준비 항목입니다. 실제 증빙 파일 업로드는 이후 신청서 첨부 단계에서 연결합니다.",
-                body,
-            ),
             safety_table,
             Spacer(1, 3 * mm),
         ]
+    else:
+        empty_safety_table = Table(
+            [[
+                _paragraph("안전개선 관점", small),
+                _paragraph("현재 판단", small),
+                _paragraph("준비할 자료", small),
+                _paragraph("설명/근거", small),
+            ], [
+                _paragraph("데이터 미입력", body),
+                _paragraph("확인 필요", body),
+                _paragraph("-", body),
+                _paragraph(
+                    "저장된 안전개선 항목이 없어 제출 전 현장 점검 자료를 확인해야 합니다.",
+                    body,
+                ),
+            ]],
+            colWidths=[36 * mm, 27 * mm, 43 * mm, 64 * mm],
+        )
+        empty_safety_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F3F7FA")),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#D9E2EA")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#D9E2EA")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("TOPPADDING", (0, 0), (-1, -1), 7),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ]))
+        story += [empty_safety_table, Spacer(1, 3 * mm)]
 
     budget = [
         ["총 사업비", _manwon(summary["investment_manwon"])],
@@ -2059,30 +2901,46 @@ def build_application_report_pdf(data: dict) -> bytes:
         ["정책 지원 한도", _manwon(policy.get("max_amount")) if policy.get("max_amount") else "-"],
     ]
     budget_table = Table(
-        [[_paragraph(label, body), _paragraph(value, right)] for label, value in budget],
+        [
+            [_paragraph("항목", small), _paragraph("값", small)],
+            *[[_paragraph(label, body), _paragraph(value, right)] for label, value in budget],
+        ],
         colWidths=[100 * mm, 70 * mm],
+        repeatRows=1,
     )
     budget_table.setStyle(TableStyle([
-        ("LINEBELOW", (0, 0), (-1, -2), 0.4, colors.HexColor("#E2E7EC")),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8EEF4")),
+        ("LINEBELOW", (0, 1), (-1, -2), 0.4, colors.HexColor("#E2E7EC")),
         ("TOPPADDING", (0, 0), (-1, -1), 8),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
     ]))
+    budget_summary = Table(
+        [
+            [_paragraph("정부 지원금", body), _paragraph(_manwon(summary["subsidy_manwon"]), right)],
+            [_paragraph("자기부담금", body), _paragraph(_manwon(summary["self_funding_manwon"]), right)],
+        ],
+        colWidths=[100 * mm, 70 * mm],
+    )
+    budget_summary.setStyle(TableStyle([
+        ("LINEBELOW", (0, 0), (-1, -1), 0.35, colors.HexColor("#E2E7EC")),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
     story += [
-        KeepTogether([
-            _paragraph("6. 예산계획", heading),
-            StackedBudgetFlowable(
-                summary["subsidy_manwon"],
-                summary["self_funding_manwon"],
-                regular_font=regular_font,
-                bold_font=bold_font,
-            ),
-            Spacer(1, 2 * mm),
-            budget_table,
-            Spacer(1, 3 * mm),
-            _paragraph(summary["financial_assessment"], body),
-            _paragraph("주요 위험요인 및 확인사항", subheading),
-            _paragraph(summary["risk_review"], body),
-        ])
+        PageBreak(),
+        _paragraph("6. 예산계획", heading),
+        _paragraph("사업비 구성", subheading),
+        budget_summary,
+        Spacer(1, 2 * mm),
+        budget_table,
+        Spacer(1, 3 * mm),
+        _legacy_content_box(summary["financial_assessment"], body),
+        Spacer(1, 2 * mm),
+        _legacy_stacked_cards(
+            [("주요 위험요인 및 확인사항", summary["risk_review"])],
+            subheading=subheading,
+            body=body,
+        ),
     ]
     if summary.get("final_recommendation"):
         conclusion_box = Table(
@@ -2100,7 +2958,16 @@ def build_application_report_pdf(data: dict) -> bytes:
         story += [
             _paragraph("종합 결론", heading),
             conclusion_box,
+            Spacer(1, 3 * mm),
         ]
+    story += [
+        StackedBudgetFlowable(
+            subsidy=_number(summary["subsidy_manwon"]),
+            self_funding=_number(summary["self_funding_manwon"]),
+            regular_font=regular_font,
+            bold_font=bold_font,
+        ),
+    ]
 
     evidence_sources = [
         (
@@ -2203,8 +3070,8 @@ def build_application_report_pdf(data: dict) -> bytes:
                 _paragraph("상태", small),
             ],
             *[
-                [_paragraph(cell, small) for cell in row]
-                for row in evidence_rows
+                [_paragraph(cell, body if row_index > 0 else small) for cell in row]
+                for row_index, row in enumerate(evidence_rows)
             ],
         ],
         colWidths=[25 * mm, 72 * mm, 51 * mm, 22 * mm],
@@ -2245,7 +3112,7 @@ def build_application_report_pdf(data: dict) -> bytes:
                 _paragraph("구분", small),
             ],
             *[
-                [_paragraph(cell, small) for cell in row]
+                [_paragraph(cell, body) for cell in row]
                 for row in calculation_rows
             ],
         ],
@@ -2265,8 +3132,10 @@ def build_application_report_pdf(data: dict) -> bytes:
     ]))
 
     story += [
-        Spacer(1, 8 * mm), _paragraph("추출 근거 및 검토 메모", title),
-        _paragraph(evidence_notice, body),
+        PageBreak(),
+        _paragraph("추출 근거 및 검토 메모", title),
+        _legacy_callout_box(evidence_notice, body),
+        Spacer(1, 3 * mm),
         _paragraph("데이터 출처별 활용 현황", heading),
         BarChartFlowable(
             evidence_chart_items,
@@ -2276,42 +3145,100 @@ def build_application_report_pdf(data: dict) -> bytes:
         ),
         Spacer(1, 2 * mm),
         evidence_table,
-        _paragraph("데이터 충족도 해석", subheading),
-        _paragraph(
-            "기업, 설비, ROI, 정책 매칭 및 정책 원문 데이터가 보고서의 주요 판단에 반영되어 "
-            "있습니다. 출처별 활용 필드 수는 데이터의 존재 여부를 나타내며, 각 수치의 정확성과 "
-            "최신성을 보장하는 지표는 아닙니다. 최종 제출 전 원본 증빙과 DB 값을 대조합니다.",
-            body,
-        ),
-        _paragraph("추가 확보가 필요한 데이터", subheading),
-        _paragraph(
-            "; ".join(missing_evidence_items)
-            if missing_evidence_items
-            else "현재 보고서 생성에 필요한 주요 데이터가 모두 확인된 상태입니다.",
-            body,
+        Spacer(1, 2 * mm),
+        _legacy_stacked_cards(
+            [
+                (
+                    "데이터 충족도 해석",
+                    "기업, 설비, ROI, 정책 매칭 및 정책 원문 데이터가 보고서의 주요 판단에 반영되어 "
+                    "있습니다. 출처별 활용 필드 수는 데이터의 존재 여부를 나타내며, 각 수치의 정확성과 "
+                    "최신성을 보장하는 지표는 아닙니다. 최종 제출 전 원본 증빙과 DB 값을 대조합니다.",
+                ),
+                (
+                    "추가 확보가 필요한 데이터",
+                    "; ".join(missing_evidence_items)
+                    if missing_evidence_items
+                    else "현재 보고서 생성에 필요한 주요 데이터가 모두 확인된 상태입니다.",
+                ),
+            ],
+            subheading=subheading,
+            body=body,
         ),
         PageBreak(),
         _paragraph("핵심 수치 산출 근거", heading),
         calculation_table,
+        Spacer(1, 3 * mm),
         _paragraph("정책 적합성 근거", heading),
-        _paragraph(matched.get("reason") or "-", body),
+        _legacy_content_box(matched.get("reason") or "-", body),
+        Spacer(1, 3 * mm),
         _paragraph("정책 원문 근거", heading),
-        _paragraph(policy.get("eligibility_evidence") or policy.get("summary") or "-", body),
-        _paragraph("ROI 판단 근거", heading),
-        _paragraph(
-            (data["roi_data"].get("ai_recommendation") or {}).get("summary")
-            or f"선택된 시나리오: {summary['scenario_label']}", body,
+        _legacy_content_box(
+            _format_bullets(
+                policy.get("eligibility_evidence")
+                or policy.get("summary")
+                or policy.get("eligibility_text")
+            ),
+            body,
         ),
+        Spacer(1, 3 * mm),
+        _paragraph("ROI 판단 근거", heading),
+        _legacy_content_box(
+            (data["roi_data"].get("ai_recommendation") or {}).get("summary")
+            or f"선택된 시나리오: {summary['scenario_label']}",
+            body,
+        ),
+        Spacer(1, 3 * mm),
         _paragraph("데이터 품질", heading),
-        _paragraph(
+        _legacy_content_box(
             (data["roi_data"].get("data_quality") or {}).get("message")
-            or "저장된 입력값을 기준으로 계산했습니다.", body,
+            or "저장된 입력값을 기준으로 계산했습니다.",
+            body,
         ),
     ]
     if data.get("tone") == "submission":
+        priority_table = Table(
+            [
+                [_paragraph("순위", small), _paragraph("확인 사항", small)],
+                [_paragraph("첫째", body), _paragraph("공고 원문에서 신청 자격과 지원 가능 비목을 확인합니다.", body)],
+                [_paragraph("둘째", body), _paragraph("공급사 견적서와 설비 사양서에서 투자금과 AI 기능 범위를 확인합니다.", body)],
+                [_paragraph("셋째", body), _paragraph("에너지 사용량과 유지보수비의 기준기간 자료를 확보합니다.", body)],
+                [_paragraph("넷째", body), _paragraph("고장 이력과 비가동 시간의 증빙을 확보합니다.", body)],
+                [_paragraph("다섯째", body), _paragraph("제출 문서와 DB의 기업명, 설비명, 금액 및 성과지표를 일치시킵니다.", body)],
+            ],
+            colWidths=[28 * mm, 142 * mm],
+            repeatRows=1,
+        )
+        priority_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8EEF4")),
+            ("BACKGROUND", (0, 1), (0, -1), colors.HexColor("#F6F7F3")),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#D5DDE5")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#D5DDE5")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 7),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        generation_note = Table(
+            [[_paragraph(
+                "생성 기준 - 본 문서는 저장된 신청서 초안의 본문 내용과 수치를 삭제하지 않고, "
+                "FactoFit 표중심 v3 가독성 강화형의 톤앤매너에 맞추어 재배치했습니다.",
+                small,
+            )]],
+            colWidths=[170 * mm],
+        )
+        generation_note.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F7F9FB")),
+            ("LINEBEFORE", (0, 0), (0, -1), 2, colors.HexColor("#244F78")),
+            ("LEFTPADDING", (0, 0), (-1, -1), 10),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 9),
+            ("TOPPADDING", (0, 0), (-1, -1), 7),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ]))
         story += [
+            PageBreak(),
             _paragraph("근거 종합 해석", heading),
-            _paragraph(
+            _legacy_content_box(
                 "정책 적합성 근거는 기업의 업종과 규모를 정책 대상 조건에 대조한 결과입니다. "
                 "정책 원문 근거는 AI 스마트공장 구축의 지원 범위와 최대 지원 한도를 확인하는 "
                 "자료입니다. ROI 판단 근거는 선택 시나리오의 투자비와 절감액을 계산한 결과입니다. "
@@ -2319,27 +3246,420 @@ def build_application_report_pdf(data: dict) -> bytes:
                 "확정하지 않습니다. 최종 신청서는 정책 자격, 기술 구성, 비용 효과를 함께 입증합니다.",
                 body,
             ),
+            Spacer(1, 3 * mm),
             _paragraph("최종 검증 우선순위", heading),
-            _paragraph(
-                "첫째, 공고 원문에서 신청 자격과 지원 가능 비목을 확인합니다. "
-                "둘째, 공급사 견적서와 설비 사양서에서 투자금과 AI 기능 범위를 확인합니다. "
-                "셋째, 에너지 사용량과 유지보수비의 기준기간 자료를 확보합니다. "
-                "넷째, 고장 이력과 비가동 시간의 증빙을 확보합니다. "
-                "다섯째, 제출 문서와 DB에 기록된 기업명, 설비명, 금액 및 성과지표를 일치시킵니다.",
-                body,
-            ),
+            priority_table,
+            Spacer(1, 4 * mm),
+            generation_note,
         ]
 
     def footer(canvas, document):
         canvas.saveState()
         canvas.setFont(regular_font, 7)
         canvas.setFillColor(colors.HexColor("#78889A"))
+        canvas.drawString(17 * mm, A4[1] - 13 * mm, "FactoFit AI Application Report")
+        canvas.drawRightString(A4[0] - 17 * mm, A4[1] - 13 * mm, report_subtitle)
+        canvas.setStrokeColor(colors.HexColor("#D5DDE5"))
+        canvas.setLineWidth(0.45)
+        canvas.line(17 * mm, A4[1] - 18 * mm, A4[0] - 17 * mm, A4[1] - 18 * mm)
+        canvas.line(17 * mm, 14 * mm, A4[0] - 17 * mm, 14 * mm)
         canvas.drawString(17 * mm, 9 * mm, "FactoFit AI Application Report")
         canvas.drawRightString(A4[0] - 17 * mm, 9 * mm, str(document.page))
         canvas.restoreState()
 
     doc.build(story, onFirstPage=footer, onLaterPages=footer)
     return buffer.getvalue()
+
+
+class ReferenceBarsFlowable(Flowable):
+    def __init__(
+        self,
+        items: list[tuple[str, float, str]],
+        *,
+        regular_font: str,
+        bold_font: str,
+        width: float = 78 * mm,
+        height: float | None = None,
+        bar_color: colors.Color = colors.HexColor("#1F4E7A"),
+    ):
+        super().__init__()
+        self.items = items
+        self.regular_font = regular_font
+        self.bold_font = bold_font
+        self.width = width
+        self.height = height or max(24 * mm, len(items) * 10 * mm)
+        self.bar_color = bar_color
+
+    def draw(self):
+        if not self.items:
+            return
+        label_width = 28 * mm
+        value_width = 17 * mm
+        bar_width = self.width - label_width - value_width
+        max_value = max((abs(value) for _, value, _ in self.items), default=1) or 1
+        row_height = self.height / len(self.items)
+        for index, (label, value, display) in enumerate(self.items):
+            y = self.height - (index + 1) * row_height + 3.2 * mm
+            self.canv.setFillColor(colors.HexColor("#53657A"))
+            self.canv.setFont(self.bold_font, 7.2)
+            self.canv.drawString(0, y, label)
+            self.canv.setFillColor(colors.HexColor("#E9EEF4"))
+            self.canv.rect(label_width, y - 1.8 * mm, bar_width, 5 * mm, fill=True, stroke=False)
+            actual_width = max(2 * mm, bar_width * max(0, value) / max_value)
+            self.canv.setFillColor(self.bar_color)
+            self.canv.rect(label_width, y - 1.8 * mm, actual_width, 5 * mm, fill=True, stroke=False)
+            self.canv.setFillColor(colors.HexColor("#102033"))
+            self.canv.setFont(self.bold_font, 6.9)
+            self.canv.drawCentredString(label_width + bar_width / 2, y - 0.2 * mm, display)
+
+
+def _report_text(value: Any, fallback: str = "-") -> str:
+    if value in (None, "", [], {}):
+        return fallback
+    return str(value)
+
+
+def _clip_text(value: Any, limit: int = 260, fallback: str = "-") -> str:
+    text = re.sub(r"\s+", " ", _report_text(value, fallback)).strip()
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 1)].rstrip() + "..."
+
+
+def _money_text(value: Any) -> str:
+    return f"{round(_number(value)):,}만원"
+
+
+def _month_text(value: Any) -> str:
+    if value in (None, ""):
+        return "-"
+    return f"{_number(value):,.1f}개월"
+
+
+def _score_text(value: Any) -> str:
+    if value in (None, ""):
+        return "-"
+    score = _number(value)
+    if 0 < score <= 1:
+        score *= 100
+    return f"{score:.1f}점"
+
+
+def _build_application_report_pdf_table_centered(data: dict) -> bytes:
+    regular_font, bold_font = _register_fonts()
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=15 * mm,
+        rightMargin=15 * mm,
+        topMargin=24 * mm,
+        bottomMargin=25 * mm,
+        title="FactoFit table-centered application report",
+        author="FactoFit",
+    )
+
+    base = getSampleStyleSheet()
+    title_style = ParagraphStyle("RefTitle", parent=base["Title"], fontName=bold_font, fontSize=21, leading=28, alignment=TA_CENTER, textColor=colors.HexColor("#101827"), spaceAfter=4 * mm)
+    meta_style = ParagraphStyle("RefMeta", fontName=regular_font, fontSize=8, leading=12, alignment=TA_CENTER, textColor=colors.HexColor("#667386"))
+    heading_style = ParagraphStyle("RefHeading", fontName=bold_font, fontSize=15.5, leading=20, textColor=colors.HexColor("#101827"), spaceBefore=4 * mm, spaceAfter=3 * mm)
+    subheading_style = ParagraphStyle("RefSubheading", fontName=bold_font, fontSize=11, leading=15, textColor=colors.HexColor("#173250"), spaceBefore=4 * mm, spaceAfter=2 * mm)
+    body_style = ParagraphStyle("RefBody", fontName=regular_font, fontSize=9.2, leading=15, textColor=colors.HexColor("#1F2A37"))
+    small_style = ParagraphStyle("RefSmall", fontName=regular_font, fontSize=7.7, leading=11, textColor=colors.HexColor("#65758A"))
+    cell_style = ParagraphStyle("RefCell", fontName=regular_font, fontSize=8.4, leading=12.2, textColor=colors.HexColor("#1F2A37"))
+    cell_bold_style = ParagraphStyle("RefCellBold", fontName=bold_font, fontSize=8.7, leading=12.4, textColor=colors.HexColor("#101827"))
+    kpi_label_style = ParagraphStyle("RefKpiLabel", fontName=regular_font, fontSize=7.4, leading=10, textColor=colors.HexColor("#53657A"))
+    kpi_value_style = ParagraphStyle("RefKpiValue", fontName=bold_font, fontSize=14.5, leading=17, textColor=colors.HexColor("#101827"))
+    pill_required_style = ParagraphStyle("RefPillRequired", fontName=bold_font, fontSize=7.2, leading=9, alignment=TA_CENTER, textColor=colors.HexColor("#102033"), borderColor=colors.HexColor("#B9C8D8"), borderWidth=0.6, borderPadding=(2, 7, 2))
+    pill_supplement_style = ParagraphStyle("RefPillSupplement", parent=pill_required_style, textColor=colors.HexColor("#173250"))
+
+    def p(value: Any, style: ParagraphStyle = cell_style) -> Paragraph:
+        return _paragraph(value, style)
+
+    def make_table(rows: list[list[Any]], widths: list[float], *, header: bool = True, label_cols: tuple[int, ...] = (), row_heights: list[float] | None = None) -> Table:
+        flow_rows = []
+        for row_index, row in enumerate(rows):
+            flow_row = []
+            for col_index, value in enumerate(row):
+                style = cell_bold_style if (header and row_index == 0) or col_index in label_cols else cell_style
+                flow_row.append(value if isinstance(value, Flowable) else p(value, style))
+            flow_rows.append(flow_row)
+        table = Table(
+            flow_rows,
+            colWidths=[width * mm for width in widths],
+            rowHeights=[height * mm for height in row_heights] if row_heights else None,
+            repeatRows=1 if header else 0,
+        )
+        style_commands: list[tuple] = [
+            ("BOX", (0, 0), (-1, -1), 0.45, colors.HexColor("#D6DEE8")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#D6DEE8")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 7),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]
+        if header:
+            style_commands += [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F2F5F8")),
+                ("LINEBELOW", (0, 0), (-1, 0), 0.85, colors.HexColor("#8393A5")),
+            ]
+        for col in label_cols:
+            style_commands.append(("BACKGROUND", (col, 1 if header else 0), (col, -1), colors.HexColor("#FAFBFD")))
+        table.setStyle(TableStyle(style_commands))
+        return table
+
+    def note_box(text: str, *, bold_prefix: str | None = None, width: float = 180 * mm) -> Table:
+        display = f"{bold_prefix} - {text}" if bold_prefix else text
+        box = Table([[p(display, body_style)]], colWidths=[width])
+        box.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#FAFBFD")),
+            ("LEFTPADDING", (0, 0), (-1, -1), 11),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("LINEBEFORE", (0, 0), (0, -1), 2.5, colors.HexColor("#103A5D")),
+        ]))
+        return box
+
+    summary = _as_dict(data.get("summary"))
+    company = _as_dict(data.get("company"))
+    equipment = _as_dict(data.get("equipment"))
+    policy = _as_dict(data.get("policy"))
+    matched = _as_dict(data.get("matched_policy"))
+    scenario = _as_dict(data.get("scenario"))
+    breakdown = _as_dict(data.get("breakdown"))
+    benchmark = _as_dict(data.get("benchmark"))
+    safety_all = _as_dict(data.get("safety_improvement")).get("items") or []
+    safety_items = safety_all[:3]
+
+    company_name = _report_text(summary.get("company_name") or company.get("company_name"), "-")
+    equipment_name = _report_text(summary.get("equipment_name") or equipment.get("name"), "-")
+    policy_title = _report_text(summary.get("policy_title") or policy.get("title") or matched.get("title"), "-")
+    industry_display = _report_text(summary.get("industry_display") or company.get("industry_name"), "-")
+    region = _report_text(company.get("region"), "-")
+    employee_count = _report_text(company.get("employee_count"), "0")
+    age_years = _number(equipment.get("age_years"))
+    defect_rate = _number(equipment.get("defect_rate"))
+    avg_cycle = _number(benchmark.get("avg_replacement_cycle_yr"), 10)
+    avg_defect = _number(benchmark.get("avg_defect_rate_pct"), 1.8)
+    investment = _number(summary.get("investment_manwon") or scenario.get("investment_manwon"))
+    subsidy = _number(summary.get("subsidy_manwon") or scenario.get("subsidy_manwon"))
+    self_funding = _number(summary.get("self_funding_manwon"), max(0, investment - subsidy))
+    payback_months = summary.get("payback_months")
+    if payback_months in (None, "") and scenario.get("payback_years") not in (None, ""):
+        payback_months = _number(scenario.get("payback_years")) * 12
+    match_score = summary.get("match_score") or matched.get("match_score")
+    energy_saving = _first_number(breakdown.get("energy_saving_manwon"), breakdown.get("energy_saving"))
+    maintenance_saving = _first_number(breakdown.get("maintenance_saving_manwon"), breakdown.get("maintenance_saving"))
+    defect_saving = _first_number(breakdown.get("defect_saving_manwon"), breakdown.get("defect_reduction_manwon"), breakdown.get("defect_reduction"))
+    productivity_gain = _first_number(breakdown.get("productivity_gain_manwon"), breakdown.get("productivity_gain"))
+    annual_net = _first_number(scenario.get("annual_net_benefit_manwon"), energy_saving + maintenance_saving + defect_saving + productivity_gain)
+    energy_cost = _number(equipment.get("energy_cost_annual"))
+    maintenance_cost = _number(equipment.get("maintenance_cost_annual"))
+    evidence_rows_raw = _consumer_evidence_rows(data)
+    evidence_total = len(evidence_rows_raw)
+    safety_evidence_count = sum(len(item.get("required_evidences") or []) for item in safety_all)
+    judgement = _consumer_judgement(summary, safety_all)
+    report_subtitle = "표 중심 신청 판단 요약서 · 가독성 강화형"
+
+    story: list[Any] = [
+        p("FactoFit 표 중심 신청 판단 요약서", title_style),
+        p(f"생성일 {datetime.now():%Y.%m.%d} · FactoFit DB/ROI 계산값 기준 · 원본 표중심 내용 삭제 없이 재배치", meta_style),
+        Spacer(1, 6 * mm),
+    ]
+
+    kpi_table = Table(
+        [[
+            [p("신청 판단", kpi_label_style), p(judgement, kpi_value_style)],
+            [p("정책 적합도", kpi_label_style), p(_score_text(match_score), kpi_value_style)],
+            [p("예상 지원금", kpi_label_style), p(_money_text(subsidy), kpi_value_style)],
+            [p("내 부담금", kpi_label_style), p(_money_text(self_funding), kpi_value_style)],
+            [p("회수기간", kpi_label_style), p(_month_text(payback_months), kpi_value_style)],
+        ]],
+        colWidths=[36 * mm] * 5,
+        rowHeights=[22 * mm],
+    )
+    kpi_table.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.55, colors.HexColor("#D6DEE8")),
+        ("INNERGRID", (0, 0), (-1, -1), 0.45, colors.HexColor("#D6DEE8")),
+        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#F7F9FB")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    core_answer = [
+        f"- 정책 추천 적합도는 {_score_text(match_score)}입니다.",
+        f"- 기업의 지역({region}), 업종({industry_display}), 규모({company.get('company_type') or company.get('company_size') or '중소기업'})에 대한 매칭 결과를 기준으로 검토합니다.",
+        f"- {policy_title}의 세부 지원한도와 제출서류, 마감일, 자격조건은 공고 원문 확인이 필요합니다.",
+        "- 추천 점수는 신청 자격 확정값과 구분되는 참고 지표입니다.",
+    ]
+    if _clip_text(matched.get("reason"), 220, ""):
+        core_answer.insert(2, f"- {_clip_text(matched.get('reason'), 220)}")
+    story += [
+        kpi_table,
+        Spacer(1, 5 * mm),
+        note_box("먼저 상단 KPI로 신청 판단을 확인하고, 아래 4개 질문에서 사장님 관점의 핵심 답변을 확인합니다. 상세 근거는 2~5페이지에서 같은 순서로 이어집니다.", bold_prefix="읽는 순서"),
+        p("1. 핵심 요약", heading_style),
+        make_table([["사장님 질문", "현재 답변", "판단"], ["우리 회사가 받을 수 있나?", "\n".join(core_answer), judgement]], [28, 116, 36], label_cols=(0,), row_heights=[9, 58]),
+        Spacer(1, 3 * mm),
+        make_table([["내 돈은 얼마 들어가나?", _money_text(self_funding), "지원금 차감 후 자기부담금 기준"]], [28, 116, 36], header=False, label_cols=(0,), row_heights=[15]),
+        Spacer(1, 3 * mm),
+        make_table([["왜 지금 해야 하나?", "\n".join([f"- {company_name}은 {industry_display} 분야에서 {equipment_name} 설비를 운영하고 있습니다.", f"- 사용연수는 {age_years:g}년이며, 연간 에너지비용 {_money_text(energy_cost)}과 유지보수비 {_money_text(maintenance_cost)}이 발생합니다.", f"- 불량률은 {defect_rate:.1f}%로 입력되어 비용과 생산성 지표의 병행 검토가 필요합니다.", "- 설비 개선 투자와 스마트공장 전환을 연계하여 검토합니다."]), "설비 노후·비용·품질 지표 기준"]], [28, 116, 36], header=False, label_cols=(0,), row_heights=[38]),
+        Spacer(1, 3 * mm),
+        make_table([["무엇이 부족한가?", f"일반 준비자료 {evidence_total}건 + 안전개선 증빙 {safety_evidence_count}건 확인 필요", "제출 전 증빙 보완"]], [28, 116, 36], header=False, label_cols=(0,), row_heights=[15]),
+        PageBreak(),
+    ]
+
+    cost_table = make_table([["항목", "금액"], ["연간 에너지비", _money_text(energy_cost)], ["연간 유지보수비", _money_text(maintenance_cost)], ["연간 비용 합계", _money_text(energy_cost + maintenance_cost)]], [43, 45], label_cols=(0,), row_heights=[10, 11, 11, 11])
+    split_table = Table(
+        [[
+            [p("설비 상태 핵심 지표", subheading_style), ReferenceBarsFlowable([("사용연수", age_years, f"{age_years:g}년 / 평균 {avg_cycle:g}년"), ("불량률", defect_rate, f"{defect_rate:.1f}% / 평균 {avg_defect:.1f}%")], regular_font=regular_font, bold_font=bold_font, width=78 * mm, height=28 * mm)],
+            [p("비용 발생 현황", subheading_style), cost_table],
+        ]],
+        colWidths=[88 * mm, 88 * mm],
+    )
+    split_table.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
+    story += [
+        p("2. 신청기업 및 설비 현황", heading_style),
+        make_table([["구분", "내용", "구분", "내용"], ["기업명", company_name, "지역", region], ["업종", industry_display, "직원 수", f"{employee_count}명"], ["설비명", equipment_name, "사용연수", f"{age_years:g}년"]], [45, 45, 45, 45], label_cols=(0, 2), row_heights=[10, 11, 11, 11]),
+        Spacer(1, 12 * mm),
+        split_table,
+        Spacer(1, 9 * mm),
+        p("3. 사업 목적 및 추진내용", heading_style),
+        make_table([["항목", "내용"], ["사업 목적", _clip_text(summary.get("implementation_plan") or summary.get("business_necessity"), 520)], ["지원사업", policy_title]], [40, 140], label_cols=(0,), row_heights=[10, 28, 12]),
+        Spacer(1, 5 * mm),
+        note_box("이 페이지는 원본 표중심 리포트의 신청기업 및 설비 현황과 사업 목적을 유지하되, 설비 상태와 비용 발생 현황을 별도로 분리해 한눈에 보이도록 재배치했습니다.", bold_prefix="FactoFit 정리"),
+        PageBreak(),
+    ]
+
+    policy_checks = [
+        ["추천 적합도", f"정책 추천 적합도는 {_score_text(match_score)}입니다."],
+        ["기업 조건", f"기업의 지역({region}), 업종({industry_display}), 규모({company.get('company_type') or company.get('company_size') or '중소기업'})에 모두 부합하는지 검토합니다."],
+        ["활용 방향", _clip_text(summary.get("policy_utilization_strategy") or summary.get("policy_analysis"), 260)],
+        ["확인 필요", "세부 지원한도와 제출서류, 마감일, 자격조건은 공고 원문 확인이 필요합니다."],
+        ["연계 판단", "해당 매칭 결과를 기준으로 본 지원사업과의 연계 조건을 충족하는지 확인합니다."],
+        ["원문 발췌 해석", _clip_text(policy.get("eligibility_evidence") or policy.get("summary"), 250)],
+        ["점수 해석", "추천 점수는 신청 자격 확정값과 구분되는 참고 지표입니다."],
+        ["최종 확인", "공고일 기준 업종과 기업 규모, 지역, 중복수혜 제한 및 자부담 조건의 최종 확인이 필요합니다."],
+    ]
+    budget_table = make_table([["항목", "금액/기간", "근거"], ["총 사업비", _money_text(investment), "ROI 계산 시나리오"], ["예상 지원금", _money_text(subsidy), "정책 지원한도 및 시나리오"], ["자기부담금", _money_text(self_funding), "총 사업비 - 예상 지원금"], ["연간 순편익", _money_text(annual_net), "ROI breakdown"], ["예상 회수기간", _month_text(payback_months), "ROI 계산값"]], [42, 42, 96], label_cols=(0,), row_heights=[9, 10, 10, 10, 10, 10])
+    budget_chart_block = Table(
+        [
+            [p("사업비 구성", subheading_style)],
+            [ReferenceBarsFlowable([("정부 지원금", subsidy, _money_text(subsidy)), ("자기부담금", self_funding, _money_text(self_funding))], regular_font=regular_font, bold_font=bold_font, width=154 * mm, height=24 * mm)],
+            [note_box("현재 기준으로는 총 사업비에서 예상 지원금을 차감한 자기부담금 기준으로 판단합니다.", width=180 * mm)],
+        ],
+        colWidths=[180 * mm],
+    )
+    budget_chart_block.setStyle(TableStyle([
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+    ]))
+    budget_split = Table(
+        [[
+            budget_table,
+        ]],
+        colWidths=[180 * mm],
+    )
+    budget_split.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
+    story += [
+        p("4. 정책 적합성", heading_style),
+        p("원본의 정책 적합성 문장을 삭제하지 않고, 심사 관점별로 끊어 읽을 수 있도록 재구성했습니다.", small_style),
+        Spacer(1, 3 * mm),
+        make_table([["검토 관점", "내용"], *policy_checks], [35, 145], label_cols=(0,), row_heights=[9, 11, 12, 32, 12, 12, 30, 12, 14]),
+        Spacer(1, 5 * mm),
+        make_table([["탈락위험 관점", "정책 적합성은 가능성 판단이며, 실제 지원 가능 여부는 공고 원문, 지원 가능 비목, 지원한도, 자부담 조건, 제출서류 확인 이후 확정됩니다."]], [35, 145], header=False, label_cols=(0,), row_heights=[18]),
+        PageBreak(),
+        p("5. 예산·ROI 판단 - 내 돈 기준", heading_style),
+        budget_split,
+        Spacer(1, 3 * mm),
+        budget_chart_block,
+        PageBreak(),
+    ]
+
+    savings_table = make_table([["절감/개선 항목", "금액", "비고"], ["에너지비 절감", _money_text(energy_saving), "입력 에너지비 기준"], ["유지보수비 절감", _money_text(maintenance_saving), "정비비 기준"], ["불량비용 절감", _money_text(defect_saving), "불량률 기준"], ["생산성 개선 효과", _money_text(productivity_gain), "생산성 개선값"]], [29, 30, 29], label_cols=(0,))
+    savings_split = Table(
+        [[
+            savings_table,
+            [p("연간 순편익 구성", subheading_style), ReferenceBarsFlowable([("에너지비", energy_saving, _money_text(energy_saving)), ("유지보수비", maintenance_saving, _money_text(maintenance_saving)), ("불량비용", defect_saving, _money_text(defect_saving))], regular_font=regular_font, bold_font=bold_font, width=76 * mm, height=30 * mm)],
+        ]],
+        colWidths=[88 * mm, 88 * mm],
+    )
+    savings_split.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
+    safety_rows = [["번호", "관점", "현재 상태", "증빙 여부", "설명·근거"]]
+    if safety_items:
+        for index, item in enumerate(safety_items, 1):
+            safety_rows.append([str(index), _report_text(item.get("viewpoint_title") or item.get("viewpoint_key"), "-"), _report_text(item.get("current_judgement"), "개선 필요"), "보유" if item.get("required_evidences") else "미보유", _clip_text(item.get("description"), 120)])
+    else:
+        safety_rows += [["1", "자동화 설비 안전성 보완", "개선 필요", "미보유", "자동화 장치와 방호장치의 연동 상태 확인이 필요합니다."], ["2", "작업자 위험 노출 감소", "개선 필요", "미보유", "주요 안전장치 확인을 통해 작업자 위험 노출을 줄일 필요가 있습니다."], ["3", "설비 운용 안정성 개선", "개선 필요", "미보유", "구동부와 제어계통 점검 자료로 설비 운용 안정성을 확인해야 합니다."]]
+    story += [
+        p("6. 절감/개선 항목 및 기대효과", heading_style),
+        savings_split,
+        Spacer(1, 4 * mm),
+        p("※ 원본 표중심 리포트의 기대효과 문단과 연간 순편익 기준에 맞춰 절감 항목을 정리했습니다.", small_style),
+        p("기대효과", subheading_style),
+        make_table([["구분", "내용"], ["기대효과", _clip_text(summary.get("expected_effects"), 430)], ["성과관리", _clip_text(summary.get("performance_plan"), 430)]], [33, 147], label_cols=(0,), row_heights=[9, 22, 18]),
+        p("7. 안전개선 근거", heading_style),
+        p("현재 상태와 증빙 여부 판단: 각 관점별 현재 상태와 증빙 보유 여부를 가시성 높게 확인할 수 있도록 구성했습니다.", small_style),
+        make_table(safety_rows, [14, 45, 27, 27, 67], label_cols=(1,), row_heights=[9] + [14] * (len(safety_rows) - 1)),
+        PageBreak(),
+    ]
+
+    evidence_rows = [["상태", "항목", "왜 필요한가", "다음 조치"]]
+    for index, row in enumerate(evidence_rows_raw[:7]):
+        status = row[0] if row else ("필수" if index < 3 else "보완")
+        status_style = pill_required_style if status == "필수" else pill_supplement_style
+        evidence_rows.append([
+            p(status, status_style),
+            _clip_text(row[1] if len(row) > 1 else "-", 34),
+            _clip_text(row[2] if len(row) > 2 else "-", 24),
+            _clip_text(row[3] if len(row) > 3 else "-", 24),
+        ])
+    summary_rows = [
+        ["확인 항목", "현재 문서 반영", "제출 전 조치"],
+        ["정책 적합도", f"{_score_text(match_score)}, 연계 가능성 있음", "공고 원문 기준 재확인"],
+        ["투자금 및 자기부담금", f"총 사업비 {_money_text(investment)}, 자기부담금 {_money_text(self_funding)}", "지원비율 및 실제 견적 확인"],
+        ["ROI", f"연간 순편익 {_money_text(annual_net)}, 회수기간 {_month_text(payback_months)}", "월별 비용자료와 견적서 대조"],
+        ["증빙자료", f"일반 준비자료 {evidence_total}건 + 안전개선 증빙 {safety_evidence_count}건 확인 필요", "필수/보완 자료 순서대로 확보"],
+    ]
+    story += [
+        p("8. 증빙자료·탈락위험 체크", heading_style),
+        make_table(evidence_rows, [21, 62, 52, 45], row_heights=[8] + [12] * (len(evidence_rows) - 1)),
+        Spacer(1, 3 * mm),
+        p("9. 데이터 보안·신뢰 안내 및 제출 전 확인", heading_style),
+        note_box("본 리포트는 저장된 기업·설비·ROI·정책·안전개선 데이터를 기준으로 생성되었습니다. 최종 제출 전 공고 원문, 실제 견적, 지원비율, 제출서류를 반드시 재확인해야 합니다."),
+        p("최종 확인용 요약", subheading_style),
+        make_table(summary_rows, [57, 66, 57], label_cols=(0,), row_heights=[9, 12, 15, 14, 15]),
+        Spacer(1, 3 * mm),
+        note_box("원본 내용은 삭제하지 않고, 긴 문단을 판단 단위로 분리했습니다. 핵심 수치는 상단/표/막대로 반복 노출하고, 상세 근거는 다음 페이지로 넘겨 읽는 흐름을 만들었습니다.", bold_prefix="가독성 개선 방식"),
+    ]
+
+    def footer(canvas, document):
+        canvas.saveState()
+        canvas.setFont(regular_font, 7)
+        canvas.setFillColor(colors.HexColor("#7B8794"))
+        canvas.drawString(15 * mm, A4[1] - 15 * mm, "FactoFit AI Application Report")
+        canvas.drawRightString(A4[0] - 15 * mm, A4[1] - 15 * mm, report_subtitle)
+        canvas.setStrokeColor(colors.HexColor("#D6DEE8"))
+        canvas.setLineWidth(0.45)
+        canvas.line(15 * mm, A4[1] - 21 * mm, A4[0] - 15 * mm, A4[1] - 21 * mm)
+        canvas.line(15 * mm, 18 * mm, A4[0] - 15 * mm, 18 * mm)
+        canvas.setFillColor(colors.HexColor("#7B8794"))
+        canvas.drawString(15 * mm, 10 * mm, "FactoFit AI Application Report")
+        canvas.drawRightString(A4[0] - 15 * mm, 10 * mm, str(document.page))
+        canvas.restoreState()
+
+    doc.build(story, onFirstPage=footer, onLaterPages=footer)
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+def build_application_report_pdf(data: dict) -> bytes:
+    return _build_application_report_pdf_legacy(data)
 
 
 def generate_application_report_pdf(

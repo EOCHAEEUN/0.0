@@ -540,18 +540,6 @@ export default function SupportProjectsFeature() {
 
           }}
 
-          stats={{
-
-            equipmentCount: workspace.equipmentCount,
-
-            closingSoonCount: workspace.closingSoonCount,
-
-            matchedPolicyCount: workspace.policySummary.matchedPolicyCount,
-
-            recentAnalysisCount: workspace.recentAnalysisCount,
-
-          }}
-
         />
 
 

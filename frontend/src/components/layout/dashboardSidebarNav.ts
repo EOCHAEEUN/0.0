@@ -6,6 +6,7 @@ export type SideNavKey =
   | "advisor"
   | "mypage"
   | "equipment"
+  | "help"
 
 export type SidebarWorkspacePaths = {
   newRoiPath?: string
@@ -19,7 +20,7 @@ export type SidebarWorkspacePaths = {
 export function buildMainNavItems(paths: SidebarWorkspacePaths) {
   return [
     { key: "dashboard" as const, label: "종합현황", path: "/dashboard" },
-    { key: "roi" as const, label: "ROI투자분석", path: paths.newRoiPath || "/roi" },
+    { key: "roi" as const, label: "ROI 분석", path: paths.newRoiPath || "/roi" },
     { key: "support" as const, label: "지원사업 일정", path: paths.policyPath || "/support-projects" },
     {
       key: "application" as const,
@@ -29,13 +30,13 @@ export function buildMainNavItems(paths: SidebarWorkspacePaths) {
           ? paths.draftPath || "/application-draft"
           : "/application-draft",
     },
-    { key: "advisor" as const, label: "AI advisor", path: paths.advisorPath || "/advisor" },
+    { key: "advisor" as const, label: "AI 어드바이저", path: paths.advisorPath || "/advisor" },
   ]
 }
 
 export const BOTTOM_NAV_ITEMS = [
-  { key: "mypage" as const, label: "마이페이지", path: "/mypage" },
-  { key: "equipment" as const, label: "설비현황", path: "/equipment" },
+  { key: "mypage" as const, label: "설정", path: "/mypage" },
+  { key: "help" as const, label: "고객지원", path: "/" },
 ] as const
 
 export function isSidebarMainActive(key: SideNavKey, pathname: string): boolean {
@@ -83,9 +84,9 @@ export function isSidebarMainActive(key: SideNavKey, pathname: string): boolean 
   return false
 }
 
-export function isSidebarBottomActive(key: "mypage" | "equipment", pathname: string): boolean {
+export function isSidebarBottomActive(key: "mypage" | "help", pathname: string): boolean {
   if (key === "mypage") {
     return pathname === "/mypage" || pathname === "/company"
   }
-  return pathname === "/equipment"
+  return pathname === "/"
 }

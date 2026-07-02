@@ -150,6 +150,11 @@ export type DashboardOverviewAnalysis = {
   detail: string
   status: string
   created_at?: string | null
+  roi_pct?: number | null
+  annual_savings_manwon?: number | null
+  investment_manwon?: number | null
+  utilization_improvement_pct?: number | null
+  chips?: string[]
 }
 
 export type DashboardOverviewResponse = {
@@ -197,6 +202,7 @@ export type DashboardOverviewResponse = {
     legacy_missing?: boolean
   }
   deadlines?: DashboardOverviewDeadline[]
+  calendar_deadlines?: DashboardOverviewDeadline[]
   recent_analyses?: DashboardOverviewAnalysis[]
   equipments?: Array<{
     equipment_id?: string

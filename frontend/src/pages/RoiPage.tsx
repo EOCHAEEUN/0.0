@@ -485,12 +485,6 @@ export default function RoiPage() {
             analysisId: draftId,
             priorityPolicyId: priorityPolicyId,
           }}
-          stats={{
-            equipmentCount: workspace.equipmentCount,
-            closingSoonCount: workspace.closingSoonCount,
-            matchedPolicyCount: workspace.policySummary.matchedPolicyCount,
-            recentAnalysisCount: workspace.recentAnalysisCount,
-          }}
         />
 
         <div className="ff-dashboard-main-content ff-roi-workspace-content">

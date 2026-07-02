@@ -29,6 +29,7 @@ export type DashboardDeadlineListItem = {
   policyTitle: string
   sourceName: string
   deadlineDisplay: string
+  deadlineDate: string | null
   daysRemaining: number
   dday: string
   urgency: "urgent" | "upcoming"
@@ -62,6 +63,10 @@ export type DashboardAnalysisRow = {
   statusLabel: string
   summary: string
   detail: string
+  chips: string[]
+  roiText: string
+  annualSavingsText: string
+  utilizationText: string
   ctaLabel: string
   ctaPath: string
 }
@@ -172,6 +177,65 @@ function formatPercent(value: number | null) {
   if (value === null || !Number.isFinite(value)) return "-"
   // roi_pct는 백엔드에서 이미 퍼센트 값(예: 15.5)으로 반환된다. 자동 스케일링 없음.
   return `${Math.round(value)}%`
+}
+
+function formatCompactSavings(manwon: number | null) {
+  if (manwon === null || !Number.isFinite(manwon)) return "-"
+  if (manwon >= 100) return `${Math.round(manwon / 100)}M`
+  return `${formatCommaNumber(manwon)}만`
+}
+
+function normalizeDeadlineDate(value: unknown) {
+  const text = compactText(value)
+  if (!text) return null
+  if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10)
+  const parsed = Date.parse(text)
+  if (!Number.isFinite(parsed)) return null
+  const date = new Date(parsed)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate(),
+  ).padStart(2, "0")}`
+}
+
+function mapOverviewDeadlineItem(
+  item: {
+    policy_id?: string | null
+    title: string
+    deadline?: string | null
+    deadline_display: string
+    d_day: string
+    days_remaining: number
+    status_hint: string
+    is_priority?: boolean
+  },
+  params: {
+    companyId: string
+    analysisId: string | null
+    equipmentId: string | null
+    policyPath: string
+  },
+): DashboardDeadlineListItem {
+  const policyId = item.policy_id ?? null
+  const daysRemaining = item.days_remaining
+  return {
+    policyId,
+    policyTitle: item.title,
+    sourceName: item.status_hint,
+    deadlineDisplay: `${item.deadline_display} 마감 · ${item.status_hint}`,
+    deadlineDate: normalizeDeadlineDate(item.deadline),
+    daysRemaining,
+    dday: item.d_day,
+    urgency: daysRemaining <= 7 ? "urgent" : "upcoming",
+    isPriority: Boolean(item.is_priority),
+    path:
+      policyId && params.analysisId
+        ? buildSupportProjectsPath({
+            companyId: params.companyId,
+            analysisId: params.analysisId,
+            equipmentId: params.equipmentId || undefined,
+          })
+        : params.policyPath,
+  }
 }
 
 function formatPayback(value: number | null) {
@@ -625,6 +689,7 @@ function mapDeadlineList(
         policyTitle: compactText(policy.title) || "공고 확인 필요",
         sourceName: getPolicySourceName(policy),
         deadlineDisplay: formatDeadlineDisplay(raw),
+        deadlineDate: normalizeDeadlineDate(raw),
         daysRemaining,
         dday: `D-${Math.max(0, daysRemaining)}`,
         urgency: daysRemaining <= 7 ? "urgent" : "upcoming",
@@ -1071,12 +1136,16 @@ function mapAnalysisRows(
           : "분석 필요",
     summary:
       workspace.status === "completed"
-        ? `ROI ${workspace.kpis[0].value} · 매칭 공고 ${workspace.matchedPolicyCount}`
+        ? `ROI ${workspace.kpis[0]?.value ?? "-"} · 매칭 공고 ${workspace.matchedPolicyCount}`
         : workspace.progressText.replace("작성 중: ", ""),
     detail:
       workspace.status === "completed"
         ? `우선 검토 정책 ${workspace.priorityPolicyTitle} · ${workspace.deadline.dday} 일정 확인 필요`
         : "투자금과 운영비 조건을 입력하면 ROI 분석을 이어갈 수 있습니다.",
+    chips: [workspace.equipmentName, workspace.industryLabel].filter(Boolean),
+    roiText: workspace.kpis[0]?.value ?? "-",
+    annualSavingsText: workspace.kpis[1]?.value ?? "-",
+    utilizationText: workspace.kpis[2]?.value ?? "-",
     ctaLabel: workspace.status === "completed" ? "결과 보기" : "이어서 작성",
     ctaPath:
       workspace.status === "completed" ? workspace.roiPath : workspace.draftPath,
@@ -1270,23 +1339,16 @@ export function mapDashboardOverview(
   const matchedCount = counts?.matched_policies ?? 0
   const status: InvestmentActionStatus = !analysisId ? "empty" : "completed"
 
-  const deadlineItems: DashboardDeadlineListItem[] = (overview.deadlines ?? []).map(
-    (item) => ({
-      policyId: item.policy_id ?? null,
-      policyTitle: item.title,
-      sourceName: item.status_hint,
-      deadlineDisplay: `${item.deadline_display} 마감 · ${item.status_hint}`,
-      daysRemaining: item.days_remaining,
-      dday: item.d_day,
-      urgency: item.days_remaining <= 7 ? "urgent" : "upcoming",
-      isPriority: Boolean(item.is_priority),
-      path: item.policy_id && analysisId
-        ? buildSupportProjectsPath({
-            companyId,
-            analysisId,
-            equipmentId: equipmentId || undefined,
-          })
-        : paths.policyPath,
+  const deadlineItems: DashboardDeadlineListItem[] = (
+    overview.calendar_deadlines?.length
+      ? overview.calendar_deadlines
+      : overview.deadlines ?? []
+  ).map((item) =>
+    mapOverviewDeadlineItem(item, {
+      companyId,
+      analysisId,
+      equipmentId,
+      policyPath: paths.policyPath,
     }),
   )
 
@@ -1299,6 +1361,20 @@ export function mapDashboardOverview(
       statusLabel: row.status,
       summary: row.summary,
       detail: row.detail,
+      chips: row.chips?.length ? row.chips : row.summary.split(" · ").filter(Boolean),
+      roiText: formatPercent(
+        typeof row.roi_pct === "number" ? row.roi_pct : readNumber(row.roi_pct),
+      ),
+      annualSavingsText: formatCompactSavings(
+        typeof row.annual_savings_manwon === "number"
+          ? row.annual_savings_manwon
+          : readNumber(row.annual_savings_manwon),
+      ),
+      utilizationText: formatPercent(
+        typeof row.utilization_improvement_pct === "number"
+          ? row.utilization_improvement_pct
+          : readNumber(row.utilization_improvement_pct),
+      ),
       ctaLabel: "결과 보기",
       ctaPath: `/analysis/${encodeURIComponent(row.analysis_id)}/result`,
     }),
@@ -1357,8 +1433,8 @@ export function mapDashboardOverview(
       policyId: deadlineItems[0]?.policyId ?? policyId,
     },
     deadlineList: {
-      title: "마감 일정",
-      subtitle: "",
+      title: "마감일정",
+      subtitle: "날짜를 선택하면 아래에 마감 공고 리스트가 펼쳐집니다.",
       viewAllLabel: "전체 보기",
       emptyMessage: legacyMissing
         ? "분석 당시 정책 이력이 없어 마감일을 확인할 수 없습니다."

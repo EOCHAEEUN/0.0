@@ -236,12 +236,6 @@ export default function EquipmentStatusFeature() {
             analysisId: workspace.analysisId,
             priorityPolicyId: workspace.priorityPolicyId,
           }}
-          stats={{
-            equipmentCount: workspace.equipmentCount,
-            closingSoonCount: workspace.closingSoonCount,
-            matchedPolicyCount: workspace.policySummary.matchedPolicyCount,
-            recentAnalysisCount: workspace.recentAnalysisCount,
-          }}
         />
 
         <div className="ff-dashboard-main-content">

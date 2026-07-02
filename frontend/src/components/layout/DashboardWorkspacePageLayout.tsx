@@ -38,12 +38,6 @@ export default function DashboardWorkspacePageLayout({
             analysisId: analysisId || workspace.analysisId,
             priorityPolicyId: policyId || workspace.priorityPolicyId,
           }}
-          stats={{
-            equipmentCount: workspace.equipmentCount,
-            closingSoonCount: workspace.closingSoonCount,
-            matchedPolicyCount: workspace.policySummary.matchedPolicyCount,
-            recentAnalysisCount: workspace.recentAnalysisCount,
-          }}
         />
 
         <div className={`ff-dashboard-main-content ${contentClassName}`.trim()}>{children}</div>

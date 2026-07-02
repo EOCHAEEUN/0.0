@@ -231,6 +231,42 @@ def _build_deadlines(
     return rows[:5]
 
 
+def _build_calendar_deadlines(
+    policies: list[dict[str, Any]],
+    *,
+    priority_policy_id: str | None,
+    legacy_missing: bool,
+    limit: int = 60,
+) -> list[dict[str, Any]]:
+    if legacy_missing:
+        return []
+
+    today = date.today()
+    rows: list[dict[str, Any]] = []
+    for policy in policies:
+        raw = _policy_deadline_raw(policy)
+        deadline = _parse_deadline(raw)
+        if not deadline or deadline < today:
+            continue
+        days_remaining = (deadline - today).days
+        policy_id = str(policy.get("policy_id") or "")
+        rows.append(
+            {
+                "policy_id": policy_id or None,
+                "title": _safe_text(policy.get("title"), default="공고명 미확인"),
+                "deadline": deadline.isoformat(),
+                "deadline_display": _format_deadline_display(deadline),
+                "d_day": _d_day_label(days_remaining),
+                "days_remaining": days_remaining,
+                "status_hint": _deadline_status_hint(policy, days_remaining),
+                "is_priority": bool(priority_policy_id and policy_id == priority_policy_id),
+            }
+        )
+
+    rows.sort(key=lambda item: (int(item.get("days_remaining") or 999), item.get("title") or ""))
+    return rows[:limit]
+
+
 def _deadline_status_hint(policy: dict[str, Any], days_remaining: int) -> str:
     if days_remaining <= 3:
         return "제출서류 확인 필요"
@@ -335,6 +371,31 @@ def _build_recent_analyses(
             metric = f"투자금 {int(investment):,}만원"
         elif payback is not None:
             metric = f"회수기간 {float(payback):g}년"
+
+        roi_pct = _safe_number(scenario.get("roi_pct"), scenario.get("roi_percent"))
+        annual_savings = _safe_number(
+            scenario.get("annual_net_benefit_manwon"),
+            scenario.get("annual_saving_manwon"),
+        )
+        ai_recommendation = _as_dict(roi_data.get("ai_recommendation"))
+        scores = _as_dict(ai_recommendation.get("scores"))
+        data_quality = _as_dict(roi_data.get("data_quality"))
+        utilization_improvement_pct = _safe_number(
+            scores.get("saving_effect"),
+            round(float(data_quality.get("score") or 0) * 100)
+            if data_quality.get("score") is not None
+            else None,
+        )
+        chips = [
+            compact
+            for compact in [
+                _safe_text(equipment.get("name")),
+                _safe_text(equipment.get("category")),
+                _safe_text(equipment.get("process")),
+                "최근 분석",
+            ]
+            if compact
+        ][:4]
         rows.append(
             {
                 "index": index,
@@ -346,6 +407,11 @@ def _build_recent_analyses(
                 "detail": metric or "ROI 분석 결과 확인",
                 "status": _analysis_status_label(roi_data),
                 "created_at": roi.get("created_at"),
+                "roi_pct": roi_pct,
+                "annual_savings_manwon": annual_savings,
+                "investment_manwon": investment,
+                "utilization_improvement_pct": utilization_improvement_pct,
+                "chips": chips,
             }
         )
     return rows
@@ -832,6 +898,11 @@ def load_dashboard_overview(
             "legacy_missing": legacy_missing,
         },
         "deadlines": deadlines,
+        "calendar_deadlines": _build_calendar_deadlines(
+            policies,
+            priority_policy_id=priority_policy_id,
+            legacy_missing=legacy_missing,
+        ),
         "recent_analyses": _build_recent_analyses(roi_outputs, equipments, limit=10),
         "equipments": [
             {

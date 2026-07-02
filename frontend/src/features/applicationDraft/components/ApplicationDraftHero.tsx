@@ -1,5 +1,5 @@
 import type { ApplicationDraftWorkspaceModel } from "../hooks/useApplicationDraftWorkspace"
-import { ApplicationDraftReadinessPanel } from "./ApplicationDraftReadinessPanel"
+import { ApplicationDraftProgressStepper } from "./ApplicationDraftProgressStepper"
 
 export function ApplicationDraftHero({
   model,
@@ -7,17 +7,16 @@ export function ApplicationDraftHero({
   model: ApplicationDraftWorkspaceModel
 }) {
   return (
-    <section className="ff-draft-hero ff-draft-hero-v2">
-      <div className="ff-draft-hero-copy">
-        <span className="ff-draft-hero-agent-badge">Factofit AI Agent</span>
-        <h3>ROI 분석 결과를 바탕으로 지원사업 신청서 초안을 생성합니다.</h3>
+    <header className="ff-draft-page-header">
+      <div className="ff-draft-page-header-copy">
+        <h2>ROI 분석 결과를 바탕으로 지원사업 신청서 초안을 생성합니다.</h2>
         <p>
-          기업정보 · 설비현황 · ROI 결과 · 정책활동을 연결해 신청서에 필요한
-          근거와 문장을 한눈에 정리합니다.
+          입력하신 기업 정보와 설비 데이터, ROI 분석 내용을 종합하여 최적화된
+          사업계획서 요약본을 제공합니다.
         </p>
       </div>
 
-      <ApplicationDraftReadinessPanel model={model} />
-    </section>
+      <ApplicationDraftProgressStepper />
+    </header>
   )
 }

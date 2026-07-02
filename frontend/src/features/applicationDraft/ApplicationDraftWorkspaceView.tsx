@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import {
   useLocation,
   useNavigate,
@@ -49,6 +49,8 @@ export function ApplicationDraftWorkspaceView({
     ? `/roi?analysisId=${encodeURIComponent(routeAnalysisId)}`
     : "/roi"
 
+  const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false)
+
   const layoutProps = {
     analysisId: routeAnalysisId || routeState.analysisId,
     policyId: resolvedPolicyId || routeState.policyId,
@@ -85,7 +87,11 @@ export function ApplicationDraftWorkspaceView({
 
         <ApplicationDraftWorkspace model={workspace} onGoRoi={() => navigate(roiPath)} />
 
-        <ApplicationDraftPdfPreview model={workspace} />
+        <ApplicationDraftPdfPreview
+          model={workspace}
+          previewOpen={pdfPreviewOpen}
+          onPreviewOpenChange={setPdfPreviewOpen}
+        />
       </div>
     </ApplicationDraftWorkspaceLayout>
   )

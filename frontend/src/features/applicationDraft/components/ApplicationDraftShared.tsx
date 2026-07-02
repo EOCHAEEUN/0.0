@@ -55,22 +55,20 @@ export function ScenarioToggle({
   onChange: (value: ScenarioKey) => void
 }) {
   return (
-    <div className="ff-draft-scenario-toggle" aria-label="투자 시나리오 선택">
+    <div className="ff-draft-scenario-toggle ff-draft-scenario-tabs" aria-label="투자 시나리오 선택">
       <button
         type="button"
         className={selected === "A" ? "is-active" : ""}
         onClick={() => onChange("A")}
       >
-        <b>A</b>
-        전체교체
+        A. 전체교체
       </button>
       <button
         type="button"
         className={selected === "B" ? "is-active" : ""}
         onClick={() => onChange("B")}
       >
-        <b>B</b>
-        부분교체
+        B. 부분교체
       </button>
     </div>
   )

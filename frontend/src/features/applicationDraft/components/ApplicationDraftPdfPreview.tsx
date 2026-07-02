@@ -1,3 +1,4 @@
+import { ChevronDown } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 
 import type { ApplicationDraftReportParams } from "../applicationDraft.contract"
@@ -174,14 +175,25 @@ async function requestApplicationReportPdf(
 
 export function ApplicationDraftPdfPreview({
   model,
+  previewOpen: controlledPreviewOpen,
+  onPreviewOpenChange,
 }: {
   model: ApplicationDraftWorkspaceModel
+  previewOpen?: boolean
+  onPreviewOpenChange?: (open: boolean) => void
 }) {
   const reportParams = model.reportParams
   const canGeneratePdf = model.canUsePdf && Boolean(reportParams)
   const isLoading = model.isLoading
 
-  const [previewOpen, setPreviewOpen] = useState(false)
+  const [internalPreviewOpen, setInternalPreviewOpen] = useState(false)
+  const previewOpen = controlledPreviewOpen ?? internalPreviewOpen
+  const setPreviewOpen = (open: boolean) => {
+    if (controlledPreviewOpen === undefined) {
+      setInternalPreviewOpen(open)
+    }
+    onPreviewOpenChange?.(open)
+  }
   const [previewTab, setPreviewTab] = useState<ReportType>("consumer_summary")
   const [previewLoading, setPreviewLoading] = useState<Record<ReportType, boolean>>({
     consumer_summary: false,
@@ -265,6 +277,13 @@ export function ApplicationDraftPdfPreview({
     await ensurePreviewPdf("consumer_summary", { force: true })
   }
 
+  useEffect(() => {
+    if (!controlledPreviewOpen) return
+    setPreviewTab("consumer_summary")
+    void ensurePreviewPdf("consumer_summary", { force: true })
+    // Controlled open is triggered from the scenario card.
+  }, [controlledPreviewOpen])
+
   const selectedDownloadCount = Object.values(downloadSelection).filter(Boolean).length
 
   const downloadSelectedPdfs = async () => {
@@ -314,7 +333,7 @@ export function ApplicationDraftPdfPreview({
   }
 
   return (
-    <section className="ff-card ff-final-preview-section">
+    <section id="ff-draft-pdf-preview" className="ff-card ff-final-preview-section">
       <div className="ff-pdf-expand-preview">
         <div className="ff-pdf-expand-head">
           <div>
@@ -344,14 +363,25 @@ export function ApplicationDraftPdfPreview({
         >
           PDF 바로보기
         </button>
-        <button
-          className="ff-pdf-action-button primary"
-          type="button"
-          disabled={!canGeneratePdf || isLoading}
-          onClick={() => setDownloadDialogOpen(true)}
-        >
-          PDF 다운로드 ▾
-        </button>
+        <div className="ff-pdf-split-button">
+          <button
+            className="ff-pdf-action-button primary main"
+            type="button"
+            disabled={!canGeneratePdf || isLoading}
+            onClick={() => setDownloadDialogOpen(true)}
+          >
+            PDF 다운로드
+          </button>
+          <button
+            className="ff-pdf-action-button primary caret"
+            type="button"
+            disabled={!canGeneratePdf || isLoading}
+            aria-label="PDF 다운로드 옵션"
+            onClick={() => setDownloadDialogOpen(true)}
+          >
+            <ChevronDown size={16} aria-hidden="true" />
+          </button>
+        </div>
       </div>
 
       {downloadFeedback && (

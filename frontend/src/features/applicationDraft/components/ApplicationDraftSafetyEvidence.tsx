@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState } from "react"
-import { ChevronDown, ChevronUp } from "lucide-react"
+import { ChevronUp } from "lucide-react"
 
 import {
   deleteSafetyEvidenceFile,
@@ -217,13 +217,18 @@ export function ApplicationDraftSafetyEvidence({
             )}
             {actionError && <div className="ff-draft-alert warning">{actionError}</div>}
 
+            <div className="ff-draft-safety-table-shell">
             <table className="ff-draft-safety-table">
               <thead>
                 <tr>
                   <th>번호</th>
                   <th>관점</th>
                   <th>현재 상태</th>
-                  <th>증빙 여부</th>
+                  <th className="ff-col-evidence">
+                    증빙
+                    <br />
+                    여부
+                  </th>
                   <th>설명 · 근거</th>
                   <th>관리</th>
                 </tr>
@@ -254,11 +259,13 @@ export function ApplicationDraftSafetyEvidence({
                               )
                             }
                           >
-                            {isOpen ? "접기" : "증빙 관리"}
                             {isOpen ? (
-                              <ChevronUp size={14} aria-hidden="true" />
+                              <>
+                                접기
+                                <ChevronUp size={14} aria-hidden="true" />
+                              </>
                             ) : (
-                              <ChevronDown size={14} aria-hidden="true" />
+                              "증빙 관리"
                             )}
                           </button>
                         </td>
@@ -344,6 +351,7 @@ export function ApplicationDraftSafetyEvidence({
                 })}
               </tbody>
             </table>
+            </div>
           </div>
 
           <footer className="ff-draft-safety-footer">

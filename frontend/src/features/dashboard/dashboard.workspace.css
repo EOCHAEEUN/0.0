@@ -88,6 +88,38 @@
   color: #123b6d;
 }
 
+.ff-sidebar-nav-group {
+  display: grid;
+  gap: 2px;
+}
+
+.ff-sidebar-subitems {
+  display: grid;
+  gap: 2px;
+  padding: 0 0 4px 28px;
+}
+
+.ff-sidebar-subitems button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #6a7c96;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: left;
+  padding: 0 10px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.ff-sidebar-subitems button.is-active {
+  background: #e8eef9;
+  color: #123b6d;
+}
+
 .ff-sidebar-footer {
   display: grid;
   gap: 4px;

@@ -6,6 +6,7 @@ import type {
   DashboardOnboardingMeResponse,
   DashboardOverviewResponse,
 } from "../dashboard.contract"
+import { buildSupportProjectsPath } from "../../support/supportProjectsPaths"
 
 export type InvestmentActionStatus = "empty" | "draft" | "completed"
 
@@ -229,7 +230,7 @@ function mapOverviewDeadlineItem(
     isPriority: Boolean(item.is_priority),
     path:
       policyId && params.analysisId
-        ? buildSupportProjectsPath({
+        ? buildSupportProjectsPathWithQuery({
             companyId: params.companyId,
             analysisId: params.analysisId,
             equipmentId: params.equipmentId || undefined,
@@ -605,19 +606,19 @@ function getNearestDeadline(policies: DashboardMatchedPolicyContract[]) {
   return dated[0] ?? null
 }
 
-function buildSupportProjectsPath(params: {
+function buildSupportProjectsPathWithQuery(params: {
   companyId?: string
   analysisId?: string
   equipmentId?: string
   policyId?: string
+  view?: "priority" | "discovery"
 }) {
-  const query = new URLSearchParams()
-  if (params.companyId) query.set("company_id", params.companyId)
-  if (params.analysisId) query.set("analysis_id", params.analysisId)
-  if (params.equipmentId) query.set("equipment_id", params.equipmentId)
-  if (params.policyId) query.set("policy_id", params.policyId)
-  const suffix = query.toString()
-  return suffix ? `/support-projects?${suffix}` : "/support-projects"
+  return buildSupportProjectsPath(params.view ?? "priority", {
+    companyId: params.companyId,
+    analysisId: params.analysisId,
+    equipmentId: params.equipmentId,
+    policyId: params.policyId,
+  })
 }
 
 function mapDeadlineList(
@@ -641,7 +642,7 @@ function mapDeadlineList(
       primaryActionLabel: "투자 조건 다시 설정",
       primaryActionPath: options.reanalysisPath || "/analysis/new",
       secondaryActionLabel: "최신 지원사업 보기",
-      secondaryActionPath: "/support-projects",
+      secondaryActionPath: "/support-projects/discovery",
       items: [],
     }
   }
@@ -694,7 +695,7 @@ function mapDeadlineList(
         dday: `D-${Math.max(0, daysRemaining)}`,
         urgency: daysRemaining <= 7 ? "urgent" : "upcoming",
         isPriority: Boolean(priorityPolicyId && policyId === priorityPolicyId),
-        path: buildSupportProjectsPath({
+        path: buildSupportProjectsPathWithQuery({
           companyId,
           analysisId,
           equipmentId,
@@ -949,7 +950,7 @@ function mapWorkspace(
       analysisRecord?.equipment_id ??
       analysisRecord?.selected_equipment_id,
   )
-  const policyPath = buildSupportProjectsPath({
+  const policyPath = buildSupportProjectsPathWithQuery({
     companyId,
     analysisId,
     equipmentId: analysisEquipmentId,
@@ -1293,12 +1294,12 @@ function buildPaths(params: {
     : equipmentManagePath
 
   const policyPath = analysisId
-    ? buildSupportProjectsPath({
+    ? buildSupportProjectsPathWithQuery({
         companyId: params.companyId,
         analysisId,
         equipmentId: params.equipmentId || undefined,
       })
-    : buildSupportProjectsPath({
+    : buildSupportProjectsPathWithQuery({
         companyId: params.companyId,
         equipmentId: params.equipmentId || undefined,
       })
@@ -1408,7 +1409,7 @@ export function mapDashboardOverview(
     priorityChips: priority?.tags ?? [],
     roiPath: paths.roiPath,
     policyPath: legacyMissing
-      ? `/support-projects?analysisId=${encodeURIComponent(analysisId || "")}`
+      ? buildSupportProjectsPath("priority", { analysisId: analysisId || "" })
       : paths.policyPath,
     draftPath: analysisId && policyId
       ? `/analysis/${encodeURIComponent(analysisId)}/policies/${encodeURIComponent(policyId)}/application`
@@ -1443,7 +1444,7 @@ export function mapDashboardOverview(
       primaryActionLabel: "투자 조건 다시 설정",
       primaryActionPath: paths.newAnalysisPath,
       secondaryActionLabel: "최신 지원사업 보기",
-      secondaryActionPath: "/support-projects",
+      secondaryActionPath: "/support-projects/discovery",
       items: deadlineItems,
     },
     progressText: "",

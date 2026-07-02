@@ -78,7 +78,7 @@ export const serviceCards: ServiceCard[] = [
     description:
       "기업 조건과 설비투자 목적에 맞는 정부지원사업을 우선순위로 정리합니다.",
     badge: "POLICY",
-    path: "/support-projects",
+    path: "/support-projects/priority",
     tone: "green",
   },
   {

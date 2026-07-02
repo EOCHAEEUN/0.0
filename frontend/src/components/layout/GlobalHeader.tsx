@@ -29,7 +29,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     label: "지원사업 추천",
-    path: "/support-projects",
+    path: "/support-projects/priority",
     matchPrefixes: ["/support-projects", "/support-detail"],
   },
   {

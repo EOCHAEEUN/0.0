@@ -34,7 +34,7 @@ const navItems: NavItem[] = [
   },
   {
     label: "지원사업",
-    path: "/support-projects",
+    path: "/support-projects/priority",
   },
   {
     label: "신청서 생성",

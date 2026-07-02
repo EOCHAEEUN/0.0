@@ -1,91 +1,140 @@
-import { ChevronRight } from "lucide-react"
+import { useMemo, useState } from "react"
+import { ChevronDown, ChevronRight, Lightbulb } from "lucide-react"
 
 import type { SupportProjectsLiveDiscovery, SupportProjectsPolicyCard } from "../supportProjectsOverview.types"
+import { formatDiscoveryMeta } from "../supportProjectsDisplay.utils"
 import "../supportProjects.workspace.css"
 
-function statusTone(status: string) {
-  if (status === "조건 확인 필요") return "neutral"
-  return "pass"
+const PAGE_SIZE = 5
+
+function ddayTone(policy: SupportProjectsPolicyCard) {
+  if (policy.is_past_deadline) return "past"
+  if (typeof policy.days_remaining === "number" && policy.days_remaining <= 7) return "urgent"
+  if (typeof policy.days_remaining === "number" && policy.days_remaining <= 21) return "soon"
+  return "normal"
 }
 
-function supportTone(label: string) {
-  if (label === "금융지원") return "finance"
-  if (label === "비금융 연계지원") return "linked"
-  if (label === "직접 지원금" || label === "바우처 지원") return "subsidy"
-  return "neutral"
+function formatAmountLabel(policy: SupportProjectsPolicyCard) {
+  const amount = policy.support_amount_text?.trim()
+  if (!amount || amount === "공고문 확인 필요") return "공고문 확인"
+  if (amount.startsWith("최대") || amount.startsWith("전액")) return amount
+  return `최대 ${amount}`
 }
 
 export function LiveDiscoverySection({
   liveDiscovery,
   onOpenDetail,
   onViewAll,
+  searchQuery = "",
 }: {
   liveDiscovery: SupportProjectsLiveDiscovery
   onOpenDetail: (policy: SupportProjectsPolicyCard) => void
   onViewAll: () => void
+  searchQuery?: string
 }) {
+  const [page, setPage] = useState(1)
+
+  const filteredItems = useMemo(() => {
+    const normalized = searchQuery.trim().toLowerCase()
+    if (!normalized) return liveDiscovery.items
+    return liveDiscovery.items.filter((policy) => {
+      const haystack = [
+        policy.title,
+        policy.organization,
+        policy.support_type_label,
+        policy.support_amount_text,
+        ...(policy.tags ?? []),
+      ]
+        .join(" ")
+        .toLowerCase()
+      return haystack.includes(normalized)
+    })
+  }, [liveDiscovery.items, searchQuery])
+
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE))
+  const currentPage = Math.min(page, totalPages)
+  const visibleItems = filteredItems.slice(0, currentPage * PAGE_SIZE)
+  const canLoadMore = currentPage < totalPages
+
+  const banner = (
+    <div className="ff-support-discovery-banner">
+      <span className="ff-support-discovery-banner-icon" aria-hidden="true">
+        <Lightbulb size={18} />
+      </span>
+      <div>
+        <h2>그 외 신청 가능성이 있는 정책</h2>
+        <p>기본 기업 조건과 지역 조건에 맞는 정책을 추가로 확인할 수 있습니다.</p>
+      </div>
+    </div>
+  )
+
   if (liveDiscovery.error) {
     return (
-      <section className="ff-support-live-section">
-        <header className="ff-support-section-head with-action">
-          <div>
-            <h2>그 외 신청 가능성이 있는 정책</h2>
-            <p>현재 정책 DB 기준으로 기업 기본 조건에 맞는 추가 후보입니다.</p>
-          </div>
-        </header>
-        <div className="ff-support-live-error">{liveDiscovery.error}</div>
+      <section className="ff-support-discovery-section">
+        <div className="ff-support-discovery-shell">
+          {banner}
+          <div className="ff-support-live-error">{liveDiscovery.error}</div>
+        </div>
       </section>
     )
   }
 
   return (
-    <section className="ff-support-live-section">
-      <header className="ff-support-section-head with-action">
-        <div>
-          <h2>그 외 신청 가능성이 있는 정책</h2>
-          <p>
-            현재 정책 DB 기준 추가 후보 · 분석 당시 추천 결과와는 별도로 최신 정책 DB에서 탐색한
-            후보입니다.
-          </p>
-        </div>
-        <button type="button" className="ff-support-link-btn" onClick={onViewAll}>
-          전체 신청 가능 정책 보기
-          <ChevronRight size={16} aria-hidden="true" />
-        </button>
-      </header>
+    <section className="ff-support-discovery-section">
+      <div className="ff-support-discovery-shell">
+        {banner}
 
-      {liveDiscovery.items.length === 0 ? (
-        <div className="ff-support-live-empty">
-          현재 기본 조건으로 추가 후보를 찾지 못했습니다.
-        </div>
-      ) : (
-        <div className="ff-support-live-grid">
-          {liveDiscovery.items.map((policy) => (
-            <article key={policy.policy_id} className="ff-support-live-card">
-              <div className="ff-support-badge-row">
-                <span className={`ff-support-status-badge ${statusTone(policy.application_status)}`}>
-                  {policy.application_status}
-                </span>
-                <span className={`ff-support-type-badge ${supportTone(policy.support_type_label)}`}>
-                  {policy.support_type_label}
-                </span>
-              </div>
-              <h3>{policy.title}</h3>
-              <p>
-                {policy.organization} · {policy.deadline_display || "상시/공고문 확인"}
-              </p>
-              <button
-                type="button"
-                className="ff-support-link-btn"
-                onClick={() => onOpenDetail(policy)}
-              >
-                상세 보기
-                <ChevronRight size={14} aria-hidden="true" />
-              </button>
-            </article>
-          ))}
-        </div>
-      )}
+        {filteredItems.length === 0 ? (
+          <div className="ff-support-live-empty">현재 기본 조건으로 추가 후보를 찾지 못했습니다.</div>
+        ) : (
+          <>
+            <ul className="ff-support-discovery-list">
+              {visibleItems.map((policy) => (
+                <li key={policy.policy_id}>
+                  <button
+                    type="button"
+                    className="ff-support-discovery-row"
+                    onClick={() => onOpenDetail(policy)}
+                  >
+                    <div className="ff-support-discovery-row-main">
+                      <p className="ff-support-discovery-meta">{formatDiscoveryMeta(policy)}</p>
+                      <strong>{policy.title}</strong>
+                    </div>
+
+                    <div className="ff-support-discovery-row-side">
+                      <div className="ff-support-discovery-status-stack">
+                        <span className="ff-support-discovery-amount">{formatAmountLabel(policy)}</span>
+                        <span className={`ff-support-discovery-dday ${ddayTone(policy)}`}>
+                          {policy.d_day && policy.d_day !== "-" ? policy.d_day : "상시"}
+                        </span>
+                      </div>
+                      <ChevronRight size={18} aria-hidden="true" className="ff-support-discovery-chevron" />
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            <div className="ff-support-discovery-foot">
+              {canLoadMore ? (
+                <button
+                  type="button"
+                  className="ff-support-discovery-more"
+                  onClick={() => setPage((value) => value + 1)}
+                >
+                  더보기 ({currentPage}/{totalPages})
+                  <ChevronDown size={16} aria-hidden="true" />
+                </button>
+              ) : totalPages > 1 ? (
+                <button type="button" className="ff-support-discovery-more" onClick={onViewAll}>
+                  전체 신청 가능 정책 보기
+                  <ChevronRight size={16} aria-hidden="true" />
+                </button>
+              ) : null}
+            </div>
+          </>
+        )}
+      </div>
     </section>
   )
 }

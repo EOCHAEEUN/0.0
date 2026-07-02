@@ -43,8 +43,8 @@ export function ApplicationDraftFeature() {
   )
 
   const analysisPoliciesPath = routeAnalysisId
-    ? `/support-projects?analysisId=${encodeURIComponent(routeAnalysisId)}`
-    : "/support-projects"
+    ? `/support-projects/priority?analysis_id=${encodeURIComponent(routeAnalysisId)}`
+    : "/support-projects/priority"
 
   if (isAnalysisPolicyRoute && support.policyState === "loading") {
     return (

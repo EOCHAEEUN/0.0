@@ -89,7 +89,7 @@ export function ApplicationDraftDashboard({
       return
     }
 
-    navigate("/support-projects")
+    navigate("/support-projects/priority")
   }, [model.navigationSeed, navigate])
 
   const handleGeneratePdf = useCallback(() => {
@@ -118,7 +118,7 @@ export function ApplicationDraftDashboard({
             model={model}
             onStartDraft={handleStartDraft}
             onGoRoi={() => navigate("/roi")}
-            onGoSupport={() => navigate("/support-projects")}
+            onGoSupport={() => navigate("/support-projects/priority")}
           />
           <ReadinessCard model={model} />
         </div>

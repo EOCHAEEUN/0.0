@@ -1,43 +1,27 @@
-import { useCallback, useMemo, useState } from "react"
-
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom"
 
-
-
 import DashboardWorkspaceSidebar from "../../components/layout/DashboardWorkspaceSidebar"
-
 import { useDashboardData } from "../dashboard/hooks/useDashboardData"
-
 import { resolveApplicationDraftNavigationPath } from "../roi/roiNavigation"
-
 import { LiveDiscoverySection } from "./components/LiveDiscoverySection"
-
 import { PolicyDetailDrawer } from "./components/PolicyDetailDrawer"
-
 import { PriorityPolicyCard } from "./components/PriorityPolicyCard"
-
 import { PriorityPolicyList } from "./components/PriorityPolicyList"
-
-import { SupportProjectsHero } from "./components/SupportProjectsHero"
-
+import { SupportProjectsToolbar } from "./components/SupportProjectsToolbar"
 import { SupportTypeGuideSection } from "./components/SupportTypeGuideSection"
-
 import { useSupportProjectsOverview } from "./hooks/useSupportProjectsOverview"
-
 import type { SupportProject } from "./supportProjects.contract"
-
+import {
+  computeSupportTypeGuideStats,
+  matchesPolicySearch,
+} from "./supportProjectsDisplay.utils"
 import { filterPriorityPolicies } from "./supportProjectsFilters"
-
+import { buildSupportProjectsPath, type SupportProjectsView } from "./supportProjectsPaths"
 import type {
-
-  SupportProjectsFilter,
-
   SupportProjectsPolicyCard,
-
 } from "./supportProjectsOverview.types"
-
 import "../dashboard/dashboard.workspace.css"
-
 import "./supportProjects.workspace.css"
 
 
@@ -132,7 +116,7 @@ function getProjectPolicyId(project: SupportProject) {
 
 
 
-export default function SupportProjectsFeature() {
+export default function SupportProjectsFeature({ view }: { view: SupportProjectsView }) {
 
   const location = useLocation()
 
@@ -141,8 +125,12 @@ export default function SupportProjectsFeature() {
   const [searchParams] = useSearchParams()
 
   const [detailPolicy, setDetailPolicy] = useState<SupportProjectsPolicyCard | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [showAllUrgent, setShowAllUrgent] = useState(false)
 
-  const [activeFilter, setActiveFilter] = useState<SupportProjectsFilter>("all")
+  useEffect(() => {
+    setShowAllUrgent(false)
+  }, [view, searchQuery])
 
 
 
@@ -238,11 +226,11 @@ export default function SupportProjectsFeature() {
 
       if (policy.policy_id) query.set("policy_id", policy.policy_id)
 
-      return `/support-projects?${query.toString()}`
+      return `/support-projects/${view}?${query.toString()}`
 
     },
 
-    [analysisId, companyId, equipmentId],
+    [analysisId, companyId, equipmentId, view],
 
   )
 
@@ -264,11 +252,16 @@ export default function SupportProjectsFeature() {
 
       const qs = next.toString()
 
-      navigate(qs ? `/support-projects?${qs}` : "/support-projects", { replace: true })
+      navigate(
+        qs
+          ? `/support-projects/${view}?${qs}`
+          : `/support-projects/${view}`,
+        { replace: true },
+      )
 
     }
 
-  }, [navigate, searchParams])
+  }, [navigate, searchParams, view])
 
 
 
@@ -476,9 +469,9 @@ export default function SupportProjectsFeature() {
 
     if (!model) return { visibleMain: null, visibleList: [] as SupportProjectsPolicyCard[] }
 
-    return filterPriorityPolicies(model.priorityPolicy, model.priorityPolicies, activeFilter)
+    return filterPriorityPolicies(model.priorityPolicy, model.priorityPolicies, "all")
 
-  }, [activeFilter, model])
+  }, [model])
 
 
 
@@ -492,15 +485,41 @@ export default function SupportProjectsFeature() {
 
 
 
-  const supportProjectsPath = analysisId
+  const supportProjectsPath = buildSupportProjectsPath("priority", {
+    analysisId,
+    companyId,
+  })
 
-    ? `/support-projects?analysis_id=${encodeURIComponent(analysisId)}`
+  const discoveryProjectsPath = buildSupportProjectsPath("discovery", {
+    analysisId,
+    companyId,
+  })
 
-    : companyId
+  const isPriorityView = view === "priority"
+  const isDiscoveryView = view === "discovery"
 
-      ? `/support-projects?company_id=${encodeURIComponent(companyId)}`
+  const searchablePolicies = useMemo(() => {
+    if (!model) return [] as SupportProjectsPolicyCard[]
+    return [...model.priorityPolicies, ...model.liveDiscovery.items, ...model.allMatched]
+  }, [model])
 
-      : "/support-projects"
+  const guideStats = useMemo(
+    () => computeSupportTypeGuideStats(searchablePolicies),
+    [searchablePolicies],
+  )
+
+  const filteredDiscoveryPolicies = useMemo(() => {
+    if (!model) return [] as SupportProjectsPolicyCard[]
+    const base = model.isAnalysisMode ? filtered.visibleList : model.priorityPolicies
+    return base.filter((policy) => matchesPolicySearch(policy, searchQuery))
+  }, [filtered.visibleList, model, searchQuery])
+
+  const visiblePriorityPolicy = useMemo(() => {
+    if (!model) return null
+    const candidate = model.isAnalysisMode ? filtered.visibleMain : model.priorityPolicy
+    if (!candidate) return null
+    return matchesPolicySearch(candidate, searchQuery) ? candidate : null
+  }, [filtered.visibleMain, model, searchQuery])
 
 
 
@@ -602,107 +621,54 @@ export default function SupportProjectsFeature() {
 
             <>
 
-              <SupportProjectsHero
+              {isPriorityView ? (
+                <>
+                  <SupportProjectsToolbar
+                    searchQuery={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    equipmentLabel={model.equipmentName || "전체 설비"}
+                  />
 
-                trustLabel={model.heroTrustLabel}
+                  <section className="ff-support-state-card">
+                    <span className="ff-support-badge purple">정책 이력 없음</span>
+                    <h2>분석 당시 정책 이력이 없습니다</h2>
+                    <p>
+                      최신 정책 DB 결과를 자동으로 붙이지 않습니다. 재분석 또는 최신 정책 탐색을
+                      진행해 주세요.
+                    </p>
+                    <div className="ff-support-state-actions">
+                      <button
+                        type="button"
+                        className="ff-support-primary-btn"
+                        onClick={() => navigate(discoveryProjectsPath)}
+                      >
+                        최신 지원사업 탐색하기
+                      </button>
+                      <button
+                        type="button"
+                        className="ff-support-secondary-btn"
+                        onClick={() => navigate(reanalysisPath)}
+                      >
+                        ROI 분석 다시 실행하기
+                      </button>
+                    </div>
+                  </section>
 
-                heroTitle="분석 당시 정책 이력이 없습니다"
+                  <SupportTypeGuideSection
+                    stats={guideStats}
+                    onViewDiscovery={() => navigate(discoveryProjectsPath)}
+                  />
+                </>
+              ) : null}
 
-                heroSubtitle="이 분석 결과에는 당시 매칭된 정책 스냅샷이 저장되어 있지 않습니다. 최신 정책을 과거 분석 결과처럼 보여주지 않습니다."
-
-                counts={model.counts}
-
-                activeFilter={activeFilter}
-
-                onFilterChange={setActiveFilter}
-
-                showFilters={false}
-
-              />
-
-              <section className="ff-support-state-card">
-
-                <span className="ff-support-badge purple">정책 이력 없음</span>
-
-                <h2>분석 당시 정책 이력이 없습니다</h2>
-
-                <p>
-
-                  최신 정책 DB 결과를 자동으로 붙이지 않습니다. 재분석 또는 최신 정책 탐색을
-
-                  진행해 주세요.
-
-                </p>
-
-                <div className="ff-support-state-actions">
-
-                  <button
-
-                    type="button"
-
-                    className="ff-support-primary-btn"
-
-                    onClick={() =>
-
-                      navigate(
-
-                        companyId
-
-                          ? `/support-projects?company_id=${encodeURIComponent(companyId)}`
-
-                          : "/support-projects",
-
-                      )
-
-                    }
-
-                  >
-
-                    최신 지원사업 탐색하기
-
-                  </button>
-
-                  <button
-
-                    type="button"
-
-                    className="ff-support-secondary-btn"
-
-                    onClick={() => navigate(reanalysisPath)}
-
-                  >
-
-                    ROI 분석 다시 실행하기
-
-                  </button>
-
-                </div>
-
-              </section>
-
-              <LiveDiscoverySection
-
-                liveDiscovery={model.liveDiscovery}
-
-                onOpenDetail={handleOpenDetail}
-
-                onViewAll={() =>
-
-                  navigate(
-
-                    companyId
-
-                      ? `/support-projects?company_id=${encodeURIComponent(companyId)}`
-
-                      : "/support-projects",
-
-                  )
-
-                }
-
-              />
-
-              <SupportTypeGuideSection />
+              {isDiscoveryView ? (
+                <LiveDiscoverySection
+                  liveDiscovery={model.liveDiscovery}
+                  onOpenDetail={handleOpenDetail}
+                  onViewAll={() => navigate(discoveryProjectsPath)}
+                  searchQuery={searchQuery}
+                />
+              ) : null}
 
             </>
 
@@ -714,55 +680,34 @@ export default function SupportProjectsFeature() {
 
             <>
 
-              <SupportProjectsHero
+              {isPriorityView ? (
+                <>
+                  <SupportProjectsToolbar
+                    searchQuery={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    equipmentLabel={model.equipmentName || "전체 설비"}
+                  />
 
-                trustLabel={model.heroTrustLabel}
+                  <section className="ff-support-state-card">
+                    <h2>표시할 우선 검토 정책이 없습니다</h2>
+                    <p>추가 후보 정책을 확인하거나 ROI 분석을 다시 실행해 주세요.</p>
+                  </section>
 
-                heroTitle={model.heroTitle}
+                  <SupportTypeGuideSection
+                    stats={guideStats}
+                    onViewDiscovery={() => navigate(discoveryProjectsPath)}
+                  />
+                </>
+              ) : null}
 
-                heroSubtitle={model.heroSubtitle}
-
-                counts={model.counts}
-
-                activeFilter={activeFilter}
-
-                onFilterChange={setActiveFilter}
-
-                showFilters={model.isAnalysisMode}
-
-              />
-
-              <section className="ff-support-state-card">
-
-                <h2>표시할 우선 검토 정책이 없습니다</h2>
-
-                <p>추가 후보 정책을 확인하거나 ROI 분석을 다시 실행해 주세요.</p>
-
-              </section>
-
-              <LiveDiscoverySection
-
-                liveDiscovery={model.liveDiscovery}
-
-                onOpenDetail={handleOpenDetail}
-
-                onViewAll={() =>
-
-                  navigate(
-
-                    companyId
-
-                      ? `/support-projects?company_id=${encodeURIComponent(companyId)}`
-
-                      : "/support-projects",
-
-                  )
-
-                }
-
-              />
-
-              <SupportTypeGuideSection />
+              {isDiscoveryView ? (
+                <LiveDiscoverySection
+                  liveDiscovery={model.liveDiscovery}
+                  onOpenDetail={handleOpenDetail}
+                  onViewAll={() => navigate(discoveryProjectsPath)}
+                  searchQuery={searchQuery}
+                />
+              ) : null}
 
             </>
 
@@ -774,95 +719,50 @@ export default function SupportProjectsFeature() {
 
             <>
 
-              <SupportProjectsHero
+              {isPriorityView ? (
+                <>
+                  <SupportProjectsToolbar
+                    searchQuery={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    equipmentLabel={model.equipmentName || "전체 설비"}
+                  />
 
-                trustLabel={model.heroTrustLabel}
+                  {visiblePriorityPolicy ? (
+                    <PriorityPolicyCard
+                      policy={visiblePriorityPolicy}
+                      onOpenDetail={handleOpenDetail}
+                    />
+                  ) : (
+                    <section className="ff-support-state-card compact">
+                      <h2>검색 조건에 맞는 최우선 지원사업이 없습니다</h2>
+                      <p>검색어를 바꾸거나 추가 맞춤 지원사업 탭에서 후보를 확인해 주세요.</p>
+                    </section>
+                  )}
 
-                heroTitle={model.heroTitle}
-
-                heroSubtitle={model.heroSubtitle}
-
-                counts={model.counts}
-
-                activeFilter={activeFilter}
-
-                onFilterChange={setActiveFilter}
-
-                showFilters={model.isAnalysisMode}
-
-              />
-
-
-
-              {model.isAnalysisMode && filtered.visibleMain ? (
-
-                <PriorityPolicyCard policy={filtered.visibleMain} onOpenDetail={handleOpenDetail} />
-
+                  <SupportTypeGuideSection
+                    stats={guideStats}
+                    onViewDiscovery={() => navigate(discoveryProjectsPath)}
+                  />
+                </>
               ) : null}
 
+              {isDiscoveryView ? (
+                <>
+                  <PriorityPolicyList
+                    policies={filteredDiscoveryPolicies}
+                    expanded={showAllUrgent}
+                    onViewMore={() => setShowAllUrgent(true)}
+                    onOpenDetail={handleOpenDetail}
+                  />
 
-
-              {model.isAnalysisMode ? (
-
-                <PriorityPolicyList
-
-                  policies={filtered.visibleList}
-
-                  onOpenDetail={handleOpenDetail}
-
-                />
-
+                  <LiveDiscoverySection
+                    liveDiscovery={model.liveDiscovery}
+                    onOpenDetail={handleOpenDetail}
+                    onViewAll={() => navigate(discoveryProjectsPath)}
+                    searchQuery={searchQuery}
+                  />
+                </>
               ) : null}
-
-
-
-              {!model.isAnalysisMode && model.priorityPolicy ? (
-
-                <PriorityPolicyCard policy={model.priorityPolicy} onOpenDetail={handleOpenDetail} />
-
-              ) : null}
-
-
-
-              {!model.isAnalysisMode && model.priorityPolicies.length > 0 ? (
-
-                <PriorityPolicyList
-
-                  policies={model.priorityPolicies}
-
-                  onOpenDetail={handleOpenDetail}
-
-                />
-
-              ) : null}
-
-
-
-              <LiveDiscoverySection
-
-                liveDiscovery={model.liveDiscovery}
-
-                onOpenDetail={handleOpenDetail}
-
-                onViewAll={() =>
-
-                  navigate(
-
-                    companyId
-
-                      ? `/support-projects?company_id=${encodeURIComponent(companyId)}`
-
-                      : "/support-projects",
-
-                  )
-
-                }
-
-              />
-
-
-
-              <SupportTypeGuideSection />
 
             </>
 

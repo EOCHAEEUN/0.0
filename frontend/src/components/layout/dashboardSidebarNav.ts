@@ -17,11 +17,50 @@ export type SidebarWorkspacePaths = {
   priorityPolicyId?: string | null
 }
 
+export const SUPPORT_SUB_NAV_ITEMS = [
+  { key: "priority" as const, label: "최우선 지원사업 분석", view: "priority" as const },
+  { key: "discovery" as const, label: "추가 맞춤 지원사업", view: "discovery" as const },
+] as const
+
+export function buildSupportSubNavPath(
+  view: "priority" | "discovery",
+  locationSearch: string,
+  policyPath?: string,
+): string {
+  if (locationSearch) {
+    return `/support-projects/${view}${locationSearch.startsWith("?") ? locationSearch : `?${locationSearch}`}`
+  }
+
+  if (policyPath?.includes("?")) {
+    return `/support-projects/${view}${policyPath.slice(policyPath.indexOf("?"))}`
+  }
+
+  return `/support-projects/${view}`
+}
+
+export function getSupportViewFromPathname(pathname: string): "priority" | "discovery" | null {
+  if (pathname === "/support-projects/priority" || pathname.startsWith("/support-projects/priority/")) {
+    return "priority"
+  }
+  if (pathname === "/support-projects/discovery" || pathname.startsWith("/support-projects/discovery/")) {
+    return "discovery"
+  }
+  if (pathname === "/support-projects") return "priority"
+  return null
+}
+
+export function isSidebarSupportSubActive(
+  view: "priority" | "discovery",
+  pathname: string,
+): boolean {
+  return getSupportViewFromPathname(pathname) === view
+}
+
 export function buildMainNavItems(paths: SidebarWorkspacePaths) {
   return [
     { key: "dashboard" as const, label: "종합현황", path: "/dashboard" },
     { key: "roi" as const, label: "ROI 분석", path: paths.newRoiPath || "/roi" },
-    { key: "support" as const, label: "지원사업 일정", path: paths.policyPath || "/support-projects" },
+    { key: "support" as const, label: "지원사업 일정", path: paths.policyPath || "/support-projects/priority" },
     {
       key: "application" as const,
       label: "신청서 작성",

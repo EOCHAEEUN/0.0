@@ -1,5 +1,6 @@
 import { hydrateAccountData } from "../../services/accountHydration"
 import { getAnalysisResult } from "../onboarding/onboardingState"
+import { buildSupportProjectsPath } from "../support/supportProjectsPaths"
 
 function getCurrentAnalysisId(pathname: string, search: string) {
   const queryId = new URLSearchParams(search).get("analysisId")
@@ -59,10 +60,10 @@ export async function resolveRoiNavigationPath(pathname: string, search: string)
 export async function resolveSupportProjectsNavigationPath(pathname: string, search: string) {
   const analysisId = await resolveLatestAnalysisId(pathname, search)
   if (analysisId) {
-    return `/support-projects?analysis_id=${encodeURIComponent(analysisId)}`
+    return buildSupportProjectsPath("priority", { analysisId })
   }
 
-  return "/support-projects"
+  return "/support-projects/priority"
 }
 
 export async function resolveApplicationDraftNavigationPath(pathname: string, search: string) {

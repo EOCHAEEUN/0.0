@@ -8,11 +8,17 @@ function formatMainCardStatus(status: string) {
   return status
 }
 
-function formatDeadlineLabel(display?: string | null, raw?: string | null) {
-  const value = (display || raw || "").trim()
-  if (!value) return "마감일 공고문 확인"
-  if (value.includes("마감")) return value
-  return `${value} 마감`
+function formatDdayPill(policy: SupportProjectsPolicyCard) {
+  if (policy.d_day && policy.d_day !== "-") return policy.d_day
+  if (policy.deadline_display) return policy.deadline_display
+  return null
+}
+
+function ddayClass(policy: SupportProjectsPolicyCard) {
+  if (policy.is_past_deadline) return "past"
+  if (typeof policy.days_remaining === "number" && policy.days_remaining <= 7) return "urgent"
+  if (typeof policy.days_remaining === "number" && policy.days_remaining <= 21) return "soon"
+  return "normal"
 }
 
 export function PriorityPolicyCard({
@@ -35,8 +41,9 @@ export function PriorityPolicyCard({
 
   return (
     <section className="ff-support-main-priority">
-      <header className="ff-support-section-head">
-        <h2>지금 먼저 확인할 정책</h2>
+      <header className="ff-support-main-priority-head">
+        <p className="ff-support-main-priority-eyebrow">AI 분석 기반 맞춤형 추천</p>
+        <h2>최우선 지원사업 분석</h2>
       </header>
 
       <article className="ff-support-main-priority-card">
@@ -58,8 +65,13 @@ export function PriorityPolicyCard({
               </span>
               <span>
                 <CalendarDays size={15} aria-hidden="true" />
-                {formatDeadlineLabel(policy.deadline_display, policy.deadline)}
+                {policy.deadline_display || policy.deadline || "예산 소진 시 마감"}
               </span>
+              {formatDdayPill(policy) ? (
+                <span className={`ff-support-dday-pill ${ddayClass(policy)}`}>
+                  {formatDdayPill(policy)}
+                </span>
+              ) : null}
             </div>
 
             <div className="ff-support-reason-panel">

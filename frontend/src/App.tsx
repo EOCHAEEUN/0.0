@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Routes, Route, useParams } from "react-router-dom"
+import { BrowserRouter, Navigate, Routes, Route, useParams, useSearchParams } from "react-router-dom"
 
 import MainPage from "./pages/MainPage"
 import LoginPage from "./pages/LoginPage"
@@ -27,10 +27,26 @@ import AuthenticatedLayout from "./components/layout/AuthenticatedLayout"
 function AnalysisPoliciesRedirect() {
   const { id, policyId } = useParams()
   const query = new URLSearchParams()
-  if (id) query.set("analysisId", id)
-  if (policyId) query.set("policyId", policyId)
+  if (id) query.set("analysis_id", id)
+  if (policyId) query.set("policy_id", policyId)
   const queryText = query.toString()
-  return <Navigate to={queryText ? `/support-projects?${queryText}` : "/support-projects"} replace />
+  return (
+    <Navigate
+      to={queryText ? `/support-projects/priority?${queryText}` : "/support-projects/priority"}
+      replace
+    />
+  )
+}
+
+function SupportProjectsIndexRedirect() {
+  const [searchParams] = useSearchParams()
+  const queryText = searchParams.toString()
+  return (
+    <Navigate
+      to={queryText ? `/support-projects/priority?${queryText}` : "/support-projects/priority"}
+      replace
+    />
+  )
 }
 
 function App() {
@@ -81,7 +97,11 @@ function App() {
           <Route path="/application-draft" element={<ApplicationDraftPage />} />
 
           {/* 지원사업 목록 */}
-          <Route path="/support-projects" element={<SupportProjectsPage />} />
+          <Route path="/support-projects">
+            <Route index element={<SupportProjectsIndexRedirect />} />
+            <Route path="priority" element={<SupportProjectsPage view="priority" />} />
+            <Route path="discovery" element={<SupportProjectsPage view="discovery" />} />
+          </Route>
           <Route path="/support-detail" element={<SupportDetailPage />} />
 
           {/* AI Advisor (Engi) */}

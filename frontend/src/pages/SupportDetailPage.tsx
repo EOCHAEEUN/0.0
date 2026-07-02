@@ -142,7 +142,7 @@ export default function SupportDetailPage() {
         <div className="container">
           <button
             type="button"
-            onClick={() => navigate("/support-projects")}
+            onClick={() => navigate("/support-projects/priority")}
             style={{
               marginBottom: "28px",
               height: "44px",
@@ -644,7 +644,7 @@ export default function SupportDetailPage() {
                   <button
                     className="btn dark"
                     type="button"
-                    onClick={() => navigate("/support-projects")}
+                    onClick={() => navigate("/support-projects/priority")}
                   >
                     다른 지원사업 비교하기
                   </button>

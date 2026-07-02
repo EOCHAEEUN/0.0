@@ -48,7 +48,7 @@ const EMPTY_DASHBOARD: DashboardViewModel = {
     needsText: "",
     priorityChips: [],
     roiPath: "/roi",
-    policyPath: "/support-projects",
+    policyPath: "/support-projects/priority",
     draftPath: "/analysis/new",
     advisorPath: "/advisor",
     engiTitle: "",

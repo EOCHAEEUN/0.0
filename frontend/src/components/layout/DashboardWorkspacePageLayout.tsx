@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 
 import { useDashboardData } from "../../features/dashboard/hooks/useDashboardData"
+import { buildSupportProjectsPath } from "../../features/support/supportProjectsPaths"
 import DashboardWorkspaceSidebar from "./DashboardWorkspaceSidebar"
 import "../../features/dashboard/dashboard.workspace.css"
 
@@ -22,9 +23,7 @@ export default function DashboardWorkspacePageLayout({
   const { dashboard } = useDashboardData({ preferredAnalysisId: analysisId })
   const workspace = dashboard.workspace
 
-  const supportProjectsPath = analysisId
-    ? `/support-projects?analysis_id=${encodeURIComponent(analysisId)}`
-    : "/support-projects"
+  const supportProjectsPath = buildSupportProjectsPath("priority", { analysisId })
 
   return (
     <main className={`page ff-dashboard-workspace-page ${pageClassName}`.trim()}>

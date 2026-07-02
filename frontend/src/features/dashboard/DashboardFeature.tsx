@@ -269,7 +269,7 @@ function DeadlineCalendarPanel({
               </button>
               <button
                 type="button"
-                onClick={() => onNavigate(list.secondaryActionPath || "/support-projects")}
+                onClick={() => onNavigate(list.secondaryActionPath || "/support-projects/discovery")}
               >
                 {list.secondaryActionLabel || "최신 지원사업 보기"}
               </button>

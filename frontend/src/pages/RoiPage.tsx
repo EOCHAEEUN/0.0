@@ -283,7 +283,7 @@ export default function RoiPage() {
   const recLabel = rec === "b" ? "B안 · 부분 교체" : rec === "a" ? "A안 · 전체 교체" : "A/B안"
 
   const priorityPolicyId = extractPriorityPolicyId(canonicalPolicies)
-  const supportProjectsPath = `/support-projects?analysisId=${encodeURIComponent(String(draftId))}`
+  const supportProjectsPath = `/support-projects/priority?analysis_id=${encodeURIComponent(String(draftId))}`
 
   const subsidyRatio =
     mRecFallback.subsidy !== null && mRecFallback.investment !== null && mRecFallback.investment > 0

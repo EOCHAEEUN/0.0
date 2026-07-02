@@ -166,7 +166,7 @@ export default function AdvisorResponseCards({ cards, analysisId }: AdvisorRespo
                 <button type="button" className="ff-support-btn ghost" onClick={() => navigate("/analysis/new")}>
                   재분석
                 </button>
-                <button type="button" className="btn blue" onClick={() => navigate("/support-projects")}>
+                <button type="button" className="btn blue" onClick={() => navigate("/support-projects/priority")}>
                   최신 지원사업
                 </button>
               </div>

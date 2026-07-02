@@ -9,6 +9,7 @@ from app.routers import (
     dashboard,
     documents,
     draft,
+    equipment_attachments,
     equipment_guide_router,
     industry,
     onboarding,
@@ -61,6 +62,7 @@ app.include_router(analyze.router, prefix="/api", tags=["analyze"])
 app.include_router(draft.router, prefix="/api", tags=["draft"])
 app.include_router(application_draft.router, prefix="/api", tags=["application-draft"])
 app.include_router(equipment_guide_router.router, prefix="/api", tags=["equipment-guide"])
+app.include_router(equipment_attachments.router, prefix="/api", tags=["equipment-attachments"])
 app.include_router(reports.router, prefix="/api", tags=["reports"])
 app.include_router(documents.router, prefix="/api", tags=["documents"])
 app.include_router(click_chat.router)

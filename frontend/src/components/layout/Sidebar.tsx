@@ -4,7 +4,7 @@ import { resolveApplicationDraftNavigationPath } from "../../features/roi/roiNav
 
 const menuItems = [
   { label: "홈 대시보드", path: "/" },
-  { label: "ROI 분석", path: "/roi" },
+  { label: "ROI 분석", path: "/roi/strategy" },
   { label: "신청서 초안", path: "/application-draft" },
   { label: "지원사업", path: "/support-projects/priority" },
   { label: "AI 어드바이저", path: "/advisor" },

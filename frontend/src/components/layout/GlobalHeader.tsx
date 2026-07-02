@@ -24,7 +24,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     label: "ROI 분석",
-    path: "/roi",
+    path: "/roi/strategy",
     matchPrefixes: ["/roi", "/analysis"],
   },
   {

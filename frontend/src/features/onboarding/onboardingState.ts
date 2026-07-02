@@ -66,6 +66,7 @@ export type AnalysisResultSnapshot = {
   matchedPolicies: number
   priorityPolicies: number
   priorityPolicyName: string
+  priorityPolicyId?: string
   recommendedScenario: string
   companyId?: string
   equipmentId?: string
@@ -171,6 +172,55 @@ function writeJsonWithOwner(key: string, value: unknown) {
   window.localStorage.setItem(key, JSON.stringify(stored))
 }
 
+function compactScenarioMetrics(record: Record<string, unknown>) {
+  const compact: Record<string, unknown> = {}
+  const numericKeys = [
+    "investment_manwon",
+    "subsidy_manwon",
+    "net_investment_manwon",
+    "net_cost_manwon",
+    "annual_net_benefit_manwon",
+    "annual_saving_manwon",
+    "saving_manwon",
+    "roi_pct",
+    "roi_percent",
+    "payback_years",
+    "paybackYears",
+  ]
+
+  for (const key of numericKeys) {
+    const value = record[key]
+    if (typeof value === "number" && Number.isFinite(value)) {
+      compact[key] = value
+    }
+  }
+
+  const policyApplication = record.policy_application
+  if (policyApplication && typeof policyApplication === "object" && !Array.isArray(policyApplication)) {
+    const pa = policyApplication as Record<string, unknown>
+    const status = typeof pa.status === "string" ? pa.status : ""
+    const amount = pa.applied_support_manwon
+    if (status || (typeof amount === "number" && Number.isFinite(amount))) {
+      compact.policy_application = {
+        ...(status ? { status } : {}),
+        ...(typeof amount === "number" && Number.isFinite(amount)
+          ? { applied_support_manwon: amount }
+          : {}),
+      }
+    }
+  }
+
+  return compact
+}
+
+function extractPriorityPolicyId(policies: unknown[], fallback?: string) {
+  if (typeof fallback === "string" && fallback.trim()) return fallback.trim()
+  if (!Array.isArray(policies) || policies.length === 0) return undefined
+  const first = policies[0] as Record<string, unknown>
+  const id = first.policyId ?? first.policy_id ?? first.policyID ?? first.id
+  return id ? String(id) : undefined
+}
+
 function buildPersistedAnalysisResult(result: AnalysisResultSnapshot): AnalysisResultSnapshot {
   const roiResultRecord =
     result.roiResult && typeof result.roiResult === "object" && !Array.isArray(result.roiResult)
@@ -178,40 +228,38 @@ function buildPersistedAnalysisResult(result: AnalysisResultSnapshot): AnalysisR
       : {}
   const scenarioA =
     roiResultRecord.scenario_a && typeof roiResultRecord.scenario_a === "object" && !Array.isArray(roiResultRecord.scenario_a)
-      ? (roiResultRecord.scenario_a as Record<string, unknown>)
+      ? compactScenarioMetrics(roiResultRecord.scenario_a as Record<string, unknown>)
       : {}
   const scenarioB =
     roiResultRecord.scenario_b && typeof roiResultRecord.scenario_b === "object" && !Array.isArray(roiResultRecord.scenario_b)
-      ? (roiResultRecord.scenario_b as Record<string, unknown>)
+      ? compactScenarioMetrics(roiResultRecord.scenario_b as Record<string, unknown>)
       : {}
   const aiRecommendation =
     roiResultRecord.ai_recommendation && typeof roiResultRecord.ai_recommendation === "object" && !Array.isArray(roiResultRecord.ai_recommendation)
       ? (roiResultRecord.ai_recommendation as Record<string, unknown>)
       : {}
-  const policies = Array.isArray(result.policies)
-    ? result.policies
-        .filter((item) => item && typeof item === "object" && !Array.isArray(item))
-        .slice(0, 20)
-    : []
-  const firstPolicy = (policies[0] as Record<string, unknown> | undefined) ?? {}
-  const firstPolicyTitle =
-    (typeof firstPolicy.title === "string" && firstPolicy.title.trim()) ||
-    (typeof firstPolicy.policy_title === "string" && firstPolicy.policy_title.trim()) ||
-    (typeof firstPolicy.name === "string" && firstPolicy.name.trim()) ||
-    ""
+  const recommendationDetail =
+    typeof result.recommendationDetail === "string"
+      ? result.recommendationDetail.slice(0, 500)
+      : ""
+  const aiSummary =
+    typeof aiRecommendation.summary === "string"
+      ? aiRecommendation.summary.slice(0, 500)
+      : recommendationDetail
 
   return {
     schemaVersion: ANALYSIS_RESULT_SCHEMA_VERSION,
     id: result.id,
     equipmentName: result.equipmentName,
     recommendation: result.recommendation,
-    recommendationDetail: result.recommendationDetail,
+    recommendationDetail,
     roiPct: result.roiPct,
     roiPercent: result.roiPercent ?? result.roiPct,
     paybackYears: result.paybackYears,
     matchedPolicies: result.matchedPolicies,
     priorityPolicies: result.priorityPolicies,
-    priorityPolicyName: firstPolicyTitle || result.priorityPolicyName,
+    priorityPolicyName: result.priorityPolicyName,
+    priorityPolicyId: extractPriorityPolicyId(result.policies ?? [], result.priorityPolicyId),
     recommendedScenario: result.recommendedScenario,
     companyId: result.companyId,
     equipmentId: result.equipmentId,
@@ -220,13 +268,10 @@ function buildPersistedAnalysisResult(result: AnalysisResultSnapshot): AnalysisR
         typeof roiResultRecord.recommended === "string"
           ? roiResultRecord.recommended
           : result.recommendedScenario,
-      scenario_a: scenarioA,
-      scenario_b: scenarioB,
+      ...(Object.keys(scenarioA).length > 0 ? { scenario_a: scenarioA } : {}),
+      ...(Object.keys(scenarioB).length > 0 ? { scenario_b: scenarioB } : {}),
       ai_recommendation: {
-        summary:
-          typeof aiRecommendation.summary === "string"
-            ? aiRecommendation.summary
-            : result.recommendationDetail,
+        summary: aiSummary,
         reason_bullets: Array.isArray(aiRecommendation.reason_bullets)
           ? aiRecommendation.reason_bullets
               .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
@@ -234,10 +279,20 @@ function buildPersistedAnalysisResult(result: AnalysisResultSnapshot): AnalysisR
           : [],
       },
     },
-    policies,
     policyStatus: result.policyStatus,
     policyError: result.policyError ?? null,
     createdAt: result.createdAt,
+  }
+}
+
+function tryWriteAnalysisCache(key: string, value: unknown) {
+  try {
+    writeJsonWithOwner(key, value)
+    return true
+  } catch (error) {
+    if (isQuotaExceededError(error)) return false
+    console.warn("[onboarding-analysis] analysis cache write failed unexpectedly.", error)
+    return false
   }
 }
 
@@ -299,6 +354,15 @@ export function getAnalysisResult(id?: string): AnalysisResultSnapshot | null {
   }
 
   const latest = readJsonOwnedByCurrentUser<AnalysisResultSnapshot>(ANALYSIS_RESULT_KEY)
+  if (!latest || latest.schemaVersion !== ANALYSIS_RESULT_SCHEMA_VERSION) return null
+
+  if (latest.id && !latest.equipmentName) {
+    const scoped = readJsonOwnedByCurrentUser<AnalysisResultSnapshot>(
+      getAnalysisResultByIdKey(latest.id),
+    )
+    return isCurrentAnalysisResult(scoped) ? scoped : null
+  }
+
   return isCurrentAnalysisResult(latest) ? latest : null
 }
 
@@ -320,37 +384,43 @@ export function saveAnalysisResult(
     priorityPolicies: next.priorityPolicies,
   })
 
+  const latestPointer = { schemaVersion: next.schemaVersion, id: next.id }
+  const scopedKey = getAnalysisResultByIdKey(next.id)
+  let cached =
+    tryWriteAnalysisCache(scopedKey, next) && tryWriteAnalysisCache(ANALYSIS_RESULT_KEY, latestPointer)
+
+  if (!cached) {
+    console.warn("[onboarding-analysis] analysis cache quota exceeded; pruning scoped cache.", {
+      id: next.id,
+    })
+    pruneAnalysisResultCache(next.id)
+    cached =
+      tryWriteAnalysisCache(scopedKey, next) &&
+      tryWriteAnalysisCache(ANALYSIS_RESULT_KEY, latestPointer)
+  }
+
+  if (!cached) {
+    console.warn(
+      "[onboarding-analysis] analysis cache write skipped after quota retry; continuing without cache.",
+      { id: next.id },
+    )
+  }
+
   try {
-    writeJsonWithOwner(ANALYSIS_RESULT_KEY, next)
-    writeJsonWithOwner(getAnalysisResultByIdKey(next.id), next)
+    updateUserOnboardingState({
+      analysisDraftId: next.id,
+      analysisDraftStatus: "completed",
+      analysisCount: Math.max(1, getUserOnboardingState().analysisCount),
+    })
   } catch (error) {
     if (isQuotaExceededError(error)) {
-      console.warn("[onboarding-analysis] analysis cache quota exceeded; pruning scoped cache.", {
+      console.warn("[onboarding-analysis] onboarding state update skipped after quota error.", {
         id: next.id,
       })
-      try {
-        pruneAnalysisResultCache(next.id)
-        writeJsonWithOwner(ANALYSIS_RESULT_KEY, next)
-        writeJsonWithOwner(getAnalysisResultByIdKey(next.id), next)
-      } catch (retryError) {
-        if (isQuotaExceededError(retryError)) {
-          console.warn(
-            "[onboarding-analysis] analysis cache write skipped after quota retry; continuing without cache.",
-            { id: next.id },
-          )
-        } else {
-          console.warn("[onboarding-analysis] analysis cache write failed unexpectedly.", retryError)
-        }
-      }
     } else {
-      console.warn("[onboarding-analysis] analysis cache write failed unexpectedly.", error)
+      console.warn("[onboarding-analysis] onboarding state update failed unexpectedly.", error)
     }
   }
-  updateUserOnboardingState({
-    analysisDraftId: next.id,
-    analysisDraftStatus: "completed",
-    analysisCount: Math.max(1, getUserOnboardingState().analysisCount),
-  })
   return next
 }
 

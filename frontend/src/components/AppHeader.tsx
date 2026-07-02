@@ -30,7 +30,7 @@ const navItems: NavItem[] = [
   },
   {
     label: "ROI 분석",
-    path: "/roi",
+    path: "/roi/strategy",
   },
   {
     label: "지원사업",

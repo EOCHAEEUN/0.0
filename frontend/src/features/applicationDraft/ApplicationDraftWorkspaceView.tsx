@@ -12,6 +12,7 @@ import { ApplicationDraftPdfPreview } from "./components/ApplicationDraftPdfPrev
 import { ApplicationDraftWorkspace } from "./components/ApplicationDraftWorkspace"
 import { ApplicationDraftWorkspaceLayout } from "./components/ApplicationDraftWorkspaceLayout"
 import { useApplicationDraftWorkspace } from "./hooks/useApplicationDraftWorkspace"
+import { buildRoiPath } from "../roi/roiPaths"
 
 type RoutePolicyContext = {
   analysisId?: string
@@ -46,8 +47,8 @@ export function ApplicationDraftWorkspaceView({
   })
 
   const roiPath = routeAnalysisId
-    ? `/roi?analysisId=${encodeURIComponent(routeAnalysisId)}`
-    : "/roi"
+    ? buildRoiPath("strategy", { analysisId: routeAnalysisId })
+    : buildRoiPath("strategy")
 
   const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false)
 

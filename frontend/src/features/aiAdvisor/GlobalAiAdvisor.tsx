@@ -38,11 +38,6 @@ export function GlobalAiAdvisor() {
   const isEmbeddedAdvisorHost =
     new URLSearchParams(location.search).get("embeddedAdvisor") === "1"
 
-  // 설비현황 페이지는 페이지 내부 EquipmentGuideChatLauncher가 챗봇을 담당
-  if (isEquipmentPage || isEmbeddedAdvisorHost) {
-    return null
-  }
-
   const activeAdvisorRoute =
     location.pathname === "/advisor" ||
     location.pathname === "/ai-advisor" ||
@@ -66,6 +61,11 @@ export function GlobalAiAdvisor() {
     if (analysisId) query.set("analysisId", analysisId)
     return `/advisor?${query.toString()}`
   }, [location.pathname, location.search])
+
+  // 설비현황 페이지는 페이지 내부 EquipmentGuideChatLauncher가 챗봇을 담당
+  if (isEquipmentPage || isEmbeddedAdvisorHost) {
+    return null
+  }
 
   if (isLoggedIn) {
     return (

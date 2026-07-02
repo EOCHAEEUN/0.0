@@ -222,7 +222,7 @@ export default function SupportDetailPage() {
                   <button
                     className="btn dark"
                     type="button"
-                    onClick={() => navigate("/roi")}
+                    onClick={() => navigate("/roi/strategy")}
                   >
                     ROI 다시 보기
                   </button>

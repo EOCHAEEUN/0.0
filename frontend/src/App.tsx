@@ -49,6 +49,17 @@ function SupportProjectsIndexRedirect() {
   )
 }
 
+function RoiIndexRedirect() {
+  const [searchParams] = useSearchParams()
+  const queryText = searchParams.toString()
+  return (
+    <Navigate
+      to={queryText ? `/roi/strategy?${queryText}` : "/roi/strategy"}
+      replace
+    />
+  )
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -78,8 +89,13 @@ function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
 
           {/* ROI 분석 */}
-          <Route path="/roi" element={<RoiPage />} />
-          <Route path="/roi/history" element={<RoiHistoryPage />} />
+          <Route path="/roi">
+            <Route index element={<RoiIndexRedirect />} />
+            <Route path="strategy" element={<RoiPage view="strategy" />} />
+            <Route path="analysis" element={<RoiPage view="analysis" />} />
+            <Route path="roadmap" element={<RoiPage view="roadmap" />} />
+            <Route path="history" element={<RoiHistoryPage />} />
+          </Route>
 
           {/* 투자 분석 결과 */}
           <Route path="/analysis/:id/result" element={<AnalysisResultPage />} />

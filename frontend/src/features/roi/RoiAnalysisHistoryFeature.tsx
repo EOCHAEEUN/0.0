@@ -7,6 +7,7 @@ import type {
   DashboardRoiOutputContract,
 } from "../dashboard/dashboard.contract"
 import { fetchDashboardOnboarding } from "../dashboard/dashboard.api"
+import { buildRoiPath } from "./roiPaths"
 
 function compactText(value: unknown) {
   if (typeof value === "string") return value.trim()
@@ -204,7 +205,7 @@ export default function RoiAnalysisHistoryFeature() {
                   <button
                     type="button"
                     className="ff-roi-history-result-btn"
-                    onClick={() => navigate(`/roi?analysisId=${encodeURIComponent(item.analysisId)}`)}
+                    onClick={() => navigate(buildRoiPath("strategy", { analysisId: item.analysisId }))}
                   >
                     결과 보기
                     <ChevronRight size={16} aria-hidden="true" />

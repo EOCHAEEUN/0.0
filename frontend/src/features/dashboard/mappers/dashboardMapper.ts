@@ -7,6 +7,7 @@ import type {
   DashboardOverviewResponse,
 } from "../dashboard.contract"
 import { buildSupportProjectsPath } from "../../support/supportProjectsPaths"
+import { buildRoiPath } from "../../roi/roiPaths"
 
 export type InvestmentActionStatus = "empty" | "draft" | "completed"
 
@@ -1045,7 +1046,7 @@ function mapWorkspace(
     matchedPolicyCount: formatCount(matchedCount),
     needsText: "세부 업종코드 · 제출서류",
     priorityChips: getPriorityChips(company, analysis?.equipment ?? equipments[0], priorityPolicy),
-    roiPath: analysisId ? `/roi?analysisId=${analysisId}` : "/roi",
+    roiPath: analysisId ? buildRoiPath("strategy", { analysisId }) : buildRoiPath("strategy"),
     policyPath,
     draftPath,
     advisorPath,
@@ -1272,12 +1273,6 @@ function buildPaths(params: {
   equipmentId?: string | null
   policyId?: string | null
 }) {
-  const companyQuery = params.companyId
-    ? `company_id=${encodeURIComponent(params.companyId)}`
-    : ""
-  const equipmentQuery = params.equipmentId
-    ? `equipment_id=${encodeURIComponent(params.equipmentId)}`
-    : ""
   const analysisId = params.analysisId || ""
 
   const equipmentManagePath = "/equipment"
@@ -1286,11 +1281,22 @@ function buildPaths(params: {
     analysisId
       ? `/analysis/${encodeURIComponent(analysisId)}/result`
       : params.equipmentId
-        ? `/roi?${[companyQuery, equipmentQuery, "source=dashboard"].filter(Boolean).join("&")}`
-        : `/roi?${[companyQuery, "source=dashboard"].filter(Boolean).join("&")}`
+        ? buildRoiPath("strategy", {
+            company_id: params.companyId || undefined,
+            equipment_id: params.equipmentId || undefined,
+            source: "dashboard",
+          })
+        : buildRoiPath("strategy", {
+            company_id: params.companyId || undefined,
+            source: "dashboard",
+          })
 
   const newRoiPath = params.equipmentId
-    ? `/roi?${[companyQuery, equipmentQuery, "source=dashboard"].filter(Boolean).join("&")}`
+    ? buildRoiPath("strategy", {
+        company_id: params.companyId || undefined,
+        equipment_id: params.equipmentId || undefined,
+        source: "dashboard",
+      })
     : equipmentManagePath
 
   const policyPath = analysisId

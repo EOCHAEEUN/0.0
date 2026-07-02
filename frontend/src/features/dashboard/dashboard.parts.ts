@@ -86,7 +86,7 @@ export const serviceCards: ServiceCard[] = [
     description:
       "총 투자금, 지원금, 절감액을 기준으로 실부담금과 회수기간을 계산합니다.",
     badge: "ROI",
-    path: "/roi",
+    path: "/roi/strategy",
     tone: "blue",
   },
   {

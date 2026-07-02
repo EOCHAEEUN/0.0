@@ -129,6 +129,7 @@ export function mapRemoteEquipment(item: unknown, index: number): EquipmentInfo 
       getStringValue(equipment.scenario_b_investment_manwon),
     ),
     status: "저장된 설비",
+    createdAt: getStringValue(equipment.created_at) || undefined,
   }
 }
 
@@ -164,9 +165,12 @@ export function buildEquipmentPayload(equipment: EquipmentInfo): EquipmentPayloa
 }
 
 export function getCategoryLabel(category: string) {
-  if (category === "press") return "press"
-  if (category === "cnc") return "cnc"
-  if (category === "injection") return "injection"
+  if (category === "press") return "프레스"
+  if (category === "cnc") return "CNC"
+  if (category === "injection") return "사출"
+  if (category === "welding") return "용접"
+  if (category === "compressor") return "컴프레서"
   if (category === "etc") return "기타"
+  if (category === "선택 필요") return "-"
   return category || "-"
 }

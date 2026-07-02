@@ -1,4 +1,4 @@
-import { Plus, Star, Trash2 } from "lucide-react"
+import { Bot, CircleHelp, Info, Plus } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import DashboardWorkspaceSidebar from "../../components/layout/DashboardWorkspaceSidebar"
 import {
@@ -27,6 +27,7 @@ import {
   mapRemoteEquipment,
 } from "./equipmentStatus.mapper"
 import EquipmentGuideChatLauncher from "./EquipmentGuideChatLauncher"
+import EquipmentRegisteredList from "./EquipmentRegisteredList"
 
 function getStringValue(value: unknown) {
   if (value === null || value === undefined) return ""
@@ -238,8 +239,9 @@ export default function EquipmentStatusFeature() {
           }}
         />
 
-        <div className="ff-dashboard-main-content">
-          <section className="ff-equipment-hero-card">
+        <div className="ff-dashboard-main-content ff-equipment-workspace-content">
+          <div className="ff-equipment-workspace-inner">
+            <section className="ff-equipment-hero-card">
             <div>
               <p className="ff-equipment-eyebrow">EQUIPMENT STATUS</p>
               <h1>설비 현황</h1>
@@ -247,26 +249,45 @@ export default function EquipmentStatusFeature() {
                 등록된 설비를 관리하고, ROI 분석에 사용할 대표 설비를 설정하세요.
               </p>
               <p className="ff-equipment-guide-page-note">
-                우하단 챗봇은 설비 등록·수정 폼의 입력 항목만 안내합니다. 그 외
-                질문(ROI, 지원사업 등)은 AI Advisor를 이용해 주세요.
+                <Info aria-hidden="true" size={15} />
+                <span>
+                  우하단 챗봇은 설비 등록·수정 폼의 입력 항목만 안내합니다. 그 외
+                  질문(ROI, 지원사업 등)은 AI Advisor를 이용해 주세요.
+                </span>
               </p>
             </div>
-            <button type="button" className="ff-equipment-primary-btn" onClick={startCreate}>
-              <Plus aria-hidden="true" size={18} />
-              내 설비 등록
-            </button>
+            {!editingId ? (
+              <button type="button" className="ff-equipment-primary-btn" onClick={startCreate}>
+                <Plus aria-hidden="true" size={18} />
+                내 설비 등록
+              </button>
+            ) : null}
           </section>
 
           {feedback ? <div className="ff-equipment-feedback">{feedback}</div> : null}
 
           <section className="ff-equipment-representative-card">
-            <div>
-              <strong>ROI 계산용 대표 설비</strong>
-              <p>
-                {representativeEquipment
-                  ? `${representativeEquipment.name} · ${getCategoryLabel(representativeEquipment.category)}`
-                  : "아직 대표 설비가 설정되지 않았습니다."}
-              </p>
+            <div className="ff-equipment-representative-head">
+              <div className="ff-equipment-representative-title">
+                <strong>ROI 계산용 대표 설비</strong>
+                <button
+                  type="button"
+                  className="ff-equipment-help-btn"
+                  aria-label="대표 설비 안내"
+                  title="ROI 분석에 사용할 기본 설비를 지정합니다."
+                >
+                  <CircleHelp aria-hidden="true" size={15} />
+                </button>
+              </div>
+              <div
+                className={`ff-equipment-representative-body ${representativeEquipment ? "has-value" : ""}`}
+              >
+                <p>
+                  {representativeEquipment
+                    ? `${representativeEquipment.name} · ${getCategoryLabel(representativeEquipment.category)}`
+                    : "아직 대표 설비가 설정되지 않았습니다."}
+                </p>
+              </div>
             </div>
             {representativeEquipment ? (
               <button
@@ -386,74 +407,26 @@ export default function EquipmentStatusFeature() {
 
                 {equipmentList.length === 0 ? (
                   <div className="ff-equipment-empty">
-                    <p>등록된 설비가 없습니다. 상단에서 내 설비를 등록해주세요.</p>
+                    <div className="ff-equipment-empty-icon" aria-hidden="true">
+                      <Bot size={28} strokeWidth={1.8} />
+                    </div>
+                    <strong>등록된 설비가 없습니다.</strong>
+                    <p>상단에서 &apos;내 설비 등록&apos; 버튼을 눌러 설비를 추가해 주세요.</p>
                   </div>
                 ) : (
-                  <div className="ff-equipment-list">
-                    {equipmentList.map((equipment) => {
-                      const isRepresentative =
-                        equipment.equipmentId === representativeEquipmentId
-
-                      return (
-                        <article key={equipment.id} className="ff-equipment-list-card">
-                          <div className="ff-equipment-list-head">
-                            <div>
-                              <strong>{equipment.name || `설비 ${equipment.id}`}</strong>
-                              <p>
-                                {getCategoryLabel(equipment.category)}
-                                {equipment.process ? ` · ${equipment.process}` : ""}
-                                {equipment.years ? ` · ${equipment.years}년` : ""}
-                              </p>
-                            </div>
-                            {isRepresentative ? (
-                              <span className="ff-equipment-badge representative">
-                                <Star aria-hidden="true" size={14} />
-                                대표 설비
-                              </span>
-                            ) : null}
-                          </div>
-
-                          <div className="ff-equipment-list-meta">
-                            <span>연간 에너지 {equipment.annualEnergyCost || "-"}만원</span>
-                            <span>
-                              {equipment.equipmentId ? "저장됨" : "미저장"}
-                            </span>
-                          </div>
-
-                          <div className="ff-equipment-list-actions">
-                            {!isRepresentative && equipment.equipmentId ? (
-                              <button
-                                type="button"
-                                className="ff-equipment-secondary-btn"
-                                onClick={() => void handleSetRepresentative(equipment)}
-                              >
-                                ROI 대표 설비로 설정
-                              </button>
-                            ) : null}
-                            <button
-                              type="button"
-                              className="ff-equipment-secondary-btn"
-                              onClick={() => startEdit(equipment)}
-                            >
-                              수정
-                            </button>
-                            <button
-                              type="button"
-                              className="ff-equipment-danger-btn"
-                              onClick={() => void handleDelete(equipment)}
-                            >
-                              <Trash2 aria-hidden="true" size={15} />
-                              삭제
-                            </button>
-                          </div>
-                        </article>
-                      )
-                    })}
-                  </div>
+                  <EquipmentRegisteredList
+                    equipmentList={equipmentList}
+                    representativeEquipmentId={representativeEquipmentId}
+                    companyId={companyId}
+                    onEdit={startEdit}
+                    onDelete={(equipment) => void handleDelete(equipment)}
+                    onSetRepresentative={(equipment) => void handleSetRepresentative(equipment)}
+                  />
                 )}
               </section>
             </>
           )}
+          </div>
         </div>
       </div>
       <EquipmentGuideChatLauncher />

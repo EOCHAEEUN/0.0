@@ -4,6 +4,7 @@ import {
   BarChart3,
   Building2,
   CirclePlus,
+  FileText,
   IdCard,
   UserRound,
 } from "lucide-react";
@@ -19,7 +20,7 @@ import {
   patchRepresentativeEquipment,
 } from "../dashboard/dashboard.api";
 import { MYPAGE_DOCUMENT_STORAGE_KEY } from "../documents/documentStorage";
-import { MyPageDocumentUploadPanel } from "./MyPageDocumentUploadPanel";
+import CompanyDocumentsManagement from "./components/CompanyDocumentsManagement";
 import type {
   BasicInfo,
   PasswordInfo,
@@ -2013,6 +2014,14 @@ export default function MyPage() {
                     options={PURPOSE_OPTIONS}
                   />
               </div>
+            </MyPageSectionCard>
+
+            <MyPageSectionCard
+              title="기업 증빙 관리"
+              subtitle="정책 신청에 필요한 공통 증빙서류를 미리 등록·관리하세요."
+              icon={<FileText />}
+            >
+              <CompanyDocumentsManagement />
             </MyPageSectionCard>
 
             <div className="ff-mypage-form-actions">

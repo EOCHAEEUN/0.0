@@ -1,6 +1,12 @@
-.ff-roi-workspace-content {
-  padding: 28px 32px 56px;
+.ff-dashboard-main-content.ff-roi-workspace-content {
+  padding: 36px 64px 72px;
   min-width: 0;
+}
+
+.ff-roi-workspace-inner {
+  width: 100%;
+  max-width: 1140px;
+  margin: 0 auto;
 }
 
 .ff-roi-hero {
@@ -622,6 +628,13 @@
 }
 
 @media (max-width: 1180px) {
+  .ff-roi-analysis-bottom,
+  .ff-roi-analysis-evidence-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1180px) {
   .ff-roi-strategy-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -644,8 +657,12 @@
 }
 
 @media (max-width: 980px) {
-  .ff-roi-workspace-content {
-    padding: 20px 16px 40px;
+  .ff-dashboard-main-content.ff-roi-workspace-content {
+    padding: 24px 24px 48px;
+  }
+
+  .ff-roi-workspace-inner {
+    max-width: none;
   }
 
   .ff-roi-hero-grid {
@@ -674,5 +691,975 @@
 
   .ff-roi-hero-actions .ff-roi-btn {
     width: 100%;
+  }
+}
+
+.ff-roi-page-intro {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.ff-roi-page-eyebrow {
+  margin: 0 0 8px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
+
+.ff-roi-page-eyebrow.ai {
+  color: #2563eb;
+}
+
+.ff-roi-page-intro h1 {
+  margin: 0;
+  color: #0f172a;
+  font-size: clamp(24px, 2.5vw, 30px);
+  font-weight: 950;
+  letter-spacing: -0.03em;
+  line-height: 1.25;
+}
+
+.ff-roi-page-sub {
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.ff-roi-page-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.ff-roi-inline-btn {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid #dbe3ee;
+  border-radius: 10px;
+  background: #fff;
+  color: #123b6d;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.ff-roi-live-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  margin-bottom: 8px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.ff-roi-scenario-grid--strategy,
+.ff-roi-scenario-grid--analysis {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ff-roi-strategy-scenario-card {
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+  width: 100%;
+  font-family: inherit;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ff-roi-strategy-scenario-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.1);
+}
+
+.ff-roi-strategy-scenario-card.is-a .ff-roi-strategy-scenario-head {
+  background: #123b6d;
+}
+
+.ff-roi-strategy-scenario-card.is-b .ff-roi-strategy-scenario-head {
+  background: #3f4f63;
+}
+
+.ff-roi-strategy-scenario-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px;
+  color: #fff;
+}
+
+.ff-roi-strategy-scenario-head-text {
+  min-width: 0;
+}
+
+.ff-roi-strategy-scenario-code {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.88;
+}
+
+.ff-roi-strategy-scenario-head h3 {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(17px, 1.7vw, 20px);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+
+.ff-roi-strategy-scenario-head-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.ff-roi-strategy-scenario-rec {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.ff-roi-strategy-scenario-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  opacity: 0.95;
+}
+
+.ff-roi-strategy-scenario-body {
+  background: #fff;
+}
+
+.ff-roi-strategy-scenario-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 22px 24px 18px;
+}
+
+.ff-roi-strategy-scenario-kpis div {
+  min-width: 0;
+}
+
+.ff-roi-strategy-scenario-kpis dt {
+  margin: 0 0 6px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ff-roi-strategy-scenario-kpis dd {
+  margin: 0;
+  color: #0f172a;
+  font-size: clamp(15px, 1.6vw, 18px);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.ff-roi-strategy-scenario-kpis dd.is-accent {
+  color: #2563eb;
+}
+
+.ff-roi-strategy-scenario-note {
+  margin: 0 24px 24px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.ff-roi-scenario-card.static {
+  cursor: default;
+}
+
+.ff-roi-strategy-action {
+  margin-top: 36px;
+  border-top: 1px solid #dde6f0;
+  border-bottom: 1px solid #dde6f0;
+  background: #fff;
+}
+
+.ff-roi-strategy-action-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto;
+  align-items: center;
+  gap: 22px;
+  padding: 22px 32px;
+}
+
+.ff-roi-strategy-action-intro {
+  text-align: right;
+  padding-right: 8px;
+}
+
+.ff-roi-strategy-action-intro strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #123b6d;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+}
+
+.ff-roi-strategy-action-intro p {
+  margin: 0;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
+.ff-roi-strategy-action-rec {
+  padding-left: 28px;
+  border-left: 4px solid #123b6d;
+}
+
+.ff-roi-strategy-action-rec strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #123b6d;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+}
+
+.ff-roi-strategy-action-rec p {
+  margin: 0;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.65;
+}
+
+.ff-roi-strategy-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 8px 14px;
+  margin-right: 4px;
+  border: 0;
+  border-radius: 999px;
+  background: #123b6d;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  box-shadow: 0 6px 16px rgba(18, 59, 109, 0.2);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ff-roi-strategy-action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(18, 59, 109, 0.24);
+}
+
+.ff-roi-strategy-footer {
+  margin-top: 0;
+  padding-top: 18px;
+  border-top: 0;
+}
+
+.ff-roi-btn.primary.light {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 10px;
+  background: #123b6d;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.ff-roi-analysis-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.ff-roi-analysis-kpi-card {
+  padding: 16px 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+}
+
+.ff-roi-analysis-kpi-card > span {
+  display: block;
+  margin-bottom: 10px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.ff-roi-analysis-kpi-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.ff-roi-analysis-kpi-value-row strong {
+  color: #123b6d;
+  font-size: 28px;
+  font-weight: 950;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.ff-roi-analysis-kpi-value-row em {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+  font-style: normal;
+}
+
+.ff-roi-analysis-kpi-card--roi p {
+  margin: 0;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.55;
+}
+
+.ff-roi-analysis-subsidy-rows {
+  margin: 0 0 10px;
+  padding: 0;
+}
+
+.ff-roi-analysis-subsidy-rows div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+}
+
+.ff-roi-analysis-subsidy-rows dt {
+  margin: 0;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ff-roi-analysis-subsidy-rows dd {
+  margin: 0;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ff-roi-analysis-subsidy-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #e8edf3;
+}
+
+.ff-roi-analysis-subsidy-total span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ff-roi-analysis-subsidy-total strong {
+  color: #123b6d;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.ff-roi-analysis-scenario-section {
+  margin-bottom: 14px;
+}
+
+.ff-roi-analysis-scenario-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.ff-roi-analysis-scenario-card {
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+}
+
+.ff-roi-analysis-scenario-card.is-recommended {
+  border: 2px solid #123b6d;
+}
+
+.ff-roi-analysis-scenario-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  color: #fff;
+}
+
+.ff-roi-analysis-scenario-card.is-a .ff-roi-analysis-scenario-head {
+  background: #123b6d;
+}
+
+.ff-roi-analysis-scenario-card.is-b .ff-roi-analysis-scenario-head {
+  background: #4f5d73;
+}
+
+.ff-roi-analysis-scenario-head h3 {
+  margin: 0;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.ff-roi-analysis-scenario-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #fff;
+  color: #123b6d;
+  font-size: 10px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.ff-roi-analysis-scenario-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  padding: 12px 14px;
+  border-bottom: 1px solid #e8edf3;
+}
+
+.ff-roi-analysis-scenario-metrics div {
+  padding: 8px 4px;
+}
+
+.ff-roi-analysis-scenario-metrics dt {
+  margin: 0 0 4px;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.ff-roi-analysis-scenario-metrics dd {
+  margin: 0;
+  color: #0f172a;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.ff-roi-analysis-scenario-metrics dd.is-green {
+  color: #16a34a;
+}
+
+.ff-roi-analysis-scenario-footer {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px 14px 12px;
+  text-align: left;
+}
+
+.ff-roi-analysis-scenario-footer span {
+  display: block;
+  margin-bottom: 4px;
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.ff-roi-analysis-scenario-footer strong {
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.ff-roi-analysis-scenario-footer strong.is-accent {
+  color: #123b6d;
+}
+
+.ff-roi-analysis-bottom {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(240px, 300px);
+  gap: 14px;
+  margin-top: 4px;
+  margin-bottom: 24px;
+}
+
+.ff-roi-analysis-rec-card,
+.ff-roi-analysis-ref-card {
+  padding: 16px 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+}
+
+.ff-roi-analysis-rec-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  color: #123b6d;
+}
+
+.ff-roi-analysis-rec-head h2 {
+  margin: 0;
+  color: #123b6d;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.ff-roi-analysis-rec-box {
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: #eef4ff;
+}
+
+.ff-roi-analysis-rec-box p {
+  margin: 0;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.65;
+}
+
+.ff-roi-analysis-rec-chips {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ff-roi-analysis-rec-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 12px 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  text-align: center;
+}
+
+.ff-roi-analysis-rec-chip-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #123b6d;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.ff-roi-analysis-rec-chip p {
+  margin: 0;
+  color: #475569;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.ff-roi-analysis-ref-title {
+  margin: 0 0 12px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ff-roi-analysis-ref-rows {
+  padding: 12px 14px;
+  border: 1.5px dashed #d1d5db;
+  border-radius: 10px;
+  background: #fafbfc;
+}
+
+.ff-roi-analysis-ref-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.ff-roi-analysis-ref-row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.ff-roi-analysis-ref-row > span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ff-roi-analysis-ref-row > strong {
+  color: #1e293b;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ff-roi-analysis-ref-value {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.ff-roi-analysis-ref-value strong {
+  color: #1e293b;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ff-roi-analysis-ref-value em {
+  color: #dc2626;
+  font-size: 10px;
+  font-weight: 800;
+  font-style: normal;
+}
+
+.ff-roi-analysis-ref-value strong.is-danger {
+  color: #dc2626;
+}
+
+.ff-roi-analysis-ref-row > strong.is-success {
+  color: #15803d;
+}
+
+.ff-roi-chart-panel {
+  margin-bottom: 14px;
+  padding: 16px 18px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+}
+
+.ff-roi-chart-head--split {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.ff-roi-chart-head h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.ff-roi-chart-legend--top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.ff-roi-chart-legend--top .dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+
+.ff-roi-chart-legend--top .dot.solid {
+  background: #123b6d;
+}
+
+.ff-roi-chart-legend--top .dot.dashed {
+  background: #64748b;
+}
+
+.ff-roi-chart-canvas-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 168px;
+  padding: 14px 0 10px;
+}
+
+.ff-roi-chart-canvas {
+  display: block;
+  width: 61.8%;
+  max-width: 100%;
+  height: auto;
+}
+
+.ff-roi-chart-legend {
+  display: flex;
+  gap: 16px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.ff-roi-chart-legend .line {
+  display: inline-block;
+  width: 18px;
+  height: 0;
+  margin-right: 6px;
+  vertical-align: middle;
+  border-top: 3px solid #2563eb;
+}
+
+.ff-roi-chart-legend .line.dashed {
+  border-top-style: dashed;
+  border-top-color: #94a3b8;
+}
+
+.ff-roi-roadmap-compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: 18px 20px;
+  border: 1px solid #ddd6fe;
+  border-radius: 16px;
+  background: #f5f3ff;
+}
+
+.ff-roi-roadmap-compare > div span {
+  display: block;
+  margin-bottom: 6px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.ff-roi-roadmap-compare > div strong {
+  display: block;
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 950;
+}
+
+.ff-roi-roadmap-compare > div em {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  font-style: normal;
+}
+
+.ff-roi-roadmap-section h2 {
+  margin: 0 0 14px;
+  color: #0f172a;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.ff-roi-roadmap-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.ff-roi-roadmap-card {
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+}
+
+.ff-roi-roadmap-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.ff-roi-roadmap-phase {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #123b6d;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.ff-roi-roadmap-duration {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.ff-roi-roadmap-card h3 {
+  margin: 0 0 10px;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1.4;
+}
+
+.ff-roi-roadmap-card ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.ff-roi-roadmap-card li {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.ff-roi-roadmap-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  border-radius: 999px;
+  background: #123b6d;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.ff-roi-roadmap-summary {
+  padding: 18px 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #fafbfc;
+}
+
+.ff-roi-roadmap-summary p {
+  margin: 8px 0 0;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.65;
+}
+
+@media (max-width: 1180px) {
+  .ff-roi-analysis-kpi-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .ff-roi-roadmap-grid,
+  .ff-roi-roadmap-compare {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 980px) {
+  .ff-roi-page-intro,
+  .ff-roi-strategy-action-bar {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .ff-roi-strategy-action-intro {
+    text-align: left;
+    padding-right: 0;
+  }
+
+  .ff-roi-strategy-action-rec {
+    padding-left: 0;
+    padding-top: 20px;
+    border-left: 0;
+    border-top: 4px solid #123b6d;
+  }
+
+  .ff-roi-strategy-action-btn {
+    width: 100%;
+  }
+
+  .ff-roi-scenario-grid--strategy,
+  .ff-roi-scenario-grid--analysis,
+  .ff-roi-analysis-scenario-grid,
+  .ff-roi-analysis-rec-chips,
+  .ff-roi-analysis-summary-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .ff-roi-strategy-scenario-kpis {
+    grid-template-columns: 1fr;
   }
 }

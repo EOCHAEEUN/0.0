@@ -31,11 +31,13 @@ export type RoiScenarioView = {
   title: string
   subLabel: string
   investment: string
+  investmentDetail: string
   subsidy: string
   net: string
   saving: string
   roi: string
   payback: string
+  summary: string
   isRecommended: boolean
   isActive: boolean
 }

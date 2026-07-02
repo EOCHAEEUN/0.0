@@ -117,7 +117,7 @@ export function ApplicationDraftDashboard({
           <PrepareCard
             model={model}
             onStartDraft={handleStartDraft}
-            onGoRoi={() => navigate("/roi")}
+            onGoRoi={() => navigate("/roi/strategy")}
             onGoSupport={() => navigate("/support-projects/priority")}
           />
           <ReadinessCard model={model} />

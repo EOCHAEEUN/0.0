@@ -421,7 +421,7 @@ export default function DashboardFeature() {
       handlePriorityEquipmentNavigate()
       return
     }
-    navigate(workspace.newRoiPath || "/roi?source=dashboard")
+    navigate(workspace.newRoiPath || "/roi/strategy?source=dashboard")
   }
 
   const handleStartAnalysis = () => {

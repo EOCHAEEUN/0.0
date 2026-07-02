@@ -1,15 +1,17 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom"
-import { fetchAnalysisEntryContext } from "../features/onboarding/onboardingAnalysisApi"
+import { fetchAnalysisEntryContext, fetchAnalysisResultSnapshot } from "../features/onboarding/onboardingAnalysisApi"
 import { getAnalysisResult } from "../features/onboarding/onboardingState"
 import { hydrateAccountData } from "../services/accountHydration"
 import { useDashboardData } from "../features/dashboard/hooks/useDashboardData"
 import DashboardWorkspaceSidebar from "../components/layout/DashboardWorkspaceSidebar"
 import {
-  RoiAnalysisResultView,
   ROI_STRATEGY_ICONS,
   type RoiScenarioView,
 } from "../features/roi/components/RoiAnalysisResultView"
+import { RoiWorkspaceViews } from "../features/roi/components/RoiWorkspaceViews"
+import { buildRoiPath, type RoiView } from "../features/roi/roiPaths"
+import type { AnalysisResultSnapshot } from "../features/onboarding/onboardingState"
 import "../features/dashboard/dashboard.workspace.css"
 import "../features/roi/roi.workspace.css"
 
@@ -43,6 +45,28 @@ function fmtYrs(v: number | null): string {
 }
 function fmtWon(v: number | null): string {
   return v !== null ? `${Math.round(v).toLocaleString("ko-KR")}만원` : "-"
+}
+function fmtInvestmentShort(v: number | null): string {
+  if (v === null) return "-"
+  if (v >= 10000) {
+    const eok = v / 10000
+    return `${Number.isInteger(eok) ? eok.toFixed(0) : eok.toFixed(1)}억`
+  }
+  return `${Math.round(v).toLocaleString("ko-KR")}만원`
+}
+function fmtSubsidyEok(v: number | null): string | null {
+  if (v === null || v <= 0) return null
+  const eok = v / 10000
+  return `${Number.isInteger(eok) ? eok.toFixed(0) : eok.toFixed(1)}`
+}
+function buildScenarioSummary(sId: "a" | "b", metrics: ScenarioMetrics): string {
+  const subsidyEok = fmtSubsidyEok(metrics.subsidyRaw)
+  if (sId === "a") {
+    return subsidyEok
+      ? `가장 높은 생산성 향상이 기대되나 초기 자본 투입량이 큼. 정부 지원금 최대 ${subsidyEok}억 수령 가능 구간.`
+      : "가장 높은 생산성 향상이 기대되나 초기 자본 투입량이 큼. 정부 지원금 수령 가능 구간."
+  }
+  return "리스크 관리에 용이하며 병목 공정 위주의 스마트화를 추진. 점진적 예산 집행에 유리함."
 }
 
 function getScenario(r: Record<string, unknown>, k: "a" | "b") {
@@ -215,19 +239,89 @@ function buildEvidenceMetrics(params: {
 }
 
 // ── main component ────────────────────────────────────────────────────────────
-export default function RoiPage() {
+export default function RoiPage({ view = "strategy" }: { view?: RoiView }) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const analysisId = searchParams.get("analysisId") || undefined
+  const [resolvedResult, setResolvedResult] = useState<AnalysisResultSnapshot | null>(() =>
+    getAnalysisResult(analysisId),
+  )
+  const [isLoadingResult, setIsLoadingResult] = useState(() =>
+    Boolean(analysisId && !getAnalysisResult(analysisId)),
+  )
+  const [loadFailed, setLoadFailed] = useState(false)
   const { dashboard } = useDashboardData({ preferredAnalysisId: analysisId })
   const workspace = dashboard.workspace
-  const result = getAnalysisResult(analysisId)
+  const result = resolvedResult
 
   const [selectedScen, setSelectedScen] = useState<"a" | "b" | null>(null)
   const [reanalysisError, setReanalysisError] = useState("")
   const [isResolvingReanalysis, setIsResolvingReanalysis] = useState(false)
 
-  if (!result) return <Navigate to="/analysis/new" replace />
+  useEffect(() => {
+    const cached = getAnalysisResult(analysisId)
+    if (cached) {
+      setResolvedResult(cached)
+      setIsLoadingResult(false)
+      setLoadFailed(false)
+      return
+    }
+
+    if (!analysisId) {
+      setResolvedResult(null)
+      setIsLoadingResult(false)
+      setLoadFailed(true)
+      return
+    }
+
+    let cancelled = false
+    setIsLoadingResult(true)
+    setLoadFailed(false)
+
+    void fetchAnalysisResultSnapshot(analysisId)
+      .then((snapshot) => {
+        if (cancelled) return
+        if (snapshot) {
+          setResolvedResult(snapshot)
+          setLoadFailed(false)
+        } else {
+          setResolvedResult(null)
+          setLoadFailed(true)
+        }
+      })
+      .catch((error) => {
+        if (cancelled) return
+        console.error("ROI 분석 결과를 불러오지 못했습니다.", error)
+        setResolvedResult(null)
+        setLoadFailed(true)
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingResult(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [analysisId])
+
+  if (isLoadingResult) {
+    return (
+      <main className="page ff-dashboard-workspace-page">
+        <div className="ff-dashboard-layout">
+          <div className="ff-dashboard-main-content ff-roi-workspace-content">
+            <p>ROI 분석 결과를 불러오는 중입니다...</p>
+          </div>
+        </div>
+      </main>
+    )
+  }
+
+  if (!result) {
+    if (loadFailed || !analysisId) {
+      return <Navigate to="/analysis/new" replace />
+    }
+    return null
+  }
 
   const resultRecord = result as Record<string, unknown>
   const roiResult = asRecord(result.roiResult)
@@ -260,7 +354,7 @@ export default function RoiPage() {
 
   const roi = mRec?.roi ?? topLevelRoi
   const payback = mRec?.payback ?? topLevelPayback
-  const draftId = analysisId || (result as Record<string, unknown>).id || "latest"
+  const draftId = String(analysisId || resultRecord.id || "latest")
   const resultEquipment = asRecord(resultRecord.equipment)
   const resultAnalysisInput = asRecord(resultRecord.analysisInput ?? resultRecord.analysis_input)
   const resultEquipmentId = String(
@@ -282,8 +376,13 @@ export default function RoiPage() {
     : []
   const recLabel = rec === "b" ? "B안 · 부분 교체" : rec === "a" ? "A안 · 전체 교체" : "A/B안"
 
-  const priorityPolicyId = extractPriorityPolicyId(canonicalPolicies)
+  const priorityPolicyId =
+    String(resultRecord.priorityPolicyId ?? "").trim() ||
+    extractPriorityPolicyId(canonicalPolicies)
   const supportProjectsPath = `/support-projects/priority?analysis_id=${encodeURIComponent(String(draftId))}`
+  const roiStrategyPath = buildRoiPath("strategy", { analysisId: String(draftId) })
+  const roiAnalysisPath = buildRoiPath("analysis", { analysisId: String(draftId) })
+  const roiRoadmapPath = buildRoiPath("roadmap", { analysisId: String(draftId) })
 
   const subsidyRatio =
     mRecFallback.subsidy !== null && mRecFallback.investment !== null && mRecFallback.investment > 0
@@ -353,7 +452,7 @@ export default function RoiPage() {
     const m = sId === "a" ? mA : mB
     return {
       id: sId,
-      title: sId === "a" ? "A안 · 전체 교체" : "B안 · 부분 교체",
+      title: sId === "a" ? "전체 교체 분석" : "부분 교체 분석",
       subLabel: hasRecommendation
         ? isRec
           ? "우선 검토"
@@ -361,12 +460,14 @@ export default function RoiPage() {
         : sId === "a"
           ? "전체 교체안"
           : "부분 교체안",
-      investment: fmtWon(m.investment),
+      investment: fmtInvestmentShort(m.investment),
+      investmentDetail: fmtWon(m.investment),
       subsidy: formatSubsidyDisplay(m),
       net: fmtWon(m.net),
       saving: fmtWon(m.saving),
       roi: fmtPct(m.roi),
       payback: fmtYrs(m.payback),
+      summary: buildScenarioSummary(sId, m),
       isRecommended: isRec,
       isActive,
     }
@@ -478,7 +579,7 @@ export default function RoiPage() {
       <div className="ff-dashboard-layout">
         <DashboardWorkspaceSidebar
           paths={{
-            newRoiPath: workspace.newRoiPath,
+            newRoiPath: workspace.newRoiPath || roiStrategyPath,
             policyPath: workspace.policyPath || supportProjectsPath,
             draftPath: workspace.draftPath,
             advisorPath: workspace.advisorPath,
@@ -488,8 +589,11 @@ export default function RoiPage() {
         />
 
         <div className="ff-dashboard-main-content ff-roi-workspace-content">
-          <RoiAnalysisResultView
+          <div className="ff-roi-workspace-inner">
+            <RoiWorkspaceViews
+            view={view}
             equipmentName={`${(result as Record<string, unknown>).equipmentName as string || "검토 설비"}`}
+            recLabel={recLabel}
             heroMain={heroText.main}
             heroSub={heroText.sub}
             kpis={[
@@ -534,7 +638,10 @@ export default function RoiPage() {
             onSupportProjects={() => navigate(supportProjectsPath)}
             onReanalysis={() => void handleReanalysis()}
             onSelectScenario={setSelectedScen}
+            onGoAnalysis={() => navigate(roiAnalysisPath)}
+            onGoRoadmap={() => navigate(roiRoadmapPath)}
           />
+          </div>
         </div>
       </div>
     </main>

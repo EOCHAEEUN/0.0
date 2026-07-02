@@ -13,6 +13,7 @@ import {
   saveAnalysisResult,
   updateUserOnboardingState,
 } from "../onboardingState"
+import { buildRoiPath } from "../../roi/roiPaths"
 
 const SETUP_EQUIPMENT_NAME_KEY = "factofit_setup_equipment_name"
 
@@ -48,7 +49,7 @@ export default function SetupCompletePage() {
         analysisDraftStatus: "completed",
         analysisDraftId: snapshot.id,
       })
-      navigate(`/roi?analysisId=${encodeURIComponent(snapshot.id)}`)
+      navigate(buildRoiPath("strategy", { analysisId: snapshot.id }))
     } catch (reason) {
       setError(
         reason instanceof Error ? reason.message : "ROI 분석 중 오류가 발생했습니다.",

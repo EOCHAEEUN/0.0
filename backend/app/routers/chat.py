@@ -64,6 +64,17 @@ def create_advisor_session(
     return {"success": True, "data": summary}
 
 
+@router.delete("/advisor/sessions/{session_id}")
+def delete_advisor_session(
+    session_id: str,
+    company_id: str = Query(...),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    AdvisorChatService.ensure_company_owner(company_id, current_user.id)
+    AdvisorChatService.delete_session(company_id, session_id)
+    return {"success": True}
+
+
 @router.get("/chat/sessions")
 def get_chat_sessions(
     company_id: str = Query(...),

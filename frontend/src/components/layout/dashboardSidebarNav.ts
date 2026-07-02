@@ -6,7 +6,7 @@ export type SideNavKey =
   | "advisor"
   | "mypage"
   | "equipment"
-  | "help"
+  | "logout"
 
 export type SidebarWorkspacePaths = {
   newRoiPath?: string
@@ -134,7 +134,7 @@ export function isSidebarSettingsSubActive(
 
 export const BOTTOM_NAV_ITEMS = [
   { key: "mypage" as const, label: "설정", path: "/mypage" },
-  { key: "help" as const, label: "고객지원", path: "/" },
+  { key: "logout" as const, label: "로그아웃" },
 ] as const
 
 export function isSidebarMainActive(key: SideNavKey, pathname: string): boolean {
@@ -188,7 +188,7 @@ export function isSidebarMainActive(key: SideNavKey, pathname: string): boolean 
   return false
 }
 
-export function isSidebarBottomActive(key: "mypage" | "help", pathname: string): boolean {
+export function isSidebarBottomActive(key: "mypage" | "logout", pathname: string): boolean {
   if (key === "mypage") {
     return (
       pathname === "/mypage" ||
@@ -198,5 +198,5 @@ export function isSidebarBottomActive(key: "mypage" | "help", pathname: string):
       pathname.startsWith("/equipment/")
     )
   }
-  return pathname === "/"
+  return false
 }

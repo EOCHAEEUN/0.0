@@ -12,7 +12,7 @@ export default function EquipmentGuideChatLauncher() {
     <div className="ff-equipment-guide-chat-launcher" data-open={open ? "true" : "false"}>
       <AdvisorFloatingButton
         open={open}
-        label="설비 입력 도우미"
+        label="설비 등록 도우미"
         onClick={() => setOpen((value) => !value)}
       />
       <EquipmentGuideChatPanel open={open} onClose={() => setOpen(false)} />

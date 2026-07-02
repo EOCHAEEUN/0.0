@@ -11,6 +11,7 @@ import { ANALYSIS_QUICK_ACTIONS, type AdvisorActionDefinition } from "../feature
 import "../features/aiAdvisor/aiAdvisor.css"
 import {
   createAdvisorChatSession,
+  deleteAdvisorChatSession,
   fetchAdvisorChatSessionDetail,
   fetchAdvisorChatSessions,
   requestAdvisorAnswer,
@@ -32,6 +33,13 @@ const SUGGESTION_CHIPS = [
   "추천 시나리오 근거 알려줘",
   "A안/B안 차이 쉽게 설명해줘",
   "지금 바로 해야 할 일 정리해줘",
+] as const
+
+const WORKFLOW_STEPS = [
+  { no: "01", title: "입력", desc: "등록된 설비 중 분석할 설비를 선택합니다." },
+  { no: "02", title: "분석", desc: "ROI 분석과 투자안별 비교를 확인합니다." },
+  { no: "03", title: "정책 매칭", desc: "맞춤 지원사업을 추천하고 선택합니다." },
+  { no: "04", title: "신청서", desc: "추가 정보를 계획서 문장에 반영합니다." },
 ] as const
 
 type EquipmentOption = {
@@ -104,6 +112,19 @@ function formatDateTime(value: string) {
   ).padStart(2, "0")}`
 }
 
+function formatHistoryDate(value: string) {
+  const parsed = Date.parse(value)
+  if (!Number.isFinite(parsed)) return "-"
+  const date = new Date(parsed)
+  const month = date.getMonth() + 1
+  const day = String(date.getDate()).padStart(2, "0")
+  const hours = date.getHours()
+  const minutes = String(date.getMinutes()).padStart(2, "0")
+  const period = hours >= 12 ? "오후" : "오전"
+  const hour12 = hours % 12 || 12
+  return `${month}월 ${day}일 ${period} ${String(hour12).padStart(2, "0")}:${minutes}`
+}
+
 function createChatMessage(
   role: "user" | "assistant",
   content: string,
@@ -118,9 +139,17 @@ function createChatMessage(
   }
 }
 
-function analysisFromRoute(searchParams: URLSearchParams, state: unknown) {
+function analysisFromRoute(
+  searchParams: URLSearchParams,
+  pathname: string,
+  state: unknown,
+) {
   const queryId = readText(searchParams.get("analysisId"), searchParams.get("analysis_id"))
   if (queryId) return queryId
+  const pathMatch = pathname.match(/^\/analysis\/([^/]+)/)
+  if (pathMatch?.[1] && pathMatch[1] !== "new" && pathMatch[1] !== "review") {
+    return pathMatch[1]
+  }
   const routeState = asRecord(state)
   return readText(routeState.analysisId, routeState.analysis_id)
 }
@@ -228,7 +257,7 @@ function toMessageListFromSession(data: unknown): ChatMessage[] {
   return messages
 }
 
-export default function AiAdvisorPage() {
+export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boolean }) {
   const location = useLocation()
   const [searchParams] = useSearchParams()
   const messageEndRef = useRef<HTMLDivElement | null>(null)
@@ -246,7 +275,7 @@ export default function AiAdvisorPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     createChatMessage(
       "assistant",
-      "안녕하세요. 작업형 AI 어드바이저 Engi입니다. 어떤 점을 도와드릴까요?",
+      "안녕하세요. 작업형 AI 어드바이저 AI Engi입니다. 어떤 점을 도와드릴까요?",
     ),
   ])
   const [input, setInput] = useState("")
@@ -263,6 +292,7 @@ export default function AiAdvisorPage() {
   const [sessionsError, setSessionsError] = useState("")
   const [sessions, setSessions] = useState<AdvisorChatSessionItem[]>([])
   const [activeChatId, setActiveChatId] = useState("")
+  const [deletingSessionId, setDeletingSessionId] = useState("")
 
   const selectedContext = useMemo(
     () => contexts.find((item) => item.analysisId === selectedAnalysisId) ?? null,
@@ -297,7 +327,7 @@ export default function AiAdvisorPage() {
         setOnboarding(response)
         const mapped = mapContexts(response)
         setContexts(mapped)
-        const routeId = analysisFromRoute(searchParams, location.state)
+        const routeId = analysisFromRoute(searchParams, location.pathname, location.state)
         const storedId = readStoredAnalysisId()
         const preferredId = readText(
           response.active_analysis_id,
@@ -607,65 +637,139 @@ export default function AiAdvisorPage() {
     }
   }
 
+  const deleteSession = async (sessionId: string) => {
+    if (!companyId || !sessionId || deletingSessionId) return
+    setSessionsError("")
+    setDeletingSessionId(sessionId)
+    try {
+      await deleteAdvisorChatSession(companyId, sessionId)
+      if (activeChatId === sessionId) {
+        hydratedSessionRef.current = ""
+        setActiveChatId("")
+        setMessages([
+          createChatMessage(
+            "assistant",
+            "안녕하세요. 작업형 AI 어드바이저 AI Engi입니다. 어떤 점을 도와드릴까요?",
+          ),
+        ])
+      }
+      await reloadSessions()
+    } catch (error) {
+      setSessionsError(error instanceof Error ? error.message : "대화 내역 삭제 실패")
+    } finally {
+      setDeletingSessionId(null)
+    }
+  }
+
+  const sendSuggestionChip = async (question: string) => {
+    if (!question.trim() || sending || loadingActionId) return
+    const userMessage = createChatMessage("user", question)
+    const nextMessages = [...messages, userMessage]
+    setMessages(nextMessages)
+    await requestChat(question, nextMessages)
+  }
+
   const preferredAnalysisId = useMemo(
-    () => selectedAnalysisId || analysisFromRoute(searchParams, location.state) || undefined,
-    [location.state, searchParams, selectedAnalysisId],
+    () => selectedAnalysisId || analysisFromRoute(searchParams, location.pathname, location.state) || undefined,
+    [location.pathname, location.state, searchParams, selectedAnalysisId],
   )
 
-  const isEmbeddedAdvisor = searchParams.get("embeddedAdvisor") === "1"
+  const isEmbeddedAdvisor =
+    popupMode || searchParams.get("embeddedAdvisor") === "1"
+  const isWorkspaceAdvisor = !isEmbeddedAdvisor
 
   const advisorPageContent = (
     <div
       className={`ff-advisor-page-shell${isEmbeddedAdvisor ? " ff-advisor-page-shell--embedded" : ""}`}
     >
-        <section className="ff-advisor-hero">
-          <div className="ff-advisor-hero-copy">
-            <span className="ff-advisor-hero-badge">WORKFLOW AI ADVISOR</span>
-            <h1>작업형 AI 어드바이저</h1>
-            <p>ROI 분석, 정책 추천, 신청서 작성을 대화로 연결합니다.</p>
-            <p className="ff-advisor-hero-sub">
-              {selectedContext
-                ? "아래 버튼은 선택한 분석의 저장 결과를 기준으로 실행됩니다."
-                : "분석이 없으면 새 투자 분석부터 시작하세요."}
-            </p>
-            {loading && <p className="ff-advisor-hero-status">상담 컨텍스트 로딩 중...</p>}
-            {loadError && <p className="ff-advisor-hero-status is-error">{loadError}</p>}
-          </div>
-          <div className="ff-advisor-hero-visual" aria-hidden="true">
-            <img src={engiBot} alt="" />
-          </div>
+        <section className={`ff-advisor-hero${isWorkspaceAdvisor ? " ff-advisor-hero--workspace" : ""}`}>
+          {isWorkspaceAdvisor ? (
+            <>
+              <div className="ff-advisor-hero-copy">
+                <span className="ff-advisor-hero-badge">FACTOFIT AI ADVISOR</span>
+                <h1>AI Engi와 설비 투자 흐름을 한 번에 정리하세요.</h1>
+                <p>
+                  설비 선택부터 ROI 분석, 지원사업 추천, 신청서 초안까지 필요한 작업을 순서대로
+                  이어갑니다.
+                </p>
+                {loading && <p className="ff-advisor-hero-status">상담 컨텍스트 로딩 중...</p>}
+                {loadError && <p className="ff-advisor-hero-status is-error">{loadError}</p>}
+              </div>
+              <div className="ff-advisor-workflow-steps" aria-label="AI Engi 작업 흐름">
+                {WORKFLOW_STEPS.map((step) => (
+                  <article key={step.no}>
+                    <div className="ff-advisor-step-head">
+                      <span className="ff-advisor-step-no">{step.no}</span>
+                      <strong className="ff-advisor-step-title">{step.title}</strong>
+                    </div>
+                    <p>{step.desc}</p>
+                  </article>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="ff-advisor-hero-copy">
+                <span className="ff-advisor-hero-badge">WORKFLOW AI ADVISOR</span>
+                <h1>작업형 AI 어드바이저</h1>
+                <p>ROI 분석, 정책 추천, 신청서 작성을 대화로 연결합니다.</p>
+                <p className="ff-advisor-hero-sub">
+                  {selectedContext
+                    ? "아래 버튼은 선택한 분석의 저장 결과를 기준으로 실행됩니다."
+                    : "분석이 없으면 새 투자 분석부터 시작하세요."}
+                </p>
+                {loading && <p className="ff-advisor-hero-status">상담 컨텍스트 로딩 중...</p>}
+                {loadError && <p className="ff-advisor-hero-status is-error">{loadError}</p>}
+              </div>
+              <div className="ff-advisor-hero-visual" aria-hidden="true">
+                <img src={engiBot} alt="" />
+              </div>
+            </>
+          )}
         </section>
 
-        <div className="ff-advisor-page-grid">
+        <div className={`ff-advisor-page-grid${isWorkspaceAdvisor ? " ff-advisor-page-grid--workspace" : ""}`}>
           <article className="ff-advisor-chat-card">
-            <div className="ff-advisor-chat-head">
-              <h3>현재 대화</h3>
-              <span className="ff-advisor-system-status">
-                <i aria-hidden="true" />
-                AI 시스템 활성화됨
-              </span>
+            <div className={`ff-advisor-chat-head${isWorkspaceAdvisor ? " ff-advisor-chat-head--workspace" : ""}`}>
+              {isWorkspaceAdvisor ? (
+                <h3>지금 필요한 작업을 선택하면 AI Engi가 순서대로 이어갑니다.</h3>
+              ) : (
+                <>
+                  <h3>현재 대화</h3>
+                  <span
+                    className={`ff-advisor-system-status${loadError || chatError ? " is-error" : ""}`}
+                  >
+                    <i aria-hidden="true" />
+                    {loadError || chatError ? "연결 확인 필요" : "AI 시스템 활성화됨"}
+                  </span>
+                </>
+              )}
             </div>
 
             {!loading && !loadError && (
               <>
                 <AdvisorQuickActions
+                  variant={isWorkspaceAdvisor ? "workspace" : "compact"}
                   hasAnalysis={Boolean(selectedContext)}
                   loadingActionId={loadingActionId}
                   onChangeAnalysis={() => setAnalysisPickerOpen(true)}
                   onAction={(action) => void executeAdvisorAction(action)}
                 />
-                <div className="ff-advisor-chip-row">
-                  {SUGGESTION_CHIPS.map((question) => (
-                    <button
-                      key={question}
-                      type="button"
-                      className="ff-ai-advisor-chip"
-                      onClick={() => setInput(question)}
-                    >
-                      {question}
-                    </button>
-                  ))}
-                </div>
+                {!isWorkspaceAdvisor && (
+                  <div className="ff-advisor-chip-row">
+                    {SUGGESTION_CHIPS.map((question) => (
+                      <button
+                        key={question}
+                        type="button"
+                        className="ff-ai-advisor-chip"
+                        disabled={sending || Boolean(loadingActionId)}
+                        onClick={() => void sendSuggestionChip(question)}
+                      >
+                        {question}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </>
             )}
 
@@ -682,21 +786,16 @@ export default function AiAdvisorPage() {
                   <div key={message.id} className="ff-advisor-message-row assistant">
                     <div className="ff-advisor-message-avatar">
                       <img src={botIcon} alt="" />
-                      <span>Industrial AI</span>
+                      <span>AI Engi</span>
                     </div>
                     <div className="ff-advisor-message-stack">
                       <div className="ff-advisor-message assistant">{message.content}</div>
                       {message.cards && message.cards.length > 0 ? (
-                        <>
-                          <AdvisorResponseCards
-                            cards={message.cards}
-                            analysisId={selectedContext?.analysisId}
-                          />
-                          <div className="ff-advisor-tip-box">
-                            <strong>Tip:</strong> 응답 카드의 버튼을 누르면 해당 화면으로 바로
-                            이동할 수 있습니다.
-                          </div>
-                        </>
+                        <AdvisorResponseCards
+                          cards={message.cards}
+                          analysisId={selectedContext?.analysisId}
+                          inPopup={isEmbeddedAdvisor}
+                        />
                       ) : null}
                     </div>
                   </div>
@@ -755,7 +854,11 @@ export default function AiAdvisorPage() {
                     void sendChat()
                   }
                 }}
-                placeholder="질문 입력 (Enter 전송 / Shift+Enter 줄바꿈)"
+                placeholder={
+                  isWorkspaceAdvisor
+                    ? "메시지 입력..."
+                    : "질문 입력 (Enter 전송 / Shift+Enter 줄바꿈)"
+                }
               />
               <button
                 type="button"
@@ -769,13 +872,21 @@ export default function AiAdvisorPage() {
             </div>
           </article>
 
-          <article className="ff-advisor-session-card">
-            <div className="ff-advisor-session-head">
-              <h3>내 대화 내역</h3>
-              <button type="button" className="ff-advisor-new-chat-btn" onClick={() => void startNewChat()}>
-                + 새 대화
-              </button>
-            </div>
+          <article className={`ff-advisor-session-card${isWorkspaceAdvisor ? " ff-advisor-session-card--workspace" : ""}`}>
+            {isWorkspaceAdvisor ? (
+              <header className="ff-advisor-history-head">
+                <span>HISTORY</span>
+                <h3>작업 히스토리</h3>
+                <p>이전에 이어가던 분석과 신청서 작업을 다시 열 수 있습니다.</p>
+              </header>
+            ) : (
+              <div className="ff-advisor-session-head">
+                <h3>내 대화 내역</h3>
+                <button type="button" className="ff-advisor-new-chat-btn" onClick={() => void startNewChat()}>
+                  + 새 대화
+                </button>
+              </div>
+            )}
 
             {sessionsLoading && <p className="ff-advisor-muted">대화 내역 조회 중...</p>}
             {sessionsError && (
@@ -803,25 +914,54 @@ export default function AiAdvisorPage() {
               {sessions.map((session) => {
                 const sessionId = session.session_id || session.chat_id
                 const isActive = activeChatId === sessionId
+                const isDeleting = deletingSessionId === sessionId
+                const sessionTime = formatHistoryDate(session.updated_at || session.created_at)
                 return (
-                  <button
+                  <div
                     key={sessionId}
-                    type="button"
                     className={`ff-advisor-session-item${isActive ? " is-active" : ""}`}
-                    onClick={() => void openSession(session)}
                   >
-                    <div className="ff-advisor-session-item-top">
-                      <strong>{session.title}</strong>
-                      <time>{formatDateTime(session.updated_at || session.created_at)}</time>
-                    </div>
-                    <p>{session.preview || "(미리보기 없음)"}</p>
-                    <span className="ff-advisor-session-tag">
-                      {session.analysis_id ? "분석 상담" : "일반 상담"}
-                    </span>
-                  </button>
+                    <button
+                      type="button"
+                      className="ff-advisor-session-open-btn"
+                      onClick={() => void openSession(session)}
+                    >
+                      <div className="ff-advisor-session-item-top">
+                        <strong>{session.title || "새 대화"}</strong>
+                        <time>{sessionTime}</time>
+                      </div>
+                      {!isWorkspaceAdvisor && (
+                        <>
+                          <p>{session.preview || "(미리보기 없음)"}</p>
+                          <span className="ff-advisor-session-tag">
+                            {session.analysis_id ? "분석 상담" : "일반 상담"}
+                          </span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className="ff-advisor-session-delete-btn"
+                      aria-label={`${session.title || "새 대화"} 삭제`}
+                      disabled={Boolean(deletingSessionId)}
+                      onClick={() => void deleteSession(sessionId)}
+                    >
+                      {isDeleting ? "삭제중" : "삭제"}
+                    </button>
+                  </div>
                 )
               })}
             </div>
+
+            {isWorkspaceAdvisor && (
+              <button
+                type="button"
+                className="ff-advisor-start-task-btn"
+                onClick={() => void startNewChat()}
+              >
+                새 작업 시작
+              </button>
+            )}
           </article>
         </div>
 

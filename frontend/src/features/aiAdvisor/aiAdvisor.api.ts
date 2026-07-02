@@ -239,6 +239,24 @@ export async function createAdvisorChatSession(params: {
   return payload?.data ?? null
 }
 
+export async function deleteAdvisorChatSession(companyId: string, sessionId: string) {
+  const response = await fetch(
+    `${API_BASE_URL}/advisor/sessions/${encodeURIComponent(sessionId)}?company_id=${encodeURIComponent(companyId)}`,
+    {
+      method: "DELETE",
+      headers: buildHeaders(),
+    },
+  )
+  const payload = await response.json().catch(() => null)
+  if (!response.ok || payload?.success === false) {
+    throw new Error(
+      payload?.detail ||
+        payload?.message ||
+        `대화 내역 삭제에 실패했습니다. (${response.status})`,
+    )
+  }
+}
+
 export function buildLocalAdvisorResponse(text: string): AdvisorMessage {
   const normalized = text.trim()
 

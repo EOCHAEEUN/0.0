@@ -1,5 +1,4 @@
 .ff-dashboard-main-content.ff-equipment-workspace-content {
-  padding: 36px 64px 72px;
   min-width: 0;
 }
 
@@ -460,10 +459,6 @@
 }
 
 @media (max-width: 960px) {
-  .ff-dashboard-main-content.ff-equipment-workspace-content {
-    padding: 24px 24px 48px;
-  }
-
   .ff-equipment-workspace-inner {
     max-width: none;
   }

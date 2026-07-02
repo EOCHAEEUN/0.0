@@ -3173,7 +3173,6 @@
 }
 
 .ff-draft-workspace-page .ff-draft-workspace-content {
-  padding: 28px 32px 56px;
   min-width: 0;
 }
 
@@ -3465,10 +3464,6 @@
 }
 
 @media (max-width: 1080px) {
-  .ff-draft-workspace-page .ff-draft-workspace-content {
-    padding: 20px 16px 40px;
-  }
-
   .ff-draft-safety-evidence-grid {
     grid-template-columns: 1fr;
   }

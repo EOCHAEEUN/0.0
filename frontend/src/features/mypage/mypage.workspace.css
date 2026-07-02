@@ -1,5 +1,4 @@
 .ff-mypage-workspace-content {
-  padding: 28px 32px 56px;
   min-width: 0;
   background: #f4f6fb;
 }
@@ -383,10 +382,6 @@
 }
 
 @media (max-width: 760px) {
-  .ff-mypage-workspace-content {
-    padding: 20px 16px 40px;
-  }
-
   .ff-mypage-two-col {
     grid-template-columns: 1fr;
   }

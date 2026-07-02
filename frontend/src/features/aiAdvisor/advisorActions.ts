@@ -41,7 +41,7 @@ export const ANALYSIS_QUICK_ACTIONS: AdvisorActionDefinition[] = [
   },
   {
     id: "roi_compare",
-    label: "A/B 비교",
+    label: "전체/부분 비교",
     userMessage: "A/B 투자안 비교",
     icon: GitCompare,
     requiresAnalysis: true,

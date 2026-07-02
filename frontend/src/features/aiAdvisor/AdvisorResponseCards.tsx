@@ -1,8 +1,7 @@
-import { useNavigate } from "react-router-dom"
-
 type AdvisorResponseCardsProps = {
   cards: unknown[]
   analysisId?: string
+  inPopup?: boolean
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -43,8 +42,10 @@ function formatYears(value: unknown) {
   return number === null ? "-" : `${number.toFixed(2)}년`
 }
 
-export default function AdvisorResponseCards({ cards, analysisId }: AdvisorResponseCardsProps) {
-  const navigate = useNavigate()
+export default function AdvisorResponseCards({
+  cards,
+  inPopup = false,
+}: AdvisorResponseCardsProps) {
   if (!cards.length) return null
 
   return (
@@ -161,15 +162,11 @@ export default function AdvisorResponseCards({ cards, analysisId }: AdvisorRespo
           return (
             <article key={`${type}-${index}`} className="ff-advisor-result-card is-warning">
               <strong>정책 snapshot 없음</strong>
-              <p>이 분석은 정책 이력 저장 전 생성되었습니다. 재분석 또는 최신 지원사업 보기를 이용해 주세요.</p>
-              <div className="ff-advisor-card-actions">
-                <button type="button" className="ff-support-btn ghost" onClick={() => navigate("/analysis/new")}>
-                  재분석
-                </button>
-                <button type="button" className="btn blue" onClick={() => navigate("/support-projects/priority")}>
-                  최신 지원사업
-                </button>
-              </div>
+              <p>
+                {inPopup
+                  ? "이 분석은 정책 이력 저장 전 생성되었습니다. 팝업 상단에서 다른 분석을 선택하거나 매칭 지원사업을 다시 요청해 주세요."
+                  : "이 분석은 정책 이력 저장 전 생성되었습니다. 재분석 또는 최신 지원사업 보기를 이용해 주세요."}
+              </p>
             </article>
           )
         }
@@ -181,20 +178,9 @@ export default function AdvisorResponseCards({ cards, analysisId }: AdvisorRespo
               <strong>신청서 초안 상태</strong>
               <p>
                 {status === "ready"
-                  ? "초안이 준비되어 있습니다. 신청서 탭에서 확인하세요."
-                  : "초안이 아직 없습니다. 신청서 탭에서 생성해 주세요."}
+                  ? "초안이 준비되어 있습니다. 신청서 초안 버튼으로 상세 내용을 다시 요청할 수 있습니다."
+                  : "초안이 아직 없습니다. 신청서 초안 버튼으로 생성 요청을 보내 주세요."}
               </p>
-              {analysisId && (
-                <button
-                  type="button"
-                  className="btn blue"
-                  onClick={() =>
-                    navigate(`/application-draft?analysisId=${encodeURIComponent(analysisId)}`)
-                  }
-                >
-                  신청서 탭 열기
-                </button>
-              )}
             </article>
           )
         }

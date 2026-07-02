@@ -3,7 +3,7 @@ import botIcon from "../../../assets/advisor/engi-bot-transparent.png"
 export function AdvisorFloatingButton({
   open,
   onClick,
-  label = "Engi AI Advisor",
+  label = "AI Engi Advisor",
 }: {
   open: boolean
   onClick: () => void

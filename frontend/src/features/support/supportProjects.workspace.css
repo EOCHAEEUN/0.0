@@ -1,5 +1,4 @@
 .ff-support-workspace-content {
-  padding: 28px 32px 56px;
   min-width: 0;
 }
 
@@ -1277,10 +1276,6 @@
   .ff-support-discovery-row-side {
     width: 100%;
     justify-content: space-between;
-  }
-
-  .ff-support-workspace-content {
-    padding: 20px 16px 40px;
   }
 }
 

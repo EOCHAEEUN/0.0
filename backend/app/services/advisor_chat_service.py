@@ -335,6 +335,21 @@ class AdvisorChatService:
         return _session_summary_from_row(result.data[0])
 
     @staticmethod
+    def delete_session(company_id: str, session_id: str):
+        row = _get_session_row(company_id, session_id)
+        if not row.data:
+            raise HTTPException(status_code=404, detail="대화 내역을 찾을 수 없습니다.")
+        (
+            get_db()
+            .table("chat_history")
+            .delete()
+            .eq("company_id", company_id)
+            .eq("chat_id", session_id)
+            .execute()
+        )
+        return True
+
+    @staticmethod
     async def handle_chat(req):
         try:
             if not req.company_id:

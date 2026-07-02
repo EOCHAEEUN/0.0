@@ -1,5 +1,4 @@
 .ff-dashboard-main-content.ff-roi-workspace-content {
-  padding: 36px 64px 72px;
   min-width: 0;
 }
 
@@ -657,10 +656,6 @@
 }
 
 @media (max-width: 980px) {
-  .ff-dashboard-main-content.ff-roi-workspace-content {
-    padding: 24px 24px 48px;
-  }
-
   .ff-roi-workspace-inner {
     max-width: none;
   }

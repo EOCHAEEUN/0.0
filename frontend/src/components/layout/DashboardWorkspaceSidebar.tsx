@@ -3,12 +3,14 @@ import {
   Bot,
   CalendarDays,
   FilePenLine,
-  HelpCircle,
   LayoutDashboard,
+  LogOut,
   Settings,
   TrendingUp,
 } from "lucide-react"
 import { useLocation, useNavigate } from "react-router-dom"
+import { clearUserOnboardingData } from "../../features/onboarding/onboardingState"
+import { clearAuthSession } from "../../services/auth"
 import {
   BOTTOM_NAV_ITEMS,
   ROI_SUB_NAV_ITEMS,
@@ -32,7 +34,7 @@ const SIDE_NAV_ICONS = {
   application: FilePenLine,
   advisor: Bot,
   mypage: Settings,
-  help: HelpCircle,
+  logout: LogOut,
 } as const
 
 type DashboardWorkspaceSidebarProps = {
@@ -49,6 +51,12 @@ export default function DashboardWorkspaceSidebar({ paths }: DashboardWorkspaceS
   const [supportExpanded, setSupportExpanded] = useState(supportActive)
   const settingsActive = isSidebarBottomActive("mypage", location.pathname)
   const [settingsExpanded, setSettingsExpanded] = useState(settingsActive)
+
+  const handleLogout = () => {
+    clearUserOnboardingData()
+    clearAuthSession()
+    navigate("/", { replace: true })
+  }
 
   useEffect(() => {
     if (settingsActive) {
@@ -185,7 +193,7 @@ export default function DashboardWorkspaceSidebar({ paths }: DashboardWorkspaceS
       </nav>
 
       <div className="ff-sidebar-footer">
-        <nav className="ff-sidebar-subnav" aria-label="설정 및 지원">
+        <nav className="ff-sidebar-subnav" aria-label="설정 및 계정">
           {BOTTOM_NAV_ITEMS.map((item) => {
             const Icon = SIDE_NAV_ICONS[item.key]
             const isActive = isSidebarBottomActive(item.key, location.pathname)
@@ -224,6 +232,19 @@ export default function DashboardWorkspaceSidebar({ paths }: DashboardWorkspaceS
                     </div>
                   ) : null}
                 </div>
+              )
+            }
+
+            if (item.key === "logout") {
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={handleLogout}
+                >
+                  <Icon aria-hidden="true" size={17} />
+                  {item.label}
+                </button>
               )
             }
 

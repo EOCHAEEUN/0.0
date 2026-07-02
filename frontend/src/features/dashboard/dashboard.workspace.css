@@ -189,6 +189,32 @@
   background: #f4f7f9;
 }
 
+.ff-dashboard-workspace-page .ff-dashboard-main-content,
+.ff-advisor-workspace-page .ff-dashboard-main-content,
+.ff-draft-workspace-page .ff-dashboard-main-content,
+.ff-dashboard-main-content.ff-roi-workspace-content,
+.ff-dashboard-main-content.ff-support-workspace-content,
+.ff-dashboard-main-content.ff-advisor-workspace-content,
+.ff-dashboard-main-content.ff-draft-workspace-content,
+.ff-dashboard-main-content.ff-mypage-workspace-content,
+.ff-dashboard-main-content.ff-equipment-workspace-content {
+  padding: 36px 64px 72px;
+}
+
+@media (max-width: 980px) {
+  .ff-dashboard-workspace-page .ff-dashboard-main-content,
+  .ff-advisor-workspace-page .ff-dashboard-main-content,
+  .ff-draft-workspace-page .ff-dashboard-main-content,
+  .ff-dashboard-main-content.ff-roi-workspace-content,
+  .ff-dashboard-main-content.ff-support-workspace-content,
+  .ff-dashboard-main-content.ff-advisor-workspace-content,
+  .ff-dashboard-main-content.ff-draft-workspace-content,
+  .ff-dashboard-main-content.ff-mypage-workspace-content,
+  .ff-dashboard-main-content.ff-equipment-workspace-content {
+    padding: 24px 24px 48px;
+  }
+}
+
 #ff-app-shell:has(.ff-dashboard-workspace-page) {
   display: block;
   min-height: 100vh;

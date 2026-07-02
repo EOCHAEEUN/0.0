@@ -75,37 +75,51 @@
   inset: 0;
   z-index: 89;
   display: flex;
-  justify-content: flex-end;
-  align-items: flex-end;
-  padding: 28px 28px 136px;
-  background: rgba(10, 15, 33, 0.22);
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(10, 15, 33, 0.42);
   pointer-events: auto;
 }
 
 .ff-advisor-popup-stage {
-  width: min(920px, calc(100vw - 56px));
-  height: min(680px, calc(100vh - 170px));
-  border-radius: 18px;
+  width: min(920px, calc((100vw - 40px) * 0.75));
+  height: calc((100dvh - 40px) * 0.75);
+  max-height: calc((100dvh - 40px) * 0.75);
+  border-radius: 16px;
   overflow: hidden;
-  border: 1px solid #d7deec;
+  border: 1px solid #c7d2e3;
+  border-bottom: 4px solid #061b34;
   background: #fff;
-  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.3);
+  box-shadow: 0 28px 72px rgba(15, 23, 42, 0.28);
   display: grid;
-  grid-template-rows: 52px minmax(0, 1fr);
+  grid-template-rows: 56px minmax(0, 1fr);
 }
 
 .ff-advisor-popup-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 14px 0 18px;
+  padding: 0 18px;
   border-bottom: 1px solid #e5eaf4;
-  background: #f8faff;
+  background: #fff;
+}
+
+.ff-advisor-popup-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ff-advisor-popup-brand-icon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
 }
 
 .ff-advisor-popup-head strong {
   color: #111827;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 900;
 }
 
@@ -117,6 +131,14 @@
   font-weight: 800;
   cursor: pointer;
   padding: 6px 8px;
+}
+
+.ff-advisor-popup-body {
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: #f8fafc;
 }
 
 .ff-advisor-popup-iframe {
@@ -501,12 +523,26 @@
   }
 
   .ff-advisor-popup-shell {
-    padding: 12px 12px 108px;
+    padding: 16px;
+    align-items: center;
   }
 
   .ff-advisor-popup-stage {
-    width: calc(100vw - 24px);
-    height: min(82vh, 720px);
+    width: calc(100vw - 32px);
+    height: calc((100dvh - 32px) * 0.75);
+    max-height: calc((100dvh - 32px) * 0.75);
+    border-radius: 12px;
+    border-left: 1px solid #c7d2e3;
+    border-right: 1px solid #c7d2e3;
+    border-top: 1px solid #c7d2e3;
+  }
+
+  .ff-advisor-action-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ff-advisor-embedded-page .ff-advisor-action-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .ff-advisor-agent-hero,
@@ -639,25 +675,41 @@
 
 .ff-advisor-action-row {
   display: grid;
-  gap: 6px;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .ff-advisor-action-btn {
   align-items: center;
   background: #fff;
   border: 1px solid #d0d5dd;
-  border-radius: 8px;
+  border-radius: 10px;
   color: #344054;
   cursor: pointer;
   display: flex;
+  flex-direction: column;
   font-size: 12px;
   font-weight: 800;
   gap: 6px;
-  height: 40px;
+  min-height: 56px;
   justify-content: center;
-  padding: 0 10px;
+  padding: 10px 12px;
   white-space: nowrap;
+}
+
+.ff-advisor-action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.ff-advisor-action-icon svg {
+  display: block;
+  width: 20px;
+  height: 20px;
 }
 
 .ff-advisor-action-btn:hover:not(:disabled) {
@@ -854,7 +906,6 @@
 }
 
 .ff-advisor-workspace-content {
-  padding: 20px 32px 24px;
   min-width: 0;
   background: #f4f6fb;
   box-sizing: border-box;
@@ -885,7 +936,6 @@
   height: 100vh;
   max-height: 100vh;
   overflow: hidden;
-  padding: 20px 32px 24px;
 }
 
 .ff-advisor-workspace-page .ff-advisor-page-shell {
@@ -915,14 +965,18 @@
 }
 
 .ff-advisor-embedded-page {
-  padding: 10px;
+  padding: 16px 18px 18px;
   height: 100%;
   min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  background: #f4f6fb;
+  background: #f8fafc;
   box-sizing: border-box;
+}
+
+.ff-advisor-popup-body .ff-advisor-embedded-page {
+  padding: 10px 12px 12px;
 }
 
 .ff-advisor-embedded-page .ff-advisor-page-shell--embedded {
@@ -930,6 +984,7 @@
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  height: 100%;
   overflow: hidden;
 }
 
@@ -937,7 +992,9 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  grid-template-columns: 1fr;
+  display: flex;
+  flex-direction: column;
+  grid-template-columns: unset;
 }
 
 .ff-advisor-embedded-page .ff-advisor-page-shell--embedded .ff-advisor-hero,
@@ -947,18 +1004,42 @@
 
 .ff-advisor-embedded-page .ff-advisor-page-shell--embedded .ff-advisor-chat-card {
   margin: 0;
+  flex: 1;
   min-height: 0;
-  height: 100%;
+  height: auto;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  padding: 12px;
 }
 
 .ff-advisor-embedded-page .ff-advisor-message-list {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-height: 0;
   max-height: none;
   overflow-y: auto;
+  margin-bottom: 8px;
+}
+
+.ff-advisor-embedded-page .ff-advisor-composer {
+  flex-shrink: 0;
+  margin-top: auto;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: #fff;
+  padding-top: 6px;
+}
+
+.ff-advisor-embedded-page .ff-advisor-inline-alert,
+.ff-advisor-embedded-page .ff-advisor-equipment-pick {
+  flex-shrink: 0;
+}
+
+.ff-advisor-embedded-page .ff-advisor-chat-head,
+.ff-advisor-embedded-page .ff-advisor-quick-panel,
+.ff-advisor-embedded-page .ff-advisor-chip-row {
+  flex-shrink: 0;
 }
 
 .ff-advisor-page-shell {
@@ -1121,6 +1202,87 @@
   box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.14);
 }
 
+.ff-advisor-system-status.is-error {
+  color: #b45309;
+}
+
+.ff-advisor-system-status.is-error i {
+  background: #f59e0b;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.14);
+}
+
+.ff-advisor-embedded-page .ff-advisor-action-btn {
+  flex-direction: row;
+  gap: 4px;
+  min-height: 34px;
+  padding: 4px 6px;
+  font-size: 10px;
+  border-radius: 8px;
+}
+
+.ff-advisor-embedded-page .ff-advisor-message-avatar img {
+  width: 44px;
+  height: 44px;
+}
+
+.ff-advisor-embedded-page .ff-advisor-message-avatar {
+  width: 64px;
+}
+
+.ff-advisor-embedded-page .ff-advisor-action-btn svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.ff-advisor-embedded-page .ff-advisor-chat-head {
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.ff-advisor-embedded-page .ff-advisor-quick-panel {
+  margin-bottom: 6px;
+  padding: 8px 10px;
+  max-height: 25%;
+  flex-shrink: 0;
+}
+
+.ff-advisor-embedded-page .ff-advisor-quick-panel-head {
+  margin-bottom: 6px;
+}
+
+.ff-advisor-embedded-page .ff-advisor-quick-panel-head strong {
+  font-size: 12px;
+}
+
+.ff-advisor-embedded-page .ff-advisor-quick-hint {
+  margin: 0 0 6px;
+  font-size: 11px;
+}
+
+.ff-advisor-embedded-page .ff-advisor-action-row {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.ff-advisor-embedded-page .ff-advisor-action-btn span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ff-advisor-embedded-page .ff-advisor-chip-row {
+  margin-bottom: 8px;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.ff-advisor-embedded-page .ff-ai-advisor-chip {
+  height: 26px;
+  padding: 0 8px;
+  font-size: 10px;
+}
+
 .ff-advisor-quick-panel {
   margin-bottom: 10px;
   padding: 14px;
@@ -1174,16 +1336,19 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-height: 0;
   max-height: none;
   overflow-y: auto;
   overflow-x: hidden;
   margin-bottom: 14px;
   padding: 4px 2px;
-  background: transparent;
-  border: 0;
   overscroll-behavior: contain;
+}
+
+.ff-advisor-workspace-page .ff-advisor-composer {
+  flex-shrink: 0;
+  margin-top: auto;
 }
 
 .ff-advisor-message-list {
@@ -1217,14 +1382,14 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  width: 54px;
+  gap: 5px;
+  width: 62px;
   flex-shrink: 0;
 }
 
 .ff-advisor-message-avatar img {
-  width: 34px;
-  height: 34px;
+  width: 42px;
+  height: 42px;
   border-radius: 999px;
   object-fit: cover;
   background: #eef2ff;
@@ -1232,7 +1397,7 @@
 
 .ff-advisor-message-avatar span {
   color: #64748b;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
   text-align: center;
   line-height: 1.2;
@@ -1286,15 +1451,19 @@
 }
 
 .ff-advisor-composer {
-  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-top: auto;
   flex-shrink: 0;
 }
 
 .ff-advisor-composer textarea {
-  width: 100%;
-  min-height: 72px;
-  padding: 14px 108px 14px 14px;
+  flex: 1;
+  width: auto;
+  min-height: 56px;
+  max-height: 160px;
+  padding: 14px 16px;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
   background: #fff;
@@ -1306,14 +1475,13 @@
 }
 
 .ff-advisor-send-btn {
-  position: absolute;
-  right: 10px;
-  bottom: 10px;
+  flex-shrink: 0;
+  align-self: center;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 38px;
-  padding: 0 14px;
+  min-height: 42px;
+  padding: 0 16px;
   border: 0;
   border-radius: 10px;
   background: #1d4ed8;
@@ -1349,24 +1517,55 @@
 }
 
 .ff-advisor-session-item {
-  display: grid;
+  display: flex;
+  align-items: center;
   gap: 8px;
   width: 100%;
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
   margin: 0;
-  padding: 14px 16px;
+  padding: 10px 10px 10px 14px;
   border: 2px solid #e8edf5;
   border-radius: 14px;
   background: #f8fafc;
+  color: inherit;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.ff-advisor-session-open-btn {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
   text-align: left;
   cursor: pointer;
   font: inherit;
   color: inherit;
   appearance: none;
   -webkit-appearance: none;
-  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.ff-advisor-session-delete-btn {
+  flex-shrink: 0;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: transparent;
+  color: #ef4444;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ff-advisor-session-delete-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .ff-advisor-session-item:hover {
@@ -1485,6 +1684,270 @@
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+.ff-advisor-hero--workspace {
+  grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+  align-items: center;
+  gap: 24px;
+  padding: 24px 28px;
+  background: #fff;
+  color: #0f172a;
+  border: 1px solid #e8edf5;
+  border-radius: 16px;
+  box-shadow: 0 6px 22px rgba(15, 23, 42, 0.05);
+}
+
+.ff-advisor-hero--workspace .ff-advisor-hero-badge {
+  background: #eef2ff;
+  color: #1e3a8a;
+  border: 0;
+  letter-spacing: 0.06em;
+}
+
+.ff-advisor-hero--workspace h1 {
+  margin: 12px 0 10px;
+  color: #0f172a;
+  font-size: clamp(22px, 2.2vw, 30px);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1.35;
+}
+
+.ff-advisor-hero--workspace .ff-advisor-hero-copy > p {
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.65;
+  max-width: 560px;
+}
+
+.ff-advisor-hero--workspace .ff-advisor-hero-status {
+  color: #64748b;
+}
+
+.ff-advisor-hero--workspace .ff-advisor-hero-status.is-error {
+  color: #dc2626;
+}
+
+.ff-advisor-workflow-steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ff-advisor-workflow-steps article {
+  background: #fff;
+  border: 1px solid #e5eaf4;
+  border-radius: 12px;
+  padding: 14px 16px;
+  color: #111827;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.02);
+}
+
+.ff-advisor-step-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.ff-advisor-step-no {
+  color: #cbd5e1;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.ff-advisor-step-title {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.ff-advisor-workflow-steps p {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.ff-advisor-workspace-page .ff-advisor-page-grid--workspace {
+  grid-template-columns: minmax(0, 3fr) minmax(260px, 1fr);
+  gap: 14px;
+}
+
+.ff-advisor-chat-head--workspace h3 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.5;
+}
+
+.ff-advisor-workspace-toolbar {
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.ff-advisor-action-row--workspace {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.ff-advisor-action-btn--workspace {
+  flex-direction: row;
+  min-height: 38px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  white-space: nowrap;
+  gap: 8px;
+}
+
+.ff-advisor-action-btn--workspace.is-primary {
+  background: #1e293b;
+  border-color: #1e293b;
+  color: #fff;
+}
+
+.ff-advisor-context-change--workspace {
+  margin-left: auto;
+  min-height: 38px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.ff-advisor-workspace-page .ff-advisor-chat-card {
+  border-radius: 16px;
+}
+
+.ff-advisor-session-card--workspace {
+  background: linear-gradient(180deg, #1a2238 0%, #12182b 100%);
+  border-color: #27314a;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  color: #e5eaf3;
+}
+
+.ff-advisor-history-head {
+  margin-bottom: 14px;
+  flex-shrink: 0;
+}
+
+.ff-advisor-history-head span {
+  display: block;
+  color: rgba(255, 255, 255, 0.46);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  margin-bottom: 6px;
+}
+
+.ff-advisor-history-head h3 {
+  margin: 0;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.ff-advisor-history-head p {
+  margin: 8px 0 0;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.ff-advisor-session-card--workspace .ff-advisor-muted {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.ff-advisor-session-card--workspace .ff-advisor-session-item {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #e5eaf3;
+  padding: 10px 10px 10px 14px;
+}
+
+.ff-advisor-session-card--workspace .ff-advisor-session-delete-btn {
+  border-color: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.ff-advisor-session-card--workspace .ff-advisor-session-item.is-active .ff-advisor-session-delete-btn {
+  border-color: #fecaca;
+  color: #ef4444;
+}
+
+.ff-advisor-session-card--workspace .ff-advisor-session-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.ff-advisor-session-card--workspace .ff-advisor-session-item.is-active {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: transparent;
+  color: #0f172a;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.ff-advisor-session-card--workspace .ff-advisor-session-item-top strong {
+  color: inherit;
+}
+
+.ff-advisor-session-card--workspace .ff-advisor-session-item-top time {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 11px;
+}
+
+.ff-advisor-session-card--workspace .ff-advisor-session-item.is-active .ff-advisor-session-item-top time {
+  color: #64748b;
+}
+
+.ff-advisor-start-task-btn {
+  margin-top: auto;
+  flex-shrink: 0;
+  width: 100%;
+  min-height: 46px;
+  border: 0;
+  border-radius: 12px;
+  background: #fff;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.ff-advisor-start-task-btn:hover {
+  background: #f8fafc;
+}
+
+.ff-advisor-workspace-page .ff-advisor-message-avatar {
+  width: 68px;
+}
+
+.ff-advisor-workspace-page .ff-advisor-message-avatar img {
+  width: 48px;
+  height: 48px;
+}
+
+.ff-advisor-workspace-page .ff-advisor-message-avatar span {
+  font-size: 11px;
+  font-weight: 900;
+  color: #475569;
+}
+
+.ff-advisor-workspace-page .ff-advisor-composer textarea {
+  min-height: 56px;
+  border-radius: 12px;
+}
+
+.ff-advisor-workspace-page .ff-advisor-send-btn {
+  background: #0f172a;
+  min-height: 42px;
+}
+
 @media (max-width: 1080px) {
   .ff-advisor-workspace-page .ff-dashboard-main-content.ff-advisor-workspace-content {
     height: auto;
@@ -1503,12 +1966,20 @@
     overflow: visible;
   }
 
-  .ff-advisor-workspace-content {
-    padding: 20px 16px 40px;
-  }
-
   .ff-advisor-page-grid,
   .ff-advisor-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .ff-advisor-hero--workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .ff-advisor-workflow-steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ff-advisor-workspace-page .ff-advisor-page-grid--workspace {
     grid-template-columns: 1fr;
   }
 
@@ -1516,7 +1987,14 @@
     display: none;
   }
 
-  .ff-advisor-workspace-page .ff-advisor-action-row {
+  .ff-advisor-workspace-page .ff-advisor-action-row,
+  .ff-advisor-action-row--workspace {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ff-advisor-context-change--workspace {
+    margin-left: 0;
+    width: 100%;
+    text-align: right;
   }
 }

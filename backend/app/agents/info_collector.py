@@ -5,6 +5,9 @@ from app.state import FactofitState
 def info_collector_node(state: FactofitState) -> FactofitState:
     """
     설비가 여러 개일 때 어떤 설비인지 선택을 요청합니다.
+    기존의 채팅으로 정보 수집하는 로직은 제거됐습니다.
+    (마이페이지에서 필수 정보를 미리 입력하는 구조로 변경)
+
     흐름:
     1. equipments 목록에서 설비 이름 목록 생성
     2. "어떤 설비에 대해 알아볼까요?" 응답
@@ -20,15 +23,9 @@ def info_collector_node(state: FactofitState) -> FactofitState:
         )
         return state
 
-    equipment_list = "\n".join([
-        f"• {eq.get('name', '알 수 없음')}"
-        for eq in equipments
-    ])
-
     state["final_response"] = (
-        f"등록된 설비가 여러 대 있어요. "
-        f"어떤 설비에 대해 알아볼까요?\n\n{equipment_list}"
+        "등록된 설비가 여러 대 있어요. "
+        "어떤 설비에 대해 알아볼까요?"
     )
 
     return state
-

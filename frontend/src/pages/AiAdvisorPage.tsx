@@ -1,27 +1,46 @@
-import { useState, useRef } from "react"
-import { useNavigate } from "react-router-dom"
-import { requestAdvisorAnswer } from "../features/aiAdvisor/aiAdvisor.api"
+import { Send } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { useLocation, useSearchParams } from "react-router-dom"
+import engiBot from "../assets/advisor/engi-bot-transparent.png"
+import botIcon from "../assets/advisor/factofit-ai-bot.png"
+import DashboardWorkspacePageLayout from "../components/layout/DashboardWorkspacePageLayout"
+import AdvisorQuickActions from "../features/aiAdvisor/AdvisorQuickActions"
+import AdvisorResponseCards from "../features/aiAdvisor/AdvisorResponseCards"
+import InvestmentSimulationDialog from "../features/aiAdvisor/InvestmentSimulationDialog"
+import { ANALYSIS_QUICK_ACTIONS, type AdvisorActionDefinition } from "../features/aiAdvisor/advisorActions"
+import "../features/aiAdvisor/aiAdvisor.css"
+import {
+  createAdvisorChatSession,
+  deleteAdvisorChatSession,
+  fetchAdvisorChatSessionDetail,
+  fetchAdvisorChatSessions,
+  requestAdvisorAnswer,
+  type AdvisorChatSessionItem,
+} from "../features/aiAdvisor/aiAdvisor.api"
+import { fetchDashboardOnboarding } from "../features/dashboard/dashboard.api"
+import type { DashboardOnboardingMeResponse } from "../features/dashboard/dashboard.contract"
 
-function getAnalysisDataForCurrentUser(): Record<string, unknown> | null {
-  try {
-    const authRaw = window.localStorage.getItem("factofit_auth_session")
-    const userId = authRaw
-      ? String((JSON.parse(authRaw) as Record<string, unknown>)?.userId ?? "")
-      : ""
-    const raw = window.localStorage.getItem("factofit_analysis_result")
-    if (!raw) return null
-    const data = JSON.parse(raw) as Record<string, unknown>
-    if (userId && data.ownerId && String(data.ownerId) !== userId) return null
-    return data
-  } catch {
-    return null
-  }
-}
-
-type AdvisorMessage = {
-  role: "user" | "ai"
+type ChatMessage = {
+  id: string
+  role: "user" | "assistant"
   content: string
+  cards?: unknown[]
+  sentAt?: string
 }
+
+const SUGGESTION_CHIPS = [
+  "현재 분석 요약해줘",
+  "추천 시나리오 근거 알려줘",
+  "A안/B안 차이 쉽게 설명해줘",
+  "지금 바로 해야 할 일 정리해줘",
+] as const
+
+const WORKFLOW_STEPS = [
+  { no: "01", title: "입력", desc: "등록된 설비 중 분석할 설비를 선택합니다." },
+  { no: "02", title: "분석", desc: "ROI 분석과 투자안별 비교를 확인합니다." },
+  { no: "03", title: "정책 매칭", desc: "맞춤 지원사업을 추천하고 선택합니다." },
+  { no: "04", title: "신청서", desc: "추가 정보를 계획서 문장에 반영합니다." },
+] as const
 
 type EquipmentOption = {
   equipment_id: string | null
@@ -30,818 +49,998 @@ type EquipmentOption = {
   age_years: number
 }
 
-type QuickQuestion = {
-  label: string
-  prompt: string
+type AnalysisContext = {
+  analysisId: string
+  companyId: string
+  equipmentId: string
+  equipmentName: string
+  createdAt: string
+  roiPct: number | null
+  scenarioAInvestment: number | null
+  scenarioBInvestment: number | null
+  snapshotMissing: boolean
 }
 
-type AdvisorAction = {
-  title: string
-  description: string
-  path: string
-  badge: string
-  tone: "blue" | "green" | "orange" | "red"
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {}
 }
 
-type InsightItem = {
-  label: string
-  value: string
-  score: number
-  tone: "green" | "orange" | "red"
-  description: string
+function readText(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim()
+    if (typeof value === "number" && Number.isFinite(value)) return String(value)
+  }
+  return ""
 }
 
-const quickQuestions: QuickQuestion[] = [
-  {
-    label: "ROI가 괜찮은지 알려줘",
-    prompt: "현재 프레스 설비 교체 ROI가 괜찮은지 알려줘.",
-  },
-  {
-    label: "어떤 지원사업이 맞아?",
-    prompt: "우리 설비투자 조건에 맞는 지원사업을 추천해줘.",
-  },
-  {
-    label: "안전 리스크 요약해줘",
-    prompt: "현재 설비의 안전 리스크를 요약해줘.",
-  },
-  {
-    label: "신청서 문장 만들어줘",
-    prompt: "지원사업 신청서에 넣을 사업 필요성 문장을 만들어줘.",
-  },
-]
-
-const advisorActions: AdvisorAction[] = [
-  {
-    title: "ROI 분석",
-    description: "투자금, 지원금, 절감액을 기준으로 회수기간을 계산합니다.",
-    path: "/roi",
-    badge: "ROI",
-    tone: "blue",
-  },
-  {
-    title: "지원사업 추천",
-    description: "설비투자 조건에 맞는 정부지원사업을 우선순위로 보여줍니다.",
-    path: "/support-projects",
-    badge: "POLICY",
-    tone: "green",
-  },
-  {
-    title: "안전 진단",
-    description: "노후 설비의 안전 리스크와 점검 우선순위를 확인합니다.",
-    path: "/safety",
-    badge: "SAFETY",
-    tone: "orange",
-  },
-  {
-    title: "신청서 초안",
-    description: "ROI 분석 결과를 바탕으로 지원사업 신청서 초안을 만듭니다.",
-    path: "/application-draft",
-    badge: "DRAFT",
-    tone: "red",
-  },
-]
-
-const insightItems: InsightItem[] = [
-  {
-    label: "ROI",
-    value: "85%",
-    score: 85,
-    tone: "green",
-    description: "실부담금 대비 회수기간이 짧아 투자 적합도가 높습니다.",
-  },
-  {
-    label: "지원사업 적합도",
-    value: "92%",
-    score: 92,
-    tone: "green",
-    description: "스마트공장 고도화 지원사업과 가장 잘 맞습니다.",
-  },
-  {
-    label: "안전 리스크",
-    value: "72점",
-    score: 72,
-    tone: "orange",
-    description: "즉시 중단 수준은 아니지만 정밀점검이 필요합니다.",
-  },
-  {
-    label: "신청 준비도",
-    value: "73%",
-    score: 73,
-    tone: "orange",
-    description: "견적서와 사업계획서 문장 보완이 필요합니다.",
-  },
-]
-
-function getToneColor(tone: "green" | "orange" | "red") {
-  if (tone === "green") return "#0B7A53"
-  if (tone === "orange") return "#E65F00"
-  return "#CD2E3A"
+function readNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value
+  if (typeof value !== "string") return null
+  const parsed = Number(value.replace(/[^0-9.-]/g, ""))
+  return Number.isFinite(parsed) ? parsed : null
 }
 
-function getToneSoftColor(tone: "green" | "orange" | "red") {
-  if (tone === "green") return "#E8F5EF"
-  if (tone === "orange") return "#FFF2DF"
-  return "#FDE8E9"
+function formatPercent(value: number | null) {
+  return value === null ? "-" : `${Math.round(value)}%`
 }
 
+function formatMessageTime(value?: string) {
+  if (!value) return ""
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ""
+  const hours = date.getHours()
+  const minutes = String(date.getMinutes()).padStart(2, "0")
+  const period = hours >= 12 ? "PM" : "AM"
+  const hour12 = hours % 12 || 12
+  return `${hour12}:${minutes} ${period}`
+}
 
-export default function AiAdvisorPage() {
-  const navigate = useNavigate()
-  const hasAnalysisData = Boolean(getAnalysisDataForCurrentUser())
+function nowIso() {
+  return new Date().toISOString()
+}
 
+function formatDateTime(value: string) {
+  const parsed = Date.parse(value)
+  if (!Number.isFinite(parsed)) return "-"
+  const date = new Date(parsed)
+  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(
+    date.getDate(),
+  ).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(
+    date.getMinutes(),
+  ).padStart(2, "0")}`
+}
+
+function formatHistoryDate(value: string) {
+  const parsed = Date.parse(value)
+  if (!Number.isFinite(parsed)) return "-"
+  const date = new Date(parsed)
+  const month = date.getMonth() + 1
+  const day = String(date.getDate()).padStart(2, "0")
+  const hours = date.getHours()
+  const minutes = String(date.getMinutes()).padStart(2, "0")
+  const period = hours >= 12 ? "오후" : "오전"
+  const hour12 = hours % 12 || 12
+  return `${month}월 ${day}일 ${period} ${String(hour12).padStart(2, "0")}:${minutes}`
+}
+
+function createChatMessage(
+  role: "user" | "assistant",
+  content: string,
+  extra?: Partial<ChatMessage>,
+): ChatMessage {
+  return {
+    id: crypto.randomUUID(),
+    role,
+    content,
+    sentAt: nowIso(),
+    ...extra,
+  }
+}
+
+function analysisFromRoute(
+  searchParams: URLSearchParams,
+  pathname: string,
+  state: unknown,
+) {
+  const queryId = readText(searchParams.get("analysisId"), searchParams.get("analysis_id"))
+  if (queryId) return queryId
+  const pathMatch = pathname.match(/^\/analysis\/([^/]+)/)
+  if (pathMatch?.[1] && pathMatch[1] !== "new" && pathMatch[1] !== "review") {
+    return pathMatch[1]
+  }
+  const routeState = asRecord(state)
+  return readText(routeState.analysisId, routeState.analysis_id)
+}
+
+function readStoredAnalysisId() {
+  try {
+    return (
+      window.localStorage.getItem("factofit_analysis_id") ||
+      window.localStorage.getItem("analysis_id") ||
+      ""
+    )
+  } catch {
+    return ""
+  }
+}
+
+function readAuthUserId() {
+  try {
+    const raw = window.localStorage.getItem("factofit_auth_session")
+    if (!raw) return ""
+    const parsed = asRecord(JSON.parse(raw))
+    return readText(parsed.userId, parsed.user_id, parsed.id)
+  } catch {
+    return ""
+  }
+}
+
+function readLoginTokenMarker() {
+  try {
+    const token =
+      window.localStorage.getItem("factofit_access_token") ||
+      window.localStorage.getItem("access_token") ||
+      ""
+    if (!token) return "anonymous"
+    return token.slice(-12)
+  } catch {
+    return "anonymous"
+  }
+}
+
+function buildActiveSessionStorageKey(companyId: string, userId: string, tokenMarker: string) {
+  if (!companyId) return ""
+  return `advisor.activeSession.${companyId}.${userId || "unknown"}.${tokenMarker}`
+}
+
+function mapContexts(onboarding: DashboardOnboardingMeResponse | null) {
+  const company = asRecord(onboarding?.company)
+  const companyId = readText(company.company_id)
+  return (onboarding?.roi_outputs ?? [])
+    .map((row) => {
+      const roiOutput = asRecord(row)
+      const analysisId = readText(roiOutput.analysis_id, roiOutput.analysisId, roiOutput.id)
+      const equipmentId = readText(roiOutput.equipment_id)
+      const roiData = asRecord(roiOutput.roi_data)
+      const scenarioA = asRecord(roiData.scenario_a)
+      const scenarioB = asRecord(roiData.scenario_b)
+      const snapshot = asRecord(roiOutput.policy_snapshot)
+      return {
+        analysisId,
+        companyId,
+        equipmentId,
+        equipmentName: readText(roiOutput.equipment_name) || "검토 설비",
+        createdAt: readText(roiOutput.created_at),
+        roiPct: readNumber(scenarioA.roi_pct),
+        scenarioAInvestment: readNumber(scenarioA.investment_manwon),
+        scenarioBInvestment: readNumber(scenarioB.investment_manwon),
+        snapshotMissing:
+          Boolean(analysisId) &&
+          (!snapshot.snapshot_version || !Array.isArray(snapshot.policies)),
+      } satisfies AnalysisContext
+    })
+    .filter((item) => Boolean(item.analysisId))
+    .sort(
+      (left, right) => Date.parse(right.createdAt || "") - Date.parse(left.createdAt || ""),
+    )
+}
+
+function extractEquipmentSelection(cards: unknown[]) {
+  const card = cards.find((item) => asRecord(item).type === "equipment_selection")
+  const data = Array.isArray(asRecord(card).data) ? (asRecord(card).data as unknown[]) : []
+  return data
+    .map((item) => {
+      const row = asRecord(item)
+      return {
+        equipment_id: readText(row.equipment_id) || null,
+        name: readText(row.name) || "설비",
+        category: readText(row.category) || "분류 없음",
+        age_years: readNumber(row.age_years) ?? 0,
+      } satisfies EquipmentOption
+    })
+    .filter((item) => Boolean(item.equipment_id))
+}
+
+function toMessageListFromSession(data: unknown): ChatMessage[] {
+  const record = asRecord(data)
+  const items = Array.isArray(record.messages) ? (record.messages as unknown[]) : []
+  const messages: ChatMessage[] = []
+  for (const item of items) {
+    const row = asRecord(item)
+    const role = readText(row.role).toLowerCase() === "assistant" ? "assistant" : "user"
+    const content = readText(row.content)
+    if (!content) continue
+    messages.push({ id: crypto.randomUUID(), role, content })
+  }
+  return messages
+}
+
+export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boolean }) {
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
+  const messageEndRef = useRef<HTMLDivElement | null>(null)
+  const hydratedSessionRef = useRef("")
+
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState("")
+  const [onboarding, setOnboarding] = useState<DashboardOnboardingMeResponse | null>(null)
+  const [contexts, setContexts] = useState<AnalysisContext[]>([])
+  const [selectedAnalysisId, setSelectedAnalysisId] = useState("")
+  const [selectedEquipmentId, setSelectedEquipmentId] = useState("")
+  const [analysisPickerOpen, setAnalysisPickerOpen] = useState(false)
+  const [analysisSearch, setAnalysisSearch] = useState("")
+
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    createChatMessage(
+      "assistant",
+      "안녕하세요. 작업형 AI 어드바이저 AI Engi입니다. 어떤 점을 도와드릴까요?",
+    ),
+  ])
   const [input, setInput] = useState("")
-  const [isSending, setIsSending] = useState(false)
-  const [pendingEquipmentCards, setPendingEquipmentCards] =
-    useState<EquipmentOption[] | null>(null)
-  const lastUserQueryRef = useRef("")
-  const [messages, setMessages] = useState<AdvisorMessage[]>([
-    {
-      role: "ai",
-      content:
-        "안녕하세요. FactoFit AI Advisor입니다. ROI, 지원사업, 안전진단, 신청서 초안에 대해 질문해보세요.",
-    },
+  const [sending, setSending] = useState(false)
+  const [chatError, setChatError] = useState("")
+  const [lastFailedQuestion, setLastFailedQuestion] = useState("")
+  const [lastFailedAction, setLastFailedAction] = useState<AdvisorActionDefinition | null>(null)
+  const [equipmentSelectionCards, setEquipmentSelectionCards] = useState<EquipmentOption[]>([])
+  const [loadingActionId, setLoadingActionId] = useState<string | null>(null)
+  const [simulationOpen, setSimulationOpen] = useState(false)
+  const [actionError, setActionError] = useState("")
+
+  const [sessionsLoading, setSessionsLoading] = useState(false)
+  const [sessionsError, setSessionsError] = useState("")
+  const [sessions, setSessions] = useState<AdvisorChatSessionItem[]>([])
+  const [activeChatId, setActiveChatId] = useState("")
+  const [deletingSessionId, setDeletingSessionId] = useState("")
+
+  const selectedContext = useMemo(
+    () => contexts.find((item) => item.analysisId === selectedAnalysisId) ?? null,
+    [contexts, selectedAnalysisId],
+  )
+
+  const companyId = useMemo(
+    () => readText(selectedContext?.companyId, asRecord(onboarding?.company).company_id),
+    [onboarding, selectedContext?.companyId],
+  )
+  const userId = useMemo(() => readAuthUserId(), [])
+  const tokenMarker = useMemo(() => readLoginTokenMarker(), [])
+  const activeSessionStorageKey = useMemo(
+    () => buildActiveSessionStorageKey(companyId, userId, tokenMarker),
+    [companyId, tokenMarker, userId],
+  )
+
+  const filteredContexts = useMemo(() => {
+    const keyword = analysisSearch.trim().toLowerCase()
+    if (!keyword) return contexts
+    return contexts.filter((item) => {
+      const haystack = `${item.equipmentName} ${item.analysisId}`.toLowerCase()
+      return haystack.includes(keyword)
+    })
+  }, [analysisSearch, contexts])
+
+  useEffect(() => {
+    let cancelled = false
+    void fetchDashboardOnboarding()
+      .then((response) => {
+        if (cancelled || !response) return
+        setOnboarding(response)
+        const mapped = mapContexts(response)
+        setContexts(mapped)
+        const routeId = analysisFromRoute(searchParams, location.pathname, location.state)
+        const storedId = readStoredAnalysisId()
+        const preferredId = readText(
+          response.active_analysis_id,
+          response.activeAnalysisId,
+          response.latest_analysis_id,
+          response.latestAnalysisId,
+        )
+        const selected =
+          mapped.find((item) => item.analysisId === routeId) ||
+          mapped.find((item) => item.analysisId === storedId) ||
+          mapped.find((item) => item.analysisId === preferredId) ||
+          mapped[0] ||
+          null
+        setSelectedAnalysisId(selected?.analysisId || "")
+        setSelectedEquipmentId(selected?.equipmentId || "")
+      })
+      .catch((error) => {
+        if (cancelled) return
+        setLoadError(error instanceof Error ? error.message : "컨텍스트 조회 실패")
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [location.state, searchParams])
+
+  useEffect(() => {
+    if (!companyId) return
+    let cancelled = false
+    setSessionsLoading(true)
+    setSessionsError("")
+    void fetchAdvisorChatSessions(companyId)
+      .then(async (items) => {
+        if (cancelled) return
+        let nextItems = items
+        if (nextItems.length === 0) {
+          const created = await createAdvisorChatSession({
+            companyId,
+            analysisId: selectedContext?.analysisId,
+            equipmentId: selectedContext?.equipmentId || selectedEquipmentId,
+          })
+          const createdSessionId = readText(created?.session_id, created?.chat_id)
+          if (createdSessionId) {
+            nextItems = await fetchAdvisorChatSessions(companyId)
+          }
+        }
+        setSessions(nextItems)
+        const storedSessionId = activeSessionStorageKey
+          ? window.localStorage.getItem(activeSessionStorageKey) || ""
+          : ""
+        const preferredSession =
+          nextItems.find((session) => session.session_id === storedSessionId) ||
+          nextItems.find((session) => session.chat_id === storedSessionId) ||
+          nextItems[0]
+        if (preferredSession) {
+          setActiveChatId(preferredSession.session_id || preferredSession.chat_id)
+        }
+      })
+      .catch((error) => {
+        if (cancelled) return
+        setSessionsError(error instanceof Error ? error.message : "대화 내역 조회 실패")
+      })
+      .finally(() => {
+        if (!cancelled) setSessionsLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    activeSessionStorageKey,
+    companyId,
+    selectedContext?.analysisId,
+    selectedContext?.equipmentId,
+    selectedEquipmentId,
   ])
 
-  const toChatHistory = (items: AdvisorMessage[]) =>
-    items.map((item) => ({
-      role: item.role === "ai" ? "assistant" : "user",
-      content: item.content,
-    }))
+  useEffect(() => {
+    if (!activeSessionStorageKey) return
+    if (!activeChatId) {
+      window.localStorage.removeItem(activeSessionStorageKey)
+      return
+    }
+    window.localStorage.setItem(activeSessionStorageKey, activeChatId)
+  }, [activeChatId, activeSessionStorageKey])
 
-  const extractEquipmentCards = (cards: unknown[]): EquipmentOption[] | null => {
-    const card = cards.find(
-      (c) => (c as { type?: string }).type === "equipment_selection",
-    ) as { type: string; data: EquipmentOption[] } | undefined
-    return card?.data?.length ? card.data : null
+  useEffect(() => {
+    messageEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
+  }, [messages, equipmentSelectionCards])
+
+  useEffect(() => {
+    if (!companyId || !activeChatId) return
+    if (hydratedSessionRef.current === activeChatId) return
+    hydratedSessionRef.current = activeChatId
+    void fetchAdvisorChatSessionDetail(companyId, activeChatId)
+      .then((data) => {
+        const historyMessages = toMessageListFromSession(data)
+        if (historyMessages.length > 0) {
+          setMessages(historyMessages)
+        }
+      })
+      .catch(() => {
+        // 세션 상세 로딩 실패는 대화 목록 오류 처리와 분리한다.
+      })
+  }, [activeChatId, companyId])
+
+  const reloadSessions = async () => {
+    if (!companyId) return
+    const items = await fetchAdvisorChatSessions(companyId)
+    setSessions(items)
   }
 
-  const handleSend = async (customPrompt?: string) => {
-    const userInput = customPrompt ?? input
+  const ensureActiveSessionId = async () => {
+    if (activeChatId) return activeChatId
+    if (!companyId) return ""
 
-    if (!userInput.trim() || isSending) {
+    const created = await createAdvisorChatSession({
+      companyId,
+      analysisId: selectedContext?.analysisId,
+      equipmentId: selectedContext?.equipmentId || selectedEquipmentId,
+    })
+    const sessionId = readText(created?.session_id, created?.chat_id)
+    if (!sessionId) {
+      throw new Error("새 대화 세션을 생성하지 못했습니다.")
+    }
+    setActiveChatId(sessionId)
+    await reloadSessions()
+    return sessionId
+  }
+
+  const requestChat = async (
+    question: string,
+    historyOverride?: ChatMessage[],
+    options?: {
+      selectedEquipmentOverride?: string
+      action?: string
+      simulationInput?: Record<string, number>
+    },
+  ) => {
+    setChatError("")
+    setActionError("")
+    setLastFailedQuestion("")
+    setLastFailedAction(null)
+    setSending(true)
+    try {
+      const sessionId = await ensureActiveSessionId()
+      const history = historyOverride ?? messages
+      const response = await requestAdvisorAnswer(
+        question,
+        history.map((item) => ({
+          role: item.role === "assistant" ? "assistant" : "user",
+          content: item.content,
+        })),
+        {
+          companyId,
+          selectedEquipmentId:
+            options?.selectedEquipmentOverride ||
+            selectedContext?.equipmentId ||
+            selectedEquipmentId,
+          analysisId: selectedContext?.analysisId,
+          action: options?.action,
+          simulationInput: options?.simulationInput,
+          chatId: sessionId || undefined,
+          sessionId: sessionId || undefined,
+          source: "advisor",
+        },
+      )
+      setMessages((prev) => [
+        ...prev,
+        createChatMessage("assistant", response.text, { cards: response.cards }),
+      ])
+      setEquipmentSelectionCards(extractEquipmentSelection(response.cards))
+      setActiveChatId((prev) => response.chatId || sessionId || prev)
+      await reloadSessions()
+      return response
+    } catch (error) {
+      setChatError(
+        error instanceof Error
+          ? error.message
+          : "AI 상담 서비스를 일시적으로 연결하지 못했습니다.",
+      )
+      setLastFailedQuestion(question)
+      throw error
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const executeAdvisorAction = async (
+    actionDef: AdvisorActionDefinition,
+    simulationInput?: Record<string, number>,
+  ) => {
+    if (loadingActionId || sending) return
+    if (actionDef.responseType === "dialog") {
+      setSimulationOpen(true)
       return
     }
 
-    lastUserQueryRef.current = userInput
-    setPendingEquipmentCards(null)
-    setMessages((prev) => [...prev, { role: "user", content: userInput }])
+    setActionError("")
+    setLoadingActionId(actionDef.id)
+    const userMessage = createChatMessage("user", actionDef.userMessage)
+    const nextMessages = [...messages, userMessage]
+    setMessages(nextMessages)
+
+    try {
+      await requestChat(actionDef.userMessage, nextMessages, {
+        action: actionDef.id,
+        simulationInput,
+      })
+    } catch (error) {
+      setActionError(
+        error instanceof Error ? error.message : "요청 처리 중 오류가 발생했습니다.",
+      )
+      setLastFailedAction(actionDef)
+    } finally {
+      setLoadingActionId(null)
+    }
+  }
+
+  const handleSimulationSubmit = async (simulationInput: Record<string, number>) => {
+    setSimulationOpen(false)
+    const simulationAction = ANALYSIS_QUICK_ACTIONS.find(
+      (item) => item.id === "investment_simulation",
+    )
+    if (!simulationAction) return
+    await executeAdvisorAction(simulationAction, simulationInput)
+  }
+
+  const sendChat = async () => {
+    const question = input.trim()
+    if (!question || sending) return
+    const userMessage = createChatMessage("user", question)
+    setMessages((prev) => [...prev, userMessage])
     setInput("")
-    setIsSending(true)
+    await requestChat(question, [...messages, userMessage])
+  }
 
+  const retryChat = async () => {
+    if (!lastFailedQuestion || sending) return
+    await requestChat(lastFailedQuestion)
+  }
+
+  const selectEquipmentFromCard = async (equipment: EquipmentOption) => {
+    if (!equipment.equipment_id || sending || loadingActionId) return
+    setSelectedEquipmentId(equipment.equipment_id)
+    const userMessage = createChatMessage("user", `${equipment.name} 설비 ROI 분석`)
+    const nextMessages = [...messages, userMessage]
+    setMessages(nextMessages)
+    setLoadingActionId("roi_analyze")
     try {
-      const result = await requestAdvisorAnswer(
-        userInput,
-        toChatHistory(messages),
-      )
-      setMessages((prev) => [...prev, { role: "ai", content: result.text }])
-      setPendingEquipmentCards(extractEquipmentCards(result.cards))
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        { role: "ai", content: "답변을 불러오지 못했습니다. 잠시 후 다시 시도해주세요." },
-      ])
-      setPendingEquipmentCards(null)
+      await requestChat(userMessage.content, nextMessages, {
+        selectedEquipmentOverride: equipment.equipment_id,
+        action: "roi_analyze",
+      })
+      setEquipmentSelectionCards([])
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "설비 분석 시작 실패")
     } finally {
-      setIsSending(false)
+      setLoadingActionId(null)
     }
   }
 
-  const handleEquipmentSelect = async (equipment: EquipmentOption) => {
-    if (!equipment.equipment_id) return
-
-    setPendingEquipmentCards(null)
-    const query = lastUserQueryRef.current || "설비 분석해줘"
-
-    setMessages((prev) => [
-      ...prev,
-      { role: "user", content: `${equipment.name} 기준으로 분석해줘` },
-    ])
-    setIsSending(true)
-
+  const openSession = async (session: AdvisorChatSessionItem) => {
+    if (!companyId) return
     try {
-      const result = await requestAdvisorAnswer(
-        query,
-        toChatHistory(messages),
-        { selectedEquipmentId: equipment.equipment_id },
-      )
-      setMessages((prev) => [...prev, { role: "ai", content: result.text }])
-      setPendingEquipmentCards(extractEquipmentCards(result.cards))
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        { role: "ai", content: "답변을 불러오지 못했습니다. 잠시 후 다시 시도해주세요." },
-      ])
-      setPendingEquipmentCards(null)
-    } finally {
-      setIsSending(false)
+      const targetSessionId = session.session_id || session.chat_id
+      const data = await fetchAdvisorChatSessionDetail(companyId, targetSessionId)
+      const historyMessages = toMessageListFromSession(data)
+      if (historyMessages.length > 0) {
+        setMessages(historyMessages)
+      } else {
+        setMessages([
+          createChatMessage("assistant", "새 대화를 시작해보세요."),
+        ])
+      }
+      hydratedSessionRef.current = targetSessionId
+      setActiveChatId(targetSessionId)
+      setChatError("")
+      setEquipmentSelectionCards([])
+    } catch (error) {
+      setSessionsError(error instanceof Error ? error.message : "대화 상세 조회 실패")
     }
   }
 
-  if (!hasAnalysisData) {
-    return (
-      <main className="page">
-        <section className="section white">
-          <div className="container">
-            <button
-              type="button"
-              onClick={() => navigate("/")}
-              style={{
-                marginBottom: "28px",
-                height: "44px",
-                padding: "0 18px",
-                borderRadius: "999px",
-                border: "1px solid #CBD5E1",
-                background: "#FFFFFF",
-                color: "#061B34",
-                fontWeight: 900,
-                cursor: "pointer",
-                boxShadow: "0 8px 20px rgba(6,27,52,.06)",
-              }}
-            >
-              ← 대시보드로 돌아가기
-            </button>
+  const startNewChat = async () => {
+    if (!companyId) return
+    setChatError("")
+    setLastFailedQuestion("")
+    setEquipmentSelectionCards([])
+    try {
+      const created = await createAdvisorChatSession({
+        companyId,
+        analysisId: selectedContext?.analysisId,
+        equipmentId: selectedContext?.equipmentId || selectedEquipmentId,
+      })
+      const nextSessionId = readText(created?.session_id, created?.chat_id)
+      hydratedSessionRef.current = nextSessionId
+      setActiveChatId(nextSessionId)
+      setMessages([
+        createChatMessage("assistant", "새 대화를 시작합니다. 궁금한 내용을 편하게 물어보세요."),
+      ])
+      await reloadSessions()
+    } catch (error) {
+      setSessionsError(error instanceof Error ? error.message : "새 대화 생성 실패")
+    }
+  }
 
-            <div className="section-head">
-              <div>
-                <div className="screen-tag">Engi AI Advisor</div>
-                <div className="label">AI DECISION ASSISTANT</div>
-                <h2>
-                  맞춤 투자 조언을 <br />
-                  준비하고 있습니다.
-                </h2>
+  const deleteSession = async (sessionId: string) => {
+    if (!companyId || !sessionId || deletingSessionId) return
+    setSessionsError("")
+    setDeletingSessionId(sessionId)
+    try {
+      await deleteAdvisorChatSession(companyId, sessionId)
+      if (activeChatId === sessionId) {
+        hydratedSessionRef.current = ""
+        setActiveChatId("")
+        setMessages([
+          createChatMessage(
+            "assistant",
+            "안녕하세요. 작업형 AI 어드바이저 AI Engi입니다. 어떤 점을 도와드릴까요?",
+          ),
+        ])
+      }
+      await reloadSessions()
+    } catch (error) {
+      setSessionsError(error instanceof Error ? error.message : "대화 내역 삭제 실패")
+    } finally {
+      setDeletingSessionId(null)
+    }
+  }
+
+  const sendSuggestionChip = async (question: string) => {
+    if (!question.trim() || sending || loadingActionId) return
+    const userMessage = createChatMessage("user", question)
+    const nextMessages = [...messages, userMessage]
+    setMessages(nextMessages)
+    await requestChat(question, nextMessages)
+  }
+
+  const preferredAnalysisId = useMemo(
+    () => selectedAnalysisId || analysisFromRoute(searchParams, location.pathname, location.state) || undefined,
+    [location.pathname, location.state, searchParams, selectedAnalysisId],
+  )
+
+  const isEmbeddedAdvisor =
+    popupMode || searchParams.get("embeddedAdvisor") === "1"
+  const isWorkspaceAdvisor = !isEmbeddedAdvisor
+
+  const advisorPageContent = (
+    <div
+      className={`ff-advisor-page-shell${isEmbeddedAdvisor ? " ff-advisor-page-shell--embedded" : ""}`}
+    >
+        <section className={`ff-advisor-hero${isWorkspaceAdvisor ? " ff-advisor-hero--workspace" : ""}`}>
+          {isWorkspaceAdvisor ? (
+            <>
+              <div className="ff-advisor-hero-copy">
+                <span className="ff-advisor-hero-badge">FACTOFIT AI ADVISOR</span>
+                <h1>AI Engi와 설비 투자 흐름을 한 번에 정리하세요.</h1>
+                <p>
+                  설비 선택부터 ROI 분석, 지원사업 추천, 신청서 초안까지 필요한 작업을 순서대로
+                  이어갑니다.
+                </p>
+                {loading && <p className="ff-advisor-hero-status">상담 컨텍스트 로딩 중...</p>}
+                {loadError && <p className="ff-advisor-hero-status is-error">{loadError}</p>}
               </div>
-              <p className="section-desc">
-                기업과 설비 정보를 입력하면 ROI, 지원사업, 안전 리스크를 종합해
-                다음 행동을 안내해드립니다.
-              </p>
+              <div className="ff-advisor-workflow-steps" aria-label="AI Engi 작업 흐름">
+                {WORKFLOW_STEPS.map((step) => (
+                  <article key={step.no}>
+                    <div className="ff-advisor-step-head">
+                      <span className="ff-advisor-step-no">{step.no}</span>
+                      <strong className="ff-advisor-step-title">{step.title}</strong>
+                    </div>
+                    <p>{step.desc}</p>
+                  </article>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="ff-advisor-hero-copy">
+                <span className="ff-advisor-hero-badge">WORKFLOW AI ADVISOR</span>
+                <h1>작업형 AI 어드바이저</h1>
+                <p>ROI 분석, 정책 추천, 신청서 작성을 대화로 연결합니다.</p>
+                <p className="ff-advisor-hero-sub">
+                  {selectedContext
+                    ? "아래 버튼은 선택한 분석의 저장 결과를 기준으로 실행됩니다."
+                    : "분석이 없으면 새 투자 분석부터 시작하세요."}
+                </p>
+                {loading && <p className="ff-advisor-hero-status">상담 컨텍스트 로딩 중...</p>}
+                {loadError && <p className="ff-advisor-hero-status is-error">{loadError}</p>}
+              </div>
+              <div className="ff-advisor-hero-visual" aria-hidden="true">
+                <img src={engiBot} alt="" />
+              </div>
+            </>
+          )}
+        </section>
+
+        <div className={`ff-advisor-page-grid${isWorkspaceAdvisor ? " ff-advisor-page-grid--workspace" : ""}`}>
+          <article className="ff-advisor-chat-card">
+            <div className={`ff-advisor-chat-head${isWorkspaceAdvisor ? " ff-advisor-chat-head--workspace" : ""}`}>
+              {isWorkspaceAdvisor ? (
+                <h3>지금 필요한 작업을 선택하면 AI Engi가 순서대로 이어갑니다.</h3>
+              ) : (
+                <>
+                  <h3>현재 대화</h3>
+                  <span
+                    className={`ff-advisor-system-status${loadError || chatError ? " is-error" : ""}`}
+                  >
+                    <i aria-hidden="true" />
+                    {loadError || chatError ? "연결 확인 필요" : "AI 시스템 활성화됨"}
+                  </span>
+                </>
+              )}
             </div>
 
-            <div
-              style={{
-                display: "flex",
-                gap: "12px",
-                marginTop: "8px",
-                marginBottom: "48px",
-              }}
-            >
+            {!loading && !loadError && (
+              <>
+                <AdvisorQuickActions
+                  variant={isWorkspaceAdvisor ? "workspace" : "compact"}
+                  hasAnalysis={Boolean(selectedContext)}
+                  loadingActionId={loadingActionId}
+                  onChangeAnalysis={() => setAnalysisPickerOpen(true)}
+                  onAction={(action) => void executeAdvisorAction(action)}
+                />
+                {!isWorkspaceAdvisor && (
+                  <div className="ff-advisor-chip-row">
+                    {SUGGESTION_CHIPS.map((question) => (
+                      <button
+                        key={question}
+                        type="button"
+                        className="ff-ai-advisor-chip"
+                        disabled={sending || Boolean(loadingActionId)}
+                        onClick={() => void sendSuggestionChip(question)}
+                      >
+                        {question}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+
+            <div className="ff-advisor-message-list">
+              {messages.map((message) =>
+                message.role === "user" ? (
+                  <div key={message.id} className="ff-advisor-message-row user">
+                    <div className="ff-advisor-message user">{message.content}</div>
+                    {message.sentAt ? (
+                      <time className="ff-advisor-message-time">{formatMessageTime(message.sentAt)}</time>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div key={message.id} className="ff-advisor-message-row assistant">
+                    <div className="ff-advisor-message-avatar">
+                      <img src={botIcon} alt="" />
+                      <span>AI Engi</span>
+                    </div>
+                    <div className="ff-advisor-message-stack">
+                      <div className="ff-advisor-message assistant">{message.content}</div>
+                      {message.cards && message.cards.length > 0 ? (
+                        <AdvisorResponseCards
+                          cards={message.cards}
+                          analysisId={selectedContext?.analysisId}
+                          inPopup={isEmbeddedAdvisor}
+                        />
+                      ) : null}
+                    </div>
+                  </div>
+                ),
+              )}
+              <div ref={messageEndRef} />
+            </div>
+
+            {actionError && (
+              <div className="ff-advisor-inline-alert">
+                <p>{actionError}</p>
+                {lastFailedAction && (
+                  <button
+                    type="button"
+                    className="ff-advisor-text-btn"
+                    onClick={() => void executeAdvisorAction(lastFailedAction)}
+                  >
+                    다시 시도
+                  </button>
+                )}
+              </div>
+            )}
+
+            {chatError && (
+              <div className="ff-advisor-inline-alert">
+                <p>{chatError}</p>
+                <button type="button" className="ff-advisor-text-btn" onClick={() => void retryChat()}>
+                  재시도
+                </button>
+              </div>
+            )}
+
+            {equipmentSelectionCards.length > 0 && (
+              <div className="ff-advisor-equipment-pick">
+                <strong>설비 선택이 필요합니다.</strong>
+                {equipmentSelectionCards.map((equipment) => (
+                  <button
+                    key={equipment.equipment_id}
+                    type="button"
+                    className="ff-advisor-text-btn"
+                    onClick={() => void selectEquipmentFromCard(equipment)}
+                  >
+                    {equipment.name} · {equipment.category} · {equipment.age_years}년
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="ff-advisor-composer">
+              <textarea
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault()
+                    void sendChat()
+                  }
+                }}
+                placeholder={
+                  isWorkspaceAdvisor
+                    ? "메시지 입력..."
+                    : "질문 입력 (Enter 전송 / Shift+Enter 줄바꿈)"
+                }
+              />
               <button
                 type="button"
-                className="btn blue"
-                onClick={() => navigate("/setup/company")}
+                className="ff-advisor-send-btn"
+                onClick={() => void sendChat()}
+                disabled={sending}
               >
-                기업 정보 입력하기
-              </button>
-              <button
-                type="button"
-                className="btn dark"
-                onClick={() => navigate("/company")}
-              >
-                설비 정보 등록하기
+                {sending ? "전송중" : "보내기"}
+                <Send size={15} aria-hidden="true" />
               </button>
             </div>
+          </article>
+
+          <article className={`ff-advisor-session-card${isWorkspaceAdvisor ? " ff-advisor-session-card--workspace" : ""}`}>
+            {isWorkspaceAdvisor ? (
+              <header className="ff-advisor-history-head">
+                <span>HISTORY</span>
+                <h3>작업 히스토리</h3>
+                <p>이전에 이어가던 분석과 신청서 작업을 다시 열 수 있습니다.</p>
+              </header>
+            ) : (
+              <div className="ff-advisor-session-head">
+                <h3>내 대화 내역</h3>
+                <button type="button" className="ff-advisor-new-chat-btn" onClick={() => void startNewChat()}>
+                  + 새 대화
+                </button>
+              </div>
+            )}
+
+            {sessionsLoading && <p className="ff-advisor-muted">대화 내역 조회 중...</p>}
+            {sessionsError && (
+              <div className="ff-advisor-inline-alert">
+                <p>{sessionsError}</p>
+                <button
+                  type="button"
+                  className="ff-advisor-text-btn"
+                  onClick={() => {
+                    setSessionsError("")
+                    void reloadSessions().catch((error) =>
+                      setSessionsError(error instanceof Error ? error.message : "대화 내역 조회 실패"),
+                    )
+                  }}
+                >
+                  다시 불러오기
+                </button>
+              </div>
+            )}
+            {!sessionsLoading && sessions.length === 0 && (
+              <p className="ff-advisor-muted">저장된 대화가 없습니다.</p>
+            )}
+
+            <div className="ff-advisor-session-list">
+              {sessions.map((session) => {
+                const sessionId = session.session_id || session.chat_id
+                const isActive = activeChatId === sessionId
+                const isDeleting = deletingSessionId === sessionId
+                const sessionTime = formatHistoryDate(session.updated_at || session.created_at)
+                return (
+                  <div
+                    key={sessionId}
+                    className={`ff-advisor-session-item${isActive ? " is-active" : ""}`}
+                  >
+                    <button
+                      type="button"
+                      className="ff-advisor-session-open-btn"
+                      onClick={() => void openSession(session)}
+                    >
+                      <div className="ff-advisor-session-item-top">
+                        <strong>{session.title || "새 대화"}</strong>
+                        <time>{sessionTime}</time>
+                      </div>
+                      {!isWorkspaceAdvisor && (
+                        <>
+                          <p>{session.preview || "(미리보기 없음)"}</p>
+                          <span className="ff-advisor-session-tag">
+                            {session.analysis_id ? "분석 상담" : "일반 상담"}
+                          </span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      className="ff-advisor-session-delete-btn"
+                      aria-label={`${session.title || "새 대화"} 삭제`}
+                      disabled={Boolean(deletingSessionId)}
+                      onClick={() => void deleteSession(sessionId)}
+                    >
+                      {isDeleting ? "삭제중" : "삭제"}
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+
+            {isWorkspaceAdvisor && (
+              <button
+                type="button"
+                className="ff-advisor-start-task-btn"
+                onClick={() => void startNewChat()}
+              >
+                새 작업 시작
+              </button>
+            )}
+          </article>
+        </div>
+
+        <InvestmentSimulationDialog
+          open={simulationOpen}
+          scenarioAInvestment={selectedContext?.scenarioAInvestment ?? null}
+          scenarioBInvestment={selectedContext?.scenarioBInvestment ?? null}
+          loading={loadingActionId === "investment_simulation"}
+          onClose={() => setSimulationOpen(false)}
+          onSubmit={(input) => void handleSimulationSubmit(input)}
+        />
+
+        {analysisPickerOpen && (
+        <section className="ff-advisor-agent-shell" aria-label="분석 선택">
+          <div className="ff-advisor-agent-stage" style={{ maxWidth: 720 }}>
+            <header className="ff-advisor-agent-header">
+              <div className="ff-advisor-brand-block">
+                <div>
+                  <span>ANALYSIS PICKER</span>
+                  <h2>분석 변경</h2>
+                </div>
+              </div>
+              <button type="button" onClick={() => setAnalysisPickerOpen(false)} aria-label="닫기">
+                ×
+              </button>
+            </header>
+            <main className="ff-advisor-agent-main">
+              <input
+                value={analysisSearch}
+                onChange={(event) => setAnalysisSearch(event.target.value)}
+                placeholder="설비명/analysis_id 검색"
+                style={{
+                  width: "100%",
+                  height: 46,
+                  borderRadius: 10,
+                  border: "1px solid #d0d5dd",
+                  padding: "0 12px",
+                  marginBottom: 10,
+                }}
+              />
+              <div style={{ display: "grid", gap: 8, maxHeight: "55vh", overflow: "auto" }}>
+                {filteredContexts.map((analysis) => (
+                  <button
+                    key={analysis.analysisId}
+                    type="button"
+                    className="ff-support-btn ghost"
+                    style={{ justifyContent: "space-between" }}
+                    onClick={() => {
+                      setSelectedAnalysisId(analysis.analysisId)
+                      setSelectedEquipmentId(analysis.equipmentId)
+                      setAnalysisPickerOpen(false)
+                    }}
+                  >
+                    <span>
+                      {analysis.equipmentName} · ROI {formatPercent(analysis.roiPct)}
+                    </span>
+                    <span>{formatDateTime(analysis.createdAt)}</span>
+                  </button>
+                ))}
+                {!filteredContexts.length && <p>검색 결과가 없습니다.</p>}
+              </div>
+            </main>
           </div>
         </section>
-      </main>
-    )
+      )}
+    </div>
+  )
+
+  if (isEmbeddedAdvisor) {
+    return <div className="ff-advisor-embedded-page">{advisorPageContent}</div>
   }
 
   return (
-    <main className="page">
-      <section className="section white">
-        <div className="container">
-          <button
-            type="button"
-            onClick={() => navigate("/")}
-            style={{
-              marginBottom: "28px",
-              height: "44px",
-              padding: "0 18px",
-              borderRadius: "999px",
-              border: "1px solid #CBD5E1",
-              background: "#FFFFFF",
-              color: "#061B34",
-              fontWeight: 900,
-              cursor: "pointer",
-              boxShadow: "0 8px 20px rgba(6,27,52,.06)",
-            }}
-          >
-            ← 대시보드로 돌아가기
-          </button>
-
-          <div className="section-head">
-            <div>
-              <div className="screen-tag">FACTOFIT AI ADVISOR</div>
-              <div className="label">AI DECISION ASSISTANT</div>
-              <h2>
-                설비투자 의사결정을 <br />
-                AI 상담으로 연결합니다.
-              </h2>
-            </div>
-
-            <p className="section-desc">
-              ROI 분석, 지원사업 추천, 안전 리스크, 신청서 초안까지 사용자의
-              질문에 맞춰 다음 행동을 안내합니다.
-            </p>
-          </div>
-
-          <div
-            className="summary-hero-card"
-            style={{
-              borderLeftColor: "#0047A0",
-              marginBottom: "28px",
-            }}
-          >
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "0.95fr 1.05fr",
-                gap: "28px",
-                alignItems: "stretch",
-              }}
-            >
-              <div>
-                <span className="badge blue">AI 상담 준비 완료</span>
-
-                <h3 style={{ marginTop: "18px" }}>
-                  지금 가장 먼저 할 일은 <br />
-                  지원사업 신청 준비입니다.
-                </h3>
-
-                <p>
-                  ROI 분석 결과와 안전진단 결과를 종합하면, 프레스 설비 교체는
-                  지원사업 신청 근거를 구성하기 좋은 상태입니다. 견적서와 설비
-                  사진을 준비한 뒤 신청서 초안을 작성하는 흐름을 추천합니다.
-                </p>
-
-                <div
-                  className="hero-actions"
-                  style={{
-                    justifyContent: "flex-start",
-                    marginTop: "28px",
-                  }}
-                >
-                  <button
-                    className="btn blue"
-                    type="button"
-                    onClick={() => navigate("/application-draft")}
-                  >
-                    신청서 초안 만들기
-                  </button>
-
-                  <button
-                    className="btn dark"
-                    type="button"
-                    onClick={() => navigate("/support-projects")}
-                  >
-                    지원사업 다시 보기
-                  </button>
-                </div>
-              </div>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                  gap: "14px",
-                }}
-              >
-                {insightItems.map((item) => {
-                  const color = getToneColor(item.tone)
-                  const softColor = getToneSoftColor(item.tone)
-                  const degree = item.score * 3.6
-
-                  return (
-                    <div
-                      key={item.label}
-                      style={{
-                        background: "#FFFFFF",
-                        border: "1px solid #E2E8F0",
-                        borderRadius: "24px",
-                        padding: "20px",
-                        borderTop: `5px solid ${color}`,
-                        boxShadow: "0 10px 25px rgba(0,0,0,0.04)",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "92px 1fr",
-                          gap: "16px",
-                          alignItems: "center",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: "92px",
-                            height: "92px",
-                            borderRadius: "50%",
-                            background: `conic-gradient(${color} 0deg ${degree}deg, #E8EEF5 ${degree}deg 360deg)`,
-                            display: "grid",
-                            placeItems: "center",
-                          }}
-                        >
-                          <div
-                            style={{
-                              width: "68px",
-                              height: "68px",
-                              borderRadius: "50%",
-                              background: "#FFFFFF",
-                              display: "grid",
-                              placeItems: "center",
-                              border: "1px solid #E2E8F0",
-                            }}
-                          >
-                            <b
-                              style={{
-                                color,
-                                fontFamily: "DM Mono, monospace",
-                                fontSize: "20px",
-                                fontWeight: 500,
-                              }}
-                            >
-                              {item.score}
-                            </b>
-                          </div>
-                        </div>
-
-                        <div>
-                          <strong
-                            style={{
-                              display: "block",
-                              color: "#061B34",
-                              fontSize: "16px",
-                              fontWeight: 900,
-                              marginBottom: "7px",
-                            }}
-                          >
-                            {item.label}
-                          </strong>
-
-                          <span
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              minHeight: "28px",
-                              padding: "0 10px",
-                              borderRadius: "999px",
-                              background: softColor,
-                              color,
-                              fontSize: "12px",
-                              fontWeight: 900,
-                              marginBottom: "8px",
-                            }}
-                          >
-                            {item.value}
-                          </span>
-
-                          <p
-                            style={{
-                              color: "#667085",
-                              fontSize: "12px",
-                              lineHeight: 1.6,
-                              fontWeight: 800,
-                            }}
-                          >
-                            {item.description}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 360px",
-              gap: "24px",
-              alignItems: "start",
-            }}
-          >
-            <section
-              style={{
-                background: "#FFFFFF",
-                border: "1px solid #E2E8F0",
-                borderRadius: "32px",
-                boxShadow: "0 24px 64px rgba(6,27,52,.10)",
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  padding: "26px 30px",
-                  borderBottom: "1px solid #E2E8F0",
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: "16px",
-                  alignItems: "center",
-                }}
-              >
-                <div>
-                  <h3
-                    style={{
-                      color: "#061B34",
-                      fontSize: "24px",
-                      fontWeight: 900,
-                      letterSpacing: "-0.5px",
-                    }}
-                  >
-                    AI Advisor 상담
-                  </h3>
-
-                  <p
-                    style={{
-                      marginTop: "8px",
-                      color: "#667085",
-                      fontSize: "14px",
-                      fontWeight: 800,
-                    }}
-                  >
-                    질문을 입력하거나 빠른 질문을 선택해보세요.
-                  </p>
-                </div>
-
-                <span className="badge green">온라인</span>
-              </div>
-
-              <div
-                style={{
-                  padding: "28px",
-                  display: "grid",
-                  gap: "14px",
-                  minHeight: "420px",
-                  alignContent: "start",
-                  background: "#F8FAFC",
-                }}
-              >
-                {messages.map((message, index) => (
-                  <div
-                    key={`${message.role}-${index}`}
-                    style={{
-                      display: "flex",
-                      justifyContent:
-                        message.role === "user" ? "flex-end" : "flex-start",
-                    }}
-                  >
-                    <div
-                      style={{
-                        maxWidth: "78%",
-                        padding: "16px 18px",
-                        borderRadius:
-                          message.role === "user"
-                            ? "22px 22px 6px 22px"
-                            : "22px 22px 22px 6px",
-                        background:
-                          message.role === "user" ? "#344BA0" : "#FFFFFF",
-                        color: message.role === "user" ? "#FFFFFF" : "#334155",
-                        border:
-                          message.role === "user"
-                            ? "1px solid #344BA0"
-                            : "1px solid #E2E8F0",
-                        boxShadow: "0 10px 24px rgba(6,27,52,.06)",
-                        fontSize: "14px",
-                        lineHeight: 1.75,
-                        fontWeight: 800,
-                      }}
-                    >
-                      {message.content}
-                    </div>
-                  </div>
-                ))}
-
-                {pendingEquipmentCards && (
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "8px",
-                      marginTop: "12px",
-                      padding: "0 4px",
-                    }}
-                  >
-                    {pendingEquipmentCards.map((equipment) =>
-                      equipment.equipment_id ? (
-                        <button
-                          key={equipment.equipment_id}
-                          type="button"
-                          disabled={isSending}
-                          onClick={() => void handleEquipmentSelect(equipment)}
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "flex-start",
-                            gap: "4px",
-                            padding: "14px 18px",
-                            background: "#FFFFFF",
-                            border: "1px solid #E2E8F0",
-                            borderRadius: "16px",
-                            boxShadow: "0 4px 12px rgba(6,27,52,.06)",
-                            cursor: isSending ? "not-allowed" : "pointer",
-                            opacity: isSending ? 0.5 : 1,
-                            textAlign: "left",
-                            transition: "border-color 0.15s, box-shadow 0.15s",
-                          }}
-                          onMouseEnter={(e) => {
-                            if (!isSending) {
-                              ;(e.currentTarget as HTMLButtonElement).style.borderColor = "#5B8BFF"
-                              ;(e.currentTarget as HTMLButtonElement).style.boxShadow =
-                                "0 4px 16px rgba(91,139,255,.18)"
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            ;(e.currentTarget as HTMLButtonElement).style.borderColor = "#E2E8F0"
-                            ;(e.currentTarget as HTMLButtonElement).style.boxShadow =
-                              "0 4px 12px rgba(6,27,52,.06)"
-                          }}
-                        >
-                          <span
-                            style={{
-                              color: "#061B34",
-                              fontSize: "14px",
-                              fontWeight: 900,
-                            }}
-                          >
-                            {equipment.name}
-                          </span>
-                          <span
-                            style={{
-                              color: "#667085",
-                              fontSize: "12px",
-                              fontWeight: 800,
-                            }}
-                          >
-                            {equipment.category} · 사용 {equipment.age_years}년
-                          </span>
-                        </button>
-                      ) : null,
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div
-                style={{
-                  padding: "22px",
-                  borderTop: "1px solid #E2E8F0",
-                  background: "#FFFFFF",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "10px",
-                    flexWrap: "wrap",
-                    marginBottom: "14px",
-                  }}
-                >
-                  {quickQuestions.map((question) => (
-                    <button
-                      key={question.label}
-                      type="button"
-                      disabled={isSending}
-                      onClick={() => void handleSend(question.prompt)}
-                      style={{
-                        border: "1px solid #BFDBFE",
-                        background: "#EFF6FF",
-                        color: "#0047A0",
-                        padding: "9px 12px",
-                        borderRadius: "999px",
-                        fontSize: "12px",
-                        fontWeight: 900,
-                        cursor: isSending ? "not-allowed" : "pointer",
-                        opacity: isSending ? 0.5 : 1,
-                      }}
-                    >
-                      {question.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 110px",
-                    gap: "10px",
-                  }}
-                >
-                  <input
-                    value={input}
-                    onChange={(event) => setInput(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        void handleSend()
-                      }
-                    }}
-                    placeholder="예: 이 설비 교체해도 괜찮을까?"
-                    style={{
-                      height: "54px",
-                      border: "1px solid #E2E8F0",
-                      borderRadius: "18px",
-                      padding: "0 16px",
-                      color: "#061B34",
-                      fontSize: "15px",
-                      fontWeight: 800,
-                      outline: "none",
-                    }}
-                  />
-
-                  <button
-                    className="btn blue"
-                    type="button"
-                    disabled={isSending}
-                    onClick={() => void handleSend()}
-                  >
-                    {isSending ? "전송 중..." : "보내기"}
-                  </button>
-                </div>
-              </div>
-            </section>
-
-            <aside
-              style={{
-                display: "grid",
-                gap: "16px",
-              }}
-            >
-              {advisorActions.map((action) => (
-                <article
-                  key={action.title}
-                  className="card"
-                  onClick={() => navigate(action.path)}
-                  style={{
-                    padding: "24px",
-                    borderRadius: "26px",
-                    cursor: "pointer",
-                  }}
-                >
-                  <span className={`badge ${action.tone}`}>{action.badge}</span>
-
-                  <h4
-                    style={{
-                      marginTop: "16px",
-                      color: "#061B34",
-                      fontSize: "20px",
-                      lineHeight: 1.35,
-                      fontWeight: 900,
-                    }}
-                  >
-                    {action.title}
-                  </h4>
-
-                  <p
-                    style={{
-                      marginTop: "10px",
-                      color: "#667085",
-                      fontSize: "13px",
-                      lineHeight: 1.7,
-                      fontWeight: 800,
-                    }}
-                  >
-                    {action.description}
-                  </p>
-                </article>
-              ))}
-            </aside>
-          </div>
-
-          <div className="details-wrap">
-            <details open>
-              <summary>AI가 추천하는 다음 액션</summary>
-
-              <div className="detail-body">
-                <div className="check-grid">
-                  <div className="check-card">
-                    <h4>신청서 초안 작성</h4>
-                    <p>
-                      ROI와 지원사업 적합도 근거가 충분하므로 신청서 초안을 먼저
-                      작성하는 것이 좋습니다.
-                    </p>
-                  </div>
-
-                  <div className="check-card orange">
-                    <h4>견적서 준비</h4>
-                    <p>
-                      도입 예정 설비의 금액, 사양, 납품 조건이 포함된 견적서를
-                      준비해야 합니다.
-                    </p>
-                  </div>
-
-                  <div className="check-card red">
-                    <h4>설비 사진 첨부</h4>
-                    <p>
-                      노후 설비 상태를 보여주는 사진과 유지보수 이력을 함께
-                      준비하면 신청 필요성이 강화됩니다.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </details>
-          </div>
-        </div>
-      </section>
-    </main>
+    <DashboardWorkspacePageLayout
+      analysisId={preferredAnalysisId}
+      pageClassName="ff-advisor-workspace-page"
+      contentClassName="ff-advisor-workspace-content"
+    >
+      {advisorPageContent}
+    </DashboardWorkspacePageLayout>
   )
 }

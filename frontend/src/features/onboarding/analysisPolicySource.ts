@@ -58,10 +58,12 @@ export function resolveCanonicalPolicies(params: {
   roiSnapshot?: unknown
   matchedPolicies?: unknown
   persistedPolicies?: unknown
+  persistedAnalysisId?: string | null
   allowEquipmentFallback?: boolean
   equipmentFallbackPolicies?: unknown
 }): CanonicalPolicyResult {
-  const hasAnalysisId = Boolean(params.analysisId && String(params.analysisId).trim())
+  const normalizedAnalysisId = String(params.analysisId ?? "").trim()
+  const hasAnalysisId = Boolean(normalizedAnalysisId)
 
   const snapshotPolicies = extractSnapshotPolicies(params.roiSnapshot)
   if (snapshotPolicies.length > 0) {
@@ -78,7 +80,12 @@ export function resolveCanonicalPolicies(params: {
   }
 
   const persistedPolicies = normalizePolicies(params.persistedPolicies)
-  if (persistedPolicies.length > 0) {
+  const normalizedPersistedAnalysisId = String(params.persistedAnalysisId ?? "").trim()
+  const canUsePersistedPolicies =
+    !hasAnalysisId ||
+    (Boolean(normalizedPersistedAnalysisId) &&
+      normalizedPersistedAnalysisId === normalizedAnalysisId)
+  if (canUsePersistedPolicies && persistedPolicies.length > 0) {
     return { policies: persistedPolicies, source: "persisted", missingState: "ready" }
   }
 
@@ -87,7 +94,8 @@ export function resolveCanonicalPolicies(params: {
     return { policies: [], source: "none", missingState: "missing" }
   }
 
-  if (params.allowEquipmentFallback) {
+  const canUseEquipmentFallback = !hasAnalysisId && Boolean(params.allowEquipmentFallback)
+  if (canUseEquipmentFallback) {
     const equipmentPolicies = normalizePolicies(params.equipmentFallbackPolicies)
     if (equipmentPolicies.length > 0) {
       return {

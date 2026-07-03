@@ -14,7 +14,7 @@ export default function UserInfoSection({
   onPhoneChange,
 }: UserInfoSectionProps) {
   return (
-    <div className="ff-signup-section">
+    <div className="ff-signup-section ff-signup-section--user">
       <h3>2. 사용자 정보</h3>
 
       <div className="ff-signup-two-col">
@@ -24,6 +24,7 @@ export default function UserInfoSection({
             placeholder="이름"
             value={userName}
             onChange={(event) => onUserNameChange(event.target.value)}
+            aria-required="true"
           />
         </div>
 
@@ -33,6 +34,7 @@ export default function UserInfoSection({
             placeholder="010-0000-0000"
             value={phone}
             onChange={(event) => onPhoneChange(event.target.value)}
+            aria-required="true"
           />
         </div>
       </div>

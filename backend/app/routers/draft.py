@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Any
+import re
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -11,6 +12,7 @@ from app.models.auth import CurrentUser
 from app.models.company import CompanyContext
 from app.models.equipment import EquipmentInput
 from app.state import FactofitState
+from app.services.safety_evidence_service import build_safety_evidence_snapshot
 
 
 router = APIRouter()
@@ -145,11 +147,35 @@ def _snapshot_policy_by_id(snapshot: dict[str, Any], requested_policy_id: str) -
     if not requested:
         return None
 
+    rows = _snapshot_policy_rows(snapshot)
+    direct = next(
+        (row for row in rows if str(row.get("policy_id") or "").strip() == requested),
+        None,
+    )
+    if direct:
+        return direct
+
+    candidates = [requested]
+    candidates.append(re.sub(r":[AB](?:\d+)?$", "", requested, flags=re.IGNORECASE))
+    candidates.append(re.sub(r":\d+$", "", requested))
+    candidates.append(re.sub(r":[AB]$", "", requested, flags=re.IGNORECASE))
+
+    for candidate in candidates:
+        normalized = str(candidate or "").strip()
+        if not normalized or normalized == requested:
+            continue
+        matched = next(
+            (row for row in rows if str(row.get("policy_id") or "").strip() == normalized),
+            None,
+        )
+        if matched:
+            return matched
+
     return next(
         (
             row
-            for row in _snapshot_policy_rows(snapshot)
-            if str(row.get("policy_id") or "").strip() == requested
+            for row in rows
+            if requested.startswith(f"{str(row.get('policy_id') or '').strip()}:")
         ),
         None,
     )
@@ -555,6 +581,8 @@ async def generate_draft(
     company_data = company_result.data[0]
     prefetched_roi_output = None
 
+    effective_policy_id = body.policy_id
+
     if body.analysis_id:
         roi_row = (
             db.table("roi_output")
@@ -644,6 +672,7 @@ async def generate_draft(
                 detail="저장된 정책 정보에서 요청한 정책을 찾을 수 없습니다.",
             )
 
+        effective_policy_id = _safe_text(snapshot_policy.get("policy_id"), body.policy_id)
         roi_data = _as_dict(roi_output.get("roi_data"))
         selected_matched_policy = _matched_policy_from_snapshot(snapshot_policy)
         selected_policy = _policy_from_snapshot(snapshot_policy)
@@ -691,6 +720,7 @@ async def generate_draft(
 
         policy_detail = _fetch_policy_detail_by_id(db, body.policy_id)
         selected_policy = _merge_policy(selected_matched_policy, policy_detail)
+        effective_policy_id = _safe_text(selected_policy.get("policy_id"), body.policy_id)
 
     scenario_used, selected_roi_scenario = _resolve_draft_scenario(
         selected_policy,
@@ -743,9 +773,10 @@ async def generate_draft(
     if not raw_draft_content:
         raw_draft_content = {}
 
+    normalized_body = body.model_copy(update={"policy_id": effective_policy_id})
     draft_content = _enrich_draft_content(
         raw_draft_content,
-        body=body,
+        body=normalized_body,
         company_data=company_data,
         equipment_data=equipment_data,
         selected_policy=selected_policy,
@@ -753,11 +784,30 @@ async def generate_draft(
         scenario_used=scenario_used,
         scenario_label=scenario_label,
     )
+    if body.analysis_id:
+        try:
+            draft_content["safety_evidence_snapshot"] = build_safety_evidence_snapshot(
+                company_id=body.company_id,
+                analysis_id=body.analysis_id,
+                policy_id=effective_policy_id,
+                equipment_id=body.equipment_id,
+            )
+        except Exception:
+            draft_content["safety_evidence_snapshot"] = {
+                "snapshot_at": datetime.now().isoformat(),
+                "analysis_id": body.analysis_id,
+                "policy_id": effective_policy_id,
+                "equipment_id": body.equipment_id,
+                "total_required_count": 0,
+                "uploaded_required_count": 0,
+                "viewpoints": [],
+                "message": "현재 분석에 연결된 안전 증빙 기준이 아직 준비되지 않았습니다.",
+            }
 
     draft_payload = {
         "company_id": body.company_id,
         "equipment_id": body.equipment_id,
-        "policy_id": body.policy_id,
+        "policy_id": effective_policy_id,
         "draft_content": draft_content,
         "created_at": datetime.now().isoformat(),
     }
@@ -771,7 +821,7 @@ async def generate_draft(
         body.equipment_id,
     ).eq(
         "policy_id",
-        body.policy_id,
+        effective_policy_id,
     ).execute()
 
     saved_draft = db.table("draft_result").insert(draft_payload).execute()
@@ -785,7 +835,7 @@ async def generate_draft(
                 else None
             ),
             "analysis_id": body.analysis_id,
-            "policy_id": body.policy_id,
+            "policy_id": effective_policy_id,
             "company_id": body.company_id,
             "equipment_id": body.equipment_id,
             "scenario_used": scenario_used,

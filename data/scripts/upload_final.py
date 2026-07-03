@@ -6,6 +6,7 @@ import io
 import json
 import os
 import re
+import sys
 import time
 import zipfile
 from datetime import datetime
@@ -25,6 +26,8 @@ except Exception:  # pragma: no cover - optional local dependency
     HumanMessage = None
     SystemMessage = None
 from supabase import Client, create_client
+
+import policy_amount_utils as amount_utils
 
 
 # -----------------------------------------------------------------------------
@@ -56,6 +59,12 @@ DATA_LLM_MODEL = os.getenv(
     "DATA_LLM_MODEL",
     "google/gemini-2.5-flash",
 ).strip()
+AMOUNT_LLM_CACHE_PATH = Path(
+    os.getenv(
+        "AMOUNT_LLM_CACHE_PATH",
+        str(SCRIPT_DIR.parent / "cache" / "amount_llm_cache.json"),
+    )
+)
 
 TARGET_TABLE = os.getenv("POLICY_VALIDATION_TARGET_TABLE", "policy_validation_new").strip()
 DEFAULT_PAGE_UNIT = int(os.getenv("BIZINFO_PAGE_UNIT", "100"))
@@ -64,6 +73,47 @@ DEFAULT_MAX_POLICIES = int(os.getenv("MAX_POLICIES", "0"))  # 0 = all
 DEFAULT_DRY_RUN = os.getenv("DRY_RUN", "1").strip() != "0"
 DEFAULT_SLEEP_SECONDS = float(os.getenv("BIZINFO_SLEEP_SECONDS", "0.4"))
 DEFAULT_SEARCH_LCLAS_IDS = os.getenv("BIZINFO_SEARCH_LCLAS_IDS", "01,02,03,07,09")
+BROAD_INDUSTRY_KEYWORDS = {"제조", "장비", "설비", "공정", "기계", "부품"}
+
+EXCLUDED_COLLECTION_FIELDS = {
+    "max_employee_count",
+    "min_revenue",
+    "max_revenue",
+    "required_documents_count",
+}
+VALIDATION_PAYLOAD_FIELDS = {
+    "policy_id", "title", "organization", "region", "url",
+    "posted_at", "posted_date_status", "posted_date_evidence",
+    "deadline", "deadline_display", "deadline_type", "deadline_status",
+    "deadline_note", "is_early_close_possible",
+    "policy_category", "policy_subcategory",
+    "service_category", "service_subcategory", "support_method",
+    "industry_codes", "hashtags",
+    "amount_candidates", "selected_amount_candidate", "support_ratio",
+    "max_amount", "max_amount_actual", "max_amount_note",
+    "max_amount_status", "max_amount_type", "max_amount_type_ko",
+    "max_amount_type_reason", "max_amount_numeric_manwon",
+    "max_amount_evidence", "max_amount_source",
+    "max_amount_basis_text", "max_amount_basis_evidence_text",
+    "roi_apply_method", "roi_apply_method_ko", "roi_apply_reason",
+    "amount_extraction_status",
+    "required_documents", "required_documents_json", "required_documents_status",
+    "employee_min", "employee_max",
+    "revenue_min_manwon", "revenue_max_manwon", "revenue_rules",
+    "company_age_min", "company_age_max", "eligible_company_types",
+    "eligibility_text", "eligibility_evidence", "eligibility_extraction_status",
+    "summary", "raw_text", "raw_json", "source_api_json",
+    "detail_text", "attachment_text", "attachment_files", "temp_extraction_json",
+    "source_name", "source_id", "collection_status", "extraction_status",
+    "error_message", "collected_at", "created_at", "updated_at",
+    "relevance_score", "has_capex_keyword", "has_manufacturing_code",
+    "is_selected", "selected_reason",
+    "support_primary_category", "support_categories", "support_items",
+    "policy_primary_nature", "safety_justification_usable",
+    "safety_justification_strength", "recommended_safety_viewpoints",
+    "application_reflection_recommendation", "safety_justification_reason",
+    "safety_justification_synced_at",
+}
 
 if not SUPABASE_URL:
     raise ValueError("SUPABASE_URL is missing from .env files.")
@@ -938,44 +988,18 @@ def amount_source_text(item: dict[str, Any], detail_text: str) -> str:
 
 
 def parse_amount_number(raw_number: str, unit: str) -> float:
-    number = float(str(raw_number).replace(",", ""))
-    normalized_unit = unit.replace(" ", "")
-
-    if normalized_unit in {"억원", "억"}:
-        return number * 10000
-    if normalized_unit in {"천만원", "천만원"}:
-        return number * 1000
-    if normalized_unit in {"백만원", "백만원"}:
-        return number * 100
-    if normalized_unit in {"천원", "천원"}:
-        return number / 10
-    if normalized_unit in {"만원", "만원"}:
-        return number
-    if normalized_unit == "원":
-        return number / 10000
-    return number
+    return amount_utils.parse_amount_number(raw_number, unit)
 
 
 def format_amount_manwon(manwon: float) -> str:
-    if manwon >= 10000:
-        eok = manwon / 10000
-        if eok.is_integer():
-            return f"최대 {int(eok)}억원"
-        return f"최대 {eok:.1f}억원"
-
-    if float(manwon).is_integer():
-        return f"최대 {int(manwon):,}만원"
-    return f"최대 {manwon:,.1f}만원"
+    return amount_utils.format_amount_manwon(manwon) or "지원금 확인 필요"
 
 
 def classify_amount_type(context: str) -> str:
-    if "융자" in context:
-        return "loan"
-    if "바우처" in context:
-        return "voucher"
-    if "보조" in context or "정부지원" in context or "국비" in context:
-        return "subsidy"
-    return "support_amount"
+    return amount_utils.classify_amount_candidate({"raw_text": context}, context).get(
+        "max_amount_type",
+        "unknown",
+    )
 
 
 def extract_amount_candidates(
@@ -984,98 +1008,42 @@ def extract_amount_candidates(
     require_support_context: bool = True,
     source_boost: int = 0,
 ) -> list[dict[str, Any]]:
-    normalized = clean_text(text)
-    if not normalized:
-        return []
+    candidates = amount_utils.extract_amount_candidates(text)
+    if require_support_context:
+        candidates = [
+            candidate
+            for candidate in candidates
+            if any(
+                keyword in clean_text(candidate.get("raw_text"))
+                for keyword in AMOUNT_CONTEXT_KEYWORDS
+            )
+        ]
 
-    pattern = re.compile(
-        r"(?P<num>\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\s*"
-        r"(?P<unit>억원|억 원|억|천만원|천만 원|백만원|백만 원|만원|만 원|천원|천 원|원)"
-    )
-    candidates: list[dict[str, Any]] = []
-
-    for match in pattern.finditer(normalized):
-        start = max(0, match.start() - 90)
-        end = min(len(normalized), match.end() + 120)
-        local_start = max(0, match.start() - 35)
-        local_end = min(len(normalized), match.end() + 35)
-        context = normalized[start:end]
-        local_context = normalized[local_start:local_end]
-        has_support_context = any(keyword in context for keyword in AMOUNT_CONTEXT_KEYWORDS)
-        has_excluded_context = any(keyword in context for keyword in AMOUNT_EXCLUDE_CONTEXT)
-        has_local_excluded_context = any(keyword in local_context for keyword in AMOUNT_EXCLUDE_CONTEXT)
-        manwon = parse_amount_number(match.group("num"), match.group("unit"))
-
-        if match.group("unit").replace(" ", "") == "원" and manwon < 100:
-            continue
-        if require_support_context and not has_support_context:
-            continue
-        if has_local_excluded_context:
-            continue
-        if has_excluded_context and not any(k in context for k in ["지원", "정부지원", "보조", "국비"]):
-            continue
-
-        score = 0
-        score = source_boost
-        for keyword in ["최대", "한도", "지원금", "지원액", "정부지원", "정부출연", "출연금", "보조금", "국비"]:
-            if keyword in context:
-                score += 3
-        for keyword in ["지원", "사업비", "과제비", "개발비", "제작비", "소요비용", "이내", "이하", "바우처", "융자", "기업당", "과제당"]:
-            if keyword in context:
-                score += 1
-
-        candidates.append(
-            {
-                "manwon": manwon,
-                "context": clean_text(context, 300),
-                "score": score,
-                "type": classify_amount_type(context),
-            }
-        )
-
+    for candidate in candidates:
+        amount_type = candidate.get("max_amount_type") or "unknown"
+        priority = amount_utils.REPRESENTATIVE_TYPE_PRIORITY.get(amount_type, 0)
+        candidate["manwon"] = candidate.get("amount_manwon")
+        candidate["context"] = clean_text(candidate.get("raw_text"), 300)
+        candidate["score"] = priority + source_boost
+        candidate["type"] = amount_type
     return candidates
 
 
 def extract_support_ratio_info(text: str) -> dict[str, Any] | None:
-    normalized = clean_text(text)
-    if not normalized:
+    ratio = amount_utils.extract_support_ratio(text)
+    if ratio is None:
         return None
 
-    pattern = re.compile(r"(?:최대|정부지원|지원|국비|보조)?\s*(?P<ratio>\d{1,3}(?:\.\d+)?)\s*%")
-    candidates = []
-    for match in pattern.finditer(normalized):
-        start = max(0, match.start() - 100)
-        end = min(len(normalized), match.end() + 140)
-        context = normalized[start:end]
-        local_context = normalized[max(0, match.start() - 35): min(len(normalized), match.end() + 35)]
-        ratio = float(match.group("ratio"))
-
-        if ratio <= 0 or ratio > 100:
-            continue
-        if not any(keyword in context for keyword in AMOUNT_CONTEXT_KEYWORDS):
-            continue
-        if any(keyword in local_context for keyword in ["자부담", "민간부담", "부담금", "매출", "수수료"]):
-            continue
-
-        score = 0
-        for keyword in ["최대", "지원", "정부지원", "국비", "보조", "이내", "한도"]:
-            if keyword in context:
-                score += 2
-        candidates.append({"ratio": ratio, "context": clean_text(context, 300), "score": score})
-
-    if not candidates:
-        return None
-
-    best = sorted(candidates, key=lambda row: (row["score"], row["ratio"]), reverse=True)[0]
-    ratio = best["ratio"]
-    ratio_text = f"{int(ratio)}%" if ratio.is_integer() else f"{ratio:g}%"
+    ratio_percent = ratio * 100
+    ratio_text = f"{int(ratio_percent)}%" if ratio_percent.is_integer() else f"{ratio_percent:g}%"
     return {
         "max_amount_actual": f"최대 {ratio_text} 지원",
         "max_amount_status": "비율 확인",
         "max_amount_type": "support_ratio",
         "max_amount_numeric_manwon": None,
-        "max_amount_evidence": best["context"],
+        "max_amount_evidence": clean_text(text, 300),
         "max_amount_note": "금액 한도는 미확인, 지원비율 문구만 자동 추출",
+        "support_ratio": ratio,
     }
 
 
@@ -1178,19 +1146,66 @@ def extract_amount_info(item: dict[str, Any], detail_text: str) -> dict[str, Any
     if not candidates and targeted_text != source:
         candidates = extract_amount_candidates(source, require_support_context=True)
 
+    amount_candidates, selected_amount_candidate = amount_utils.normalize_candidate_selection(
+        candidates
+    )
+    derived_fields = amount_utils.derive_policy_amount_fields(
+        selected_amount_candidate,
+        amount_candidates,
+    )
+
     if not candidates:
         ratio_result = extract_support_ratio_info(targeted_text)
         if not ratio_result and targeted_text != source:
             ratio_result = extract_support_ratio_info(source)
         if ratio_result:
-            return ratio_result
+            ratio_candidate = amount_utils.classify_amount_candidate(
+                {
+                    "label": "지원비율",
+                    "raw_text": ratio_result.get("max_amount_evidence"),
+                    "amount_manwon": None,
+                    "display_amount": ratio_result.get("max_amount_actual"),
+                    "support_ratio": ratio_result.get("support_ratio"),
+                    "evidence": ratio_result.get("max_amount_evidence"),
+                },
+                ratio_result.get("max_amount_evidence"),
+            )
+            ratio_candidate.update(
+                {
+                    "max_amount_type": "support_ratio",
+                    "max_amount_type_ko": "지원비율",
+                    "roi_apply_method": "ratio_cap",
+                    "roi_apply_method_ko": "비율 계산",
+                    "reason": "지원비율만 확인되어 최대한도 확인 필요",
+                }
+            )
+            return {
+                **ratio_result,
+                "amount_candidates": [ratio_candidate],
+                "selected_amount_candidate": None,
+            }
 
         llm_result = extract_amount_info_with_llm(
             policy_id,
             clean_text(targeted_text, 3000),
         )
         if llm_result:
-            return llm_result
+            llm_candidate = amount_utils.classify_amount_candidate(
+                {
+                    "label": "LLM 추출 금액",
+                    "raw_text": llm_result.get("max_amount_evidence"),
+                    "amount_manwon": llm_result.get("max_amount_numeric_manwon"),
+                    "display_amount": llm_result.get("max_amount_actual"),
+                    "evidence": llm_result.get("max_amount_evidence"),
+                },
+                llm_result.get("max_amount_evidence"),
+            )
+            llm_candidate["max_amount_type"] = llm_result.get("max_amount_type") or llm_candidate.get("max_amount_type")
+            llm_candidates, llm_selected = amount_utils.normalize_candidate_selection([llm_candidate])
+            return {
+                **llm_result,
+                **amount_utils.derive_policy_amount_fields(llm_selected, llm_candidates),
+            }
 
         hwp_amount_note = None
         if "HWP/미지원 첨부파일 확인 필요" in source:
@@ -1204,18 +1219,17 @@ def extract_amount_info(item: dict[str, Any], detail_text: str) -> dict[str, Any
             "max_amount_numeric_manwon": None,
             "max_amount_evidence": "원천 API와 상세 공고 페이지에서 명확한 지원금 한도 문구를 찾지 못함",
             "max_amount_note": hwp_amount_note or "원천 API와 상세페이지에서 지원금 문구 확인 불가",
+            "amount_candidates": [],
+            "selected_amount_candidate": None,
+            "support_ratio": None,
         }
 
-    best = sorted(candidates, key=lambda row: (row["score"], row["manwon"]), reverse=True)[0]
-    manwon = round(float(best["manwon"]), 2)
-
     return {
-        "max_amount_actual": format_amount_manwon(manwon),
-        "max_amount_status": "확정",
-        "max_amount_type": best["type"],
-        "max_amount_numeric_manwon": manwon,
-        "max_amount_evidence": best["context"],
-        "max_amount_note": "기업마당 API/상세 공고 페이지 금액 문구 기반 자동 추출",
+        **derived_fields,
+        "max_amount_note": (
+            derived_fields.get("max_amount_note")
+            or "기업마당 API/상세 공고 페이지 금액 문구 기반 자동 추출"
+        ),
     }
 
 
@@ -1944,6 +1958,38 @@ def split_hashtags(raw: Any) -> list[str]:
     return [tag.strip() for tag in clean_text(raw).split(",") if tag.strip()]
 
 
+def _console_safe(text: str) -> str:
+    encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+    return text.encode(encoding, errors="backslashreplace").decode(
+        encoding,
+        errors="replace",
+    )
+
+
+def has_industry_context(text: str, keyword: str) -> bool:
+    index = text.find(keyword)
+    if index < 0:
+        return False
+    start = max(0, index - 80)
+    end = min(len(text), index + len(keyword) + 120)
+    context = text[start:end]
+    return any(
+        marker in context
+        for marker in [
+            "지원",
+            "대상",
+            "업종",
+            "중소기업",
+            "공장",
+            "스마트",
+            "자동화",
+            "생산",
+            "공정개선",
+            "설비투자",
+        ]
+    )
+
+
 def infer_industry_codes(text: str) -> list[str]:
     codes: set[str] = set()
     for keyword, mapped_codes in INDUSTRY_CODE_MAP.items():
@@ -2338,9 +2384,17 @@ def build_extraction_fields(
         "max_amount_actual": amount_info.get("max_amount_actual"),
         "max_amount_status": amount_info.get("max_amount_status"),
         "max_amount_type": amount_info.get("max_amount_type"),
+        "max_amount_type_ko": amount_info.get("max_amount_type_ko"),
+        "max_amount_type_reason": amount_info.get("max_amount_type_reason"),
         "max_amount_numeric_manwon": amount_info.get("max_amount_numeric_manwon"),
         "max_amount_evidence": amount_info.get("max_amount_evidence"),
         "max_amount_note": amount_info.get("max_amount_note"),
+        "roi_apply_method": amount_info.get("roi_apply_method"),
+        "roi_apply_method_ko": amount_info.get("roi_apply_method_ko"),
+        "roi_apply_reason": amount_info.get("roi_apply_reason"),
+        "amount_candidates": amount_info.get("amount_candidates") or [],
+        "selected_amount_candidate": amount_info.get("selected_amount_candidate"),
+        "support_ratio": amount_info.get("support_ratio"),
         "employee_min": None,
         "employee_max": None,
         "revenue_min_manwon": None,
@@ -2526,7 +2580,7 @@ def main() -> None:
         )
 
     dry_run = bool(args.dry_run)
-    llm = create_data_llm(args.llm_model)
+    llm = None if args.no_llm_summary else create_data_llm(args.llm_model)
 
     supabase: Client | None = None
     if not dry_run:
@@ -2647,7 +2701,11 @@ def main() -> None:
                             "attachment_text": len(clean_payload.get("attachment_text") or ""),
                             "raw_text": len(clean_payload.get("raw_text") or ""),
                         }
-                        print(json.dumps(preview_payload, ensure_ascii=False, indent=2))
+                        print(
+                            _console_safe(
+                                json.dumps(preview_payload, ensure_ascii=False, indent=2)
+                            )
+                        )
                     else:
                         assert supabase is not None
                         supabase.table(args.target_table).upsert(

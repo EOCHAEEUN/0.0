@@ -1,0 +1,275 @@
+
+================================================================================
+SAMPLE 1
+너는 제조업/중소기업 지원사업 공고의 대표 지원금 검수자다.
+아래 한 건에 대해 기존 DB 금액과 새 파싱 후보 금액 중 어느 쪽을 대표금액으로 볼지 판단해라.
+반드시 JSON 객체 하나만 반환해라.
+
+판정값:
+- adopt_new: 새 파싱 금액이 기업/과제/사업장 단위의 대표 최대 지원금으로 명확함
+- keep_old: 새 파싱 금액이 매출조건, 벌칙, 누적/총액, 제외기준, 금융한도, 다른 항목 금액 등이라 기존값 유지가 더 안전함
+- hold: 둘 중 확정하기 어렵거나 표/단위/행 연결이 불명확함
+
+주의:
+- 융자/대출/팩토링/보증/이차보전은 ROI 직접 차감 금액으로 채택하지 말고 keep_old 또는 hold
+- 월별/명당/건당/점당/연간한도는 대표금액으로 바로 채택하지 말고 hold
+- 총사업비, 총지원금, 누적금액, 합계액, 매출액 조건, 벌금/징역은 새 대표금액으로 채택하지 말 것
+- 확신이 낮으면 hold
+
+공고:
+policy_id: ENERGYAGENCY:24575
+title: (수정)2026년도 산업진단 개선이행 지원사업 2차 공고
+organization: 한국에너지공단
+url: https://www.energy.or.kr/front/board/View2.do?boardMngNo=2&boardNo=24575
+
+기존값:
+old_amount_manwon: 69000.0
+old_amount_actual: 최대 6.9억원
+old_amount_type: support_amount
+old_roi_apply_method: subtract
+
+새 파싱 후보:
+new_amount_manwon: 1000.0
+new_amount_actual: 최대 1,000만원
+new_amount_type: support_amount
+new_roi_apply_method: subtract
+delta_ratio: 0.0145x
+hold_group: limit_candidate_large_delta
+pattern: likely_new_limit_candidate
+
+새 후보 근거 문맥:
+/ 약 69개 사업장 ㅇ 지원한도 : 사업장 당 최대 1.000만원(투자비용의 70% 또는 50%) - 타 유사사업과의 지원금 중복지원 불가능 ㅇ 신청방법 - (사업신청) 전자메일 신청(메일주소 : conan0
+
+후보 전체 요약:
+69000.0만원/consulting_fee/recommend_only: - 다 음 - ㅇ 사업내용 : 산업진단 지원사업의 진단결과에 따른 개선이행 비용을 지원하여 에너지진단의 실효성 제고 및 에너지절약 투자 활성화 ㅇ 지원대상 : 산업진단 지원(보조) 사업 참여 이력이 있는 사업장 - '23년 ~ '26년 산업진단 지원사업 에너지진단 완료 사업장 ㅇ 지원규 || 1000.0만원/support_amount/subtract: / 약 69개 사업장 ㅇ 지원한도 : 사업장 당 최대 1.000만원(투자비용의 70% 또는 50%) - 타 유사사업과의 지원금 중복지원 불가능 ㅇ 신청방법 - (사업신청) 전자메일 신청(메일주소 : conan0
+
+반환 JSON 형식:
+{
+  "decision": "adopt_new|keep_old|hold",
+  "representative_amount_manwon": 1000,
+  "amount_type": "support_amount|subsidy|voucher|support_ratio|loan|guarantee|non_cash|unknown",
+  "roi_apply_method": "subtract|recommend_only|exclude|review|ratio_cap",
+  "confidence": "high|medium|low",
+  "reason": "한국어 한 문장",
+  "evidence_text": "근거 문구"
+}
+
+================================================================================
+SAMPLE 2
+너는 제조업/중소기업 지원사업 공고의 대표 지원금 검수자다.
+아래 한 건에 대해 기존 DB 금액과 새 파싱 후보 금액 중 어느 쪽을 대표금액으로 볼지 판단해라.
+반드시 JSON 객체 하나만 반환해라.
+
+판정값:
+- adopt_new: 새 파싱 금액이 기업/과제/사업장 단위의 대표 최대 지원금으로 명확함
+- keep_old: 새 파싱 금액이 매출조건, 벌칙, 누적/총액, 제외기준, 금융한도, 다른 항목 금액 등이라 기존값 유지가 더 안전함
+- hold: 둘 중 확정하기 어렵거나 표/단위/행 연결이 불명확함
+
+주의:
+- 융자/대출/팩토링/보증/이차보전은 ROI 직접 차감 금액으로 채택하지 말고 keep_old 또는 hold
+- 월별/명당/건당/점당/연간한도는 대표금액으로 바로 채택하지 말고 hold
+- 총사업비, 총지원금, 누적금액, 합계액, 매출액 조건, 벌금/징역은 새 대표금액으로 채택하지 말 것
+- 확신이 낮으면 hold
+
+공고:
+policy_id: PBLN_000000000117454
+title: [강원] 2026년 글로벌 IP 스타기업 육성 해외OA비용 지원사업 공고
+organization: 강원특별자치도
+url: https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000117454
+
+기존값:
+old_amount_manwon: 164.0
+old_amount_actual: 최대 164만원
+old_amount_type: support_amount
+old_roi_apply_method: subtract
+
+새 파싱 후보:
+new_amount_manwon: 410.0
+new_amount_actual: 최대 410만원
+new_amount_type: support_amount
+new_roi_apply_method: subtract
+delta_ratio: 2.5x
+hold_group: limit_candidate_large_delta
+pattern: likely_new_limit_candidate
+
+새 후보 근거 문맥:
+싱가폴 氠瑢 구분 세부사업명 지원한도 지원내용 전체 지원금 기업부담금 (현금) 해외 OA 비용 지원 미 국 4,100천원 2
+
+후보 전체 요약:
+410.0만원/support_amount/subtract: 싱가폴 氠瑢 구분 세부사업명 지원한도 지원내용 전체 지원금 기업부담금 (현금) 해외 OA 비용 지원 미 국 4,100천원 2 || 246.0만원/unknown/review: 100천원 2,460천원 이내 1 || 164.0만원/unknown/review: 460천원 이내 1,640천원 해외 특허 || 350.0만원/unknown/review: 디자인 출원의 중간대응(OA비용)에 필요한 비용 지원 유 럽 3,500천원 2 || 210.0만원/unknown/review: 500천원 2,100천원 이내 1 || 140.0만원/unknown/review: 100천원 이내 1,400천원 중국 || 200.0만원/support_amount/subtract: 지원 유 럽 3,500천원 2,100천원 이내 1,400천원 중국·일본·특수국 2,000천원 1,200천원 이내 800천원 기 타 1,300천원 780천원 이내 520천원 || 120.0만원/unknown/review: 000천원 1,200천원 이내 800천원 기 타 1 || ... 후보 4개 추가
+
+반환 JSON 형식:
+{
+  "decision": "adopt_new|keep_old|hold",
+  "representative_amount_manwon": 1000,
+  "amount_type": "support_amount|subsidy|voucher|support_ratio|loan|guarantee|non_cash|unknown",
+  "roi_apply_method": "subtract|recommend_only|exclude|review|ratio_cap",
+  "confidence": "high|medium|low",
+  "reason": "한국어 한 문장",
+  "evidence_text": "근거 문구"
+}
+
+================================================================================
+SAMPLE 3
+너는 제조업/중소기업 지원사업 공고의 대표 지원금 검수자다.
+아래 한 건에 대해 기존 DB 금액과 새 파싱 후보 금액 중 어느 쪽을 대표금액으로 볼지 판단해라.
+반드시 JSON 객체 하나만 반환해라.
+
+판정값:
+- adopt_new: 새 파싱 금액이 기업/과제/사업장 단위의 대표 최대 지원금으로 명확함
+- keep_old: 새 파싱 금액이 매출조건, 벌칙, 누적/총액, 제외기준, 금융한도, 다른 항목 금액 등이라 기존값 유지가 더 안전함
+- hold: 둘 중 확정하기 어렵거나 표/단위/행 연결이 불명확함
+
+주의:
+- 융자/대출/팩토링/보증/이차보전은 ROI 직접 차감 금액으로 채택하지 말고 keep_old 또는 hold
+- 월별/명당/건당/점당/연간한도는 대표금액으로 바로 채택하지 말고 hold
+- 총사업비, 총지원금, 누적금액, 합계액, 매출액 조건, 벌금/징역은 새 대표금액으로 채택하지 말 것
+- 확신이 낮으면 hold
+
+공고:
+policy_id: PBLN_000000000118395
+title: [경기] 2026년 기술닥터사업 공고
+organization: 경기도
+url: https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000118395
+
+기존값:
+old_amount_manwon: 500.0
+old_amount_actual: 최대 500만원
+old_amount_type: support_amount
+old_roi_apply_method: subtract
+
+새 파싱 후보:
+new_amount_manwon: 2000.0
+new_amount_actual: 최대 2,000만원
+new_amount_type: support_amount
+new_roi_apply_method: subtract
+delta_ratio: 4x
+hold_group: limit_candidate_large_delta
+pattern: likely_new_limit_candidate
+
+새 후보 근거 문맥:
+공정 개선 등 구체적 성과물 도출) 2,000만원 이내 총 비용의 20% 3단계 상용화 지원 기업의 매출향상 및 고용창출 위한 제품화‧사업화 지원(상세설계
+
+후보 전체 요약:
+500.0만원/support_amount/subtract: 부가세 제외 지원금 요청액 원 총 소요비용의 ( )% ☞ 500만원 한도 내에서 총 소요비용의 80%까지 지원가능 ☞ 사회적기업 || 500.0만원/support_amount/subtract: 경기도 일자리우수기업 의 경우 500만원 한도 내에서 총 소요비용의 85%까지 지원가능 첨 부 서 류 필수 ① 견적서 1부 || 500.0만원/support_amount/subtract: 부가세 제외) 원 원 지원금 요청액 원 원 총 소요비용의 ( )% 총 소요비용의 ( )% ☞ 500만원 한도 내에서 총 소요비용의 80%까지 지원가능 ☞ 사회적기업 || 500.0만원/non_cash/recommend_only: 경기도일자리우수 기업 의 경우 500만원 한도 내에서 총 소요비용의 85%까지 지원 가능 첨부서류 ① 과제수행 증빙(시험성적서 || 0.0만원/revenue_condition/review: 정량적 기대효과 (예시) 구 분 1차 년도 2차 년도 3차 년도 세부근거 (세부 근거는 과제 성격에 맞게 수정가능) 매출액(단위: 원) (예시) ㆍ지원전 : 000(단가)x000개=000천원 ㆍ지원후 : 000(단가)x000개=000천원 수출액(단위: 원) ㆍ지원전 : 000(단가)x0 || 0.0만원/revenue_condition/review: 정량적 기대효과 (예시) 구 분 1차 년도 2차 년도 3차 년도 세부근거 (세부 근거는 과제 성격에 맞게 수정가능) 매출액(단위: 원) (예시) ㆍ지원전 : 000(단가)x000개=000천원 ㆍ지원후 : 000(단가)x000개=000천원 수출액(단위: 원) ㆍ지원전 : 000(단가)x0 || 0.0만원/revenue_condition/review: 정량적 기대효과 (예시) 구 분 1차 년도 2차 년도 3차 년도 세부근거 (세부 근거는 과제 성격에 맞게 수정가능) 매출액(단위: 원) (예시) ㆍ지원전 : 000(단가)x000개=000천원 ㆍ지원후 : 000(단가)x000개=000천원 수출액(단위: 원) ㆍ지원전 : 000(단가)x0 || 0.0만원/revenue_condition/review: 정량적 기대효과 (예시) 구 분 1차 년도 2차 년도 3차 년도 세부근거 (세부 근거는 과제 성격에 맞게 수정가능) 매출액(단위: 원) (예시) ㆍ지원전 : 000(단가)x000개=000천원 ㆍ지원후 : 000(단가)x000개=000천원 수출액(단위: 원) ㆍ지원전 : 000(단가)x0 || ... 후보 6개 추가
+
+반환 JSON 형식:
+{
+  "decision": "adopt_new|keep_old|hold",
+  "representative_amount_manwon": 1000,
+  "amount_type": "support_amount|subsidy|voucher|support_ratio|loan|guarantee|non_cash|unknown",
+  "roi_apply_method": "subtract|recommend_only|exclude|review|ratio_cap",
+  "confidence": "high|medium|low",
+  "reason": "한국어 한 문장",
+  "evidence_text": "근거 문구"
+}
+
+================================================================================
+SAMPLE 4
+너는 제조업/중소기업 지원사업 공고의 대표 지원금 검수자다.
+아래 한 건에 대해 기존 DB 금액과 새 파싱 후보 금액 중 어느 쪽을 대표금액으로 볼지 판단해라.
+반드시 JSON 객체 하나만 반환해라.
+
+판정값:
+- adopt_new: 새 파싱 금액이 기업/과제/사업장 단위의 대표 최대 지원금으로 명확함
+- keep_old: 새 파싱 금액이 매출조건, 벌칙, 누적/총액, 제외기준, 금융한도, 다른 항목 금액 등이라 기존값 유지가 더 안전함
+- hold: 둘 중 확정하기 어렵거나 표/단위/행 연결이 불명확함
+
+주의:
+- 융자/대출/팩토링/보증/이차보전은 ROI 직접 차감 금액으로 채택하지 말고 keep_old 또는 hold
+- 월별/명당/건당/점당/연간한도는 대표금액으로 바로 채택하지 말고 hold
+- 총사업비, 총지원금, 누적금액, 합계액, 매출액 조건, 벌금/징역은 새 대표금액으로 채택하지 말 것
+- 확신이 낮으면 hold
+
+공고:
+policy_id: PBLN_000000000119836
+title: [전남광주] 2026년 상반기 구조고도화자금 지원 계획 공고
+organization: 전남광주통합특별시
+url: https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000119836
+
+기존값:
+old_amount_manwon: 3000000.0
+old_amount_actual: 최대 300억원
+old_amount_type: support_amount
+old_roi_apply_method: subtract
+
+새 파싱 후보:
+new_amount_manwon: 1000000.0
+new_amount_actual: 최대 100억원
+new_amount_type: support_amount
+new_roi_apply_method: subtract
+delta_ratio: 0.333x
+hold_group: limit_candidate_large_delta
+pattern: likely_new_limit_candidate
+
+새 후보 근거 문맥:
+하반기 100억원 예정 ❍ 지원 내용 사 업 명지원 용도지원 한도상환 조건비 고창업지원사업(업력: 7년 이내)공장부지 매입
+
+후보 전체 요약:
+100000.0만원/support_amount/subtract: , 경영안정사업) 지원 - 창업지원사업(3년 거치, 5년 균분상환 / 지원 한도 10억원 / 시설자금) - 경쟁력강화사업(3년 거치, 5년 균분상환 / 지원 한도 10억 || 100000.0만원/support_amount/subtract: 0억원 / 시설자금) - 경쟁력강화사업(3년 거치, 5년 균분상환 / 지원 한도 10억원 / 시설자금) - 경영안정화사업(1년 거치, 2년 균분상환 / 지원 한도 3억원 || 30000.0만원/loan/exclude: 0억원 / 시설자금) - 경영안정화사업(1년 거치, 2년 균분상환 / 지원 한도 3억원 / 운전자금) 사업신청 방법 온라인 접수 (기금융자관리시스템) 사업신청 사이트 || 3000000.0만원/unknown/review: 2026년 3월 4일광 주 광 역 시 장1 지원 개요 ❍ 지원 규모 : 300억원 || 1000000.0만원/support_amount/subtract: 하반기 100억원 예정 ❍ 지원 내용 사 업 명지원 용도지원 한도상환 조건비 고창업지원사업(업력: 7년 이내)공장부지 매입 || 100000.0만원/unknown/review: 임차 등10억원3년 거치5년 균분상환 시설 자금경쟁력강화사업(업력: 7년 초과)생산시설 교체 || 30000.0만원/unknown/review: 기타 경영 소요 자금3억원1년 거치2년 균분상환 운전 자금 || 1000000.0만원/support_amount/subtract: 지자체 정책자금 지원금액 100억원 초과 업체 - 운전자금(1년 거치 2년 균분상환)의 경우 || ... 후보 1개 추가
+
+반환 JSON 형식:
+{
+  "decision": "adopt_new|keep_old|hold",
+  "representative_amount_manwon": 1000,
+  "amount_type": "support_amount|subsidy|voucher|support_ratio|loan|guarantee|non_cash|unknown",
+  "roi_apply_method": "subtract|recommend_only|exclude|review|ratio_cap",
+  "confidence": "high|medium|low",
+  "reason": "한국어 한 문장",
+  "evidence_text": "근거 문구"
+}
+
+================================================================================
+SAMPLE 5
+너는 제조업/중소기업 지원사업 공고의 대표 지원금 검수자다.
+아래 한 건에 대해 기존 DB 금액과 새 파싱 후보 금액 중 어느 쪽을 대표금액으로 볼지 판단해라.
+반드시 JSON 객체 하나만 반환해라.
+
+판정값:
+- adopt_new: 새 파싱 금액이 기업/과제/사업장 단위의 대표 최대 지원금으로 명확함
+- keep_old: 새 파싱 금액이 매출조건, 벌칙, 누적/총액, 제외기준, 금융한도, 다른 항목 금액 등이라 기존값 유지가 더 안전함
+- hold: 둘 중 확정하기 어렵거나 표/단위/행 연결이 불명확함
+
+주의:
+- 융자/대출/팩토링/보증/이차보전은 ROI 직접 차감 금액으로 채택하지 말고 keep_old 또는 hold
+- 월별/명당/건당/점당/연간한도는 대표금액으로 바로 채택하지 말고 hold
+- 총사업비, 총지원금, 누적금액, 합계액, 매출액 조건, 벌금/징역은 새 대표금액으로 채택하지 말 것
+- 확신이 낮으면 hold
+
+공고:
+policy_id: PBLN_000000000120012
+title: [경기] 2026년 공동활용 연구장비 사용료 지원 기업 모집 공고
+organization: 경기도
+url: https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000120012
+
+기존값:
+old_amount_manwon: 10000.0
+old_amount_actual: 최대 1억원
+old_amount_type: support_amount
+old_roi_apply_method: subtract
+
+새 파싱 후보:
+new_amount_manwon: 500.0
+new_amount_actual: 최대 500만원
+new_amount_type: support_amount
+new_roi_apply_method: subtract
+delta_ratio: 0.05x
+hold_group: limit_candidate_large_delta
+pattern: likely_new_limit_candidate
+
+새 후보 근거 문맥:
+자세한 지원대상 공고문 참조 ☞ 도내 기업이 주관기관의 공동활용 연구장비(장비기반 기술서비스 포함) 사용 시 사용료 지원(기업당 최대 5백만원 지원) 사업신청 방법 온라인 접수 (경기도연구장비공동활용사업) 사업신청 사이트 온라인신청 바로가기 문의처 경기도경제과학진흥원 바이오기업지원팀
+
+후보 전체 요약:
+500.0만원/support_amount/subtract: 자세한 지원대상 공고문 참조 ☞ 도내 기업이 주관기관의 공동활용 연구장비(장비기반 기술서비스 포함) 사용 시 사용료 지원(기업당 최대 5백만원 지원) 사업신청 방법 온라인 접수 (경기도연구장비공동활용사업) 사업신청 사이트 온라인신청 바로가기 문의처 경기도경제과학진흥원 바이오기업지원팀 || 0.0만원/total_project_cost/review: ‘해당없음’ 기재) 사업명 연구과제명 주관부처 참여기간 총사업비 참여형태 000천원 주관/참여 【서식 2호】 (필수 제출 서류) 「2026년 경기도 연구장비 공동활용 사용료 지원사업」 참여기업 대상 만족도 및 성과조사 1 참여 || 10000.0만원/total_support_scale/review: □ 수행기관 : (재)경기도경제과학진흥원 □ 지원규모 ㅇ 총 사업비 : 100백만원 ㅇ 지원기업 : 20개사 이상 ㅇ 지원금액 : 기업당 최대 5백만원 - 2 - 2 지 원 내 용 □ 지원대상 : 경기도 소재 스타트업 || 500.0만원/total_support_scale/review: □ 수행기관 : (재)경기도경제과학진흥원 □ 지원규모 ㅇ 총 사업비 : 100백만원 ㅇ 지원기업 : 20개사 이상 ㅇ 지원금액 : 기업당 최대 5백만원 - 2 - 2 지 원 내 용 □ 지원대상 : 경기도 소재 스타트업 || 500.0만원/support_amount/subtract: 기업당 최대 5백만원 한도구분지원비율자부담율창업 7년 미만 기업90%10%창업 7년 이상 기업70%30% □ 관세피해기업 우선지원 ㅇ 대미 관세피해 기업 대상 15 || 6000.0만원/project_budget/review: (금)지원예산60백만원40백만원지원방법모집 종료 후 적격 검토 및 일괄 선정접수순으로 적격검토 후 순차 지원 □ 선정기준 ㅇ 1 || 4000.0만원/project_budget/review: (금)지원예산60백만원40백만원지원방법모집 종료 후 적격 검토 및 일괄 선정접수순으로 적격검토 후 순차 지원 □ 선정기준 ㅇ 1 || 500.0만원/support_amount/subtract: kr) ‧ 사용료 지원 접수 : 적격검토 후 1차일괄지원/2차순차지원 ‧ 제출서류 : 신청서 및 관련 서류 등 ‧ 최대 5백만원 한도 내 지원(1회 한정 추가접수) ‧ 1차 경쟁모집 || ... 후보 2개 추가
+
+반환 JSON 형식:
+{
+  "decision": "adopt_new|keep_old|hold",
+  "representative_amount_manwon": 1000,
+  "amount_type": "support_amount|subsidy|voucher|support_ratio|loan|guarantee|non_cash|unknown",
+  "roi_apply_method": "subtract|recommend_only|exclude|review|ratio_cap",
+  "confidence": "high|medium|low",
+  "reason": "한국어 한 문장",
+  "evidence_text": "근거 문구"
+}

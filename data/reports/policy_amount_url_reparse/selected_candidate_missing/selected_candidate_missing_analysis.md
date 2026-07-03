@@ -1,0 +1,217 @@
+input=data\reports\policy_amount_url_reparse\policy_amount_url_reparse_reevaluated_20260703_114737.json
+selected_candidate_missing=167
+
+## group_counts
+- mixed_non_representative: 37
+- mixed_with_unknown: 65
+- non_cash_only: 10
+- support_ratio_only: 31
+- total_scale_only: 17
+- unknown_only: 7
+
+## suggested_action_counts
+- exclude_amount_update: 17
+- exclude_or_policy_decision: 37
+- needs_gemini_or_rule: 72
+- recommend_only_or_exclude: 10
+- store_support_ratio_only: 31
+
+### mixed_non_representative
+- PBLN_000000000116853 | 2026년 기업훈련 탄력운영제 참여기업 모집 공고
+  - types: project_budget:1 | support_ratio:1
+  - action: exclude_or_policy_decision / 대표금액 제외 타입이 혼합되어 정책 판단이 필요합니다.
+  - candidates: 1820000.0만원/최대 182억원/project_budget/review: 지원예산: 182억(기업 350개 내외) || None만원/최대 50% 지원/support_ratio/ratio_cap: 2026년 기업훈련 탄력운영제 참여기업 모집 공고 고용노동부 기업마당>정책정보>지원사업 공고 기업마당 본문 바로가기 주메뉴 바로가기 기업마당 > 정책정보 > 지원사업 공고 메뉴열기 로그인 정책정보 정책정보 지원사업 공고 품목별 법정의무 인증제도 행사정보 정책뉴스 입법·행정예고/고시 월간 중기누리 활용정보 활용정보 기업업무
+- PBLN_000000000117291 | 2026년 한국식품산업클러스터진흥원 기업지원시설ㆍ장비 활용 지원사업 공고
+  - types: equipment_usage_fee:1 | support_ratio:1 | total_support_scale:1
+  - action: exclude_or_policy_decision / 대표금액 제외 타입이 혼합되어 정책 판단이 필요합니다.
+  - candidates: 2000.0만원/최대 2,000만원/total_support_scale/review: (수) ∼ 지원금 소진시까지 □ 사업비 지원규모: 기업별 최대 20백만원 □ 사업비 구성: 지원금 70~20% || 25000.0만원/최대 2.5억원/equipment_usage_fee/recommend_only: 간접 지원 氠瑢 氠瑢 농림축산식품부 정책수립 및 예산 지원 한국식품산업클러스터진흥원 사업 기획 및 관리 지원유형❶ 지원유형❷ 신청기업 식품진흥원 신청기업 식품진흥원 기술/생산장비 공동활용 시험‧분석 의뢰 시험‧분석 결과 제공 氠瑢 2 공고 개요 □ 공고규모: 예산 2.5억
+- PBLN_000000000117481 | 전북바이오융합교육센터 재직자 교육 훈련생ㆍ기업 모집 공고(국가인적자원개발컨소시엄)
+  - types: education_fee:1 | support_ratio:1
+  - action: exclude_or_policy_decision / 대표금액 제외 타입이 혼합되어 정책 판단이 필요합니다.
+  - candidates: 100.0만원/최대 100만원/education_fee/recommend_only: 강사료는 교육센터 강사료 지급기준에 따라 차등 지급(1일 최대 1백만원) || None만원/최대 100% 지원/support_ratio/ratio_cap: 전북바이오융합교육센터 재직자 교육 훈련생ㆍ기업 모집 공고(국가인적자원개발컨소시엄) 전북특별자치도 기업마당>정책정보>지원사업 공고 기업마당 본문 바로가기 주메뉴 바로가기 기업마당 > 정책정보 > 지원사업 공고 메뉴열기 로그인 정책정보 정책정보 지원사업 공고 품목별 법정의무 인증제도 행사정보 정책뉴스 입법·행정예고/고시 월간
+- PBLN_000000000118006 | 2026년 스마트공장 수준확인 사업 공고
+  - types: consulting_fee:1 | support_ratio:1
+  - action: exclude_or_policy_decision / 대표금액 제외 타입이 혼합되어 정책 판단이 필요합니다.
+  - candidates: 200000.0만원/최대 20억원/consulting_fee/recommend_only: 중견 제조기업의 자발적인 스마트공장 구축 및 고도화를 촉진하기 위한 스마트화 수준진단을 지원◦(사업 규모)2,000백만 원(수준확인 2 || None만원/최대 100% 지원/support_ratio/ratio_cap: 2026년 스마트공장 수준확인 사업 공고 중소벤처기업부 기업마당>정책정보>지원사업 공고 기업마당 본문 바로가기 주메뉴 바로가기 기업마당 > 정책정보 > 지원사업 공고 메뉴열기 로그인 정책정보 정책정보 지원사업 공고 품목별 법정의무 인증제도 행사정보 정책뉴스 입법·행
+- PBLN_000000000118318 | 2026년 소스개발 및 생산지원 사업 공고
+  - types: equipment_usage_fee:1 | fee:3 | total_support_scale:2
+  - action: exclude_or_policy_decision / 대표금액 제외 타입이 혼합되어 정책 판단이 필요합니다.
+  - candidates: 2000.0만원/최대 2,000만원/equipment_usage_fee/recommend_only: 디지털식품정보플랫폼 가입기업 등) ☞ 장비사용 수수료 할인(기업별 누적 최대 20백만원) 지원 사업신청 방법 온라인 접수 (디지털식품정보플랫폼) 사업신청 사이트 온라인신청 바로가기 문의처 한국식품산업클러스터진흥원 [일반문의] 06 || 2000.0만원/최대 2,000만원/total_support_scale/review: (수) ∼ 지원금 소진시까지 □ 지원방법: 장비사용 수수료 할인 □ 지원규모: 기업별 누적 최대 20백만원 □ 사업규모: 총 30백만원 이내 □ 지원대
+- PBLN_000000000119093 | [인천] 2026년 파브(PAV) 부품 시험ㆍ인증 지원사업 참여기업 모집 공고
+  - types: project_budget:1 | support_ratio:1
+  - action: exclude_or_policy_decision / 대표금액 제외 타입이 혼합되어 정책 판단이 필요합니다.
+  - candidates: 8000.0만원/최대 8,000만원/project_budget/review: 지원예산: 80,000천원지원분야 || None만원/최대 100% 지원/support_ratio/ratio_cap: [인천] 2026년 파브(PAV) 부품 시험ㆍ인증 지원사업 참여기업 모집 공고 인천광역시 기업마당>정책정보>지원사업 공고 기업마당 본문 바로가기 주메뉴 바로가기 기업마당 > 정책정보 > 지원사업 공고 메뉴열기 로그인 정책정보 정책정보 지원사업 공고 품목별 법정의무 인증제도 행사정보 정책뉴스 입법·행정예고/고시 월간 중기누
+- PBLN_000000000119881 | [제주] 2026년 어업활동지원 사업 대상자 모집 공고
+  - types: education_fee:1 | support_ratio:1
+  - action: exclude_or_policy_decision / 대표금액 제외 타입이 혼합되어 정책 판단이 필요합니다.
+  - candidates: 1440.0만원/최대 1,440만원/education_fee/recommend_only: 교육일에 한해 지원 2) 지원한도 (1) 사 업 비 : 14,400천원(국고 9 || None만원/최대 20% 지원/support_ratio/ratio_cap: [제주] 2026년 어업활동지원 사업 대상자 모집 공고 제주특별자치도 기업마당>정책정보>지원사업 공고 기업마당 본문 바로가기 주메뉴 바로가기 기업마당 > 정책정보 > 지원사업 공고 메뉴열기 로그인 정책정보 정책정보 지원사업 공고 품목별 법정의무 인증제도 행사정보 정책뉴스 입법·행정예고/고시 월간 중기누리 활용정보 활용정보
+- PBLN_000000000120342 | 2026년 기업승계 M&A 활성화를 위한 컨설팅 지원사업 시행계획 공고
+  - types: consulting_fee:14 | self_funding:1 | support_ratio:1
+  - action: exclude_or_policy_decision / 대표금액 제외 타입이 혼합되어 정책 판단이 필요합니다.
+  - candidates: 100.0만원/최대 100만원/consulting_fee/recommend_only: 자산 등) 컨설팅 신청 항목 (해당항목 택1) 매도희망기업 □ 딜구조설계 □ 적정시기 발굴 □ 지분매각 방법 □ 기업소개자료(TM) 작성 □ 마케팅 지원 매수희망기업 □ 적정 인수대상 탐색 □ 자금조달 컨설팅 희망기업승계 중개기관 기업승계 중개기관 중 택3 계약예정금액 (1백만원 이상 || 100.0만원/최대 100만원/consulting_fee/recommend_only: / 부 ② 기업승계 중개기관과 1백만원 이상(부가세 제외)의 컨설팅 계약*을 체결 예정이다 || 30.0만원/
+
+### mixed_with_unknown
+- PBLN_000000000117019 | 2026년 제조DX멘토단 활용지원사업 통합 공고
+  - types: support_ratio:1 | total_support_scale:7 | unknown:6
+  - action: needs_gemini_or_rule / unknown 후보가 섞여 있어 문맥/표 검수가 필요합니다.
+  - candidates: 862000.0만원/최대 86.2억원/total_support_scale/review: 구축지도및운영애로사항해결지원□지원규모 : 총86.2억원 || 238.0만원/최대 238만원/unknown/review: 선정사전기획3개월(8회)500개사 내외238만원85%‘25 || 476.0만원/최대 476만원/unknown/review: 2월~수시수시AX기획200개사 내외476만원구축지도3개월(4회)400개사 내외119만원최종 협약 후 2주 이내사후관리4개월210개사 내외최대 1 || 119.0만원/최대 119만원/unknown/review: 2월~수시수시AX기획200개사 내
+- PBLN_000000000117066 | 장애인고용개선장려금 사업 공고
+  - types: support_ratio:1 | unknown:2
+  - action: needs_gemini_or_rule / unknown 후보가 섞여 있어 문맥/표 검수가 필요합니다.
+  - candidates: 35.0만원/최대 35만원/unknown/review: 지급 단가와 월임금액(최저임금에 산입되는 임금만을 포함)의 60%를 비교하여 낮은 단가를 적용 중증남성 35만원 중증여성 45만원 || 45.0만원/최대 45만원/unknown/review: 지급 단가와 월임금액(최저임금에 산입되는 임금만을 포함)의 60%를 비교하여 낮은 단가를 적용 중증남성 35만원 중증여성 45만원 || None만원/최대 60% 지원/support_ratio/ratio_cap: 장애인고용개선장려금 사업 공고 고용노동부 기업마당>정책정보>지원사업 공고 기업마당 본문 바로가기 주메뉴 바로가기 기
+- PBLN_000000000117463 | [강원] 2026년 글로벌 IP 스타기업 육성 해외등록비용 지원사업 공고
+  - types: total_support_scale:3 | unknown:6
+  - action: needs_gemini_or_rule / unknown 후보가 섞여 있어 문맥/표 검수가 필요합니다.
+  - candidates: 360.0만원/최대 360만원/total_support_scale/review: 지원규모 氠瑢 구분 세부사업명 지원한도 지원내용 전체 지원금 기업부담금 (현금) 해외 등록 비용 지원 미 국 3,600천원 2 || 216.0만원/최대 216만원/unknown/review: 600천원 2,160천원 이내 1 || 144.0만원/최대 144만원/unknown/review: 160천원 이내 1,440천원 해외 특허 || 530.0만원/최대 530만원/unknown/review: 디자인 출원의 설정등록에 필요한 등록비 지원 유 럽 5,300천원 3 || 318.0만원/최대 3
+- PBLN_000000000117794 | [경북] 2026년 중소기업 정부기술개발공모사업 선정지원 참여기업 모집 공고
+  - types: consulting_fee:6 | self_funding:2 | unknown:4
+  - action: needs_gemini_or_rule / unknown 후보가 섞여 있어 문맥/표 검수가 필요합니다.
+  - candidates: 30.0만원/최대 30만원/consulting_fee/recommend_only: / 5회 中 선택 牭景 기획 컨설팅(기업부담금 30만원) || 50.0만원/최대 50만원/consulting_fee/recommend_only: 주관기관 운영프로그램 참여 시 지원 牭景 발표평가 컨설팅 牭景 모의발표평가 牭景 재도전 컨설팅 牭景 차년도 R&D 컨설팅(기업부담금 50만원) || 150.0만원/최대 150만원/consulting_fee/recommend_only: 사업계획서 작성방법 컨설팅 등 결 과 물: 컨설팅 일지 150 만원 漠杳 신청서 접수  漠杳 기업 현장점검 
+- PBLN_000000000118047 | [충북] 청주시 2026년 도시근로자 지원사업 참여기업 모집 공고
+  - types: support_ratio:1 | unknown:1
+  - action: needs_gemini_or_rule / unknown 후보가 섞여 있어 문맥/표 검수가 필요합니다.
+  - candidates: 20.0만원/최대 20만원/unknown/review: 참여자 3개월 이상 고용 시 1명당 근속인센티브 20만원 지급(1회) 제출서류 1 || None만원/최대 40% 지원/support_ratio/ratio_cap: [충북] 청주시 2026년 도시근로자 지원사업 참여기업 모집 공고 충청북도 기업마당>정책정보>지원사업 공고 기업마당 본문 바로가기 주메뉴 바로가기 기업마당 > 정책정보 > 지원사업 공고 메뉴열기 로그인 정책정보 정책정보 지원사업 공고 품목별 법정의무 인증제도 행사정보 정책뉴스 입법·행정예고/고시 월간 중기누리 활용정보 활
+- PBLN_000000000118204 | 2026년 여성기업 육성사업 공고
+  - types: education_fee:1 | support_ratio:1 | unknown:4
+  - action: needs_gemini_or_rule / unknown 후보가 섞여 있어 문맥/표 검수가 필요합니다.
+  - candidates: 2000.0만원/최대 2,000만원/unknown/review: 상금 2,000만원) ▪예비 여성창업자 ▪ 창업 7년 미만 여성기업 (단 || 300000.0만원/최대 30억원/unknown/review: 투 자유치금액 30억 미만일 것) 2월 ▪(글로벌 액셀러레이팅) 수출희망 기업 || 300000.0만원/최대 30억원/unknown/review: 투자유치 금액이 30억 미만일 것 ** 펨테크 || 2000.0만원/최대 2,000만원/education_fee/recommend_only: 투자유치 등 - 교육․멘토링 : 사업계획서 작성법 등 비즈니스모델 고도화 지원
+- PBLN_000000000118927 | [강원] 2026년 직장문화ㆍ환경개선지원사업 참여기업 모집 공고
+  - types: education_fee:1 | unknown:4
+  - action: needs_gemini_or_rule / unknown 후보가 섞여 있어 문맥/표 검수가 필요합니다.
+  - candidates: 100.0만원/최대 100만원/unknown/review: 비정규직( 명) 여성근로자 인적 사항 연 령 □ 20대 ⾷ Ȁ ( 명) □ 30대 ⾷ Ȁ ( 명) □ 40대 ➇ Ȁ ( 명) □ 50대 이상 ☋ Ȁ ( 명) 학 력 □ 중졸 이하 ✃ Ȁ ( 명) □ 고졸 ♳ Ȁ ( 명) □ 전문대졸 ✃ Ȁ ( 명) □ 대졸 이상 ⓷ Ȁ ( 명) 급 여 □ 100만원 미만 ᷋ Ȁ ( 명) || 100.0만원/최대 100만원/unknown/review: 비정규직( 명) 여성근로자 인적 사항 연 령 □ 20대 ⾷ Ȁ ( 명) □ 30대 ⾷ Ȁ ( 명) □ 40대 ➇ Ȁ ( 명) □
+- PBLN_000000000119457 | [경기] 평택시 2026년 장비 활용 지원사업 기업 모집 공고
+  - types: equipment_usage_fee:1 | total_support_scale:2 | unknown:1
+  - action: needs_gemini_or_rule / unknown 후보가 섞여 있어 문맥/표 검수가 필요합니다.
+  - candidates: 400.0만원/최대 400만원/equipment_usage_fee/recommend_only: 관내 지사만 소재한 경우는 지원 불가 - 「중소기업 기본법」 제2조(중소기업자의 범위)에 의한 중소기업 ☞ 기술개발 및 품질 향상을 위한 연구장비 활용 비용 지원 - 기업당 지원한도 4,000천원 이내 지원 사업신청 방법 온라인 접수 (기업지원사업신청) 사업신청 사이트 온라인신청 바로가기 문의처 평택산업진흥원 기업지원팀 || 2000.0만원/최대 2,000만원/total_support_scale/review: 진흥원 → 기업02지원규모 및 지원내용 □ 지원규모 : 총 5개사
+
+### non_cash_only
+- PBLN_000000000119518 | [전북] 2026년 에너지산업융복합단지 공동연구장비 활용 및 컨설팅 지원 수혜기업 모집 공고
+  - types: consulting_fee:1 | equipment_usage_fee:4
+  - action: recommend_only_or_exclude / 비현금/수수료/인증성 후보만 있어 ROI 직접 차감 제외 후보입니다.
+  - candidates: 250.0만원/최대 250만원/equipment_usage_fee/recommend_only: ☞ 새만금 에너지산업융복합단지 내 에너지 관련 기업 - 본사업을 통해 旣지원받은 횟수가 2회 미만인 기업(0~1회 旣지원 받은 기업 가능/2회 旣지원 받은 기업 불가능) ☞ 공동연구장비 활용(건당 250만원 이내) 및 애로기술 컨설팅(기업당 최대 200만원 이내) 지원 - 전북테크노파크 보유 장비 대상 공동연구장비 활용 || 200.0만원/최대 200만원/equipment_usage_fee/recommend_only: ☞ 새만금 에너지산업융복합단지 내 에너지 관련 기업 -
+- PBLN_000000000119727 | [부산] 2026년 중소기업 빅데이터 분석 활용 지원사업 참가기업 모집 공고
+  - types: consulting_fee:1
+  - action: recommend_only_or_exclude / 비현금/수수료/인증성 후보만 있어 ROI 직접 차감 제외 후보입니다.
+  - candidates: 500.0만원/최대 500만원/consulting_fee/recommend_only: 최대 500만원) 지원 및 사전 컨설팅
+- PBLN_000000000121853 | 2026년 업종별 임금체계 개선 지원 사업 참여기업 모집 공고
+  - types: consulting_fee:1
+  - action: recommend_only_or_exclude / 비현금/수수료/인증성 후보만 있어 ROI 직접 차감 제외 후보입니다.
+  - candidates: 8000.0만원/최대 8,000만원/consulting_fee/recommend_only: 8,000 만 원 + 시중 컨설팅 가치 2026 년 IT 업종 임금체계 개선 컨설팅 참여기업 모집 고용노동부 지원 무료 지원 시장임금 및 직무급 Tool 제공
+- PBLN_000000000122744 | 2026년 2차 GLP(세포독성) 시험평가인증 지원사업 공고(메카노바이오활성소재 혁신의료기기 실증 기반구축)
+  - types: equipment_usage_fee:2
+  - action: recommend_only_or_exclude / 비현금/수수료/인증성 후보만 있어 ROI 직접 차감 제외 후보입니다.
+  - candidates: 0.0만원/최대 0만원/equipment_usage_fee/recommend_only: hwp] 捤獥 汤捯 湰灧 【서식 1】 氠瑢 2026년 GLP(세포독성) 시험평가인증 지원사업 신청서 기 업 개 요 기 업 명 대 표 자 사업자등록번호 홈페이지 http:// 소 재 지 (주 소) (우편번호 : ) 업 종 한국표준산업분류코드 (대분류/중분류) 업 태 신 청 개 요 평가기관명 평가장비명 제 품 명 사용 목적 || 0.0만원/최대 0만원/equipment_usage_fee/recommend_only: pdf] - 1 - 【서식 1】2026년 GLP(세포독성) 시험평가인증
+- PBLN_000000000122942 | [세종] 조달청 다수공급자계약(MAS) 활용 컨설팅 지원사업 공고
+  - types: consulting_fee:2
+  - action: recommend_only_or_exclude / 비현금/수수료/인증성 후보만 있어 ROI 직접 차감 제외 후보입니다.
+  - candidates: 200.0만원/최대 200만원/consulting_fee/recommend_only: 공장등록증 등 제조 및 생산을 증명 가능한 기업에 한함 ☞ 조달청 다수공급자계약 제도를 활용한 나라장터 종합 쇼핑몰 제품 등록 컨설팅 지원 - 지원대상 업체로 선정시200만원 상당의 MAS등록 컨설팅비 지원 - 기업당 1개품명 || 200.0만원/최대 200만원/consulting_fee/recommend_only: 공장등록증등제조및생산을증명가능한기업에한함 ❍ 선정기업 : 3개 기업 *선착순접수순마감 ❍ 지원내용 : 조달청 다수공급자계약 제도를 활용한 나라장터 종합쇼핑몰 제품 등록
+- PBLN_000000000123451 | 바이오의약품 소재부품장비 기업지원 프로그램 모집 공고
+  - types: consulting_fee:2
+  - action: recommend_only_or_exclude / 비현금/수수료/인증성 후보만 있어 ROI 직접 차감 제외 후보입니다.
+  - candidates: 1000.0만원/최대 1,000만원/consulting_fee/recommend_only: ① 컨설팅, 기술지도 수요기업이 컨설팅 공급 기업과 매칭 후 지원 1건, 건당 10백만원 내외 ② 시험·평가·인증 참고용 성적서 발행 공인성적서 효력 없음 ③ 시험분석 || 1000.0만원/최대 1,000만원/consulting_fee/recommend_only: 센터① 컨설팅, 기술지도-수요기업이 컨설팅 공급 기업과 매칭 후 지원1건, 건당 10백만원 내외② 시험·평가·인증-참고용 성적서 발행공 인 성 적 서 효 력 없 음③ 시험
+- PBLN_000000000123596 | [서울ㆍ경기ㆍ인천ㆍ강원] 2026년 중소기업 AI활용 도입을 위한 AI훈련 참여기업 모집 공고
+  - types: education_fee:1
+  - action: recommend_only_or_exclude / 비현금/수수료/인증성 후보만 있어 ROI 직접 차감 제외 후보입니다.
+  - candidates: 783.0만원/최대 783만원/education_fee/recommend_only: 업 등의 경우에는 20인 미만도 가능) ☞ 컨설팅 비용 100% , 기업당 최대 783만원, 실무 중심 AI 프로젝트 교육 지원 ※ 자세한 지원내용 공고문 참조 사업신청
+- PBLN_000000000123638 | [경남] 2026년 4차 기술경영 애로해결을 위한 Quick Solution Program(기술닥터 및 이노카페심층상담) 참여기업 모집 공고
+  - types: consulting_fee:2
+  - action: recommend_only_or_exclude / 비현금/수수료/인증성 후보만 있어 ROI 직접 차감 제외 후보입니다.
+  - candidates: 10.0만원/최대 10만원/consulting_fee/recommend_only: 기업의 기술애로 해결을 위해 기술닥터가 기업 현장을 방문하여 컨설팅 수행(기업당 총10시간/시간당 10만원/1일 최대 3시간) - 기업이 희망하는 전문가(기술닥터)가 있는 경우 자격요건(참고 기술닥터 자격요건) 충족여부를 평가하여 적합시 우선 매칭하 || 10.0만원/최대 10만원/consulting_fee/recommend_only: 기업의 경영애로 해결을 위해 이노카페 전문위원이 기업 현장을 방문하여 컨설팅 수행(기업당 총 5시간/시간당 10만원/1일 최대 3시간) - 기업이 희망하
+
+### support_ratio_only
+- PBLN_000000000117307 | [인천] 2026년 가상융합산업 콘텐츠 제작 장비 임차지원 공고(인천 가상융합산업 혁신센터)
+  - types: support_ratio:1
+  - action: store_support_ratio_only / 지원비율만 있어 대표금액은 만들지 않습니다.
+  - candidates: None만원/최대 100% 지원/support_ratio/ratio_cap: [인천] 2026년 가상융합산업 콘텐츠 제작 장비 임차지원 공고(인천 가상융합산업 혁신센터) 인천광역시 기업마당>정책정보>지원사업 공고 기업마당 본문 바로가기 주메뉴 바로가기 기업마당 > 정책정보 > 지원사업 공고 메뉴열기 로그인 정책정보 정책정보 지원사업 공고 품목별 법정의무 인증제도 행사정보 정책뉴스 입법·행정예고/고
+- PBLN_000000000117839 | 2026년 고령친화식품 사용성평가 참여기업 모집 공고
+  - types: support_ratio:1
+  - action: store_support_ratio_only / 지원비율만 있어 대표금액은 만들지 않습니다.
+  - candidates: None만원/최대 100% 지원/support_ratio/ratio_cap: 2026년 고령친화식품 사용성평가 참여기업 모집 공고 식품의약품안전처 기업마당>정책정보>지원사업 공고 기업마당 본문 바로가기 주메뉴 바로가기 기업마당 > 정책정보 > 지원사업 공고 메뉴열기 로그인 정책정보 정책정보 지원사업 공고 품목별 법정의무 인증제도 행사정보 정책뉴스 입법·행정예고/고시 월간 중기누리 활용정보 활용정보
+- PBLN_000000000118224 | 2026년 미래 치과이식형 디지털의료제품 개발 기반구축 사업 기술서비스 지원사업 통합 공고
+  - types: support_ratio:1
+  - action: store_support_ratio_only / 지원비율만 있어 대표금액은 만들지 않습니다.
+  - candidates: None만원/최대 25% 지원/support_ratio/ratio_cap: 2026년 미래 치과이식형 디지털의료제품 개발 기반구축 사업 기술서비스 지원사업 통합 공고 산업통상부 기업마당>정책정보>지원사업 공고 기업마당 본문 바로가기 주메뉴 바로가기 기업마당 > 정책정보 > 지원사업 공고 메뉴열기 로그인 정책정보 정책정보 지원사업 공고 품목별 법정의무 인증제도 행사정보 정책뉴스 입법·행정예고/고시
+- PBLN_000000000118467 | [부산] 2026년 중소기업 ISO 인증 지원사업 모집 공고
+  - types: support_ratio:1
+  - action: store_support_ratio_only / 지원비율만 있어 대표금액은 만들지 않습니다.
+  - candidates: None만원/최대 100% 지원/support_ratio/ratio_cap: [부산] 2026년 중소기업 ISO 인증 지원사업 모집 공고 부산광역시 기업마당>정책정보>지원사업 공고 기업마당 본문 바로가기 주메뉴 바로가기 기업마당 > 정책정보 > 지원사업 공고 메뉴열기 로그인 정책정보 정책정보 지원사업 공고 품목별 법정의무 인증제도 행사정보 정책뉴스 입법·행정예고/고시 월간 중기누리 활용정보 활용정
+- PBLN_000000000118530 | 2026년 중소ㆍ중견 에너지효율 혁신 선도 프로젝트 선도기업 모집 공고
+  - types: support_ratio:1
+  - action: store_support_ratio_only / 지원비율만 있어 대표금액은 만들지 않습니다.
+  - candidates: None만원/최대 5% 지원/support_ratio/ratio_cap: 2026년 중소ㆍ중견 에너지효율 혁신 선도 프로젝트 선도기업 모집 공고 기후에너지환경부 기업마당>정책정보>지원사업 공고 기업마당 본문 바로가기 주메뉴 바로가기 기업마당 > 정책정보 > 지원사업 공고 메뉴열기 로그인 정책정보 정책정보 지원사업 공고 품목별 법정의무 인증제도 행사정보 정책뉴스 입법·행정예고/고시 월간 중기누리
+- PBLN_000000000118617 | [충북] 지능형첨단부품산업의 디지털전환 거점 구축 사업 오픈랩 AI 개발플랫폼 활용 지원 수혜기업 모집 공고
+  - types: support_ratio:1
+  - action: store_support_ratio_only / 지원비율만 있어 대표금액은 만들지 않습니다.
+  - candidates: None만원/최대 100% 지원/support_ratio/ratio_cap: [충북] 지능형첨단부품산업의 디지털전환 거점 구축 사업 오픈랩 AI 개발플랫폼 활용 지원 수혜기업 모집 공고 충청북도 기업마당>정책정보>지원사업 공고 기업마당 본문 바로가기 주메뉴 바로가기 기업마당 > 정책정보 > 지원사업 공고 메뉴열기 로그인 정책정보 정책정보 지원사업 공고 품목별 법정의무 인증제도 행사정보 정책뉴스 입
+- PBLN_000000000119083 | [충북] 2026년 소상공인 IP출원(상표출원) 지원 사업 소상공인 수혜자 모집 공고
+  - types: support_ratio:1
+  - action: store_support_ratio_only / 지원비율만 있어 대표금액은 만들지 않습니다.
+  - candidates: None만원/최대 20% 지원/support_ratio/ratio_cap: [충북] 2026년 소상공인 IP출원(상표출원) 지원 사업 소상공인 수혜자 모집 공고 충청북도 기업마당>정책정보>지원사업 공고 기업마당 본문 바로가기 주메뉴 바로가기 기업마당 > 정책정보 > 지원사업 공고 메뉴열기 로그인 정책정보 정책정보 지원사업 공고 품목별 법정의무 인증제도 행사정보 정책뉴스 입법·행정예고/고시 월간
+- PBLN_000000000119904 | [충북] 2026년 산업체 방사광가속기 활용 역량강화사업 산업체 방사광가속기 활용 프로그램 참여기업 모집 공고
+  - types: support_ratio:1
+  - action: store_support_ratio_only / 지원비율만 있어 대표금액은 만들지 않습니다.
+  - candidates: None만원/최대 100% 지원/support_ratio/ratio_cap: [충북] 2026년 산업체 방사광가속기 활용 역량강화사업 산업체 방사광가속기 활용 프로그램 참여기업 모집 공고 충청북도 기업마당>정책정보>지원사업 공고 기업마당 본문 바로가기 주메뉴 바로가기 기업마당 > 정책정보 > 지원사업 공고 메뉴열기 로그인 정책정보 정책정보 지원사업 공고 품목별 법정의무 인증제도 행사정보 정책뉴스
+
+### total_scale_only
+- PBLN_000000000122442 | [울산] 2026년 기술이전지원사업 기술코칭프로그램 참여기업 모집 공고
+  - types: total_support_scale:1
+  - action: exclude_amount_update / 총지원규모/총사업비 계열만 있어 대표금액 제외가 맞습니다.
+  - candidates: 20.0만원/최대 20만원/total_support_scale/review: 지원규모 : 전문가활용비(200천원 × 2회 이내
+- PBLN_000000000122990 | [경남] 서부 2026년 2차 글로벌IP스타기업육성사업 특허기술 홍보영상제작 지원기업 모집 공고
+  - types: total_support_scale:1
+  - action: exclude_amount_update / 총지원규모/총사업비 계열만 있어 대표금액 제외가 맞습니다.
+  - candidates: 1500.0만원/최대 1,500만원/total_support_scale/review: 내레이션 등을 통해 3차원 홍보영상으로 제작하여 제공 □ 지원기준 o 신청일 현재 권리가 등록되어 있는 특허․실용신안 □ 지원규모 o 지원금액 : 건당 15,000천원 이내 (VAT포함
+- PBLN_000000000122992 | [경남] 서부 2026년 2차 글로벌IP스타기업육성사업 포장디자인개발 지원기업 모집 공고
+  - types: total_support_scale:1
+  - action: exclude_amount_update / 총지원규모/총사업비 계열만 있어 대표금액 제외가 맞습니다.
+  - candidates: 1500.0만원/최대 1,500만원/total_support_scale/review: 지식재산 긴급지원 □ 지원내용 o 포장디자인 개발 □ 지원기준 o 포장디자인 개발 : 제품의 포장 및 패키지 디자인 개발 □ 지원규모 o 건당 15,000천원 이내(VAT포함
+- PBLN_000000000122996 | [경남] 서부 2026년 2차 글로벌IP스타기업육성사업 리뉴얼브랜드개발 지원기업 모집 공고
+  - types: total_support_scale:1
+  - action: exclude_amount_update / 총지원규모/총사업비 계열만 있어 대표금액 제외가 맞습니다.
+  - candidates: 1000.0만원/최대 1,000만원/total_support_scale/review: 지식재산 긴급지원 □ 지원내용 o 지역 중소기업의 기존 브랜드를 리뉴얼하여 권리화를 지원함으로써 지역 중소기업의 경쟁력 강화 및 브랜드 보호 □ 지원기준 o 기업브랜드(CI) 개발 o 제품브랜드(BI) 개발 : 제품에 대한 브랜드 개발 □ 지원규모 o 건당 10,000천원 이내(VAT포함
+- PBLN_000000000123133 | 2026년 선도형 양자공정 오픈팹 인프라 구축 사업 지원기업 모집 공고
+  - types: total_support_scale:1
+  - action: exclude_amount_update / 총지원규모/총사업비 계열만 있어 대표금액 제외가 맞습니다.
+  - candidates: 1200.0만원/최대 1,200만원/total_support_scale/review: 지원함 ❑ 지원내용 ❑ 지원규모세부 사업지원규모지원건수기업부담금*양자전환 스타트업 기업지원지원기업별 12백만원 내외2개사 내외대전소재 이외의 기업일 경우 지원금의 10% 이상(대전소재 기업일 경우 제외) * 부가가치세 및 기업이 환급받는 금액에 대해서는
+- SMARTFACTORY:2026-N-0062:3 | [2차] 2026 AI 트랙 (삼성) 스마트공장 구축
+  - types: total_support_scale:1
+  - action: exclude_amount_update / 총지원규모/총사업비 계열만 있어 대표금액 제외가 맞습니다.
+  - candidates: 30000.0만원/최대 3억원/total_support_scale/review: 미디어 연계 글로벌 홍보 - 6 - □ 지원조건【지원내용】구 분 스마트공장(AI 트랙)지원대상스마트공장 고도화(중간1 이상)구축 목표지원규모최대 3억원(총 사업비의 75% 지원)지원비율정부 : 삼성 : 도입기업 2 : 1 : 1 매칭 * 스마트공장 지원 이력이 있거나
+- SMARTFACTORY:2026-N-0067:3 | [인천] 2026년 제조DX멘토단 활용지원사업 (구축지도) 도입기업 모집공고
+  - types: total_support_scale:6
+  - action: exclude_amount_update / 총지원규모/총사업비 계열만 있어 대표금액 제외가 맞습니다.
+  - candidates: 119.0만원/최대 119만원/total_support_scale/review: 구축 지도 및 운영 애로사항 해결지원 구분지원기간지원규모지원한도지원비중접수평가선정구축 지도3개월(4회)400개사 내외119만원85%최종 협약 후 2주 이내수시□신청 자격◦국내 제조기업 중「중소기업기본법」에 따른 중소기업 및 「중견기업성장촉진 및 경쟁력 강화에 관한 특별 || 119.0만원/최대 119만원/total_support_scale/review: 기술애로 해결 등 제조 노하우 전수 등□지원 규모 및 조건◦(지원규모)400개사 내외◦(지원조건)총 사업비의 85%지원구 분지원방법지원기
+- SMARTFACTORY:2026-N-0068:1 | [부산] 2026년 제조DX멘토단 활용지원사업(구축지도) 도입기업 모집 공고
+  - types: total_support_scale:3
+  - action: exclude_amount_update / 총지원규모/총사업비 계열만 있어 대표금액 제외가 맞습니다.
+  - candidates: 119.0만원/최대 119만원/total_support_scale/review: 구축 지도 및 운영 애로사항 해결지원 구분 지원기간 지원규모 지원한도 지원비중 접수 평가선정 구축 지도 3개월(4회) 400개사 내외 119만원 85% 최종 협약 후 2주 이내 수시 □ 신청 자격 ◦ 국내 제조기업 중「중소기업기본법」에 따른 중소기업 및 「중견기업 성장촉진 및 경쟁력 강 || 119.0만원/최대 119만원/total_support_scale/review: 기술애로 해결 등 제조 노하우 전수 등 □ 지원 규모 및 조건 ◦ (지원규모) 400개사 내외 ◦ (지원조건) 총 사업
+
+### unknown_only
+- PBLN_000000000117654 | [강원] 2026년 중소ㆍ벤처기업 투자이음 강화 프로그램 참여기업 연중 상시접수 공고(강원 벤처투자 생태계 조성사업)
+  - types: unknown:3
+  - action: needs_gemini_or_rule / 금액은 있으나 성격 분류가 안 되어 추가 검수가 필요합니다.
+  - candidates: 650000.0만원/최대 65억원/unknown/review: 초기~7년 미만 농식품 경영체 인라이트벤처스 65억  대학창업펀드 12 대학창업 펀드 제1호/2호 초기기업 || 280000.0만원/최대 28억원/unknown/review: 대학/학생 창업기업 강원대기술지주 28억/ 34억 氠瑢 湯湷 Ⅱ 지원내용 □ 지원방법 || 340000.0만원/최대 34억원/unknown/review: 대학/학생 창업기업 강원대기술지주 28억/ 34억 氠瑢 湯湷 Ⅱ 지원내용 □ 지원방법
+- PBLN_000000000118049 | 2026년 중소벤처기업부 외국전문인력(E-7-1) 고용추천 공고
+  - types: unknown:1
+  - action: needs_gemini_or_rule / 금액은 있으나 성격 분류가 안 되어 추가 검수가 필요합니다.
+  - candidates: 2897.0만원/최대 2,897만원/unknown/review: 31까지는 기존 임금요건(연 2,897만원 이상) 기준 적용 ② 중소기업 중소기업기본법 제2조(중소기업자의 범위)에 따른 중소기업 ③ 고용기준 디자이너 (285) 내국인 피보험자 수에
+- PBLN_000000000120006 | [서울] 2026년 노동환경개선컨설팅 사업 대상 모집 공고
+  - types: unknown:2
+  - action: needs_gemini_or_rule / 금액은 있으나 성격 분류가 안 되어 추가 검수가 필요합니다.
+  - candidates: 100000.0만원/최대 10억원/unknown/review: 선착순 마감 시 조기 종료 o 모집 대상 -【市 유관 사업장】서울시 발주 10억원 미만 건설 || 100000.0만원/최대 10억원/unknown/review: 선착순 마감 시 조기 종료 o 모집 대상 -【市 유관 사업장】서울시 발주 10억원 미만 건설
+- PBLN_000000000120201 | [경기] 포천시 2026년 신소재개발 프로그램 지원사업 모집 공고
+  - types: unknown:1
+  - action: needs_gemini_or_rule / 금액은 있으나 성격 분류가 안 되어 추가 검수가 필요합니다.
+  - candidates: 73.0만원/최대 73만원/unknown/review: 1건당 약 730천원 내외 氠瑢 Ⅱ 사업 신청 및 문의 □ (신청방법 및 문의처) 氠瑢
+- PBLN_000000000122852 | 2026년 하반기 우수 상용품 시범사용 제안제품 접수 공고
+  - types: unknown:1
+  - action: needs_gemini_or_rule / 금액은 있으나 성격 분류가 안 되어 추가 검수가 필요합니다.
+  - candidates: 2000.0만원/최대 2,000만원/unknown/review: 제품 가격자료(견적서) * 조달청 단가계약 제품의 경우 동일가격 적용 * 단가 2천만원 이상의 제품은 임차방식의 견적 제출가능부가세
+- PBLN_000000000123379 | [경북] 포항시 2026년 지역 기업 투자유치 활성화를 위한 Rising Star IR DAY 참가기업 모집 공고
+  - types: unknown:1
+  - action: needs_gemini_or_rule / 금액은 있으나 성격 분류가 안 되어 추가 검수가 필요합니다.
+  - candidates: 400.0만원/최대 400만원/unknown/review: 피칭 코칭 등(1社당 최대 4백만원
+- PBLN_000000000123505 | 2026년 1차 바이오스타 2.0 사업 참여 초기창업기업 모집 공고
+  - types: unknown:5
+  - action: needs_gemini_or_rule / 금액은 있으나 성격 분류가 안 되어 추가 검수가 필요합니다.
+  - candidates: 34000.0만원/최대 3.4억원/unknown/review: 사업비: 선정기업 별 연간 기준 340백만 원 내외 || 34000.0만원/최대 3.4억원/unknown/review: 사업비: 선정기업 별 연간 기준 340백만 원 내외 || 608000.0만원/최대 60.8억원/unknown/review: 정부지원 연구개발비: 총 6,080백만 원 규모 - 1차년도 960백만 원 - 2~5차년도 각 1 || 96000.0만원/최대 9.6억원/unknown/review: 080백만 원 규모 - 1차년도 960백만 원 - 2~5차년도 각 1 || 128000.0만원/최대

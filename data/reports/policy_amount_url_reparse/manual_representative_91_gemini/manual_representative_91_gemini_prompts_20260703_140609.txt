@@ -1,0 +1,783 @@
+
+================================================================================
+SAMPLE 1
+너는 중소기업/제조업 지원사업 공고에서 ROI 직접 차감 가능한 대표 지원금을 고르는 2차 검수자다.
+반드시 JSON 객체 하나만 반환해라.
+
+decision:
+- adopt_candidate: 후보 중 하나가 기업당/과제당/건당/사업장당 최대 현금성 지원금으로 명확함
+- keep_no_representative: 후보가 총규모, 자부담, 수수료, 교육/컨설팅/장비사용료, 금융성 한도, 지원비율뿐이라 대표금액을 만들면 안 됨
+- hold: 다중 프로그램 중 대표 선택, 표 연결, 월/명/연간 환산, 컨소시엄 기준 등이 애매함
+
+채택 조건:
+- high confidence일 때만 채택 후보가 될 수 있다.
+- 금액 타입은 support_amount, subsidy, voucher 중 하나여야 한다.
+- roi_apply_method는 subtract여야 한다.
+- 근거문장에 기업당/과제당/건당/사업장당/최대/한도/이내 같은 한도 문맥이 있어야 한다.
+
+보류 조건:
+- 월/명/연간/컨소시엄/총액/전체예산/총사업비/자부담/수수료/보증/대출/융자가 섞이면 hold 또는 keep_no_representative.
+- 다중 프로그램 공고에서 어떤 프로그램을 대표로 삼아야 할지 운영 판단이 필요하면 hold.
+
+공고:
+policy_id: PBLN_000000000117942
+title: [경남] 창원시 2026년 지식재산진흥 지원사업 기업 모집 공고
+organization: 경상남도
+url: https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000117942
+old_amount_manwon: 
+stage2_category: Gemini 2차 검수 대상
+stage2_reason: 규칙으로 대표금액 확정 불가, Gemini 2차 검수 대상
+
+후보 목록(JSON):
+[
+  {
+    "index": 0,
+    "amount_manwon": 3000.0,
+    "display_amount": "최대 3,000만원",
+    "current_type": "subsidy",
+    "current_roi_method": "subtract",
+    "support_ratio": null,
+    "context": "경찰 등 수사기관에서 조사나 수사 중인 기업으로서 비위의 정도가 중대하고 이로 인하여 정상적인 과제수행을 기대하기 현저히 어려운 기업 □ 중복지원 제한 요건 ▸당해년도 창원산업진흥원 보조금 지원사업(지원금 3,000만원 이상) 2개 초과 수행 중 상기 내용이 사실임을 확인하며"
+  },
+  {
+    "index": 1,
+    "amount_manwon": 5250.0,
+    "display_amount": "최대 5,250만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "(화) ~ 예산 소진 시까지 ▪총지원비 : 52,500천원"
+  },
+  {
+    "index": 2,
+    "amount_manwon": 100.0,
+    "display_amount": "최대 100만원",
+    "current_type": "fee",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "선행기술조사 : 국내권리화 지원 시 함께 지원 가능 (선행기술조사 단독지원 불가) ▪지원규모구분지원분야지원내역지원한도(VAT 제외)접수1국내권리화발생수수료의80%이내 지원100만원상 시(사업비 소진시까지)2선행기술조사50만원 ▪지원기준 - 2026"
+  },
+  {
+    "index": 3,
+    "amount_manwon": 50.0,
+    "display_amount": "최대 50만원",
+    "current_type": "fee",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "선행기술조사 : 국내권리화 지원 시 함께 지원 가능 (선행기술조사 단독지원 불가) ▪지원규모구분지원분야지원내역지원한도(VAT 제외)접수1국내권리화발생수수료의80%이내 지원100만원상 시(사업비 소진시까지)2선행기술조사50만원 ▪지원기준 - 2026"
+  },
+  {
+    "index": 4,
+    "amount_manwon": null,
+    "display_amount": "최대 80% 지원",
+    "current_type": "support_ratio",
+    "current_roi_method": "ratio_cap",
+    "support_ratio": 0.8,
+    "context": "[경남] 창원시 2026년 지식재산진흥 지원사업 기업 모집 공고 경상남도 기업마당>정책정보>지원사업 공고 기업마당 본문 바로가기 주메뉴 바로가기 기업마당 > 정책정보 > 지원사업 공고 메뉴열기 로그인 정책정보 정책정보 지원사업 공고 품목별 법정의무 인증제도 행사정보 정책뉴스 입법·행정예고/고시 월간 중기누리 활용정보 활용정보 기업업무용 서식 입주기업 모집공고 온라인화상회의실 정책정보 개방 속보성 대시보드 고객알림 고객알림 공지사항 고객의 소리 자주하는질문 이용안내 이용안내 개인정보처리방침 이메일주소 무단 수집 거부안내 저작권 정책"
+  }
+]
+
+반환 JSON 형식:
+{
+  "decision": "adopt_candidate|keep_no_representative|hold",
+  "candidate_index": 0,
+  "representative_amount_manwon": 1000,
+  "amount_type": "support_amount|subsidy|voucher|support_ratio|loan|guarantee|non_cash|total_support_scale|total_budget|total_project_cost|revenue_condition|fee|self_funding|education_fee|equipment_usage_fee|consulting_fee|unknown",
+  "roi_apply_method": "subtract|ratio_cap|recommend_only|exclude|review",
+  "confidence": "high|medium|low",
+  "reason": "한국어 한 문장",
+  "evidence_text": "근거 문구"
+}
+
+================================================================================
+SAMPLE 2
+너는 중소기업/제조업 지원사업 공고에서 ROI 직접 차감 가능한 대표 지원금을 고르는 2차 검수자다.
+반드시 JSON 객체 하나만 반환해라.
+
+decision:
+- adopt_candidate: 후보 중 하나가 기업당/과제당/건당/사업장당 최대 현금성 지원금으로 명확함
+- keep_no_representative: 후보가 총규모, 자부담, 수수료, 교육/컨설팅/장비사용료, 금융성 한도, 지원비율뿐이라 대표금액을 만들면 안 됨
+- hold: 다중 프로그램 중 대표 선택, 표 연결, 월/명/연간 환산, 컨소시엄 기준 등이 애매함
+
+채택 조건:
+- high confidence일 때만 채택 후보가 될 수 있다.
+- 금액 타입은 support_amount, subsidy, voucher 중 하나여야 한다.
+- roi_apply_method는 subtract여야 한다.
+- 근거문장에 기업당/과제당/건당/사업장당/최대/한도/이내 같은 한도 문맥이 있어야 한다.
+
+보류 조건:
+- 월/명/연간/컨소시엄/총액/전체예산/총사업비/자부담/수수료/보증/대출/융자가 섞이면 hold 또는 keep_no_representative.
+- 다중 프로그램 공고에서 어떤 프로그램을 대표로 삼아야 할지 운영 판단이 필요하면 hold.
+
+공고:
+policy_id: PBLN_000000000119212
+title: [제주] 2026년 청정임산물 생산기반 지원사업 재공고
+organization: 제주특별자치도
+url: https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000119212
+old_amount_manwon: 2161.0
+stage2_category: 다중 프로그램 중 대표 선택 필요
+stage2_reason: 여러 지원 프로그램 후보 중 대표 선택 기준 필요
+
+후보 목록(JSON):
+[
+  {
+    "index": 0,
+    "amount_manwon": 1080.9,
+    "display_amount": "최대 1,080.9만원",
+    "current_type": "subsidy",
+    "current_roi_method": "subtract",
+    "support_ratio": null,
+    "context": "☞ 공고일 현재 제주특별자치도에 주소를 두고 있는「임업 및 산촌 진흥촉진에 관한 법률 시행규칙」 제7조제1항「별표2」“임산물소득원의 지원 대상품목”을 재배하고 있는 생산자(임업인) 또는 생산자단체와 임산물의 선별ㆍ가공ㆍ유통ㆍ상품화를 하고자 하는 생산자 또는 생산자단체 ☞ 임산물 재배ㆍ생산 기계ㆍ장비 지원(1인 1대 보조금 10,809천원 범위내) 사업신청 방법 방문 및 우편 접수 - 접수처 : 제주특별자치도 산림녹지과 산지경영팀"
+  },
+  {
+    "index": 1,
+    "amount_manwon": 2161.8,
+    "display_amount": "최대 2,161.8만원",
+    "current_type": "total_support_scale",
+    "current_roi_method": "review",
+    "support_ratio": 0.5,
+    "context": "보조금 지원개요 氠瑢 사 업 명 지원규모 보조율 사업기간 사업내용 청정 임산물 생산기반지원사업 21,618천원 범위내 50% ‘25"
+  },
+  {
+    "index": 2,
+    "amount_manwon": 1080.9,
+    "display_amount": "최대 1,080.9만원",
+    "current_type": "subsidy",
+    "current_roi_method": "subtract",
+    "support_ratio": null,
+    "context": "장비 지원 (1인 1대 보조금 10,809천원 범위내)"
+  },
+  {
+    "index": 3,
+    "amount_manwon": 3000.0,
+    "display_amount": "최대 3,000만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "거짓 신청이나 부정한 방법으로 교부받은 자는 5년 이하의 징역 또는 3천만원 이하의 벌금이 부과됩니다"
+  },
+  {
+    "index": 4,
+    "amount_manwon": 2000.0,
+    "display_amount": "최대 2,000만원",
+    "current_type": "subsidy",
+    "current_roi_method": "subtract",
+    "support_ratio": null,
+    "context": "지방보조금 교부결정 내용 등에 위반하여 다른 용도 사용한 경우 3년이하의 징역 또는 2천만원 이하의 벌금이 부과됩니다"
+  },
+  {
+    "index": 5,
+    "amount_manwon": 63.0,
+    "display_amount": "최대 63만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "00개×10회 = 500천원 사무관리비 630 ․현수막 70,000원×3개×3회=630천원 ※1식*10,000천원 = 10,000천원(X) → 1식과 같이 산출기초를 구체"
+  },
+  {
+    "index": 6,
+    "amount_manwon": 1000.0,
+    "display_amount": "최대 1,000만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "500천원 사무관리비 630 ․현수막 70,000원×3개×3회=630천원 ※1식*10,000천원 = 10,000천원(X) → 1식과 같이 산출기초를 구체적으로 파악할 수 없는"
+  },
+  {
+    "index": 7,
+    "amount_manwon": 1000.0,
+    "display_amount": "최대 1,000만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "000천원 = 10,000천원(X) → 1식과 같이 산출기초를 구체적으로 파악할 수 없는 표현 금지 나"
+  },
+  {
+    "index": 8,
+    "amount_manwon": 50.0,
+    "display_amount": "최대 50만원",
+    "current_type": "self_funding",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "자부담 집행계획(구체적으로 작성) 氠瑢 ①사업내용(단위사업명) ②보조비목* ③금액(천원) ④산출내역(기초) 계 해안변 환경정비 사무관리비 500 ․장갑 500원×100개×10회 = 500천원 사무관리비 630 ․현수막 70"
+  },
+  {
+    "index": 9,
+    "amount_manwon": 63.0,
+    "display_amount": "최대 63만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "00개×10회 = 500천원 사무관리비 630 ․현수막 70,000원×3개×3회=630천원 ※1식*10,000천원 = 10,000천원(X) → 1식과 같이 산출기초를 구체"
+  },
+  {
+    "index": 10,
+    "amount_manwon": 1000.0,
+    "display_amount": "최대 1,000만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "500천원 사무관리비 630 ․현수막 70,000원×3개×3회=630천원 ※1식*10,000천원 = 10,000천원(X) → 1식과 같이 산출기초를 구체적으로 파악할 수 없는"
+  },
+  {
+    "index": 11,
+    "amount_manwon": 1000.0,
+    "display_amount": "최대 1,000만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "000천원 = 10,000천원(X) → 1식과 같이 산출기초를 구체적으로 파악할 수 없는 표현 금지"
+  },
+  {
+    "index": 12,
+    "amount_manwon": null,
+    "display_amount": "최대 100% 지원",
+    "current_type": "support_ratio",
+    "current_roi_method": "ratio_cap",
+    "support_ratio": 1.0,
+    "context": "[제주] 2026년 청정임산물 생산기반 지원사업 재공고 제주특별자치도 기업마당>정책정보>지원사업 공고 기업마당 본문 바로가기 주메뉴 바로가기 기업마당 > 정책정보 > 지원사업 공고 메뉴열기 로그인 정책정보 정책정보 지원사업 공고 품목별 법정의무 인증제도 행사정보 정책뉴스 입법·행정예고/고시 월간 중기누리 활용정보 활용정보 기업업무용 서식 입주기업 모집공고 온라인화상회의실 정책정보 개방 속보성 대시보드 고객알림 고객알림 공지사항 고객의 소리 자주하는질문 이용안내 이용안내 개인정보처리방침 이메일주소 무단 수집 거부안내 저작권 정책 웹접"
+  }
+]
+
+반환 JSON 형식:
+{
+  "decision": "adopt_candidate|keep_no_representative|hold",
+  "candidate_index": 0,
+  "representative_amount_manwon": 1000,
+  "amount_type": "support_amount|subsidy|voucher|support_ratio|loan|guarantee|non_cash|total_support_scale|total_budget|total_project_cost|revenue_condition|fee|self_funding|education_fee|equipment_usage_fee|consulting_fee|unknown",
+  "roi_apply_method": "subtract|ratio_cap|recommend_only|exclude|review",
+  "confidence": "high|medium|low",
+  "reason": "한국어 한 문장",
+  "evidence_text": "근거 문구"
+}
+
+================================================================================
+SAMPLE 3
+너는 중소기업/제조업 지원사업 공고에서 ROI 직접 차감 가능한 대표 지원금을 고르는 2차 검수자다.
+반드시 JSON 객체 하나만 반환해라.
+
+decision:
+- adopt_candidate: 후보 중 하나가 기업당/과제당/건당/사업장당 최대 현금성 지원금으로 명확함
+- keep_no_representative: 후보가 총규모, 자부담, 수수료, 교육/컨설팅/장비사용료, 금융성 한도, 지원비율뿐이라 대표금액을 만들면 안 됨
+- hold: 다중 프로그램 중 대표 선택, 표 연결, 월/명/연간 환산, 컨소시엄 기준 등이 애매함
+
+채택 조건:
+- high confidence일 때만 채택 후보가 될 수 있다.
+- 금액 타입은 support_amount, subsidy, voucher 중 하나여야 한다.
+- roi_apply_method는 subtract여야 한다.
+- 근거문장에 기업당/과제당/건당/사업장당/최대/한도/이내 같은 한도 문맥이 있어야 한다.
+
+보류 조건:
+- 월/명/연간/컨소시엄/총액/전체예산/총사업비/자부담/수수료/보증/대출/융자가 섞이면 hold 또는 keep_no_representative.
+- 다중 프로그램 공고에서 어떤 프로그램을 대표로 삼아야 할지 운영 판단이 필요하면 hold.
+
+공고:
+policy_id: PBLN_000000000119733
+title: [울산] 울주군 2026년 강소기업 육성 기술 혁신 지원사업 시행 공고
+organization: 울산광역시
+url: https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000119733
+old_amount_manwon: 1000.0
+stage2_category: 다중 프로그램 중 대표 선택 필요
+stage2_reason: 명확한 한도 후보가 여러 개라 대표 선택 필요
+
+후보 목록(JSON):
+[
+  {
+    "index": 0,
+    "amount_manwon": 200.0,
+    "display_amount": "최대 200만원",
+    "current_type": "non_cash",
+    "current_roi_method": "recommend_only",
+    "support_ratio": null,
+    "context": "2,000천원 한도 원 지식재산권(A) 원 국내인증(B) 원"
+  },
+  {
+    "index": 1,
+    "amount_manwon": 200.0,
+    "display_amount": "최대 200만원",
+    "current_type": "non_cash",
+    "current_roi_method": "recommend_only",
+    "support_ratio": null,
+    "context": "국내 인증 획득 시험 및 등록비용* 2백만원 23 자부담 10% ② 혁신기술 사업화 기술가치평가"
+  },
+  {
+    "index": 2,
+    "amount_manwon": 1000.0,
+    "display_amount": "최대 1,000만원",
+    "current_type": "support_amount",
+    "current_roi_method": "subtract",
+    "support_ratio": null,
+    "context": "기술평가 전문기관 연계 지원 10백만원 최대 5백만원 15 특허 선행기술조사"
+  },
+  {
+    "index": 3,
+    "amount_manwon": 500.0,
+    "display_amount": "최대 500만원",
+    "current_type": "support_amount",
+    "current_roi_method": "subtract",
+    "support_ratio": null,
+    "context": "기술평가 전문기관 연계 지원 10백만원 최대 5백만원 15 특허 선행기술조사"
+  },
+  {
+    "index": 4,
+    "amount_manwon": 300.0,
+    "display_amount": "최대 300만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "유사 특허에 대한 회피전략 제공 최대 3백만원 시제품제작"
+  },
+  {
+    "index": 5,
+    "amount_manwon": 1000.0,
+    "display_amount": "최대 1,000만원",
+    "current_type": "consulting_fee",
+    "current_roi_method": "recommend_only",
+    "support_ratio": null,
+    "context": "전시용 샘플 제작(양산품 제외) 최대 10백만원 ③혁신성장 컨설팅"
+  },
+  {
+    "index": 6,
+    "amount_manwon": 500.0,
+    "display_amount": "최대 500만원",
+    "current_type": "consulting_fee",
+    "current_roi_method": "recommend_only",
+    "support_ratio": null,
+    "context": "대기업 협력사 인증 품질경영 컨설팅 비용 지원 5백만원 2 총 지원 건수 40 *제품 및 기술 인증 : KS"
+  },
+  {
+    "index": 7,
+    "amount_manwon": 200.0,
+    "display_amount": "최대 200만원",
+    "current_type": "non_cash",
+    "current_roi_method": "recommend_only",
+    "support_ratio": null,
+    "context": "/ 기업당 2백만원 한도 (자부담 10%이상) ❍ 지원대상 : 울주군 소재 제조업 영위 중소기업으로 기술개발 후 기술 또는 제품 지식재산권 확보나 국내 인증이 필"
+  },
+  {
+    "index": 8,
+    "amount_manwon": 400000.0,
+    "display_amount": "최대 40억원",
+    "current_type": "revenue_condition",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "`24년도 표준재무제표증명원 상의 매출액 40억 30억 20억 10억 5억 5억 이상 이상 이상 이상 이상 미만 5 4 3 2 1 0 매출 증가율 (5)"
+  },
+  {
+    "index": 9,
+    "amount_manwon": 300000.0,
+    "display_amount": "최대 30억원",
+    "current_type": "revenue_condition",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "`24년도 표준재무제표증명원 상의 매출액 40억 30억 20억 10억 5억 5억 이상 이상 이상 이상 이상 미만 5 4 3 2 1 0 매출 증가율 (5)"
+  },
+  {
+    "index": 10,
+    "amount_manwon": 200000.0,
+    "display_amount": "최대 20억원",
+    "current_type": "revenue_condition",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "`24년도 표준재무제표증명원 상의 매출액 40억 30억 20억 10억 5억 5억 이상 이상 이상 이상 이상 미만 5 4 3 2 1 0 매출 증가율 (5)"
+  },
+  {
+    "index": 11,
+    "amount_manwon": 100000.0,
+    "display_amount": "최대 10억원",
+    "current_type": "revenue_condition",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "`24년도 표준재무제표증명원 상의 매출액 40억 30억 20억 10억 5억 5억 이상 이상 이상 이상 이상 미만 5 4 3 2 1 0 매출 증가율 (5)"
+  }
+]
+
+반환 JSON 형식:
+{
+  "decision": "adopt_candidate|keep_no_representative|hold",
+  "candidate_index": 0,
+  "representative_amount_manwon": 1000,
+  "amount_type": "support_amount|subsidy|voucher|support_ratio|loan|guarantee|non_cash|total_support_scale|total_budget|total_project_cost|revenue_condition|fee|self_funding|education_fee|equipment_usage_fee|consulting_fee|unknown",
+  "roi_apply_method": "subtract|ratio_cap|recommend_only|exclude|review",
+  "confidence": "high|medium|low",
+  "reason": "한국어 한 문장",
+  "evidence_text": "근거 문구"
+}
+
+================================================================================
+SAMPLE 4
+너는 중소기업/제조업 지원사업 공고에서 ROI 직접 차감 가능한 대표 지원금을 고르는 2차 검수자다.
+반드시 JSON 객체 하나만 반환해라.
+
+decision:
+- adopt_candidate: 후보 중 하나가 기업당/과제당/건당/사업장당 최대 현금성 지원금으로 명확함
+- keep_no_representative: 후보가 총규모, 자부담, 수수료, 교육/컨설팅/장비사용료, 금융성 한도, 지원비율뿐이라 대표금액을 만들면 안 됨
+- hold: 다중 프로그램 중 대표 선택, 표 연결, 월/명/연간 환산, 컨소시엄 기준 등이 애매함
+
+채택 조건:
+- high confidence일 때만 채택 후보가 될 수 있다.
+- 금액 타입은 support_amount, subsidy, voucher 중 하나여야 한다.
+- roi_apply_method는 subtract여야 한다.
+- 근거문장에 기업당/과제당/건당/사업장당/최대/한도/이내 같은 한도 문맥이 있어야 한다.
+
+보류 조건:
+- 월/명/연간/컨소시엄/총액/전체예산/총사업비/자부담/수수료/보증/대출/융자가 섞이면 hold 또는 keep_no_representative.
+- 다중 프로그램 공고에서 어떤 프로그램을 대표로 삼아야 할지 운영 판단이 필요하면 hold.
+
+공고:
+policy_id: PBLN_000000000119836
+title: [전남광주] 2026년 상반기 구조고도화자금 지원 계획 공고
+organization: 전남광주통합특별시
+url: https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000119836
+old_amount_manwon: 3000000.0
+stage2_category: 다중 프로그램 중 대표 선택 필요
+stage2_reason: 여러 지원 프로그램 후보 중 대표 선택 기준 필요
+
+후보 목록(JSON):
+[
+  {
+    "index": 0,
+    "amount_manwon": 100000.0,
+    "display_amount": "최대 10억원",
+    "current_type": "support_amount",
+    "current_roi_method": "subtract",
+    "support_ratio": null,
+    "context": ", 경영안정사업) 지원 - 창업지원사업(3년 거치, 5년 균분상환 / 지원 한도 10억원 / 시설자금) - 경쟁력강화사업(3년 거치, 5년 균분상환 / 지원 한도 10억"
+  },
+  {
+    "index": 1,
+    "amount_manwon": 100000.0,
+    "display_amount": "최대 10억원",
+    "current_type": "support_amount",
+    "current_roi_method": "subtract",
+    "support_ratio": null,
+    "context": "0억원 / 시설자금) - 경쟁력강화사업(3년 거치, 5년 균분상환 / 지원 한도 10억원 / 시설자금) - 경영안정화사업(1년 거치, 2년 균분상환 / 지원 한도 3억원"
+  },
+  {
+    "index": 2,
+    "amount_manwon": 30000.0,
+    "display_amount": "최대 3억원",
+    "current_type": "loan",
+    "current_roi_method": "exclude",
+    "support_ratio": null,
+    "context": "0억원 / 시설자금) - 경영안정화사업(1년 거치, 2년 균분상환 / 지원 한도 3억원 / 운전자금) 사업신청 방법 온라인 접수 (기금융자관리시스템) 사업신청 사이트"
+  },
+  {
+    "index": 3,
+    "amount_manwon": 3000000.0,
+    "display_amount": "최대 300억원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "2026년 3월 4일광 주 광 역 시 장1 지원 개요 ❍ 지원 규모 : 300억원"
+  },
+  {
+    "index": 4,
+    "amount_manwon": 1000000.0,
+    "display_amount": "최대 100억원",
+    "current_type": "support_amount",
+    "current_roi_method": "subtract",
+    "support_ratio": null,
+    "context": "하반기 100억원 예정 ❍ 지원 내용 사 업 명지원 용도지원 한도상환 조건비 고창업지원사업(업력: 7년 이내)공장부지 매입"
+  },
+  {
+    "index": 5,
+    "amount_manwon": 100000.0,
+    "display_amount": "최대 10억원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "임차 등10억원3년 거치5년 균분상환 시설 자금경쟁력강화사업(업력: 7년 초과)생산시설 교체"
+  },
+  {
+    "index": 6,
+    "amount_manwon": 30000.0,
+    "display_amount": "최대 3억원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "기타 경영 소요 자금3억원1년 거치2년 균분상환 운전 자금"
+  },
+  {
+    "index": 7,
+    "amount_manwon": 1000000.0,
+    "display_amount": "최대 100억원",
+    "current_type": "support_amount",
+    "current_roi_method": "subtract",
+    "support_ratio": null,
+    "context": "지자체 정책자금 지원금액 100억원 초과 업체 - 운전자금(1년 거치 2년 균분상환)의 경우"
+  },
+  {
+    "index": 8,
+    "amount_manwon": null,
+    "display_amount": "최대 10% 지원",
+    "current_type": "support_ratio",
+    "current_roi_method": "ratio_cap",
+    "support_ratio": 0.1,
+    "context": "[전남광주] 2026년 상반기 구조고도화자금 지원 계획 공고 전남광주통합특별시 기업마당>정책정보>지원사업 공고 기업마당 본문 바로가기 주메뉴 바로가기 기업마당 > 정책정보 > 지원사업 공고 메뉴열기 로그인 정책정보 정책정보 지원사업 공고 품목별 법정의무 인증제도 행사정보 정책뉴스 입법·행정예고/고시 월간 중기누리 활용정보 활용정보 기업업무용 서식 입주기업 모집공고 온라인화상회의실 정책정보 개방 속보성 대시보드 고객알림 고객알림 공지사항 고객의 소리 자주하는질문 이용안내 이용안내 개인정보처리방침 이메일주소 무단 수집 거부안내 저작권"
+  }
+]
+
+반환 JSON 형식:
+{
+  "decision": "adopt_candidate|keep_no_representative|hold",
+  "candidate_index": 0,
+  "representative_amount_manwon": 1000,
+  "amount_type": "support_amount|subsidy|voucher|support_ratio|loan|guarantee|non_cash|total_support_scale|total_budget|total_project_cost|revenue_condition|fee|self_funding|education_fee|equipment_usage_fee|consulting_fee|unknown",
+  "roi_apply_method": "subtract|ratio_cap|recommend_only|exclude|review",
+  "confidence": "high|medium|low",
+  "reason": "한국어 한 문장",
+  "evidence_text": "근거 문구"
+}
+
+================================================================================
+SAMPLE 5
+너는 중소기업/제조업 지원사업 공고에서 ROI 직접 차감 가능한 대표 지원금을 고르는 2차 검수자다.
+반드시 JSON 객체 하나만 반환해라.
+
+decision:
+- adopt_candidate: 후보 중 하나가 기업당/과제당/건당/사업장당 최대 현금성 지원금으로 명확함
+- keep_no_representative: 후보가 총규모, 자부담, 수수료, 교육/컨설팅/장비사용료, 금융성 한도, 지원비율뿐이라 대표금액을 만들면 안 됨
+- hold: 다중 프로그램 중 대표 선택, 표 연결, 월/명/연간 환산, 컨소시엄 기준 등이 애매함
+
+채택 조건:
+- high confidence일 때만 채택 후보가 될 수 있다.
+- 금액 타입은 support_amount, subsidy, voucher 중 하나여야 한다.
+- roi_apply_method는 subtract여야 한다.
+- 근거문장에 기업당/과제당/건당/사업장당/최대/한도/이내 같은 한도 문맥이 있어야 한다.
+
+보류 조건:
+- 월/명/연간/컨소시엄/총액/전체예산/총사업비/자부담/수수료/보증/대출/융자가 섞이면 hold 또는 keep_no_representative.
+- 다중 프로그램 공고에서 어떤 프로그램을 대표로 삼아야 할지 운영 판단이 필요하면 hold.
+
+공고:
+policy_id: PBLN_000000000120866
+title: 2026년 부산형 SiC 전력반도체 연구플랫폼 활성화 지원사업 기업지원 모집 공고
+organization: 부산광역시
+url: https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000120866
+old_amount_manwon: 100.0
+stage2_category: 다중 프로그램 중 대표 선택 필요
+stage2_reason: 여러 지원 프로그램 후보 중 대표 선택 기준 필요
+
+후보 목록(JSON):
+[
+  {
+    "index": 0,
+    "amount_manwon": 2000.0,
+    "display_amount": "최대 2,000만원",
+    "current_type": "support_amount",
+    "current_roi_method": "subtract",
+    "support_ratio": null,
+    "context": "(예시)지원금액이 20,000천원일 경우 - 기업지원금 : 총 22"
+  },
+  {
+    "index": 1,
+    "amount_manwon": 2200.0,
+    "display_amount": "최대 2,200만원",
+    "current_type": "support_amount",
+    "current_roi_method": "subtract",
+    "support_ratio": null,
+    "context": "000천원일 경우 - 기업지원금 : 총 22,000천원(20"
+  },
+  {
+    "index": 2,
+    "amount_manwon": 2000.0,
+    "display_amount": "최대 2,000만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "000천원(20,000천원(공급가액) + 2"
+  },
+  {
+    "index": 3,
+    "amount_manwon": 200.0,
+    "display_amount": "최대 200만원",
+    "current_type": "self_funding",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "000천원(공급가액) + 2,000천원(부가가치세)) - 기업부담금 : 총 2"
+  },
+  {
+    "index": 4,
+    "amount_manwon": 220.0,
+    "display_amount": "최대 220만원",
+    "current_type": "self_funding",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "000천원(부가가치세)) - 기업부담금 : 총 2,200천원(2"
+  },
+  {
+    "index": 5,
+    "amount_manwon": 200.0,
+    "display_amount": "최대 200만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "200천원(2,000천원(공급가액) + 200천원(부가가치세)) 이상 漠杳 Ⅱ"
+  },
+  {
+    "index": 6,
+    "amount_manwon": 20.0,
+    "display_amount": "최대 20만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "000천원(공급가액) + 200천원(부가가치세)) 이상 漠杳 Ⅱ"
+  },
+  {
+    "index": 7,
+    "amount_manwon": 2000.0,
+    "display_amount": "최대 2,000만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "까지 최대 20,000천원/건 부산 내"
+  },
+  {
+    "index": 8,
+    "amount_manwon": 500.0,
+    "display_amount": "최대 500만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "까지 최대 5,000천원/건 부산 내"
+  },
+  {
+    "index": 9,
+    "amount_manwon": 200.0,
+    "display_amount": "최대 200만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "까지 최대 2,000천원/건 부산 내"
+  },
+  {
+    "index": 10,
+    "amount_manwon": 100.0,
+    "display_amount": "최대 100만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "까지 최대 1,000천원/건 부산 내"
+  },
+  {
+    "index": 11,
+    "amount_manwon": 2000.0,
+    "display_amount": "최대 2,000만원",
+    "current_type": "support_amount",
+    "current_roi_method": "subtract",
+    "support_ratio": null,
+    "context": "(예시)지원금액이 20,000천원일 경우 - 기업지원금 : 총 22"
+  },
+  {
+    "index": 12,
+    "amount_manwon": 2200.0,
+    "display_amount": "최대 2,200만원",
+    "current_type": "support_amount",
+    "current_roi_method": "subtract",
+    "support_ratio": null,
+    "context": "000천원일 경우 - 기업지원금 : 총 22,000천원(20"
+  },
+  {
+    "index": 13,
+    "amount_manwon": 2000.0,
+    "display_amount": "최대 2,000만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "000천원(20,000천원(공급가액) + 2"
+  },
+  {
+    "index": 14,
+    "amount_manwon": 200.0,
+    "display_amount": "최대 200만원",
+    "current_type": "self_funding",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "000천원(공급가액) + 2,000천원(부가가치세)) - 기업부담금 : 총 2"
+  },
+  {
+    "index": 15,
+    "amount_manwon": 220.0,
+    "display_amount": "최대 220만원",
+    "current_type": "self_funding",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "000천원(부가가치세)) - 기업부담금 : 총 2,200천원(2"
+  },
+  {
+    "index": 16,
+    "amount_manwon": 200.0,
+    "display_amount": "최대 200만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "200천원(2,000천원(공급가액) + 200천원(부가가치세)) 이상 Ⅱ"
+  },
+  {
+    "index": 17,
+    "amount_manwon": 20.0,
+    "display_amount": "최대 20만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "000천원(공급가액) + 200천원(부가가치세)) 이상 Ⅱ"
+  },
+  {
+    "index": 18,
+    "amount_manwon": 2000.0,
+    "display_amount": "최대 2,000만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "까지최대 20,000천원/건부산 내"
+  },
+  {
+    "index": 19,
+    "amount_manwon": 500.0,
+    "display_amount": "최대 500만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "까지최대 5,000천원/건부산 내"
+  },
+  {
+    "index": 20,
+    "amount_manwon": 200.0,
+    "display_amount": "최대 200만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "까지최대 2,000천원/건부산 내"
+  },
+  {
+    "index": 21,
+    "amount_manwon": 100.0,
+    "display_amount": "최대 100만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "까지최대 1,000천원/건부산 내"
+  },
+  {
+    "index": 22,
+    "amount_manwon": null,
+    "display_amount": "최대 20% 지원",
+    "current_type": "support_ratio",
+    "current_roi_method": "ratio_cap",
+    "support_ratio": 0.2,
+    "context": "2026년 부산형 SiC 전력반도체 연구플랫폼 활성화 지원사업 기업지원 모집 공고 부산광역시 기업마당>정책정보>지원사업 공고 기업마당 본문 바로가기 주메뉴 바로가기 기업마당 > 정책정보 > 지원사업 공고 메뉴열기 로그인 정책정보 정책정보 지원사업 공고 품목별 법정의무 인증제도 행사정보 정책뉴스 입법·행정예고/고시 월간 중기누리 활용정보 활용정보 기업업무용 서식 입주기업 모집공고 온라인화상회의실 정책정보 개방 속보성 대시보드 고객알림 고객알림 공지사항 고객의 소리 자주하는질문 이용안내 이용안내 개인정보처리방침 이메일주소 무단 수집 거"
+  }
+]
+
+반환 JSON 형식:
+{
+  "decision": "adopt_candidate|keep_no_representative|hold",
+  "candidate_index": 0,
+  "representative_amount_manwon": 1000,
+  "amount_type": "support_amount|subsidy|voucher|support_ratio|loan|guarantee|non_cash|total_support_scale|total_budget|total_project_cost|revenue_condition|fee|self_funding|education_fee|equipment_usage_fee|consulting_fee|unknown",
+  "roi_apply_method": "subtract|ratio_cap|recommend_only|exclude|review",
+  "confidence": "high|medium|low",
+  "reason": "한국어 한 문장",
+  "evidence_text": "근거 문구"
+}

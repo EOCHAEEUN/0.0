@@ -1,7 +1,26 @@
 import { useEffect, useMemo, useState } from "react";
-import AppHeader from "../../components/AppHeader";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+  BarChart3,
+  Building2,
+  CirclePlus,
+  FileText,
+  IdCard,
+  UserRound,
+} from "lucide-react";
+import DashboardWorkspacePageLayout from "../../components/layout/DashboardWorkspacePageLayout";
+import {
+  MyPageProfileStatusSidebar,
+  MyPageRevenueStatusPill,
+  MyPageSectionCard,
+} from "./MyPageWorkspaceParts";
+import "./mypage.workspace.css";
+import {
+  getStoredCompanyId,
+  patchRepresentativeEquipment,
+} from "../dashboard/dashboard.api";
 import { MYPAGE_DOCUMENT_STORAGE_KEY } from "../documents/documentStorage";
-import { MyPageDocumentUploadPanel } from "./MyPageDocumentUploadPanel";
+import CompanyDocumentsManagement from "./components/CompanyDocumentsManagement";
 import type {
   BasicInfo,
   PasswordInfo,
@@ -64,18 +83,17 @@ import {
   normalizeCommaNumber,
   getPasswordStrength,
   getCurrentUserId,
-  SelectChip,
   FieldLabel,
   EquipmentCategoryHelpTooltip,
   IndustryRemoveButton,
   Field,
   SelectField,
-  ChecklistItem,
   InfoTooltip,
   FloatingModalNotice,
   hasRequiredEquipmentFields,
-  AiGuideHeroBanner,
   AccordionPanel,
+  EquipmentOptionalAccordion,
+  countEquipmentOptionalFieldsFilled,
 } from "./myPage.parts";
 
 
@@ -287,6 +305,11 @@ function mapRemoteEquipment(item: unknown, index: number): EquipmentInfo {
 
 
 export default function MyPage() {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnToDashboard = searchParams.get("return_to") === "dashboard";
+  const focusRepresentative = searchParams.get("focus") === "representative";
+
   const storedData = useMemo(() => {
     if (typeof window === "undefined") return null;
     return loadStoredMyPageData();
@@ -307,6 +330,9 @@ export default function MyPage() {
   const [energyTooltipEquipmentId, setEnergyTooltipEquipmentId] = useState<
     number | null
   >(null);
+  const [equipmentOptionalOpen, setEquipmentOptionalOpen] = useState<
+    Record<number, boolean>
+  >({});
 
   const [openSections, setOpenSections] = useState<
     Record<MyPagePanelKey, boolean>
@@ -345,6 +371,14 @@ export default function MyPage() {
         storedData?.equipmentList?.[0]?.id ??
         1,
     );
+  const [representativeEquipmentId, setRepresentativeEquipmentId] = useState("");
+  const [representativeFeedback, setRepresentativeFeedback] = useState("");
+
+  useEffect(() => {
+    if (focusRepresentative || searchParams.get("panel") === "equipment") {
+      setOpenSections((prev) => ({ ...prev, equipment: true }));
+    }
+  }, [focusRepresentative, searchParams]);
 
   useEffect(() => {
     setBasicInfo((prev) => ({
@@ -430,6 +464,10 @@ export default function MyPage() {
         }
 
         if (company) {
+          const representativeId = getStringValue(company.representative_equipment_id);
+          if (representativeId) {
+            setRepresentativeEquipmentId(representativeId);
+          }
           const industryCodes = getStringArrayValue(company.industry_code);
           const industryName = getStringValue(company.industry_name);
           const remoteIndustries = normalizeRemoteIndustries(
@@ -823,6 +861,16 @@ export default function MyPage() {
     );
   };
 
+  const toggleEquipmentOptional = (equipmentId: number) => {
+    setEquipmentOptionalOpen((prev) => ({
+      ...prev,
+      [equipmentId]: !prev[equipmentId],
+    }));
+  };
+
+  const isEquipmentOptionalOpen = (equipmentId: number) =>
+    Boolean(equipmentOptionalOpen[equipmentId]);
+
   const addEquipment = () => {
     const nextId =
       equipmentList.length > 0
@@ -833,6 +881,58 @@ export default function MyPage() {
 
     if (!selectedAnalysisEquipmentId) {
       setSelectedAnalysisEquipmentId(nextId);
+    }
+  };
+
+  const handleSetRepresentativeEquipment = async (equipment: EquipmentInfo) => {
+    const companyId =
+      window.localStorage.getItem(COMPANY_ID_STORAGE_KEY) || getStoredCompanyId();
+    const equipmentId = equipment.equipmentId?.trim();
+    const equipmentLabel = equipment.name?.trim() || `설비 ${equipment.id}`;
+
+    if (!companyId || !equipmentId) {
+      window.alert("대표 설비를 저장하려면 먼저 설비 정보를 저장해주세요.");
+      return;
+    }
+
+    try {
+      await patchRepresentativeEquipment({ companyId, equipmentId });
+      setRepresentativeEquipmentId(equipmentId);
+      setRepresentativeFeedback(`대표 설비를 ${equipmentLabel}로 변경했습니다.`);
+      if (returnToDashboard) {
+        navigate("/dashboard");
+      }
+    } catch (error) {
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : "대표 설비를 저장하지 못했습니다.",
+      );
+    }
+  };
+
+  const handleClearRepresentativeEquipment = async () => {
+    const companyId =
+      window.localStorage.getItem(COMPANY_ID_STORAGE_KEY) || getStoredCompanyId();
+
+    if (!companyId) {
+      window.alert("회사 정보를 먼저 저장해주세요.");
+      return;
+    }
+
+    try {
+      await patchRepresentativeEquipment({ companyId, equipmentId: null });
+      setRepresentativeEquipmentId("");
+      setRepresentativeFeedback("대표 설비를 해제했습니다.");
+      if (returnToDashboard) {
+        navigate("/dashboard");
+      }
+    } catch (error) {
+      window.alert(
+        error instanceof Error
+          ? error.message
+          : "대표 설비를 해제하지 못했습니다.",
+      );
     }
   };
 
@@ -852,6 +952,10 @@ export default function MyPage() {
         window.alert(getErrorMessage(error));
         return;
       }
+
+      if (representativeEquipmentId === targetEquipment.equipmentId) {
+        setRepresentativeEquipmentId("");
+      }
     }
 
     const nextEquipmentList = equipmentList.filter(
@@ -864,6 +968,11 @@ export default function MyPage() {
 
     setEquipmentList(nextEquipmentList);
     setSelectedAnalysisEquipmentId(nextSelectedAnalysisEquipmentId);
+    setEquipmentOptionalOpen((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
 
     const nextSelectedEquipmentUuid =
       nextEquipmentList.find(
@@ -1302,19 +1411,15 @@ export default function MyPage() {
   };
 
   return (
-    <main className="page">
+    <>
       <style>{`
         details > summary::-webkit-details-marker { display: none !important; }
         details > summary::marker { content: "" !important; }
         details > summary { list-style: none !important; }
         @media (max-width: 960px) {
-          .ff-mypage-hero-grid,
-          .ff-mypage-ai-banner-grid,
           .ff-mypage-service-flow,
-          .ff-mypage-two-col,
           .ff-mypage-three-col,
           .ff-mypage-four-col,
-          .ff-mypage-ai-summary-grid,
           .ff-mypage-analysis-bar {
             grid-template-columns: 1fr !important;
           }
@@ -1326,7 +1431,6 @@ export default function MyPage() {
           }
         }
       `}</style>
-      <AppHeader />
 
       <FloatingModalNotice
         open={analysisBlockNoticeOpen}
@@ -1336,124 +1440,23 @@ export default function MyPage() {
         onClose={() => setAnalysisBlockNoticeOpen(false)}
       />
 
-
-      <section
-        style={{
-          background: "#F8FAFC",
-          padding: "56px clamp(22px,5vw,80px) 96px",
-        }}
+      <DashboardWorkspacePageLayout
+        pageClassName="ff-mypage-workspace-page"
+        contentClassName="ff-mypage-workspace-content"
       >
-        <div
-          style={{
-            width: "min(1180px, 100%)",
-            margin: "0 auto",
-          }}
-        >
-          <div
-            className="ff-mypage-hero-grid"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 0.85fr",
-              gap: "40px",
-              alignItems: "end",
-              marginBottom: "30px",
-            }}
-          >
-            <div>
-              <div
-                style={{
-                  width: "122px",
-                  height: "4px",
-                  borderRadius: "999px",
-                  background:
-                    "linear-gradient(90deg, #344BA0 0%, #C68B3C 50%, rgba(255,255,255,0) 100%)",
-                  marginBottom: "16px",
-                }}
-              />
+        <div className="ff-mypage-page-shell">
+          <header className="ff-mypage-page-header">
+            <h1>프로필 및 기업 설정</h1>
+            <p>산업 분석 플랫폼의 개인 정보와 기업 데이터를 관리하세요.</p>
+          </header>
 
-              <div className="screen-tag">FACTOFIT MY PAGE</div>
-
-              <div
-                className="label"
-                style={{
-                  marginTop: "16px",
-                  marginBottom: "16px",
-                }}
-              >
-                ACCOUNT & COMPANY PROFILE
-              </div>
-
-              <h1
-                style={{
-                  color: "#061B34",
-                  fontSize: "56px",
-                  lineHeight: 1.12,
-                  fontWeight: 900,
-                  letterSpacing: "-2px",
-                  margin: 0,
-                }}
-              >
-                내 정보와 기업 정보를 <br />
-                한곳에서 관리합니다.
-              </h1>
-
-              <div
-                style={{
-                  width: "130px",
-                  height: "3px",
-                  borderRadius: "999px",
-                  background:
-                    "linear-gradient(90deg, #344BA0 0%, rgba(52,75,160,0) 100%)",
-                  marginTop: "24px",
-                }}
-              />
-            </div>
-
-            <p
-              style={{
-                color: "#667085",
-                fontSize: "16px",
-                lineHeight: 1.8,
-                fontWeight: 900,
-                margin: 0,
-              }}
+          <div className="ff-mypage-profile-grid">
+            <div className="ff-mypage-profile-main">
+            <MyPageSectionCard
+              title="기본 정보"
+              icon={<UserRound />}
             >
-              회원가입 이후 기업·설비 정보를 입력하면 FactoFit이 ROI 분석,
-              지원사업 추천, 신청 준비도를 더 정확하게 계산할 수 있습니다.
-            </p>
-          </div>
-
-          <AiGuideHeroBanner
-            completionScore={completionScore}
-            missingCoreCount={missingCoreCount}
-            needsInputGuide={needsInputGuide}
-            savedPolicyCount={savedPolicies.length}
-            completedEquipmentCount={completedEquipmentCount}
-            analysisHistoryCount={analysisHistories.length}
-          />
-
-          <div
-            style={{
-              display: "grid",
-              gap: "24px",
-            }}
-          >
-            <AccordionPanel
-              title="기본정보"
-              description="사용자 계정과 담당자 정보를 관리합니다."
-              badge={<span className="badge blue">필수 + 선택</span>}
-              open={openSections.basic}
-              onToggle={() => toggleSection("basic")}
-            >
-              <div
-                className="ff-mypage-two-col"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "16px",
-                  alignItems: "start",
-                }}
-              >
+              <div className="ff-mypage-two-col">
                 <Field
                   label="이름"
                   required
@@ -1475,106 +1478,100 @@ export default function MyPage() {
                 />
               </div>
 
-              <Field
-                label="연락처"
-                required
-                value={basicInfo.phone}
-                placeholder="예: 010-1234-5678"
-                onChange={(value) =>
-                  setBasicInfo((prev) => ({
-                    ...prev,
-                    phone: formatPhoneNumber(value),
-                  }))
-                }
-              />
-
-              <label style={{ display: "grid", gap: "9px" }}>
-                <FieldLabel
-                  label="현재 비밀번호"
+              <div className="ff-mypage-two-col">
+                <Field
+                  label="연락처"
                   required
-                  right={
-                    <span
-                      style={{
-                        position: "relative",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                      }}
-                      onMouseEnter={() => setPasswordTooltipOpen(true)}
-                      onMouseLeave={() => setPasswordTooltipOpen(false)}
-                      onFocus={() => setPasswordTooltipOpen(true)}
-                      onBlur={() => setPasswordTooltipOpen(false)}
-                    >
-                      <button
-                        type="button"
-                        aria-label="비밀번호 변경 안내"
+                  value={basicInfo.phone}
+                  placeholder="예: 010-1234-5678"
+                  onChange={(value) =>
+                    setBasicInfo((prev) => ({
+                      ...prev,
+                      phone: formatPhoneNumber(value),
+                    }))
+                  }
+                />
+
+                <label style={{ display: "grid", gap: "9px" }}>
+                  <FieldLabel
+                    label="현재 비밀번호"
+                    required
+                    right={
+                      <span
                         style={{
-                          width: "18px",
-                          height: "18px",
-                          borderRadius: "999px",
-                          border: "0",
+                          position: "relative",
                           display: "inline-flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          background: "#F1F5F9",
-                          color: "#64748B",
-                          fontSize: "11px",
-                          fontWeight: 800,
-                          cursor: "help",
-                          lineHeight: 1,
-                          padding: 0,
+                          flexShrink: 0,
                         }}
+                        onMouseEnter={() => setPasswordTooltipOpen(true)}
+                        onMouseLeave={() => setPasswordTooltipOpen(false)}
+                        onFocus={() => setPasswordTooltipOpen(true)}
+                        onBlur={() => setPasswordTooltipOpen(false)}
                       >
-                        i
-                      </button>
+                        <button
+                          type="button"
+                          aria-label="비밀번호 변경 안내"
+                          style={{
+                            width: "18px",
+                            height: "18px",
+                            borderRadius: "999px",
+                            border: "0",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            background: "#F1F5F9",
+                            color: "#64748B",
+                            fontSize: "11px",
+                            fontWeight: 800,
+                            cursor: "help",
+                            lineHeight: 1,
+                            padding: 0,
+                          }}
+                        >
+                          i
+                        </button>
 
-                      <InfoTooltip
-                        open={passwordTooltipOpen}
-                        text="비밀번호를 변경한 뒤에는 맨 아래의 저장하기 버튼을 눌러야 최종 적용됩니다."
-                      />
-                    </span>
-                  }
-                />
+                        <InfoTooltip
+                          open={passwordTooltipOpen}
+                          text="비밀번호를 변경한 뒤에는 정보 저장하기 버튼을 눌러야 최종 적용됩니다."
+                        />
+                      </span>
+                    }
+                  />
 
-                <input
-                  type="password"
-                  value={passwordInfo.currentPassword}
-                  placeholder="현재 비밀번호"
-                  onChange={(event) =>
-                    setPasswordInfo((prev) => ({
-                      ...prev,
-                      currentPassword: event.target.value,
-                    }))
-                  }
-                  style={{
-                    height: "52px",
-                    borderRadius: "18px",
-                    border: "1px solid #E2E8F0",
-                    background: "#FFFFFF",
-                    color: "#061B34",
-                    padding: "0 16px",
-                    fontSize: "15px",
-                    fontWeight: 800,
-                    outline: "none",
-                    boxSizing: "border-box",
-                    width: "100%",
-                  }}
-                />
-              </label>
+                  <input
+                    type="password"
+                    value={passwordInfo.currentPassword}
+                    placeholder="현재 비밀번호"
+                    onChange={(event) =>
+                      setPasswordInfo((prev) => ({
+                        ...prev,
+                        currentPassword: event.target.value,
+                      }))
+                    }
+                    style={{
+                      height: "52px",
+                      borderRadius: "18px",
+                      background: "#FFFFFF",
+                      color: "#061B34",
+                      padding: "0 16px",
+                      fontSize: "15px",
+                      fontWeight: 800,
+                      outline: "none",
+                      boxSizing: "border-box",
+                      width: "100%",
+                    }}
+                  />
+                </label>
+              </div>
 
-              <div
-                className="ff-mypage-two-col"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "16px",
-                }}
-              >
+              <div className="ff-mypage-two-col">
                 <Field
                   label="새 비밀번호"
                   value={passwordInfo.newPassword}
-                  placeholder="새 비밀번호"
+                  placeholder="최소 8자 이상"
                   type="password"
                   onChange={(value) =>
                     setPasswordInfo((prev) => ({ ...prev, newPassword: value }))
@@ -1584,7 +1581,7 @@ export default function MyPage() {
                 <Field
                   label="새 비밀번호 확인"
                   value={passwordInfo.confirmPassword}
-                  placeholder="새 비밀번호 확인"
+                  placeholder="비밀번호를 다시 입력하세요"
                   type="password"
                   onChange={(value) =>
                     setPasswordInfo((prev) => ({
@@ -1595,102 +1592,28 @@ export default function MyPage() {
                 />
               </div>
 
-              <div
-                style={{
-                  display: "grid",
-                  gap: "12px",
-                }}
-              >
-                <div
-                  style={{
-                    height: "10px",
-                    borderRadius: "999px",
-                    background: "#E5E7EB",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div
+              <div className="ff-mypage-password-meta">
+                <div className="ff-mypage-password-bar">
+                  <span
                     style={{
                       width: `${passwordStrength.percent}%`,
-                      height: "100%",
-                      borderRadius: "999px",
                       background: passwordStrength.color,
                     }}
                   />
                 </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "10px",
-                    flexWrap: "wrap",
-                    alignItems: "center",
-                  }}
-                >
-                  <span
-                    style={{
-                      minHeight: "32px",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      borderRadius: "999px",
-                      padding: "0 13px",
-                      color: passwordStrength.color,
-                      background: passwordStrength.bg,
-                      fontSize: "12px",
-                      fontWeight: 950,
-                    }}
-                  >
-                    비밀번호 보안 수준 · {passwordStrength.label}
-                  </span>
-
-                  {passwordChecks.map(([label, passed]) => (
-                    <span
-                      key={label}
-                      style={{
-                        minHeight: "32px",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        borderRadius: "999px",
-                        padding: "0 13px",
-                        color: passed ? "#0B7A53" : "#94A3B8",
-                        background: passed ? "#E6F6EF" : "#F8FAFC",
-                        border: "1px solid #E2E8F0",
-                        fontSize: "12px",
-                        fontWeight: 900,
-                      }}
-                    >
-                      · {label}
-                    </span>
-                  ))}
+                <div className="ff-mypage-password-label">
+                  보안 수준: {passwordStrength.label}
                 </div>
-
-                <p
-                  style={{
-                    color: passwordMatched ? "#0B7A53" : "#CD2E3A",
-                    fontSize: "13px",
-                    fontWeight: 900,
-                    margin: 0,
-                  }}
-                >
-                  {passwordMatched
-                    ? "새 비밀번호가 일치합니다."
-                    : "새 비밀번호 확인이 일치하지 않습니다."}
-                </p>
               </div>
+            </MyPageSectionCard>
 
-              <div
-                className="ff-mypage-two-col"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "16px",
-                }}
-              >
+            <MyPageSectionCard title="담당자 정보" icon={<IdCard />}>
+              <div className="ff-mypage-two-col">
                 <Field
-                  label="담당자명"
+                  label="담당자 성함"
                   selectable
                   value={basicInfo.manager}
-                  placeholder="예: 홍길동"
+                  placeholder="담당자 성함을 입력하세요"
                   onChange={(value) =>
                     setBasicInfo((prev) => ({ ...prev, manager: value }))
                   }
@@ -1700,7 +1623,7 @@ export default function MyPage() {
                   label="담당자 연락처"
                   selectable
                   value={basicInfo.managerPhone}
-                  placeholder="예: 010-0000-0000"
+                  placeholder="010-0000-0000"
                   onChange={(value) =>
                     setBasicInfo((prev) => ({
                       ...prev,
@@ -1709,103 +1632,15 @@ export default function MyPage() {
                   }
                 />
               </div>
+            </MyPageSectionCard>
 
-              <div
-                style={{
-                  border: "1px solid #E2E8F0",
-                  borderRadius: "26px",
-                  padding: "24px",
-                  background: "#FFFFFF",
-                  display: "grid",
-                  gridTemplateColumns: "minmax(0, 1fr) auto",
-                  gap: "18px",
-                  alignItems: "start",
-                }}
-              >
-                <div>
-                  <h3
-                    style={{
-                      color: "#061B34",
-                      fontSize: "20px",
-                      fontWeight: 950,
-                      letterSpacing: "-.3px",
-                      margin: 0,
-                    }}
-                  >
-                    프로필 저장 상태
-                  </h3>
-
-                  <p
-                    style={{
-                      color: "#667085",
-                      fontSize: "14px",
-                      fontWeight: 800,
-                      lineHeight: 1.6,
-                      margin: "8px 0 0",
-                    }}
-                  >
-                    저장 후 기업·설비 정보가 맞춤 분석 기준으로 사용됩니다.
-                  </p>
-
-                  <div
-                    style={{
-                      display: "grid",
-                      gap: "12px",
-                      marginTop: "18px",
-                    }}
-                  >
-                    <ChecklistItem
-                      done={basicInfoDone}
-                      label="기본 정보 입력"
-                    />
-                    <ChecklistItem
-                      done={companyInfoDone}
-                      label="기업정보 입력"
-                    />
-                    <ChecklistItem
-                      done={equipmentInfoDone}
-                      label="설비 1개 이상 등록"
-                    />
-                  </div>
-                </div>
-
-                <span
-                  style={{
-                    minHeight: "38px",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderRadius: "999px",
-                    padding: "0 16px",
-                    background: profileCompleted ? "#E6F6EF" : "#FFF4E5",
-                    color: profileCompleted ? "#0B7A53" : "#B45309",
-                    fontSize: "13px",
-                    fontWeight: 950,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {profileCompleted ? "저장 완료" : "저장 필요"}
-                </span>
-              </div>
-            </AccordionPanel>
-
-            <AccordionPanel
+            <MyPageSectionCard
               id="company-profile-form"
-              title="기업정보"
-              description="지원사업 추천 기준으로 사용되는 정보입니다."
-              badge={<span className="badge green">매칭 기준</span>}
-              open={openSections.company}
-              onToggle={() => toggleSection("company")}
+              title="기업 정보"
+              subtitle="지원사업 추천 기준으로 사용되는 정보입니다."
+              icon={<Building2 />}
             >
-              <div
-                className="ff-mypage-two-col"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "16px",
-                  alignItems: "start",
-                }}
-              >
+              <div className="ff-mypage-two-col">
                 <Field
                   label="기업명"
                   required
@@ -1895,7 +1730,6 @@ export default function MyPage() {
                       style={{
                         height: "52px",
                         borderRadius: "18px",
-                        border: "1px solid #E2E8F0",
                         background: "#FFFFFF",
                         color: "#061B34",
                         padding: "0 16px",
@@ -2009,237 +1843,100 @@ export default function MyPage() {
                   }
                 />
               </div>
+            </MyPageSectionCard>
 
-              <label style={{ display: "grid", gap: "9px" }}>
-                <FieldLabel
-                  label="연매출액"
-                  required
-                  right={
-                    <span
-                      style={{ position: "relative", display: "inline-flex" }}
-                      onMouseEnter={() => setAnnualRevenueTooltipOpen(true)}
-                      onMouseLeave={() => setAnnualRevenueTooltipOpen(false)}
-                      onFocus={() => setAnnualRevenueTooltipOpen(true)}
-                      onBlur={() => setAnnualRevenueTooltipOpen(false)}
-                    >
-                      <button
-                        type="button"
-                        aria-label="연매출액 안내"
-                        style={{
-                          width: "18px",
-                          height: "18px",
-                          borderRadius: "999px",
-                          border: 0,
-                          background: "#F1F5F9",
-                          color: "#64748B",
-                          fontSize: "11px",
-                          fontWeight: 800,
-                          cursor: "help",
-                        }}
-                      >
-                        i
-                      </button>
-                      <InfoTooltip
-                        open={annualRevenueTooltipOpen}
-                        text={`단위는 만원입니다. ${CURRENT_YEAR}년 기준 ${PREVIOUS_YEAR}년 매출액을 입력하면 됩니다.`}
-                      />
-                    </span>
-                  }
-                />
-                <input
-                  value={companyInfo.annualRevenue}
-                  placeholder="예: 100000"
-                  inputMode="numeric"
-                  onChange={(event) =>
-                    setCompanyInfo((prev) => ({
-                      ...prev,
-                      annualRevenue: formatCommaNumber(event.target.value),
-                    }))
-                  }
-                  style={{
-                    height: "52px",
-                    borderRadius: "18px",
-                    border: "1px solid #E2E8F0",
-                    background: "#FFFFFF",
-                    color: "#061B34",
-                    padding: "0 16px",
-                    fontSize: "15px",
-                    fontWeight: 800,
-                    outline: "none",
-                    boxSizing: "border-box",
-                    width: "100%",
-                  }}
-                />
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "10px",
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <span className="badge">단위: 만원</span>
-                  <span className="badge">예: 10억 원 = 100000</span>
-                  <span className="badge">
-                    {CURRENT_YEAR}년 기준 {PREVIOUS_YEAR}년 매출액
-                  </span>
-                </div>
-              </label>
+            <MyPageSectionCard title="최근 3개년 매출액" icon={<BarChart3 />}>
+              <div className="ff-mypage-revenue-table-wrap">
+                <table className="ff-mypage-revenue-table">
+                  <thead>
+                    <tr>
+                      <th>회계 연도</th>
+                      <th>매출액 (단위: 만원)</th>
+                      <th>비고</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        {PREVIOUS_YEAR}
+                        <span style={{ color: "#94a3b8", fontWeight: 700 }}> (추정)</span>
+                      </td>
+                      <td>
+                        <input
+                          value={companyInfo.annualRevenue}
+                          placeholder="매출액 입력"
+                          inputMode="numeric"
+                          onChange={(event) =>
+                            setCompanyInfo((prev) => ({
+                              ...prev,
+                              annualRevenue: formatCommaNumber(event.target.value),
+                            }))
+                          }
+                          className={companyInfo.annualRevenue.trim() ? "is-filled" : ""}
+                        />
+                      </td>
+                      <td>
+                        <MyPageRevenueStatusPill filled={!!companyInfo.annualRevenue.trim()} />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>{TWO_YEARS_AGO}</td>
+                      <td>
+                        <input
+                          value={companyInfo.revenue2YearsAgo}
+                          placeholder="매출액 입력"
+                          inputMode="numeric"
+                          onChange={(event) =>
+                            setCompanyInfo((prev) => ({
+                              ...prev,
+                              revenue2YearsAgo: formatCommaNumber(event.target.value),
+                            }))
+                          }
+                          className={companyInfo.revenue2YearsAgo.trim() ? "is-filled" : ""}
+                        />
+                      </td>
+                      <td>
+                        <MyPageRevenueStatusPill filled={!!companyInfo.revenue2YearsAgo.trim()} />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>{THREE_YEARS_AGO}</td>
+                      <td>
+                        <input
+                          value={companyInfo.revenue3YearsAgo}
+                          placeholder="매출액 입력"
+                          inputMode="numeric"
+                          onChange={(event) =>
+                            setCompanyInfo((prev) => ({
+                              ...prev,
+                              revenue3YearsAgo: formatCommaNumber(event.target.value),
+                            }))
+                          }
+                          className={companyInfo.revenue3YearsAgo.trim() ? "is-filled" : ""}
+                        />
+                      </td>
+                      <td>
+                        <MyPageRevenueStatusPill filled={!!companyInfo.revenue3YearsAgo.trim()} />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="ff-mypage-optional-note">
+                입력하지 않으면 직전년도 매출액을 기준으로 3년 평균값을 계산합니다.
+              </p>
+            </MyPageSectionCard>
 
-              <section
-                style={{
-                  border: "1px solid #E2E8F0",
-                  borderRadius: "26px",
-                  padding: "22px",
-                  background: "#FFFFFF",
-                  display: "grid",
-                  gap: "18px",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <h3
-                    style={{
-                      color: "#061B34",
-                      fontSize: "18px",
-                      fontWeight: 950,
-                      margin: 0,
-                    }}
-                  >
-                    최근 3개년 매출액
-                  </h3>
-                  <SelectChip />
-                </div>
-
-                <div
-                  className="ff-mypage-two-col"
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: "16px",
-                  }}
-                >
-                  <Field
-                    label={`${TWO_YEARS_AGO}년 매출액`}
-                    value={companyInfo.revenue2YearsAgo}
-                    placeholder="예: 95,000"
-                    helperText="단위: 만원"
-                    inputMode="numeric"
-                    onChange={(value) =>
-                      setCompanyInfo((prev) => ({
-                        ...prev,
-                        revenue2YearsAgo: formatCommaNumber(value),
-                      }))
-                    }
-                  />
-
-                  <Field
-                    label={`${THREE_YEARS_AGO}년 매출액`}
-                    value={companyInfo.revenue3YearsAgo}
-                    placeholder="예: 90,000"
-                    helperText="단위: 만원"
-                    inputMode="numeric"
-                    onChange={(value) =>
-                      setCompanyInfo((prev) => ({
-                        ...prev,
-                        revenue3YearsAgo: formatCommaNumber(value),
-                      }))
-                    }
-                  />
-                </div>
-
-                <p
-                  style={{
-                    color: "#667085",
-                    fontSize: "13px",
-                    fontWeight: 850,
-                    lineHeight: 1.65,
-                    margin: 0,
-                  }}
-                >
-                  입력하지 않으면 직전년도 매출액을 기준으로 3년 평균값을
-                  계산합니다.
-                </p>
-              </section>
-
-              <section
-                style={{
-                  border: "1px solid #E2E8F0",
-                  borderRadius: "26px",
-                  padding: "22px",
-                  background: "#FFFFFF",
-                  display: "grid",
-                  gap: "18px",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <h3
-                    style={{
-                      color: "#061B34",
-                      fontSize: "18px",
-                      fontWeight: 950,
-                      margin: 0,
-                    }}
-                  >
-                    선택정보 입력하기
-                  </h3>
-                  <SelectChip />
-                  <span
-                    style={{ position: "relative", display: "inline-flex" }}
-                    onMouseEnter={() => setCompanyInfoTooltipOpen(true)}
-                    onMouseLeave={() => setCompanyInfoTooltipOpen(false)}
-                    onFocus={() => setCompanyInfoTooltipOpen(true)}
-                    onBlur={() => setCompanyInfoTooltipOpen(false)}
-                  >
-                    <button
-                      type="button"
-                      aria-label="기업 선택정보 안내"
-                      style={{
-                        width: "20px",
-                        height: "20px",
-                        borderRadius: "999px",
-                        border: 0,
-                        background: "#F1F5F9",
-                        color: "#64748B",
-                        fontSize: "11px",
-                        fontWeight: 800,
-                        cursor: "help",
-                      }}
-                    >
-                      i
-                    </button>
-                    <InfoTooltip
-                      open={companyInfoTooltipOpen}
-                      text="선택정보는 필수는 아니지만, 지원사업 매칭과 신청서 초안 생성 시 보조 기준으로 사용됩니다."
-                    />
-                  </span>
-                </div>
-
-                <div
-                  className="ff-mypage-two-col"
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: "16px",
-                    alignItems: "start",
-                  }}
-                >
+            <MyPageSectionCard
+              title="선택정보 입력하기"
+              subtitle="* 분석 정확도가 향상됩니다."
+              icon={<CirclePlus />}
+            >
+              <div className="ff-mypage-two-col">
                   <Field
                     label="사업자등록번호"
                     value={companyInfo.businessNumber}
-                    placeholder="예: 123-45-67890"
+                    placeholder="000-00-00000"
                     onChange={(value) =>
                       setCompanyInfo((prev) => ({
                         ...prev,
@@ -2249,9 +1946,9 @@ export default function MyPage() {
                   />
 
                   <Field
-                    label="기업자산 총액"
+                    label="총 자산"
                     value={companyInfo.assetTotalManwon}
-                    placeholder="예: 500,000"
+                    placeholder="단위: 억원"
                     helperText="단위: 만원"
                     inputMode="numeric"
                     onChange={(value) =>
@@ -2261,18 +1958,11 @@ export default function MyPage() {
                       }))
                     }
                   />
-                </div>
+              </div>
 
-                <div
-                  className="ff-mypage-two-col"
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: "16px",
-                  }}
-                >
+              <div className="ff-mypage-two-col">
                   <SelectField
-                    label="대기업 계열사 여부"
+                    label="계열사 여부"
                     selectable={false}
                     value={companyInfo.affiliateStatus}
                     onChange={(value) =>
@@ -2285,9 +1975,9 @@ export default function MyPage() {
                   />
 
                   <Field
-                    label="설립연도"
+                    label="설립 연도"
                     value={companyInfo.foundedYear}
-                    placeholder="예: 2024"
+                    placeholder="YYYY"
                     inputMode="numeric"
                     onChange={(value) =>
                       setCompanyInfo((prev) => ({
@@ -2296,16 +1986,9 @@ export default function MyPage() {
                       }))
                     }
                   />
-                </div>
+              </div>
 
-                <div
-                  className="ff-mypage-two-col"
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: "16px",
-                  }}
-                >
+              <div className="ff-mypage-two-col">
                   <SelectField
                     label="사업장 유형"
                     selectable={false}
@@ -2328,646 +2011,44 @@ export default function MyPage() {
                     }
                     options={PURPOSE_OPTIONS}
                   />
-                </div>
-              </section>
-            </AccordionPanel>
-
-            <AccordionPanel
-              id="equipment-profile-form"
-              title="설비현황"
-              description="ROI 분석과 안전점검에 사용할 설비 정보를 관리합니다."
-              badge={
-                <span className="badge blue">
-                  ROI 분석 대상: {selectedEquipmentLabel}
-                </span>
-              }
-              open={openSections.equipment}
-              onToggle={() => toggleSection("equipment")}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  gap: "12px",
-                  flexWrap: "wrap",
-                  marginTop: "-8px",
-                }}
-              >
-                <button
-                  type="button"
-                  className="btn blue"
-                  onClick={addEquipment}
-                  style={{ minWidth: "150px" }}
-                >
-                  설비 추가
-                </button>
               </div>
+            </MyPageSectionCard>
 
-              <div style={{ display: "grid", gap: "22px" }}>
-                {equipmentList.map((equipment, index) => {
-                  const isSelected =
-                    equipment.id === selectedAnalysisEquipmentId;
-
-                  return (
-                    <article
-                      key={equipment.id}
-                      style={{
-                        border: isSelected
-                          ? "2px solid rgba(52,75,160,.34)"
-                          : "1px solid #E2E8F0",
-                        borderRadius: "28px",
-                        background: "#FFFFFF",
-                        padding: "24px",
-                        boxShadow: isSelected
-                          ? "0 16px 38px rgba(52,75,160,.09)"
-                          : "0 10px 24px rgba(15,23,42,.04)",
-                        display: "grid",
-                        gap: "22px",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "minmax(0, 1fr) auto",
-                          gap: "16px",
-                          alignItems: "center",
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSelectedAnalysisEquipmentId(equipment.id)
-                          }
-                          style={{
-                            border: 0,
-                            background: "transparent",
-                            padding: 0,
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "14px",
-                            textAlign: "left",
-                          }}
-                        >
-                          <span
-                            style={{
-                              width: "34px",
-                              height: "34px",
-                              borderRadius: "999px",
-                              background: isSelected ? "#344BA0" : "#EEF2FF",
-                              color: isSelected ? "#FFFFFF" : "#344BA0",
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              fontSize: "15px",
-                              fontWeight: 950,
-                              flexShrink: 0,
-                            }}
-                          >
-                            {isSelected ? "✓" : index + 1}
-                          </span>
-
-                          <span>
-                            <strong
-                              style={{
-                                display: "block",
-                                color: "#061B34",
-                                fontSize: "20px",
-                                fontWeight: 950,
-                                letterSpacing: "-.3px",
-                              }}
-                            >
-                              {equipment.name.trim() || `설비 ${index + 1}`}
-                            </strong>
-                            <span
-                              style={{
-                                display: "block",
-                                color: "#667085",
-                                fontSize: "13px",
-                                fontWeight: 850,
-                                marginTop: "4px",
-                              }}
-                            >
-                              {isSelected
-                                ? "현재 ROI 분석 대상"
-                                : "클릭하면 ROI 분석 대상으로 선택"}
-                            </span>
-                          </span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => removeEquipment(equipment.id)}
-                          style={{
-                            height: "40px",
-                            borderRadius: "999px",
-                            border: "1px solid #FEE2E2",
-                            background: "#FFFFFF",
-                            color: "#CD2E3A",
-                            padding: "0 16px",
-                            fontSize: "13px",
-                            fontWeight: 950,
-                            cursor: "pointer",
-                          }}
-                        >
-                          삭제
-                        </button>
-                      </div>
-
-                      <section
-                        style={{
-                          border: "1px solid #E2E8F0",
-                          borderRadius: "24px",
-                          padding: "20px",
-                          display: "grid",
-                          gap: "18px",
-                        }}
-                      >
-                        <h3
-                          style={{
-                            color: "#061B34",
-                            fontSize: "17px",
-                            fontWeight: 950,
-                            margin: 0,
-                          }}
-                        >
-                          설비 기본정보
-                        </h3>
-
-                        <div
-                          className="ff-mypage-three-col"
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "1.1fr 1fr 1fr",
-                            gap: "16px",
-                            alignItems: "start",
-                          }}
-                        >
-                          <SelectField
-                            label="설비 종류"
-                            required
-                            labelRight={<EquipmentCategoryHelpTooltip />}
-                            value={equipment.category}
-                            onChange={(value) =>
-                              updateEquipment(equipment.id, "category", value)
-                            }
-                            options={EQUIPMENT_CATEGORY_OPTIONS}
-                          />
-
-                          <Field
-                            label="설비명"
-                            required
-                            value={equipment.name}
-                            placeholder="예: 프레스 1호기"
-                            onChange={(value) =>
-                              updateEquipment(equipment.id, "name", value)
-                            }
-                          />
-
-                          <Field
-                            label="공정"
-                            selectable
-                            value={equipment.process}
-                            placeholder="예: 프레스"
-                            onChange={(value) =>
-                              updateEquipment(equipment.id, "process", value)
-                            }
-                          />
-                        </div>
-
-                        <div
-                          className="ff-mypage-three-col"
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "0.8fr 1fr 1fr",
-                            gap: "16px",
-                            alignItems: "start",
-                          }}
-                        >
-                          <Field
-                            label="설비 사용연수"
-                            required
-                            value={equipment.years}
-                            placeholder="예: 10"
-                            helperText="단위: 년"
-                            inputMode="numeric"
-                            onChange={(value) =>
-                              updateEquipment(equipment.id, "years", value)
-                            }
-                          />
-
-                          <Field
-                            label="연간 에너지 비용"
-                            required
-                            value={equipment.annualEnergyCost}
-                            placeholder="예: 5,000"
-                            helperText="단위: 만원"
-                            inputMode="numeric"
-                            labelRight={
-                              <span
-                                style={{
-                                  position: "relative",
-                                  display: "inline-flex",
-                                }}
-                                onMouseEnter={() =>
-                                  setEnergyTooltipEquipmentId(equipment.id)
-                                }
-                                onMouseLeave={() =>
-                                  setEnergyTooltipEquipmentId(null)
-                                }
-                                onFocus={() =>
-                                  setEnergyTooltipEquipmentId(equipment.id)
-                                }
-                                onBlur={() => setEnergyTooltipEquipmentId(null)}
-                              >
-                                <button
-                                  type="button"
-                                  aria-label="연간 에너지 비용 안내"
-                                  style={{
-                                    width: "18px",
-                                    height: "18px",
-                                    borderRadius: "999px",
-                                    border: 0,
-                                    background: "#F1F5F9",
-                                    color: "#64748B",
-                                    fontSize: "11px",
-                                    fontWeight: 800,
-                                    cursor: "help",
-                                  }}
-                                >
-                                  i
-                                </button>
-                                <InfoTooltip
-                                  open={
-                                    energyTooltipEquipmentId === equipment.id
-                                  }
-                                  text="해당 설비를 1년 동안 운영하는 전기·가스 등 에너지 비용을 만원 단위로 입력합니다."
-                                />
-                              </span>
-                            }
-                            onChange={(value) =>
-                              updateEquipment(
-                                equipment.id,
-                                "annualEnergyCost",
-                                formatCommaNumber(value),
-                              )
-                            }
-                          />
-
-                          <Field
-                            label="불량률"
-                            selectable
-                            value={equipment.defectRate}
-                            placeholder="예: 3"
-                            helperText="% 단위"
-                            onChange={(value) =>
-                              updateEquipment(equipment.id, "defectRate", value)
-                            }
-                          />
-                        </div>
-                      </section>
-
-                      <section
-                        style={{
-                          border: "1px solid #E2E8F0",
-                          borderRadius: "24px",
-                          padding: "20px",
-                          display: "grid",
-                          gap: "18px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                            flexWrap: "wrap",
-                          }}
-                        >
-                          <h3
-                            style={{
-                              color: "#061B34",
-                              fontSize: "17px",
-                              fontWeight: 950,
-                              margin: 0,
-                            }}
-                          >
-                            예상 투자비용 입력하기
-                          </h3>
-                          <SelectChip />
-                        </div>
-
-                        <div
-                          className="ff-mypage-two-col"
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "1fr 1fr",
-                            gap: "16px",
-                          }}
-                        >
-                          <Field
-                            label="전체교체 예상 투자금"
-                            value={equipment.scenarioAInvestment}
-                            placeholder="예: 22,000"
-                            helperText="단위: 만원"
-                            inputMode="numeric"
-                            onChange={(value) =>
-                              updateEquipment(
-                                equipment.id,
-                                "scenarioAInvestment",
-                                formatCommaNumber(value),
-                              )
-                            }
-                          />
-
-                          <Field
-                            label="부분교체 예상 투자금"
-                            value={equipment.scenarioBInvestment}
-                            placeholder="예: 4,994"
-                            helperText="단위: 만원"
-                            inputMode="numeric"
-                            onChange={(value) =>
-                              updateEquipment(
-                                equipment.id,
-                                "scenarioBInvestment",
-                                formatCommaNumber(value),
-                              )
-                            }
-                          />
-                        </div>
-
-                        <p
-                          style={{
-                            color: "#667085",
-                            fontSize: "13px",
-                            fontWeight: 850,
-                            lineHeight: 1.65,
-                            margin: 0,
-                          }}
-                        >
-                          입력하지 않으면 업계 평균 투자금으로 ROI를 추정합니다.
-                          입력하면 실제 투자 계획에 가까운 ROI 분석이
-                          가능합니다.
-                        </p>
-                      </section>
-
-                      <section
-                        style={{
-                          border: "1px solid #E2E8F0",
-                          borderRadius: "24px",
-                          padding: "20px",
-                          display: "grid",
-                          gap: "18px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                            flexWrap: "wrap",
-                          }}
-                        >
-                          <h3
-                            style={{
-                              color: "#061B34",
-                              fontSize: "17px",
-                              fontWeight: 950,
-                              margin: 0,
-                            }}
-                          >
-                            추가 운영지표 입력하기
-                          </h3>
-                          <SelectChip />
-                        </div>
-
-                        <div
-                          className="ff-mypage-four-col"
-                          style={{
-                            display: "grid",
-                            gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
-                            gap: "16px",
-                            alignItems: "start",
-                          }}
-                        >
-                          <Field
-                            label="연간 유지보수 비용"
-                            value={equipment.maintenanceCostAnnual}
-                            placeholder="예: 1,200"
-                            helperText="단위: 만원"
-                            inputMode="numeric"
-                            onChange={(value) =>
-                              updateEquipment(
-                                equipment.id,
-                                "maintenanceCostAnnual",
-                                formatCommaNumber(value),
-                              )
-                            }
-                          />
-
-                          <Field
-                            label="설비 용량 규격값"
-                            value={equipment.currentCapacityValue}
-                            placeholder="예: 100"
-                            labelRight={
-                              <span
-                                style={{
-                                  position: "relative",
-                                  display: "inline-flex",
-                                }}
-                                onMouseEnter={() =>
-                                  setCapacityTooltipEquipmentId(equipment.id)
-                                }
-                                onMouseLeave={() =>
-                                  setCapacityTooltipEquipmentId(null)
-                                }
-                                onFocus={() =>
-                                  setCapacityTooltipEquipmentId(equipment.id)
-                                }
-                                onBlur={() =>
-                                  setCapacityTooltipEquipmentId(null)
-                                }
-                              >
-                                <button
-                                  type="button"
-                                  aria-label="설비 용량 규격값 안내"
-                                  style={{
-                                    width: "18px",
-                                    height: "18px",
-                                    borderRadius: "999px",
-                                    border: 0,
-                                    background: "#F1F5F9",
-                                    color: "#64748B",
-                                    fontSize: "11px",
-                                    fontWeight: 800,
-                                    cursor: "help",
-                                  }}
-                                >
-                                  i
-                                </button>
-                                <InfoTooltip
-                                  open={
-                                    capacityTooltipEquipmentId === equipment.id
-                                  }
-                                  text="보조 단위: 프레스/사출기: 톤, CNC: kW"
-                                />
-                              </span>
-                            }
-                            onChange={(value) =>
-                              updateEquipment(
-                                equipment.id,
-                                "currentCapacityValue",
-                                value,
-                              )
-                            }
-                          />
-
-                          <Field
-                            label="연간 생산량"
-                            value={equipment.productionQty}
-                            placeholder="예: 50000"
-                            inputMode="numeric"
-                            onChange={(value) =>
-                              updateEquipment(
-                                equipment.id,
-                                "productionQty",
-                                value,
-                              )
-                            }
-                          />
-
-                          <Field
-                            label="제품 개당 예상이익"
-                            value={equipment.contributionMarginWon}
-                            placeholder="예: 12,000"
-                            helperText="원 단위"
-                            inputMode="numeric"
-                            onChange={(value) =>
-                              updateEquipment(
-                                equipment.id,
-                                "contributionMarginWon",
-                                formatCommaNumber(value),
-                              )
-                            }
-                          />
-                        </div>
-                      </section>
-                    </article>
-                  );
-                })}
-              </div>
-            </AccordionPanel>
-
-            <AccordionPanel
-              id="document-upload-form"
-              title="첨부파일"
-              description="저장한 서류는 신청서 생성 화면의 제출 전 확인 목록에서 자동으로 비교됩니다."
-              badge={<span className="badge green">PDF 저장 문서</span>}
-              open={openSections.documents}
-              onToggle={() => toggleSection("documents")}
+            <MyPageSectionCard
+              title="기업 증빙 관리"
+              subtitle="정책 신청에 필요한 공통 증빙서류를 미리 등록·관리하세요."
+              icon={<FileText />}
             >
-              <MyPageDocumentUploadPanel />
-            </AccordionPanel>
-          </div>
+              <CompanyDocumentsManagement />
+            </MyPageSectionCard>
 
-          <section
-            style={{
-              marginTop: "28px",
-              background: "#FFFFFF",
-              border: "1px solid #E2E8F0",
-              borderRadius: "30px",
-              padding: "26px",
-              display: "grid",
-              gridTemplateColumns: "1fr auto",
-              gap: "20px",
-              alignItems: "center",
-              boxShadow: "0 16px 48px rgba(15,23,42,.06)",
-            }}
-          >
-            <div>
-              <h2
-                style={{
-                  color: "#061B34",
-                  fontSize: "30px",
-                  fontWeight: 950,
-                  letterSpacing: "-.7px",
-                  margin: 0,
-                }}
-              >
-                분석 준비
-              </h2>
-
-              <p
-                style={{
-                  color: "#667085",
-                  fontSize: "14px",
-                  fontWeight: 850,
-                  lineHeight: 1.65,
-                  margin: "8px 0 0",
-                }}
-              >
-                저장된 기업·설비 정보를 기준으로 ROI 분석과 지원사업 추천을
-                시작할 수 있습니다. 현재 선택된 ROI 분석 대상 설비는{" "}
-                <b>{selectedEquipmentLabel}</b> 입니다.
-              </p>
-            </div>
-
-            <div
-              className="ff-mypage-analysis-actions"
-              style={{
-                display: "flex",
-                gap: "12px",
-                justifyContent: "flex-end",
-                flexWrap: "wrap",
-              }}
-            >
+            <div className="ff-mypage-form-actions">
               <button
                 type="button"
-                className="btn blue"
+                className="ff-mypage-btn ghost"
+                onClick={() => navigate("/dashboard")}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="ff-mypage-btn primary"
                 onClick={handleSave}
                 disabled={saving}
-                style={{
-                  minWidth: "180px",
-                  opacity: saving ? 0.72 : 1,
-                  cursor: saving ? "not-allowed" : "pointer",
-                }}
               >
-                {saving ? "저장 중..." : "저장하기"}
-              </button>
-
-              <button
-                type="button"
-                className="btn dark"
-                onClick={goToAnalysis}
-                disabled={analyzing}
-                style={{
-                  minWidth: "180px",
-                  opacity: analyzing ? 0.72 : 1,
-                  cursor: analyzing ? "not-allowed" : "pointer",
-                }}
-              >
-                {analyzing ? "분석 중..." : "분석하기"}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleReset}
-                style={{
-                  minWidth: "120px",
-                  height: "52px",
-                  borderRadius: "999px",
-                  border: "1px solid #E2E8F0",
-                  background: "#FFFFFF",
-                  color: "#667085",
-                  fontSize: "14px",
-                  fontWeight: 900,
-                  cursor: "pointer",
-                }}
-              >
-                초기화
+                {saving ? "저장 중..." : "정보 저장하기"}
               </button>
             </div>
-          </section>
+            </div>
+
+            <MyPageProfileStatusSidebar
+              completionScore={completionScore}
+              basicInfoDone={basicInfoDone}
+              companyInfoDone={companyInfoDone}
+              equipmentInfoDone={equipmentInfoDone}
+              onGoEquipment={() => navigate("/equipment")}
+            />
+          </div>
 
           {saved && (
             <div
@@ -3038,7 +2119,7 @@ export default function MyPage() {
             </div>
           )}
         </div>
-      </section>
-    </main>
+      </DashboardWorkspacePageLayout>
+    </>
   );
 }

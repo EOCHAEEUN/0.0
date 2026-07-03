@@ -31,6 +31,7 @@ type DraftContent = {
 
 type DraftApiData = {
   draft_result_id?: string | null
+  analysis_id?: string | null
   policy_id?: string | null
   company_id?: string | null
   equipment_id?: string | null
@@ -426,8 +427,10 @@ function resolveDraftParams(
     routeAnalysisId ||
     pickText(state, ["analysisId", "analysis_id", "id"]) ||
     pickText(selectedProjectFromState, ["analysisId", "analysis_id"]) ||
-    readLocalStorage("factofit_analysis_id") ||
-    readLocalStorage("analysis_id")
+    (!routePolicyId
+      ? readLocalStorage("factofit_analysis_id") ||
+        readLocalStorage("analysis_id")
+      : "")
 
   if (!companyId || !equipmentId || !policyId) return null
 
@@ -651,12 +654,16 @@ export function useApplicationDraft(
     [locationState, routeContext],
   )
   const storedAnalysisData = useMemo(() => getStoredAnalysisData(), [])
+  const companyId = params?.companyId
+  const equipmentId = params?.equipmentId
+  const policyId = params?.policyId
+  const analysisId = params?.analysisId
 
   useEffect(() => {
     let cancelled = false
 
     async function generateDraft() {
-      if (!params) {
+      if (!companyId || !equipmentId || !policyId) {
         setErrorMessage(
           "company_id, equipment_id, policy_id가 없어 신청서 초안을 생성할 수 없습니다. 지원사업 목록에서 공고를 먼저 선택해주세요.",
         )
@@ -681,10 +688,10 @@ export function useApplicationDraft(
           method: "POST",
           headers,
           body: JSON.stringify({
-            company_id: params.companyId,
-            equipment_id: params.equipmentId,
-            policy_id: params.policyId,
-            ...(params.analysisId ? { analysis_id: params.analysisId } : {}),
+            company_id: companyId,
+            equipment_id: equipmentId,
+            policy_id: policyId,
+            ...(analysisId ? { analysis_id: analysisId } : {}),
           }),
         })
 
@@ -715,7 +722,7 @@ export function useApplicationDraft(
     return () => {
       cancelled = true
     }
-  }, [params])
+  }, [analysisId, companyId, equipmentId, policyId])
 
   const draft = getDraftObject(apiData?.draft_result)
   const scenarioKey = normalizeScenarioKey(

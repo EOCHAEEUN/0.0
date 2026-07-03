@@ -124,6 +124,8 @@ function isEmailVerificationTarget(target: EventTarget | null) {
   }
 
   if (interactive instanceof HTMLButtonElement) {
+    if (interactive.classList.contains("ff-signup-submit")) return true
+
     const descriptor = normalizeText(
       [
         interactive.innerText,
@@ -226,12 +228,41 @@ export default function SignupModal({
     return {
       type: "lock",
       title: "이메일 인증을 먼저 완료해주세요.",
-      message: "인증번호 확인 후 비밀번호, 이름, 연락처 입력이 활성화됩니다.",
+      message: "인증번호 확인 후 나머지 항목을 입력할 수 있습니다.",
     }
   }, [isLockNoticeDismissed, isSignupUnlocked])
 
-  const lockNotice =
-    !isSignupUnlocked && signupNotice?.type === "lock" ? signupNotice : defaultLockedNotice
+  const canSubmit = useMemo(() => {
+    if (!isSignupUnlocked || form.isSubmitting) return false
+    if (missingRequiredItems.length > 0) return false
+    return isPasswordRequirementPassed(
+      form.password,
+      form.passwordChecks,
+      form.passwordLevel,
+      form.passwordLabel,
+    )
+  }, [
+    form.isSubmitting,
+    form.password,
+    form.passwordChecks,
+    form.passwordLabel,
+    form.passwordLevel,
+    isSignupUnlocked,
+    missingRequiredItems.length,
+  ])
+
+  const displayEmailNotice = useMemo(() => {
+    if (isSignupUnlocked) {
+      return {
+        type: "success" as const,
+        title: "이메일 인증이 완료되었습니다.",
+        message: "아래 항목을 입력해주세요.",
+      }
+    }
+    if (signupNotice?.type === "lock") return signupNotice
+    if (isLockNoticeDismissed) return null
+    return defaultLockedNotice
+  }, [defaultLockedNotice, isLockNoticeDismissed, isSignupUnlocked, signupNotice])
 
   const requiredNotice =
     isSignupUnlocked && signupNotice?.type === "required" ? signupNotice : null
@@ -307,9 +338,9 @@ export default function SignupModal({
 
         <header className="ff-signup-header">
           <h2>회원가입</h2>
-          <p>간단한 계정 생성 후, 우리 기업에 맞는 투자 분석을 시작해보세요.</p>
-          <p className="ff-signup-header-sub">
-            가입 후 기업 정보를 입력하면 ROI 분석과 투자 관리에 필요한 맞춤 결과를 받아볼 수 있습니다.
+          <p>
+            간단한 계정 생성 후, 우리 기업에 맞는 투자 분석을 시작해보세요. 가입 후 기업 정보를
+            입력하면 맞춤 ROI 결과를 받아볼 수 있습니다.
           </p>
 
           <div className="ff-signup-badges">
@@ -319,29 +350,36 @@ export default function SignupModal({
           </div>
         </header>
 
-        {lockNotice && (
+        {displayEmailNotice && (
           <div
-            className="ff-signup-top-notice ff-signup-top-notice--lock"
+            className={`ff-signup-top-notice ${
+              displayEmailNotice.type === "success"
+                ? "ff-signup-top-notice--success"
+                : "ff-signup-top-notice--lock"
+            }`}
             role="status"
             aria-live="polite"
           >
             <div className="ff-signup-top-notice__head">
               <div>
-                <strong>{lockNotice.title}</strong>
-                <p>{lockNotice.message}</p>
+                <strong>{displayEmailNotice.title}</strong>
+                <p>{displayEmailNotice.message}</p>
               </div>
-              <button
-                type="button"
-                className="ff-signup-notice-close"
-                onClick={closeLockNotice}
-                aria-label="안내 닫기"
-              >
-                ×
-              </button>
+              {displayEmailNotice.type !== "success" ? (
+                <button
+                  type="button"
+                  className="ff-signup-notice-close"
+                  onClick={closeLockNotice}
+                  aria-label="안내 닫기"
+                >
+                  ×
+                </button>
+              ) : null}
             </div>
           </div>
         )}
 
+        <div className="ff-signup-body">
         <AccountSection
           email={form.email}
           emailCode={form.emailCode}
@@ -424,14 +462,16 @@ export default function SignupModal({
           </div>
         )}
 
+        </div>
+
         <button
           type="button"
-          className={`ff-signup-submit ${isSignupUnlocked ? "" : "ff-signup-submit--locked"}`}
+          className={`ff-signup-submit ${canSubmit ? "" : "ff-signup-submit--locked"}`}
           onClick={handleSubmit}
           disabled={form.isSubmitting}
-          aria-disabled={!isSignupUnlocked || form.isSubmitting}
+          aria-disabled={!canSubmit || form.isSubmitting}
         >
-          {form.isSubmitting ? "저장 중..." : "회원가입 완료"}
+          {form.isSubmitting ? "가입 처리 중..." : "회원가입 완료"}
         </button>
 
         <button
@@ -439,7 +479,7 @@ export default function SignupModal({
           className="ff-signup-login-link"
           onClick={onLoginClick ?? onClose}
         >
-          이미 계정이 있으신가요? 로그인으로 돌아가기
+          이미 계정이 있으신가요? <strong>로그인으로 돌아가기</strong>
         </button>
       </section>
     </div>

@@ -10,17 +10,3 @@ export type LoginFeatureCard = {
   line1: string
   line2: string
 }
-
-export type LoginPreviewMetric = {
-  label: string
-  value: string
-  color: string
-}
-
-export type LoginPreviewData = {
-  availablePolicyCount: string
-  expectedSupportAmount: string
-  expectedRoi: string
-  recommendedPolicies: string[]
-  policyNews: string[]
-}

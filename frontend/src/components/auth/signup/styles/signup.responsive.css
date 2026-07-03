@@ -1,15 +1,23 @@
 @media (max-width: 760px) {
+  .ff-signup-overlay {
+    padding: 8px;
+    align-items: flex-start;
+    overflow-y: auto;
+  }
+
   .ff-signup-panel {
-    padding: 32px 24px;
-    border-radius: 28px;
+    max-height: none;
+    margin: auto 0;
+    padding: 18px 16px 14px;
+    border-radius: 18px;
   }
 
   .ff-signup-header {
-    padding-right: 56px;
+    padding-right: 36px;
   }
 
   .ff-signup-header h2 {
-    font-size: 38px;
+    font-size: 24px;
   }
 
   .ff-signup-two-col,
@@ -22,27 +30,19 @@
   }
 
   .ff-signup-close {
-    top: 22px;
-    right: 22px;
-    width: 48px;
-    height: 48px;
+    top: 14px;
+    right: 14px;
+  }
+}
+
+@media (max-height: 720px) and (min-width: 761px) {
+  .ff-signup-overlay {
+    align-items: flex-start;
+    overflow-y: auto;
   }
 
-  .ff-signup-industry-row-top {
-    margin-bottom: 10px;
-  }
-
-  .ff-signup-add-industry {
-    height: 54px;
-    border-radius: 18px;
-  }
-
-  .ff-signup-optional-summary {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-
-  .ff-signup-optional-summary b {
-    width: 72px;
+  .ff-signup-panel {
+    margin-top: 8px;
+    margin-bottom: 8px;
   }
 }

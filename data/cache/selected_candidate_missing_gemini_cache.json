@@ -1,0 +1,938 @@
+{
+  "7b63226a76764c68121084efefde9390bae97e2a4211bec096f4ce8417dfd4ce": {
+    "parsed": {
+      "decision": "adopt_candidate",
+      "candidate_index": 5,
+      "representative_amount_manwon": 2380000.0,
+      "amount_type": "subsidy",
+      "roi_apply_method": "subtract",
+      "confidence": "high",
+      "reason": "최대 238만원은 현금성 지원금으로 ROI 직접 차감이 가능하며, 총사업비의 85%를 지원하는 조건이 명시되어 있어 대표 지원금으로 적합합니다.",
+      "evidence_text": "□지원 규모 및 조건◦(지원규모)500개사내외◦(지원조건)총사업비의85%지원구 분지원방법지원기간사업비(분담비율)정부지원(85%)민간부담(15%)사전 기획DX멘토단 1인 x 8회최대 3개월238만원42만원"
+    },
+    "policy_id": "PBLN_000000000117019"
+  },
+  "c8f5e4181097ec27fddcbc6b4d95ddb1657c778d627e933ef01972430164b9e2": {
+    "parsed": {
+      "decision": "adopt_candidate",
+      "candidate_index": 1,
+      "representative_amount_manwon": 45.0,
+      "amount_type": "support_amount",
+      "roi_apply_method": "review",
+      "confidence": "high",
+      "reason": "중증여성 장애인 고용 시 최대 45만원의 현금성 지원금이 명확하게 제시되어 대표 지원금으로 선정합니다.",
+      "evidence_text": "중증여성 45만원"
+    },
+    "policy_id": "PBLN_000000000117066"
+  },
+  "1dbea048a8f963461684841f916f649b7b7e01bc096a758a1428784f296bf731": {
+    "parsed": {
+      "decision": "adopt_candidate",
+      "candidate_index": 0,
+      "representative_amount_manwon": 360.0,
+      "amount_type": "support_amount",
+      "roi_apply_method": "review",
+      "confidence": "high",
+      "reason": "해외 등록 비용 지원으로 명확한 현금성 지원금액이 제시되어 대표 지원금으로 채택합니다.",
+      "evidence_text": "해외 등록 비용 지원 미 국 3,600천원"
+    },
+    "policy_id": "PBLN_000000000117463"
+  },
+  "b60f058c22ea25cc33180260e10f1c10570c8690e8bf4b6c74d61e8864066f2a": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "review",
+      "confidence": "low",
+      "reason": "제시된 후보 금액들은 '최대 OO억원'으로 표시되어 있으며, 구체적인 지원 대상이나 방식에 대한 정보가 부족하여 ROI 직접 차감이 가능한 대표 지원금으로 판단하기 어렵습니다. 또한, '대학창업펀드'와 같은 투자 형태의 지원으로 보이며, 이는 직접적인 현금성 지원금과는 다를 수 있습니다.",
+      "evidence_text": "초기~7년 미만 농식품 경영체 인라이트벤처스 65억  대학창업펀드 12 대학창업 펀드 제1호/2호 초기기업"
+    },
+    "policy_id": "PBLN_000000000117654"
+  },
+  "847ee2a16f9f15ed5c3abf9a27fa35028ef90b68e605b8ce3dbc92b2412d4b3f": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": null,
+      "roi_apply_method": null,
+      "confidence": "high",
+      "reason": "모든 후보가 컨설팅 비용, 자부담 또는 불확실한 유형으로, 직접 차감 가능한 대표 현금성 지원금이 명확하지 않습니다.",
+      "evidence_text": "current_type: consulting_fee, self_funding, unknown"
+    },
+    "policy_id": "PBLN_000000000117794"
+  },
+  "98fb2d802aa9c8ec38f9da7977ffcadc3c90289123be25408308c0c268def6e9": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "unknown",
+      "confidence": "low",
+      "reason": "제시된 후보들은 1인당 지급액 또는 지원 비율로, 직접적인 ROI 차감이 가능한 대표 지원금으로 보기 어렵습니다.",
+      "evidence_text": "참여자 3개월 이상 고용 시 1명당 근속인센티브 20만원 지급(1회)"
+    },
+    "policy_id": "PBLN_000000000118047"
+  },
+  "4f6881b7339e4c72e5c24eb1a599f7cc02aa46e09cc38aa89e3762dc9537449b": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "review",
+      "confidence": "low",
+      "reason": "제시된 금액은 외국인 전문인력 고용 추천을 위한 임금 요건으로, 직접적인 현금성 지원금이 아니므로 ROI 직접 차감 가능한 대표 지원금으로 보기 어렵습니다.",
+      "evidence_text": "최대 2,897만원"
+    },
+    "policy_id": "PBLN_000000000118049"
+  },
+  "95b2921757941048313d0c3f8c0ad3fc905c49b9a2bfcb80f0034475ac7cb14b": {
+    "parsed": {
+      "decision": "adopt_candidate",
+      "candidate_index": 4,
+      "representative_amount_manwon": 1000.0,
+      "amount_type": "unknown",
+      "roi_apply_method": "review",
+      "confidence": "high",
+      "reason": "초기 사업화자금으로 명확한 현금성 지원금 후보입니다.",
+      "evidence_text": "초기 사업화자금 (최대 1,000만원)"
+    },
+    "policy_id": "PBLN_000000000118204"
+  },
+  "33ef2771331b4543229ce406bd2c3cfc8a9a2a9131300d7bda1cd4a682988940": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "unknown",
+      "confidence": "low",
+      "reason": "제시된 후보 금액들은 교육비, 컨설팅비 등 직접적인 현금성 지원금으로 보기 어렵거나, 금액의 성격이 불명확하여 대표 지원금으로 선정하기 어렵습니다.",
+      "evidence_text": "후보 2번은 education_fee로 분류되어 있으며, 다른 후보들은 unknown으로 분류되어 명확한 현금성 지원금으로 판단하기 어렵습니다."
+    },
+    "policy_id": "PBLN_000000000118927"
+  },
+  "621c04e267681dfd036535dd929f0a8ff826b877ba2844e7130e75383914fa83": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": null,
+      "roi_apply_method": null,
+      "confidence": "high",
+      "reason": "제시된 후보 금액들은 장비 사용료, 총 지원 규모, 또는 특정 조건(80만원 이상 활용 건)에 해당하여 ROI 직접 차감이 가능한 대표 지원금으로 보기 어렵습니다.",
+      "evidence_text": "기술개발 및 품질 향상을 위한 연구장비 활용 비용 지원 - 기업당 지원한도 4,000천원 이내 지원, 총 5개사 내외 / 최대 20,000천원 이내, 장비 활용장비 사용료4,000천원 이내, 지원금 기준 80만원 이상 활용건부터 지원"
+    },
+    "policy_id": "PBLN_000000000119457"
+  },
+  "9557e70102c754486307475141fa8baeb93a3e018f69d63f4ed931a6ad6873bb": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "review",
+      "confidence": "low",
+      "reason": "제시된 후보들은 총 지원 규모, 과제당 지원금액, 지원 비율 등 다양한 형태를 포함하고 있어 ROI 직접 차감이 가능한 단일 대표 지원금을 명확히 선정하기 어렵습니다.",
+      "evidence_text": "후보 목록의 current_type이 total_support_scale, unknown 등으로 다양하며, support_ratio도 포함되어 있어 대표 금액을 특정하기 어렵습니다."
+    },
+    "policy_id": "PBLN_000000000119764"
+  },
+  "5bae0a265b3d57992da57d35dfe49516825efa5152e6b35d761c87dc580c2708": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": null,
+      "roi_apply_method": null,
+      "confidence": "low",
+      "reason": "제시된 후보들은 작품당 최대 금액, 지원 규모, 순 제작비 조건, 관내 소비액 조건, 숙박업소 단가 등 다양한 조건으로 명시되어 있어 ROI 직접 차감이 가능한 단일 대표 지원금을 특정하기 어렵습니다.",
+      "evidence_text": "작품당 최대 5천만원 지급 가능, 지원규모 : 193,700천원, 순 제작비 10억 이상 작품 중, 관내 소비액이 2천만원 이상인 작품, 객 단가 10만원(공급가액) 이하 숙박업소"
+    },
+    "policy_id": "PBLN_000000000119851"
+  },
+  "9e336cb515633fed3f8709a6897bf1660592f5b75f905c3e83f88d3e14ef7c27": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "review",
+      "confidence": "low",
+      "reason": "제시된 후보들은 작품당 최대 금액, 지원 규모, 지원 비율 등 다양한 형태로 제시되어 ROI 직접 차감이 가능한 단일 대표 지원금을 명확히 특정하기 어렵습니다.",
+      "evidence_text": "작품당 최대 7천만원 지급 가능, 지원규모 : 90,800천원, 최대 70% 지원"
+    },
+    "policy_id": "PBLN_000000000119852"
+  },
+  "9e53a421906baca393afa5c67c0b2c4a6e4bb2cc72b6b10dccc3f6d1d857f9dc": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "consulting_fee",
+      "roi_apply_method": "recommend_only",
+      "confidence": "high",
+      "reason": "모든 후보 금액은 컨설팅 비용이며, ROI 직접 차감이 아닌 recommend_only 또는 review 방식으로 적용되어 대표 지원금으로 채택할 수 없습니다.",
+      "evidence_text": "current_roi_method: recommend_only"
+    },
+    "policy_id": "PBLN_000000000119978"
+  },
+  "dc435ce6dfc80b4e9fefaec29ab9efe6414727ade133afeaaf05ee6f6b56e01b": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "review",
+      "confidence": "low",
+      "reason": "제시된 후보는 '최대 10억원'으로 명시되어 있으나, 이는 총 지원 규모를 나타낼 가능성이 높으며, 구체적인 현금성 지원금액이나 ROI 직접 차감이 가능한 대표 지원금액으로 판단하기 어렵습니다. 또한, '서울시 발주 10억원 미만 건설'이라는 조건은 지원 대상의 범위를 나타낼 뿐, 지원금액 자체를 특정하지 않습니다.",
+      "evidence_text": "선착순 마감 시 조기 종료 o 모집 대상 -【市 유관 사업장】서울시 발주 10억원 미만 건설"
+    },
+    "policy_id": "PBLN_000000000120006"
+  },
+  "d8905aa16fedcf9a64f7bb286580642102bc4d705ae6025ade86ddd9d9fde653": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "review",
+      "confidence": "low",
+      "reason": "제시된 후보들은 보험의 보상한도 금액으로, 직접적인 현금성 지원금이라기보다는 보험 가입 시 최대 보장 금액을 나타냅니다. 따라서 ROI 직접 차감이 가능한 대표 지원금으로 보기 어렵습니다.",
+      "evidence_text": "보상한도 : gfedc3천만원 gfedc5천만원"
+    },
+    "policy_id": "PBLN_000000000120170"
+  },
+  "7be1c52c5370d2f57083c3315809ef70fb3318bed3775da36c0f3aa87b038f51": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "review",
+      "confidence": "low",
+      "reason": "제시된 금액은 '1건당 약 730천원'으로, 건당 금액으로 대표 지원금으로 판단하기 어렵습니다.",
+      "evidence_text": "1건당 약 730천원 내외 氠瑢 Ⅱ 사업 신청 및 문의 □ (신청방법 및 문의처) 氠瑢"
+    },
+    "policy_id": "PBLN_000000000120201"
+  },
+  "3951c5989ce3d04c8643b3840630a80e163ecc772907d8358cc0ba3080083fa7": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": null,
+      "roi_apply_method": null,
+      "confidence": "high",
+      "reason": "제시된 후보들은 시험 수수료 지원 비율 및 최대 지원 금액으로, 직접적인 현금성 지원금으로 보기 어려워 대표 지원금으로 채택할 수 없습니다.",
+      "evidence_text": "시험수수료 80% 정부지원 (라이트 약 4.8백만원"
+    },
+    "policy_id": "PBLN_000000000121038"
+  },
+  "73a585d62e47fefde2c98011effb7c2f0e71892e7ee52fd345c4508b95435d7b": {
+    "parsed": {
+      "decision": "adopt_candidate",
+      "candidate_index": 9,
+      "representative_amount_manwon": 1000,
+      "amount_type": "support_amount",
+      "roi_apply_method": "review",
+      "confidence": "high",
+      "reason": "공고문에서 '지원금액 : 10,000천원 이내'라고 명시되어 있어 대표 지원금으로 적합합니다.",
+      "evidence_text": "지원금액 : 10,000천원 이내"
+    },
+    "policy_id": "PBLN_000000000121397"
+  },
+  "26671da0cb1307495f1ac8db60d361e27b6859aae4aeba60eba861451c680725": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": null,
+      "roi_apply_method": null,
+      "confidence": "low",
+      "reason": "제시된 후보들 중 직접적인 현금성 지원금으로 명확하게 판단되는 대표 지원금이 없으며, 대부분 총사업비, 민간부담금, 지원규모 등 간접적이거나 조건부 금액으로 구성되어 있습니다.",
+      "evidence_text": "후보 목록의 current_type이 self_funding, total_project_cost, total_support_scale, unknown, support_ratio 등으로 다양하며, 직접적인 현금성 지원금으로 명확히 식별되는 항목이 없습니다."
+    },
+    "policy_id": "PBLN_000000000121415"
+  },
+  "6c52ba30b8b54bf47acc0a3df33bbacbdf618513fcb580027ef87289a86430e4": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": null,
+      "roi_apply_method": null,
+      "confidence": "low",
+      "reason": "제시된 후보 금액들은 총사업비, 자부담, 컨설팅 비용 등 다양한 성격의 금액으로 구성되어 있어 ROI 직접 차감이 가능한 단일 대표 지원금을 명확히 특정하기 어렵습니다.",
+      "evidence_text": "후보 목록의 current_type이 total_project_cost, self_funding, consulting_fee 등으로 다양하게 나타나며, 명확한 현금성 지원금으로 보기 어렵습니다."
+    },
+    "policy_id": "PBLN_000000000121614"
+  },
+  "1f2044166603b1cb11dee05b4caf59d73e8a7ea7a1674a47b95312cc1cf3a716": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "unknown",
+      "confidence": "low",
+      "reason": "제시된 후보들은 지원 비율 또는 불명확한 금액으로, 직접적인 현금성 지원금액으로 보기 어려워 대표 지원금으로 채택하기 어렵습니다.",
+      "evidence_text": "최대 80% 지원"
+    },
+    "policy_id": "PBLN_000000000121777"
+  },
+  "d5c5ad26f42dd11e2bf65cc06b8e413b059b04604b69b9d444547b76cfd0f733": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": null,
+      "roi_apply_method": null,
+      "confidence": "high",
+      "reason": "제시된 후보 금액들은 총사업비, 예산, 자부담금으로, 직접적인 현금성 지원금액으로 보기 어려워 대표 지원금으로 채택할 수 없습니다. 지원 비율(80%)은 있으나 직접적인 금액이 아닙니다.",
+      "evidence_text": "총사업비 : 506백만원, 2026년도 본 예 산 : 416백만원, 자부담 166, 최대 80% 지원"
+    },
+    "policy_id": "PBLN_000000000122168"
+  },
+  "c28a1660d7d3df99151838b8e811d33e44ca9d6fcb2317ce492ed5fd74cba39f": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": null,
+      "roi_apply_method": null,
+      "confidence": "low",
+      "reason": "제시된 후보들은 '과제별 지원금' 또는 '총 지원 규모'로 명시되어 있으며, 'unknown' 또는 'total_support_scale' 타입으로 분류되어 대표 현금성 지원금으로 직접 차감하기 어렵습니다. 또한, 'review'로 표시되어 확신이 낮습니다.",
+      "evidence_text": "과제별44백만원, 과제별55백만원, (지원규모) 최대 4,400만원, (지원규모) 최대 5,500만원"
+    },
+    "policy_id": "PBLN_000000000122275"
+  },
+  "0abd033f9ac7f385a4a6fe7fa7dd7a89dc2e70d74d61f33bc78697326abbb915": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": null,
+      "roi_apply_method": null,
+      "confidence": "low",
+      "reason": "제시된 후보 금액들은 총 지원 규모, 컨설팅 비용, 또는 불확실한 항목으로, ROI 직접 차감이 가능한 대표 현금성 지원금으로 명확하게 판단하기 어렵습니다.",
+      "evidence_text": "old_amount_actual: 최대 3,200만원, current_type: total_support_scale, current_type: consulting_fee, current_type: unknown"
+    },
+    "policy_id": "PBLN_000000000122644"
+  },
+  "f660d2261fdbaf531df1ec1d25a4dd1ee16d8d7e4e8184daca7ea944291bd772": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "unknown",
+      "confidence": "low",
+      "reason": "제시된 후보들은 총 지원 규모 또는 지원 비율로, 직접적인 현금성 지원금액으로 보기 어려워 대표 지원금으로 채택하기 어렵습니다.",
+      "evidence_text": "총 205억원 내외 지원, 최대 100% 지원"
+    },
+    "policy_id": "PBLN_000000000122761"
+  },
+  "1782cb9f6334b9d781f1501134934fcd05ecfbb6247211db1497cddb2fcb20e3": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "review",
+      "confidence": "low",
+      "reason": "제시된 후보들은 총 지원 규모, 지원 비율, 또는 불확실한 금액으로 구성되어 있어 ROI 직접 차감이 가능한 대표 지원금을 명확히 특정하기 어렵습니다.",
+      "evidence_text": "후보 목록의 current_type이 total_support_scale, support_ratio, unknown으로 다양하며, 일부는 연간 최대 금액이나 특정 연차별 금액을 나타내어 대표 지원금으로 선정하기 어렵습니다."
+    },
+    "policy_id": "PBLN_000000000122820"
+  },
+  "bb22767bca86479bc458dd9c0a5363117e5cddc3e604ccdc8eb4403e16f3ef75": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "review",
+      "confidence": "low",
+      "reason": "제시된 금액은 최대 지원 가능 금액이며, 실제 지원 규모는 제품 가격 및 임차 방식 등 여러 요인에 따라 달라질 수 있어 대표 지원금으로 확정하기 어렵습니다.",
+      "evidence_text": "최대 2,000만원"
+    },
+    "policy_id": "PBLN_000000000122852"
+  },
+  "30c39f02060cc6e1ea71104d3ffad51f128d43ef61faf3b75bc68cdddbb1d615": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "review",
+      "confidence": "low",
+      "reason": "제시된 후보들은 '최대 1.2억원' 또는 '최대 4,500만원'과 같이 과제별 소요예산으로 명시되어 있으며, 이는 총 지원 규모나 사업비의 일부일 수 있어 직접적인 ROI 차감 가능한 대표 지원금으로 보기 어렵습니다. 또한 '최대 100% 지원'은 지원 비율을 나타내므로 대표 현금성 지원금으로 판단하기 어렵습니다.",
+      "evidence_text": "과 제 명 기간 예산 RFP 1 계약시장제도 도입에 따른 제도 전환 세부 설계 방안 마련 연구 12개월 120백만원 RFP 2 태양광 발전설비 재해예방을 위한 시공 기준 강화 및 철강 구조물 품질관리 기준 마련을 위한 정책 연구 6개월 45백만원 RFP 3"
+    },
+    "policy_id": "PBLN_000000000122891"
+  },
+  "372b1cee38fe6530995990472cd20c9581e652e7be89a0dfb26c4e8d3b9fa133": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "review",
+      "confidence": "low",
+      "reason": "제시된 후보 금액들은 주로 채용 인원 산정 기준이나 연구개발비의 배수 조건으로 언급되어 직접적인 현금성 지원금액으로 보기 어렵고, 지원 비율(최대 100%)만 명시되어 있어 대표 지원금액을 특정하기 어렵습니다.",
+      "evidence_text": "정부지원연구개발비 합계액이 5억원의 배수에 달할 때마다 해당 연도 말까지 채용하여야 할 인원을 1명씩 가산 예시) 연구개발기관 중 3개의 기업이 나누어 받는 총 정부지원연구개발비 13.8억원인 경우"
+    },
+    "policy_id": "PBLN_000000000123130"
+  },
+  "b88e1087ddd71f692a5fb45efaac1902af59c8d867d1e7fe89707f932df157ee": {
+    "parsed": {
+      "decision": "adopt_candidate",
+      "candidate_index": 2,
+      "representative_amount_manwon": 153600.0,
+      "amount_type": "subsidy",
+      "roi_apply_method": "review",
+      "confidence": "high",
+      "reason": "공고문에 명시된 국비 예산 규모가 직접적인 현금성 지원금으로 판단되어 대표 지원금으로 선정합니다.",
+      "evidence_text": "식품소재 및 반가공산업 관련 시설 및 장비구축(예산(안): 국비 1,536백만원)"
+    },
+    "policy_id": "PBLN_000000000123147"
+  },
+  "1bd74e23883543336af1a523a1baeb91a5d66c21853717299065dd2422a293df": {
+    "parsed": {
+      "decision": "adopt_candidate",
+      "candidate_index": 0,
+      "representative_amount_manwon": 120.0,
+      "amount_type": "subsidy",
+      "roi_apply_method": "subtract",
+      "confidence": "high",
+      "reason": "매장별 120만원 현금성 지원금이 명확하여 대표 지원금으로 선정합니다.",
+      "evidence_text": "매장별 1,200,000원 지원"
+    },
+    "policy_id": "PBLN_000000000123336"
+  },
+  "62a2c0037f4ccf1fff67308be0d4f3536a70f55e1876cc5dd90325382049aed4": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "review",
+      "confidence": "low",
+      "reason": "제시된 후보 금액들은 특정 업종별 최대 지원 규모를 나타내거나, 총 지원 규모를 의미하며, ROI 직접 차감이 가능한 대표 현금성 지원금으로 명확하게 판단하기 어렵습니다.",
+      "evidence_text": "후보 목록의 display_amount 및 context에서 '최대 120억원', '최대 80억원', '최대 10억원' 등은 특정 업종별 지원 한도 또는 총 지원 규모를 나타내며, ROI 직접 차감이 가능한 대표 지원금으로 보기 어렵습니다. 또한, '최대 450만원'은 지원 규모로 명시되어 있으나, 전체 공고의 대표 지원금으로 보기에는 불명확합니다."
+    },
+    "policy_id": "PBLN_000000000123354"
+  },
+  "67aebac3e4e93c791bb637499b39077324a83ff3b8353229f6cb9fd0e0eb036a": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": null,
+      "roi_apply_method": null,
+      "confidence": "low",
+      "reason": "제시된 후보들은 총 지원 규모, 지원 비율, 기업당 최대 지원금 등 명확한 단일 현금성 지원금으로 보기 어려워 대표 지원금을 선정하기 어렵습니다.",
+      "evidence_text": "ㅇ (지원규모) 2.1억원 ㅇ (지원기간) 협약일로부터 ~ 2026 외 제조로봇 및 로봇SI기업 기업당 최대 70백만원 최대 100% 지원"
+    },
+    "policy_id": "PBLN_000000000123374"
+  },
+  "d6cdf0c08d33e274beebe248009e8fe5966cf3ed33fe4ce0707f3f9dcc8004ce": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": 0,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "review",
+      "confidence": "medium",
+      "reason": "해당 금액은 '1사당 최대 4백만원'으로, 피칭 코칭 등 지원에 대한 금액으로 명시되어 있어 직접적인 현금성 지원금으로 보기 어렵습니다.",
+      "evidence_text": "피칭 코칭 등(1社당 최대 4백만원"
+    },
+    "policy_id": "PBLN_000000000123379"
+  },
+  "362714a6b1cefddd5609963618a33c9bcdd6766cf64fb18931edfc976bca008a": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "unknown",
+      "confidence": "low",
+      "reason": "제시된 후보 금액들은 매출액 조건, 지원 비율, 또는 불확실한 기타 조건에 해당하여 직접적인 현금성 지원금으로 보기 어렵습니다.",
+      "evidence_text": "매출액 50억원 이상이며 종업원 수 20명 이상, 최대 40% 지원"
+    },
+    "policy_id": "PBLN_000000000123387"
+  },
+  "48a91f67e959518a751f2c3ccbfddca83de906d5baf0cafa4a926606885667f8": {
+    "parsed": {
+      "decision": "adopt_candidate",
+      "candidate_index": 4,
+      "representative_amount_manwon": 6000000.0,
+      "amount_type": "total_project_cost",
+      "roi_apply_method": "review",
+      "confidence": "high",
+      "reason": "총 사업비의 10% 이내로 최대 600만원을 지원하는 현금성 지원금으로 명확하여 대표 지원금으로 채택합니다.",
+      "evidence_text": "임차비용은 총 사업비의 10%(최대 600만원) 이내로 한정하되"
+    },
+    "policy_id": "PBLN_000000000123415"
+  },
+  "88ff5242fb2aeabe38d318b54e9972a223680a80e0e2f52f121b7b531b284003": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": null,
+      "roi_apply_method": null,
+      "confidence": "low",
+      "reason": "제시된 후보 금액들은 총지원규모, 총사업비, 지원 비율 등으로 대표 현금성 지원금으로 보기 어렵거나, 명확한 금액으로 특정하기 어렵습니다.",
+      "evidence_text": "후보 0: 총지원규모, 후보 1: 총사업비, 후보 3: 지원 비율"
+    },
+    "policy_id": "PBLN_000000000123427"
+  },
+  "d17543bb45520dd13e847ed9b036ea72234768c6bb9955d1ca051362112dcb1d": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": null,
+      "roi_apply_method": null,
+      "confidence": "low",
+      "reason": "제시된 후보들은 총사업비 또는 불확실한 유형이며, 명확한 현금성 지원금액으로 보기 어렵습니다. 또한 지원 비율은 직접적인 금액이 아닙니다.",
+      "evidence_text": "기업당 최대 25백만원1과제(기업단독), 기업당 최대 25백만원지원조건총사업비 = TP지원금 + 기업부담금TP지원금기업부담금비고과제당 최대 25백만원총사업비의 10% 이상 현금 부담부가세 별도 (기업 부담), 최대 50% 지원"
+    },
+    "policy_id": "PBLN_000000000123448"
+  },
+  "39eec2f39758a0e3b964af0c7f03785ec7458cf992f3098a7ab23f2476ab0103": {
+    "parsed": {
+      "decision": "adopt_candidate",
+      "candidate_index": 0,
+      "representative_amount_manwon": 270.0,
+      "amount_type": "support_amount",
+      "roi_apply_method": "subtract",
+      "confidence": "high",
+      "reason": "시제품 제작비로 최대 270만원을 직접 지원하는 현금성 지원금으로 명확하여 대표 지원금으로 채택합니다.",
+      "evidence_text": "시제품 제작비 270만원 지원"
+    },
+    "policy_id": "PBLN_000000000123462"
+  },
+  "405973853c10f990be1efd41be1636ed53d0c2f165ba9de61f3d53146b16647f": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "unknown",
+      "confidence": "low",
+      "reason": "제시된 후보 금액들은 '최대 0.x만원' 또는 '최대 X만원' 형태로 명시되어 있으며, 구체적인 지원 대상이나 성격이 불분명하여 ROI 직접 차감이 가능한 대표 지원금으로 판단하기 어렵습니다. 또한, '지원 비율'이나 '장비 활용'과 같은 항목도 포함되어 있어 단일 대표 금액을 특정하기 어렵습니다.",
+      "evidence_text": "최대 0.1만원, 최대 0.2만원, 최대 0.3만원, 최대 0.4만원, 최대 0.5만원, 최대 4,000만원, 최대 2,000만원, 최대 1,500만원, 최대 1,000만원, 최대 100% 지원"
+    },
+    "policy_id": "PBLN_000000000123466"
+  },
+  "833f6e97954196a37440a3584b8e4d227d076e7b91a73f43a30ab70e38ca3859": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "equipment_usage_fee",
+      "roi_apply_method": "recommend_only",
+      "confidence": "high",
+      "reason": "해당 지원금은 장비 사용료의 일부를 지원하는 것으로, 직접적인 현금성 지원금으로 보기 어려워 대표 지원금으로 채택할 수 없습니다.",
+      "evidence_text": "기업당 장비사용료의 60%(기업당 연 최대 6백만원 내 지원(최대 3회 분할 신청 가능) 지원 사업신청 방법 이메일 접수 ➀ 공동활용 연구장비 목록[첨부1] 확인 후"
+    },
+    "policy_id": "PBLN_000000000123478"
+  },
+  "2094e9855a8759a24b4f6ac3ce242d9a667e669d12a9a428ca7d23f92b14ccf2": {
+    "parsed": {
+      "decision": "adopt_candidate",
+      "candidate_index": 0,
+      "representative_amount_manwon": 34000.0,
+      "amount_type": "support_amount",
+      "roi_apply_method": "review",
+      "confidence": "high",
+      "reason": "공고에서 명시된 '최대 3.4억원'은 기업 단위의 대표 현금성 지원금으로 판단됩니다.",
+      "evidence_text": "사업비: 선정기업 별 연간 기준 340백만 원 내외"
+    },
+    "policy_id": "PBLN_000000000123505"
+  },
+  "ed679ff045d8a0707bdc05347a145e2cb6486d4219b640b5ac502b44f7077e98": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "review",
+      "confidence": "low",
+      "reason": "제시된 후보 금액들은 재료비, 인건비, 기업부담금 등 세부 항목별 금액이거나 총 지원 규모, 지원 비율 등으로 명확한 대표 현금성 지원금으로 보기 어렵습니다.",
+      "evidence_text": "PoC 비용 중 재료비(현금 6,000천원)에 대한 사용계획 구체적으로 작성, 인건비(현물 15,000천원) 활용 참여인력 명시 및 가능여부확인, 선정평가위원회를 통해 심층Poc 대상으로 선정되는 경우 소모성 재료비 4,000천원 증액 예정, (지원규모) 20개사, 최대 10% 지원"
+    },
+    "policy_id": "PBLN_000000000123526"
+  },
+  "01e6454de672bbea2820f684847c50706a8e27629d691e871ce27b168a27fe7f": {
+    "parsed": {
+      "decision": "adopt_candidate",
+      "candidate_index": 0,
+      "representative_amount_manwon": 8000.0,
+      "amount_type": "total_support_scale",
+      "roi_apply_method": "review",
+      "confidence": "high",
+      "reason": "공고에서 기업당 최대 지원 규모로 명확하게 제시된 8,000만원이 대표 지원금으로 판단됩니다.",
+      "evidence_text": "기업당 최대 80백만원 이내"
+    },
+    "policy_id": "PBLN_000000000123569"
+  },
+  "69426d43702ba1aca263ed6cf6c5894d52682e42eec8a767391826fbec065a52": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": null,
+      "roi_apply_method": null,
+      "confidence": "low",
+      "reason": "제시된 후보들은 시설개선 비용, 컨설팅 비용 등 여러 항목이 혼합되어 있으며, 명확한 단일 현금성 지원금액으로 보기 어렵습니다. 또한, 'equipment_usage_fee'로 분류된 항목은 'recommend_only'로 ROI 직접 차감이 어렵습니다.",
+      "evidence_text": "노후 시설개선 지원(기업당 최대 12,500,000원 지원) - 컨설팅 : 안전보건 전문가가 현장 순회 점검 및 유해ㆍ위험요인 발굴개선 등 영세사업장이 안전보건 관리 체계를 구축할 수 있도록 방문"
+    },
+    "policy_id": "PBLN_000000000123700"
+  },
+  "172fbdf5b5752d78cfbcbfd3b2e26bf36827b231af5257a3de2d106e6b399668": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": "consulting_fee",
+      "roi_apply_method": "recommend_only",
+      "confidence": "high",
+      "reason": "제시된 후보들은 모두 컨설팅 비용으로, ROI 직접 차감이 가능한 대표 현금성 지원금이 아니며, 'recommend_only'로 분류되어 있습니다.",
+      "evidence_text": "컨설팅 비용으로, ROI 직접 차감이 가능한 대표 현금성 지원금이 아니며, 'recommend_only'로 분류되어 있습니다."
+    },
+    "policy_id": "PBLN_000000000123718"
+  },
+  "8bdc206a01258ddf8f83e100329a070343ab0013dbf43378f81c8d2b74276b0e": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "unknown",
+      "confidence": "low",
+      "reason": "제시된 후보 금액들은 대부분 교육비, 식비, 회의비 등 소액의 항목별 한도이거나, 지원 비율, 총 지원 규모 등 직접적인 현금성 지원금으로 보기 어려운 정보들입니다. 따라서 ROI 직접 차감이 가능한 대표 지원금을 명확히 선정하기 어렵습니다.",
+      "evidence_text": "후보 목록의 display_amount 및 current_type 참조"
+    },
+    "policy_id": "PBLN_000000000123783"
+  },
+  "fcaf7c14269162677310c3a96f85359c029fe5673f0c322ba10806cb7ab585db": {
+    "parsed": {
+      "decision": "adopt_candidate",
+      "candidate_index": 0,
+      "representative_amount_manwon": 25000.0,
+      "amount_type": "total_support_scale",
+      "roi_apply_method": "review",
+      "confidence": "high",
+      "reason": "과제당 총 사업비의 50%를 지원하며 최대 2.5억원을 지원하는 금액이 대표 지원금으로 명확합니다.",
+      "evidence_text": "◦(지원규모)180개 내외◦(지원조건)과제당 총 사업비의 50%(최대 2.5억원)지원 2"
+    },
+    "policy_id": "SMARTFACTORY:2025-N-0205:1"
+  },
+  "1d144e53ed4dc5fab4fc48ec183abcdbab2ba8cdf64c335b72d90c5aa2fcf79e": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "review",
+      "confidence": "low",
+      "reason": "제시된 후보 금액들은 총 지원 규모, 특정 활동에 대한 지원금, 또는 지원 비율 등 다양한 성격을 가지고 있어 ROI 직접 차감이 가능한 단일 대표 지원금을 명확히 선정하기 어렵습니다.",
+      "evidence_text": "총 지원 규모 : 총 86.2억원, 최대 238만원, 최대 476만원, 최대 119만원, 최대 1,900만원, 총 사업비의 85% 지원, 최대 42만원, 최대 84만원, 총 사업비의 50% 지원"
+    },
+    "policy_id": "SMARTFACTORY:2025-N-0211:1"
+  },
+  "8c66d7039b98d2c175047408527cf707fcf73811e59ce5ac8bb7a9e2f91f6973": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "review",
+      "confidence": "low",
+      "reason": "제시된 후보 금액들은 지원금액, 민간부담금, 총사업비 등 여러 항목이 혼재되어 있어 ROI 직접 차감이 가능한 단일 대표 지원금을 명확히 특정하기 어렵습니다.",
+      "evidence_text": "사전기획 DX멘토단 1인 x 8회 최대 3개월 238만원 42만원"
+    },
+    "policy_id": "SMARTFACTORY:2026-N-0010:1"
+  },
+  "9809cdb8a591b8cbcc44d768252b46dd01e3e8c19ab75ad3e65dcff6391c7cf7": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": null,
+      "roi_apply_method": null,
+      "confidence": "high",
+      "reason": "제시된 후보 금액들은 지원금액, 총사업비, 민간부담금 등 여러 성격의 금액이 혼재되어 있으며, 명확한 대표 현금성 지원금을 특정하기 어렵습니다.",
+      "evidence_text": "사전기획 DX멘토단 1인 x 8회 최대 3개월 238만원 42만원"
+    },
+    "policy_id": "SMARTFACTORY:2026-N-0011:1"
+  },
+  "72930af52f477bd028dcc56d73b73aba7ba313d316101a66928d5f63dc15a5fa": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "review",
+      "confidence": "low",
+      "reason": "제시된 후보 금액들은 총 지원 규모, 월별 지원금, 또는 특정 조건에 따른 금액으로, ROI 직접 차감이 가능한 대표 현금성 지원금으로 명확하게 판단하기 어렵습니다.",
+      "evidence_text": "총 86.2억원, 최대 119만원, 최대 21만원"
+    },
+    "policy_id": "SMARTFACTORY:2026-N-0104:1"
+  },
+  "716ec5753d4cc96a3f291db74712fe96e58b4f80584d826d886fcaab30a4b7e3": {
+    "parsed": {
+      "decision": "adopt_candidate",
+      "candidate_index": 0,
+      "representative_amount_manwon": 8000.0,
+      "amount_type": "total_support_scale",
+      "roi_apply_method": "review",
+      "confidence": "high",
+      "reason": "기업당 최대 8,000만원이라는 명확한 현금성 지원금액이 제시되어 대표 지원금으로 선정합니다.",
+      "evidence_text": "기업당 최대 80백만원 이내"
+    },
+    "policy_id": "SMARTFACTORY:2026-N-0106:1"
+  },
+  "c32f00675203a63d6511247e34d19b6c8e10b8f384f3cc5bff7e19e2df9b9c39": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": null,
+      "roi_apply_method": null,
+      "confidence": "low",
+      "reason": "제시된 후보 금액들은 총사업비, 지원 비율, 매출 조건 등 다양한 형태로 나타나며, ROI 직접 차감이 가능한 단일 대표 지원금을 명확히 특정하기 어렵습니다.",
+      "evidence_text": "후보 목록의 current_type이 revenue_condition, total_project_cost 등으로 다양하게 나타나며, 명확한 현금성 지원금액으로 보기 어렵습니다."
+    },
+    "policy_id": "SMARTFACTORY:2026-N-0112:1"
+  },
+  "7217b500f812def6bbc07a1becfeb19f4603bc93835d21ba2c37fd979178d617": {
+    "parsed": {
+      "decision": "adopt_candidate",
+      "candidate_index": 0,
+      "representative_amount_manwon": 5000.0,
+      "amount_type": "unknown",
+      "roi_apply_method": "review",
+      "confidence": "high",
+      "reason": "최대 5,000만원은 현금성 지원금으로 직접 차감 가능한 대표 지원금으로 판단됩니다.",
+      "evidence_text": "생산성 향상 지원및 간편자동화장비 도입으로 현장혁신 지원 0.5억원(0"
+    },
+    "policy_id": "SMARTFACTORY:2026-N-0112:2"
+  },
+  "576da83abd18e410a2d55f40c2f1f897bb76cabeed5d46e6a75f106411de3035": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "unknown",
+      "confidence": "low",
+      "reason": "제시된 후보들 중 명확한 현금성 지원금으로 ROI 직접 차감이 가능한 대표 지원금이 없어 대표 지원금을 선정할 수 없습니다.",
+      "evidence_text": "제시된 후보들 중 명확한 현금성 지원금으로 ROI 직접 차감이 가능한 대표 지원금이 없어 대표 지원금을 선정할 수 없습니다."
+    },
+    "policy_id": "SMARTFACTORY:2026-N-0113:1"
+  },
+  "e540afae62e443df5eb5e4605be1e05e8624a709ab6263fead668d9cecf3ac1f": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": null,
+      "roi_apply_method": null,
+      "confidence": "low",
+      "reason": "명확한 대표 현금성 지원금 후보가 없으며, 지원금액이 총사업비, 지원비율, 수수료, 교육비 등으로 명시되어 있어 ROI 직접 차감이 가능한 단일 대표 금액을 특정하기 어렵습니다.",
+      "evidence_text": "총사업비(최대)지원기간정부지원한도분담비율, 최대 98% 지원, ④정산 수수료, ②교육비"
+    },
+    "policy_id": "SMARTFACTORY:2026-N-0114:1"
+  },
+  "d5209b2f9bb4c022f001a6796e3cda58cc935d7299f1179080219d05c6ca4411": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "unknown",
+      "confidence": "low",
+      "reason": "명확한 대표 현금성 지원금 후보가 없어 대표 지원금을 선정할 수 없습니다.",
+      "evidence_text": ""
+    },
+    "policy_id": "SMARTFACTORY:2026-N-0115:1"
+  },
+  "43eb3c8cd00aa07be0ada07ae258d4e1dc553ee419b7f9a00fd85ca5841ba397": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "unknown",
+      "confidence": "low",
+      "reason": "제시된 후보들 중 명확한 단일 현금성 지원금액이 없어 대표 지원금을 선정하기 어렵습니다. 총사업비, 교육비, 수수료 등 다양한 항목이 혼재되어 있으며, 지원 비율 또한 존재하여 ROI 직접 차감이 가능한 대표 지원금을 특정하기 어렵습니다.",
+      "evidence_text": "후보 목록에 총사업비, 교육비, 수수료, 지원 비율 등 다양한 항목이 혼재되어 있으며, 명확한 단일 현금성 지원금액이 없습니다."
+    },
+    "policy_id": "SMARTFACTORY:2026-N-0118:1"
+  },
+  "4810cf6fb5b79e8704e9fab7172e053a9306dde4aaef784f5987ca0d17d9dab5": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "unknown",
+      "confidence": "low",
+      "reason": "제시된 후보들 중 명확한 현금성 지원금액이 없어 대표 지원금을 선정하기 어렵습니다. 총사업비, 지원 비율, 수수료, 교육비 등 다양한 항목이 혼재되어 있으며, '최대 15억원'과 같은 금액은 총사업비 또는 정부지원한도를 의미할 가능성이 높아 직접적인 ROI 차감 가능 대표 지원금으로 보기 어렵습니다.",
+      "evidence_text": "한도 15억 이내에서 지원가능 * 본 사업은 중기부에서 수행중인 ICT융합 스마트공장 보급확산사업과 동시 수행 가능총사업비(최대)지원기간정부지원한도분담비율"
+    },
+    "policy_id": "SMARTFACTORY:2026-N-0119:1"
+  },
+  "4c7054b01b338ce18223b30202a2269fd088c12b0f2e8497a8ad6e7277aca18b": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "unknown",
+      "confidence": "low",
+      "reason": "명확한 대표 현금성 지원금 후보가 없으며, 대부분 총사업비, 지원 비율, 교육비, 수수료 등으로 구성되어 있어 ROI 직접 차감이 어려운 항목들입니다.",
+      "evidence_text": "총사업비(최대)지원기간정부지원한도분담비율, ②교육비 및 ③기술임치 비용을 사업비의 기타 비용에 필수 포함, ④정산 수수료 :지정 회계법인의 사업비 상시모니터링 및 정산을 위한 수수료 필수 편성, 최대 98% 지원"
+    },
+    "policy_id": "SMARTFACTORY:2026-N-0120:1"
+  },
+  "508d375fdb52634d0d88e8ca63bdabbf36fc0c799c9c0e83cfa44018c87d7692": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": null,
+      "roi_apply_method": null,
+      "confidence": "high",
+      "reason": "제시된 후보 금액들은 총사업비, 교육비, 수수료, 지원 비율 등으로, ROI 직접 차감이 가능한 대표 현금성 지원금으로 보기 어렵습니다.",
+      "evidence_text": "총사업비(최대)지원기간정부지원한도분담비율, ②교육비, ④정산 수수료, 최대 50% 지원"
+    },
+    "policy_id": "SMARTFACTORY:2026-N-0122:1"
+  },
+  "b78db774963a6d612b7a8efb854d78412eb8d03b1dc3657e9f823c97dd45f633": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": null,
+      "roi_apply_method": null,
+      "confidence": "high",
+      "reason": "제시된 후보들은 총사업비, 교육비, 수수료 등 ROI 직접 차감이 어려운 항목이거나, 지원 비율, 불확실한 금액으로 대표 지원금을 특정하기 어렵습니다.",
+      "evidence_text": "총사업비 (최대) 지원기간 정부지원, ② 교육비 : 스마트공장 기술교육 (사업관리교육 및 기술교육) 수강 비용 (1백만원) 필수 편성, ④ 정산 수수료 : 지정 회계법인이 사업비 상시모니터링 및 정산을 위한 수수료 필수 편성, 최대 50% 지원"
+    },
+    "policy_id": "SMARTFACTORY:2026-N-0123:1"
+  },
+  "370942ae171e63664808a9e2ec5aa5622d05fa32c0d2f606a38e3bd813658385": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "unknown",
+      "confidence": "low",
+      "reason": "명확한 대표 현금성 지원금 후보가 없어 대표 지원금 선정이 어렵습니다.",
+      "evidence_text": "본 사업은 중기부에서 수행중인 ICT융합 스마트공장 보급확산사업과 동시 수행 가능총사업비(최대)지원기간정부지원한도분담비율"
+    },
+    "policy_id": "SMARTFACTORY:2026-N-0124:1"
+  },
+  "cfc9a1ec5e9468414e8652a7671e3c828482d781fa30c8e0acbb866749f039b0": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": null,
+      "roi_apply_method": null,
+      "confidence": "low",
+      "reason": "제시된 후보들은 위탁정산 수수료, 1인당 식사비, 지원 비율 등 ROI 직접 차감이 어려운 항목들이거나, 사업비 규모에 따른 수수료로 대표 지원금을 특정하기 어렵습니다.",
+      "evidence_text": "SW 등의 구입 불가 기 타 회계정산수수료(위탁정산 수수료) * [참고]위탁정산수수료 기준 참고 기타 사업추진에 필요한 비용 [참고] 위탁정산 수수료 기준 ◇ 위탁정산 수수료 氠瑢 사업비 규모 위탁정산 수수료 표준액 1억원 미만 987천원 1억원 이상 3억원 미만 1"
+    },
+    "policy_id": "TECHNOPARK:1519"
+  },
+  "ef385047beb6c73868a3a34fbb8fcc257c75acc41e9aab2c2fddad0c2a91c1a4": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": null,
+      "roi_apply_method": null,
+      "confidence": "low",
+      "reason": "제시된 후보들은 총지원규모, 기업부담금, 소액 재료비, PoC 비용, 인건비, 증액 예정 금액 등으로, ROI 직접 차감이 가능한 명확한 대표 현금성 지원금으로 보기 어렵습니다. 또한 지원 비율도 있어 대표 금액을 특정하기 어렵습니다.",
+      "evidence_text": "선정기업은 지원로드맵 수립을 위한 PM제도 의무 참여 ❍ (지원규모) 20개사 ❍ (기업부담금) 현금 2,000천원"
+    },
+    "policy_id": "TECHNOPARK:1532"
+  },
+  "ffc2f9faca24a8b8e4bbc898e6f060e85ef10d84d7f5c374632d3f9a0dd99f27": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "review",
+      "confidence": "low",
+      "reason": "제시된 후보 금액은 총 사업비 규모를 나타내며, 실제 지원금액이 명확하지 않아 대표 지원금으로 선정하기 어렵습니다.",
+      "evidence_text": "총 사업비 규모 : 40억 원 미만(2개 이상의 기관/기업이 컨소시엄 구성시)"
+    },
+    "policy_id": "TECHNOPARK:1770"
+  },
+  "a4013b50e685365565432e55cd47cde516327af82014b7286f50ac2b194d5fb7": {
+    "parsed": {
+      "decision": "adopt_candidate",
+      "candidate_index": 0,
+      "representative_amount_manwon": 1200.0,
+      "amount_type": "support_amount",
+      "roi_apply_method": "subtract",
+      "confidence": "high",
+      "reason": "저작권 등록 지원금으로 최대 1,200만원이 명확하게 제시되어 ROI 직접 차감이 가능한 대표 지원금으로 판단됩니다.",
+      "evidence_text": "저작권 등록 1,200 만원 70 일 제품홍보영상 멀티"
+    },
+    "policy_id": "TECHNOPARK:1794"
+  },
+  "061d9b010030f14966054519ccfc4655d17c97736b2193abb95ce0a3375952c8": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": -1,
+      "representative_amount_manwon": null,
+      "amount_type": "unknown",
+      "roi_apply_method": "unknown",
+      "confidence": "low",
+      "reason": "제시된 후보들은 상금, 컨설팅 비용, 지원 비율 등 다양한 성격의 금액을 포함하고 있으며, 명확한 단일 대표 현금성 지원금을 특정하기 어렵습니다.",
+      "evidence_text": "후보 목록의 display_amount 및 current_type 참조"
+    },
+    "policy_id": "TECHNOPARK:405"
+  },
+  "9e8615d22686663a2e21aba4aedf00cd2d393d1d5a42e45e88d26b8be62776d1": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": null,
+      "roi_apply_method": null,
+      "confidence": "low",
+      "reason": "제시된 후보들은 총 지원 규모, 지원 비율, 또는 특정 비용 항목에 대한 언급으로, ROI 직접 차감이 가능한 단일 대표 지원금으로 명확하게 판단하기 어렵습니다.",
+      "evidence_text": "후보 목록의 current_type이 total_support_scale, support_ratio, unknown으로 다양하며, 특정 금액이 현금성 지원금으로 명확히 구분되지 않음"
+    },
+    "policy_id": "TECHNOPARK:616"
+  },
+  "8e4eb6cfa9b0b3b3ca3f51a066d6159f622ddfa9d0897661ee5ea53d385ff713": {
+    "parsed": {
+      "decision": "keep_no_representative",
+      "candidate_index": null,
+      "representative_amount_manwon": null,
+      "amount_type": null,
+      "roi_apply_method": null,
+      "confidence": "high",
+      "reason": "제시된 후보들은 총 지원 규모, 교육비, 컨설팅비, 매출 조건, 자부담 비율 등 ROI 직접 차감이 어려운 항목들이거나 불분명하여 대표 지원금을 선정하기 어렵습니다.",
+      "evidence_text": "candidate_types: consulting_fee:1 | education_fee:1 | revenue_condition:1 | self_funding:1 | total_support_scale:3 | unknown:4"
+    },
+    "policy_id": "TECHNOPARK:955"
+  }
+}

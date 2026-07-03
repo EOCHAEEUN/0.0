@@ -1,0 +1,272 @@
+reparse_json=data\reports\policy_amount_url_reparse\policy_amount_url_reparse_reevaluated_20260703_114737.json
+integrated_update_candidates=171
+review_rows=510
+
+## bucket_action_counts
+- candidate_missing / manual_or_ocr_review: 45
+- candidate_missing / recommend_only_or_exclude: 8
+- candidate_missing / retry_or_manual_source: 2
+- large_amount_delta_hold / manual_review: 27
+- non_cash_only / recommend_only_or_exclude: 10
+- residual_risk_reason / manual_review: 5
+- resolved_keep_old / no_update_keep_existing: 43
+- resolved_update / apply_payload_candidate: 171
+- safe_non_update_remainder / no_payload_update: 46
+- selected_candidate_missing / exclude_or_policy_decision: 37
+- selected_candidate_missing / manual_review: 11
+- selected_candidate_missing / no_representative_amount: 57
+- support_ratio_only / store_support_ratio_only: 31
+- total_scale_only / recheck_total_vs_limit: 17
+
+## samples
+
+### candidate_missing
+- KOSMES:6107069 | 2026년 숙련기능인력 E-7-4 전환추천 모집공고(제2026-52호)
+  - action: manual_or_ocr_review / no_amount_found_in_source
+  - reason: 원문에서 금액 후보가 없어 표/OCR/첨부 품질 확인 필요
+- PBLN_000000000117557 | [충북] 충주시 2026년 기술평가 인증 수수료 지원사업 공고
+  - action: manual_or_ocr_review / no_amount_found_in_source
+  - reason: 원문에서 금액 후보가 없어 표/OCR/첨부 품질 확인 필요
+- PBLN_000000000117668 | [인천] 2026년 기술거래촉진네트워크사업(인천기술전환플랫폼) 기술이전 및 기술수요조사서 신청 공고
+  - action: manual_or_ocr_review / no_amount_found_in_source
+  - reason: 원문에서 금액 후보가 없어 표/OCR/첨부 품질 확인 필요
+- PBLN_000000000117774 | [서울] 가죽ㆍ패션산업 소공인 장비 임대지원사업 공고
+  - action: manual_or_ocr_review / no_amount_found_in_source
+  - reason: 원문에서 금액 후보가 없어 표/OCR/첨부 품질 확인 필요
+- PBLN_000000000118037 | 2026년 기업인력애로센터 활용 취업지원 사업 구인기업 및 구직자 모집 공고
+  - action: manual_or_ocr_review / no_amount_found_in_source
+  - reason: 원문에서 금액 후보가 없어 표/OCR/첨부 품질 확인 필요
+- PBLN_000000000118213 | [경기] 2026년 가구디자인창작공간운영사업 경기가구창작스튜디오 공동장비 활용 지원 참여기업 모집 공고
+  - action: manual_or_ocr_review / no_amount_found_in_source
+  - reason: 원문에서 금액 후보가 없어 표/OCR/첨부 품질 확인 필요
+- PBLN_000000000119064 | 2026년 자동차용 반도체 기능안전ㆍ신뢰성 산업혁신기반구축사업 기업지원 모집 공고
+  - action: manual_or_ocr_review / no_amount_found_in_source
+  - reason: 원문에서 금액 후보가 없어 표/OCR/첨부 품질 확인 필요
+- PBLN_000000000119124 | 2026년 의료기기 분야 기술지도 지원사업 공고(메카노바이오활성소재 혁신의료기기 실증 기반구축)
+  - action: manual_or_ocr_review / no_amount_found_in_source
+  - reason: 원문에서 금액 후보가 없어 표/OCR/첨부 품질 확인 필요
+
+### large_amount_delta_hold
+- PBLN_000000000117056 | [경기] 부천시 2026년 내일채움공제 지원 계획 공고
+  - action: manual_review / 
+  - reason: Gemini/규칙 후에도 기존값과 새값 확정 불가
+- PBLN_000000000117454 | [강원] 2026년 글로벌 IP 스타기업 육성 해외OA비용 지원사업 공고
+  - action: manual_review / 
+  - reason: Gemini/규칙 후에도 기존값과 새값 확정 불가
+- PBLN_000000000117563 | 2026년 중소기업 매출채권팩토링 지원계획 공고
+  - action: manual_review / 
+  - reason: Gemini/규칙 후에도 기존값과 새값 확정 불가
+- PBLN_000000000117671 | [인천] 서구 2026년 제품인증획득 지원사업 신청 공고
+  - action: manual_review / 
+  - reason: Gemini/규칙 후에도 기존값과 새값 확정 불가
+- PBLN_000000000117688 | [인천] 서구(검단지역) 2026년 제품인증획득 지원사업 신청 공고
+  - action: manual_review / 
+  - reason: Gemini/규칙 후에도 기존값과 새값 확정 불가
+- PBLN_000000000117992 | 2026년 나눔장비 이전지원사업 모집 공고
+  - action: manual_review / 
+  - reason: Gemini/규칙 후에도 기존값과 새값 확정 불가
+- PBLN_000000000118245 | [경북] 2026년 중소벤처기업 지식재산권 및 해외인증 지원사업 참가기업 모집 공고
+  - action: manual_review / 
+  - reason: Gemini/규칙 후에도 기존값과 새값 확정 불가
+- PBLN_000000000120498 | [경기] 화성시 2026년 GAP 안정성 분석 지원사업 신청 공고
+  - action: manual_review / 
+  - reason: Gemini/규칙 후에도 기존값과 새값 확정 불가
+
+### non_cash_only
+- PBLN_000000000119518 | [전북] 2026년 에너지산업융복합단지 공동연구장비 활용 및 컨설팅 지원 수혜기업 모집 공고
+  - action: recommend_only_or_exclude / non_cash_only
+  - reason: 비현금/수수료/인증성 후보만 있어 ROI 직접 차감 제외 후보입니다.
+- PBLN_000000000119727 | [부산] 2026년 중소기업 빅데이터 분석 활용 지원사업 참가기업 모집 공고
+  - action: recommend_only_or_exclude / non_cash_only
+  - reason: 비현금/수수료/인증성 후보만 있어 ROI 직접 차감 제외 후보입니다.
+- PBLN_000000000121853 | 2026년 업종별 임금체계 개선 지원 사업 참여기업 모집 공고
+  - action: recommend_only_or_exclude / non_cash_only
+  - reason: 비현금/수수료/인증성 후보만 있어 ROI 직접 차감 제외 후보입니다.
+- PBLN_000000000122744 | 2026년 2차 GLP(세포독성) 시험평가인증 지원사업 공고(메카노바이오활성소재 혁신의료기기 실증 기반구축)
+  - action: recommend_only_or_exclude / non_cash_only
+  - reason: 비현금/수수료/인증성 후보만 있어 ROI 직접 차감 제외 후보입니다.
+- PBLN_000000000122942 | [세종] 조달청 다수공급자계약(MAS) 활용 컨설팅 지원사업 공고
+  - action: recommend_only_or_exclude / non_cash_only
+  - reason: 비현금/수수료/인증성 후보만 있어 ROI 직접 차감 제외 후보입니다.
+- PBLN_000000000123451 | 바이오의약품 소재부품장비 기업지원 프로그램 모집 공고
+  - action: recommend_only_or_exclude / non_cash_only
+  - reason: 비현금/수수료/인증성 후보만 있어 ROI 직접 차감 제외 후보입니다.
+- PBLN_000000000123596 | [서울ㆍ경기ㆍ인천ㆍ강원] 2026년 중소기업 AI활용 도입을 위한 AI훈련 참여기업 모집 공고
+  - action: recommend_only_or_exclude / non_cash_only
+  - reason: 비현금/수수료/인증성 후보만 있어 ROI 직접 차감 제외 후보입니다.
+- PBLN_000000000123638 | [경남] 2026년 4차 기술경영 애로해결을 위한 Quick Solution Program(기술닥터 및 이노카페심층상담) 참여기업 모집 공고
+  - action: recommend_only_or_exclude / non_cash_only
+  - reason: 비현금/수수료/인증성 후보만 있어 ROI 직접 차감 제외 후보입니다.
+
+### residual_risk_reason
+- PBLN_000000000117942 | [경남] 창원시 2026년 지식재산진흥 지원사업 기업 모집 공고
+  - action: manual_review / subtract_without_limit_context
+  - reason: 한도/기업당 문맥 부족으로 보류 유지
+- PBLN_000000000119212 | [제주] 2026년 청정임산물 생산기반 지원사업 재공고
+  - action: manual_review / subtract_without_limit_context
+  - reason: 한도/기업당 문맥 부족으로 보류 유지
+- PBLN_000000000121191 | 2026년 산업 분야 온실가스 국제감축사업 공고
+  - action: manual_review / subtract_without_limit_context
+  - reason: 한도/기업당 문맥 부족으로 보류 유지
+- PBLN_000000000123662 | [전북] 2026년 게임기업 컨설팅 지원사업 신청 게임기업(예비창업자) 모집 공고
+  - action: manual_review / subtract_without_limit_context
+  - reason: 한도/기업당 문맥 부족으로 보류 유지
+- PBLN_000000000123720 | [부산] 2026년 콘텐츠코리아 랩 미드폼 영상콘텐츠 제작지원 사업 모집 공고
+  - action: manual_review / subtract_without_limit_context
+  - reason: 한도/기업당 문맥 부족으로 보류 유지
+
+### resolved_keep_old
+- ENERGYAGENCY:24575 | (수정)2026년도 산업진단 개선이행 지원사업 2차 공고
+  - action: no_update_keep_existing / 
+  - reason: large_amount_delta 검수 결과 기존값 유지
+- KPASS:P2950 | 2026년 산업기술국제협력사업 통합 시행계획 공고
+  - action: no_update_keep_existing / 
+  - reason: large_amount_delta 검수 결과 기존값 유지
+- PBLN_000000000118027 | 2026년 KOLAS 공인 제품인증 서비스 바우처 지원사업 참가 희망기업 모집 공고
+  - action: no_update_keep_existing / 
+  - reason: large_amount_delta 검수 결과 기존값 유지
+- PBLN_000000000118209 | 2026년 중소기업 연구인력지원사업 공고
+  - action: no_update_keep_existing / 
+  - reason: large_amount_delta 검수 결과 기존값 유지
+- PBLN_000000000119206 | [충남] 아산시 2026년 해외마케팅 지원사업 참가기업 모집 공고
+  - action: no_update_keep_existing / 
+  - reason: large_amount_delta 검수 결과 기존값 유지
+- PBLN_000000000119454 | [경기] 평택시 2026년 국내외 지식재산 권리화 지원사업 모집 공고
+  - action: no_update_keep_existing / 
+  - reason: large_amount_delta 검수 결과 기존값 유지
+- PBLN_000000000119836 | [전남광주] 2026년 상반기 구조고도화자금 지원 계획 공고
+  - action: no_update_keep_existing / 
+  - reason: large_amount_delta 검수 결과 기존값 유지
+- PBLN_000000000121194 | [경남] 고성군 2026년 지역지식재산창출 지원사업 공고
+  - action: no_update_keep_existing / 
+  - reason: large_amount_delta 검수 결과 기존값 유지
+
+### resolved_update
+- ENERGYAGENCY:21809 | 2019년 에너지경영시스템 인프라 구축 지원사업 공고 안내
+  - action: apply_payload_candidate / 
+  - reason: 통합 payload에 포함된 업데이트 후보
+- ENERGYAGENCY:21849 | 2019년 에너지경영시스템 인프라 구축 지원사업 공고 안내
+  - action: apply_payload_candidate / 
+  - reason: 통합 payload에 포함된 업데이트 후보
+- PBLN_000000000115994 | 2026년 스마트 제조혁신 지원사업 통합 공고
+  - action: apply_payload_candidate / 
+  - reason: 통합 payload에 포함된 업데이트 후보
+- PBLN_000000000116004 | 스마트 공장 수준 확인(2026년 스마트 제조혁신 지원사업 통합 공고)
+  - action: apply_payload_candidate / 
+  - reason: 통합 payload에 포함된 업데이트 후보
+- PBLN_000000000116008 | 제조 DX멘토단 활용지원(2026년 스마트 제조혁신 지원사업 통합 공고)
+  - action: apply_payload_candidate / 
+  - reason: 통합 payload에 포함된 업데이트 후보
+- PBLN_000000000117019 | 2026년 제조DX멘토단 활용지원사업 통합 공고
+  - action: apply_payload_candidate / 
+  - reason: 통합 payload에 포함된 업데이트 후보
+- PBLN_000000000117643 | 2026년 예산군 로케이션 인센티브 제작지원 사업 공고
+  - action: apply_payload_candidate / 
+  - reason: 통합 payload에 포함된 업데이트 후보
+- PBLN_000000000117781 | [경북] 국방기술 민간이전 사업 참여기업 모집 공고(경북ㆍ구미 방산혁신클러스터)
+  - action: apply_payload_candidate / 
+  - reason: 통합 payload에 포함된 업데이트 후보
+
+### safe_non_update_remainder
+- PBLN_000000000118133 | [경북] 2026년 화장품산업 경쟁력 강화사업(성분 분석ㆍ검증 시험인증) 모집공고
+  - action: no_payload_update / /recommend_only
+  - reason: 위험 사유는 없지만 통합 업데이트 payload 기준에는 포함되지 않은 잔여 건
+- PBLN_000000000118361 | [경기] 부천시 2026년 유해물질 시험분석 수수료 지원 사업 참여 기업 모집 공고
+  - action: no_payload_update / /recommend_only
+  - reason: 위험 사유는 없지만 통합 업데이트 payload 기준에는 포함되지 않은 잔여 건
+- PBLN_000000000118750 | [경남] 진주시 2026년 중소기업 국내외 인증수수료 지원사업 공고
+  - action: no_payload_update / /recommend_only
+  - reason: 위험 사유는 없지만 통합 업데이트 payload 기준에는 포함되지 않은 잔여 건
+- PBLN_000000000119010 | [인천] 2026년 연구장비 공동활용 지원사업 모집 공고
+  - action: no_payload_update / /subtract
+  - reason: 위험 사유는 없지만 통합 업데이트 payload 기준에는 포함되지 않은 잔여 건
+- PBLN_000000000119126 | 2026년 물리ㆍ화학적 시험평가인증 지원사업 공고(메카노바이오활성소재 혁신의료기기 실증 기반구축)
+  - action: no_payload_update / /recommend_only
+  - reason: 위험 사유는 없지만 통합 업데이트 payload 기준에는 포함되지 않은 잔여 건
+- PBLN_000000000119181 | [충북] 2026년 소부장 지원 전문가 스테이션 운영사업 기술애로 지원 모집 공고
+  - action: no_payload_update / /recommend_only
+  - reason: 위험 사유는 없지만 통합 업데이트 payload 기준에는 포함되지 않은 잔여 건
+- PBLN_000000000119201 | 2026년 중소기업 연구인력 현장맞춤형 양성지원 사업 시행계획 공고
+  - action: no_payload_update / /subtract
+  - reason: 위험 사유는 없지만 통합 업데이트 payload 기준에는 포함되지 않은 잔여 건
+- PBLN_000000000119733 | [울산] 울주군 2026년 강소기업 육성 기술 혁신 지원사업 시행 공고
+  - action: no_payload_update / /subtract
+  - reason: 위험 사유는 없지만 통합 업데이트 payload 기준에는 포함되지 않은 잔여 건
+
+### selected_candidate_missing
+- PBLN_000000000116853 | 2026년 기업훈련 탄력운영제 참여기업 모집 공고
+  - action: exclude_or_policy_decision / mixed_non_representative
+  - reason: 대표금액 제외 타입이 혼합되어 정책 판단이 필요합니다.
+- PBLN_000000000117066 | 장애인고용개선장려금 사업 공고
+  - action: manual_review / mixed_with_unknown
+  - reason: Gemini 후보 제안이 sanity check에서 보류됨
+- PBLN_000000000117291 | 2026년 한국식품산업클러스터진흥원 기업지원시설ㆍ장비 활용 지원사업 공고
+  - action: exclude_or_policy_decision / mixed_non_representative
+  - reason: 대표금액 제외 타입이 혼합되어 정책 판단이 필요합니다.
+- PBLN_000000000117463 | [강원] 2026년 글로벌 IP 스타기업 육성 해외등록비용 지원사업 공고
+  - action: manual_review / mixed_with_unknown
+  - reason: Gemini 후보 제안이 sanity check에서 보류됨
+- PBLN_000000000117481 | 전북바이오융합교육센터 재직자 교육 훈련생ㆍ기업 모집 공고(국가인적자원개발컨소시엄)
+  - action: exclude_or_policy_decision / mixed_non_representative
+  - reason: 대표금액 제외 타입이 혼합되어 정책 판단이 필요합니다.
+- PBLN_000000000117654 | [강원] 2026년 중소ㆍ벤처기업 투자이음 강화 프로그램 참여기업 연중 상시접수 공고(강원 벤처투자 생태계 조성사업)
+  - action: no_representative_amount / unknown_only
+  - reason: Gemini 검수 결과 대표금액 없음
+- PBLN_000000000117794 | [경북] 2026년 중소기업 정부기술개발공모사업 선정지원 참여기업 모집 공고
+  - action: no_representative_amount / mixed_with_unknown
+  - reason: Gemini 검수 결과 대표금액 없음
+- PBLN_000000000118006 | 2026년 스마트공장 수준확인 사업 공고
+  - action: exclude_or_policy_decision / mixed_non_representative
+  - reason: 대표금액 제외 타입이 혼합되어 정책 판단이 필요합니다.
+
+### support_ratio_only
+- PBLN_000000000117307 | [인천] 2026년 가상융합산업 콘텐츠 제작 장비 임차지원 공고(인천 가상융합산업 혁신센터)
+  - action: store_support_ratio_only / support_ratio_only
+  - reason: 지원비율만 있어 대표금액은 만들지 않습니다.
+- PBLN_000000000117839 | 2026년 고령친화식품 사용성평가 참여기업 모집 공고
+  - action: store_support_ratio_only / support_ratio_only
+  - reason: 지원비율만 있어 대표금액은 만들지 않습니다.
+- PBLN_000000000118224 | 2026년 미래 치과이식형 디지털의료제품 개발 기반구축 사업 기술서비스 지원사업 통합 공고
+  - action: store_support_ratio_only / support_ratio_only
+  - reason: 지원비율만 있어 대표금액은 만들지 않습니다.
+- PBLN_000000000118467 | [부산] 2026년 중소기업 ISO 인증 지원사업 모집 공고
+  - action: store_support_ratio_only / support_ratio_only
+  - reason: 지원비율만 있어 대표금액은 만들지 않습니다.
+- PBLN_000000000118530 | 2026년 중소ㆍ중견 에너지효율 혁신 선도 프로젝트 선도기업 모집 공고
+  - action: store_support_ratio_only / support_ratio_only
+  - reason: 지원비율만 있어 대표금액은 만들지 않습니다.
+- PBLN_000000000118617 | [충북] 지능형첨단부품산업의 디지털전환 거점 구축 사업 오픈랩 AI 개발플랫폼 활용 지원 수혜기업 모집 공고
+  - action: store_support_ratio_only / support_ratio_only
+  - reason: 지원비율만 있어 대표금액은 만들지 않습니다.
+- PBLN_000000000119083 | [충북] 2026년 소상공인 IP출원(상표출원) 지원 사업 소상공인 수혜자 모집 공고
+  - action: store_support_ratio_only / support_ratio_only
+  - reason: 지원비율만 있어 대표금액은 만들지 않습니다.
+- PBLN_000000000119904 | [충북] 2026년 산업체 방사광가속기 활용 역량강화사업 산업체 방사광가속기 활용 프로그램 참여기업 모집 공고
+  - action: store_support_ratio_only / support_ratio_only
+  - reason: 지원비율만 있어 대표금액은 만들지 않습니다.
+
+### total_scale_only
+- PBLN_000000000122442 | [울산] 2026년 기술이전지원사업 기술코칭프로그램 참여기업 모집 공고
+  - action: recheck_total_vs_limit / total_scale_only
+  - reason: 총규모로 분류됐으나 건당/기업별 한도 가능성 샘플 재검토 필요
+- PBLN_000000000122990 | [경남] 서부 2026년 2차 글로벌IP스타기업육성사업 특허기술 홍보영상제작 지원기업 모집 공고
+  - action: recheck_total_vs_limit / total_scale_only
+  - reason: 총규모로 분류됐으나 건당/기업별 한도 가능성 샘플 재검토 필요
+- PBLN_000000000122992 | [경남] 서부 2026년 2차 글로벌IP스타기업육성사업 포장디자인개발 지원기업 모집 공고
+  - action: recheck_total_vs_limit / total_scale_only
+  - reason: 총규모로 분류됐으나 건당/기업별 한도 가능성 샘플 재검토 필요
+- PBLN_000000000122996 | [경남] 서부 2026년 2차 글로벌IP스타기업육성사업 리뉴얼브랜드개발 지원기업 모집 공고
+  - action: recheck_total_vs_limit / total_scale_only
+  - reason: 총규모로 분류됐으나 건당/기업별 한도 가능성 샘플 재검토 필요
+- PBLN_000000000123133 | 2026년 선도형 양자공정 오픈팹 인프라 구축 사업 지원기업 모집 공고
+  - action: recheck_total_vs_limit / total_scale_only
+  - reason: 총규모로 분류됐으나 건당/기업별 한도 가능성 샘플 재검토 필요
+- SMARTFACTORY:2026-N-0062:3 | [2차] 2026 AI 트랙 (삼성) 스마트공장 구축
+  - action: recheck_total_vs_limit / total_scale_only
+  - reason: 총규모로 분류됐으나 건당/기업별 한도 가능성 샘플 재검토 필요
+- SMARTFACTORY:2026-N-0067:3 | [인천] 2026년 제조DX멘토단 활용지원사업 (구축지도) 도입기업 모집공고
+  - action: recheck_total_vs_limit / total_scale_only
+  - reason: 총규모로 분류됐으나 건당/기업별 한도 가능성 샘플 재검토 필요
+- SMARTFACTORY:2026-N-0068:1 | [부산] 2026년 제조DX멘토단 활용지원사업(구축지도) 도입기업 모집 공고
+  - action: recheck_total_vs_limit / total_scale_only
+  - reason: 총규모로 분류됐으나 건당/기업별 한도 가능성 샘플 재검토 필요

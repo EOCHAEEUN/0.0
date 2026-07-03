@@ -446,11 +446,27 @@ def sanitize_policy_payload_amount(
     cleaned = dict(payload)
     cleaned["max_amount"] = None
     cleaned["max_amount_actual"] = None
-    cleaned["max_amount_evidence"] = None
+    cleaned["max_amount_evidence"] = row.get("max_amount_evidence")
+    cleaned["max_amount_basis_text"] = promoter.build_max_amount_basis_text(row)
+    cleaned["max_amount_type_reason"] = promoter.build_max_amount_type_reason(
+        row,
+        amount_type=cleaned.get("max_amount_type"),
+        amount=cleaned.get("max_amount"),
+    )
     cleaned["max_amount_note"] = (
         f"{reason}으로 판단되어 지원금에서 제외"
     )
     cleaned["amount_extraction_status"] = "needs_review"
+    (
+        cleaned["roi_apply_method"],
+        cleaned["roi_apply_method_ko"],
+        cleaned["roi_apply_reason"],
+    ) = promoter.classify_roi_apply_method(
+        max_amount=cleaned.get("max_amount"),
+        max_amount_type=cleaned.get("max_amount_type"),
+        roi_support_type=cleaned.get("roi_support_type"),
+        support_method=cleaned.get("support_method"),
+    )
     return cleaned, reason
 
 

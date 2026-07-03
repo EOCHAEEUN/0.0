@@ -1,19 +1,22 @@
-import { BrowserRouter, Navigate, Routes, Route, useParams } from "react-router-dom"
+import { BrowserRouter, Navigate, Routes, Route, useParams, useSearchParams } from "react-router-dom"
 
 import MainPage from "./pages/MainPage"
 import LoginPage from "./pages/LoginPage"
 import DashboardPage from "./pages/DashboardPage"
 import RoiPage from "./pages/RoiPage"
+import RoiHistoryPage from "./pages/RoiHistoryPage"
 import ApplicationDraftPage from "./pages/ApplicationDraftPage"
 import SupportProjectsPage from "./pages/SupportProjectsPage"
 import SupportDetailPage from "./pages/SupportDetailPage"
 import AiAdvisorPage from "./pages/AiAdvisorPage"
 import SafetyPage from "./pages/SafetyPage"
 import MyPage from "./pages/MyPage"
+import EquipmentStatusPage from "./pages/EquipmentStatusPage"
 import GlobalAiAdvisor from "./features/aiAdvisor/GlobalAiAdvisor"
 import WelcomePage from "./features/onboarding/pages/WelcomePage"
 import CompanySetupPage from "./features/onboarding/pages/CompanySetupPage"
 import EquipmentSetupPage from "./features/onboarding/pages/EquipmentSetupPage"
+import SetupCompletePage from "./features/onboarding/pages/SetupCompletePage"
 import AnalysisNewPage from "./features/onboarding/pages/AnalysisNewPage"
 import AnalysisReviewPage from "./features/onboarding/pages/AnalysisReviewPage"
 import AnalysisResultPage from "./features/onboarding/pages/AnalysisResultPage"
@@ -24,10 +27,37 @@ import AuthenticatedLayout from "./components/layout/AuthenticatedLayout"
 function AnalysisPoliciesRedirect() {
   const { id, policyId } = useParams()
   const query = new URLSearchParams()
-  if (id) query.set("analysisId", id)
-  if (policyId) query.set("policyId", policyId)
+  if (id) query.set("analysis_id", id)
+  if (policyId) query.set("policy_id", policyId)
   const queryText = query.toString()
-  return <Navigate to={queryText ? `/support-projects?${queryText}` : "/support-projects"} replace />
+  return (
+    <Navigate
+      to={queryText ? `/support-projects/priority?${queryText}` : "/support-projects/priority"}
+      replace
+    />
+  )
+}
+
+function SupportProjectsIndexRedirect() {
+  const [searchParams] = useSearchParams()
+  const queryText = searchParams.toString()
+  return (
+    <Navigate
+      to={queryText ? `/support-projects/priority?${queryText}` : "/support-projects/priority"}
+      replace
+    />
+  )
+}
+
+function RoiIndexRedirect() {
+  const [searchParams] = useSearchParams()
+  const queryText = searchParams.toString()
+  return (
+    <Navigate
+      to={queryText ? `/roi/strategy?${queryText}` : "/roi/strategy"}
+      replace
+    />
+  )
 }
 
 function App() {
@@ -45,6 +75,7 @@ function App() {
         <Route path="/welcome" element={<WelcomePage />} />
         <Route path="/setup/company" element={<CompanySetupPage />} />
         <Route path="/setup/equipment" element={<EquipmentSetupPage />} />
+        <Route path="/setup/complete" element={<SetupCompletePage />} />
         {/* 분석 생성/검토는 온보딩 UI 흐름이므로 공통 헤더 제외 */}
         <Route path="/analysis/new" element={<AnalysisNewPage />} />
         <Route path="/analysis/review" element={<AnalysisReviewPage />} />
@@ -58,7 +89,13 @@ function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
 
           {/* ROI 분석 */}
-          <Route path="/roi" element={<RoiPage />} />
+          <Route path="/roi">
+            <Route index element={<RoiIndexRedirect />} />
+            <Route path="strategy" element={<RoiPage view="strategy" />} />
+            <Route path="analysis" element={<RoiPage view="analysis" />} />
+            <Route path="roadmap" element={<RoiPage view="roadmap" />} />
+            <Route path="history" element={<RoiHistoryPage />} />
+          </Route>
 
           {/* 투자 분석 결과 */}
           <Route path="/analysis/:id/result" element={<AnalysisResultPage />} />
@@ -76,7 +113,11 @@ function App() {
           <Route path="/application-draft" element={<ApplicationDraftPage />} />
 
           {/* 지원사업 목록 */}
-          <Route path="/support-projects" element={<SupportProjectsPage />} />
+          <Route path="/support-projects">
+            <Route index element={<SupportProjectsIndexRedirect />} />
+            <Route path="priority" element={<SupportProjectsPage view="priority" />} />
+            <Route path="discovery" element={<SupportProjectsPage view="discovery" />} />
+          </Route>
           <Route path="/support-detail" element={<SupportDetailPage />} />
 
           {/* AI Advisor (Engi) */}
@@ -88,6 +129,7 @@ function App() {
           <Route path="/safety" element={<SafetyPage />} />
 
           {/* 설비 관리 / 마이페이지 */}
+          <Route path="/equipment" element={<EquipmentStatusPage />} />
           <Route path="/mypage" element={<MyPage />} />
           <Route path="/company" element={<MyPage />} />
         </Route>

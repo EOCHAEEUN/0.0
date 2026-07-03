@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Optional
 
 from fastapi import APIRouter, Body, Query
@@ -11,6 +12,16 @@ from app.services.safety_preview import create_safety_preview, get_safety_previe
 router = APIRouter()
 
 
+def _normalize_policy_id(value: str) -> str:
+    policy_id = str(value or "").strip()
+    if not policy_id:
+        return ""
+    normalized = re.sub(r":[AB](?:\d+)?$", "", policy_id, flags=re.IGNORECASE)
+    normalized = re.sub(r":\d+$", "", normalized)
+    normalized = re.sub(r":[AB]$", "", normalized, flags=re.IGNORECASE)
+    return normalized
+
+
 @router.get("/analysis/{analysis_id}/policies/{policy_id}/safety-preview")
 async def read_safety_preview(
     analysis_id: str,
@@ -18,9 +29,10 @@ async def read_safety_preview(
     equipment_id: Optional[str] = Query(default=None),
     investment_plan_id: Optional[str] = Query(default=None),
 ):
+    normalized_policy_id = _normalize_policy_id(policy_id) or policy_id
     preview = get_safety_preview(
         analysis_id=analysis_id,
-        policy_id=policy_id,
+        policy_id=normalized_policy_id,
         equipment_id=equipment_id,
         investment_plan_id=investment_plan_id,
     )
@@ -46,10 +58,11 @@ async def generate_safety_preview(
     investment_plan_id: Optional[str] = Query(default=None),
     body: dict[str, Any] | None = Body(default=None),
 ):
+    normalized_policy_id = _normalize_policy_id(policy_id) or policy_id
     try:
         preview = create_safety_preview(
             analysis_id=analysis_id,
-            policy_id=policy_id,
+            policy_id=normalized_policy_id,
             equipment_id=equipment_id,
             investment_plan_id=investment_plan_id,
             body=body or {},

@@ -51,6 +51,7 @@ from app.tools.safety_calc import (
     prepare_inspection_save,
     build_pre_work_checklist,
     UNSUPPORTED_CATEGORY_MESSAGE,
+    normalize_inspection_purpose,
 )
 
 
@@ -59,14 +60,30 @@ def fetch_legal_rules() -> list[SafetyRuleLegal]:
     """safety_rule_legal 테이블 전체를 조회합니다."""
     db = get_db()
     result = db.table("safety_rule_legal").select("*").execute()
-    return [SafetyRuleLegal(**row) for row in result.data]
+    rows = result.data or []
+    normalized_rows = []
+    for row in rows:
+        next_row = dict(row)
+        next_row["inspection_purpose"] = normalize_inspection_purpose(
+            next_row.get("inspection_purpose")
+        )
+        normalized_rows.append(next_row)
+    return [SafetyRuleLegal(**row) for row in normalized_rows]
 
 
 def fetch_voluntary_rules() -> list[SafetyRuleVoluntary]:
     """safety_rule_voluntary 테이블 전체를 조회합니다."""
     db = get_db()
     result = db.table("safety_rule_voluntary").select("*").execute()
-    return [SafetyRuleVoluntary(**row) for row in result.data]
+    rows = result.data or []
+    normalized_rows = []
+    for row in rows:
+        next_row = dict(row)
+        next_row["inspection_purpose"] = normalize_inspection_purpose(
+            next_row.get("inspection_purpose")
+        )
+        normalized_rows.append(next_row)
+    return [SafetyRuleVoluntary(**row) for row in normalized_rows]
 
 
 def fetch_check_statuses(company_id: str, equipment_id: str) -> list[SafetyCheckStatus]:

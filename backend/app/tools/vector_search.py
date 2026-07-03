@@ -3,7 +3,14 @@ from app.core.vectordb import get_policy_collection
 def search_policies(query: str, n_results: int = 5, where: dict = None) -> list[dict]:
     """ChromaDB에서 지원사업 공고 검색"""
     collection = get_policy_collection()
-    kwargs = {"query_texts": [query], "n_results": n_results}
+
+    total = collection.count()
+    if total == 0:
+        return []
+
+    safe_n = min(n_results, total)
+
+    kwargs = {"query_texts": [query], "n_results": safe_n}
     if where:
         kwargs["where"] = where
     results = collection.query(**kwargs)

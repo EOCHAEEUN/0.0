@@ -13,6 +13,7 @@ import {
   saveAnalysisResult,
   type AnalysisConditionDraft,
 } from "../onboardingState"
+import { buildRoiPath } from "../../roi/roiPaths"
 
 type AnalysisMode = "start" | "new_equipment" | "existing_equipment" | "reanalysis"
 
@@ -185,7 +186,7 @@ export default function AnalysisNewPage() {
               equipmentId!,
             )
       saveAnalysisResult(result)
-      navigate(`/roi?analysisId=${encodeURIComponent(result.id)}`)
+      navigate(buildRoiPath("strategy", { analysisId: result.id }))
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "분석 중 오류가 발생했습니다.")
     } finally {

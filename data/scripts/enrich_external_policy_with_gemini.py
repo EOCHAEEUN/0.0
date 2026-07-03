@@ -130,6 +130,7 @@ SELECT_COLUMNS = ",".join(
         "policy_id",
         "source_name",
         "source_id",
+        "is_selected",
         "title",
         "organization",
         "region",
@@ -138,6 +139,8 @@ SELECT_COLUMNS = ",".join(
         "deadline_display",
         "policy_category",
         "policy_subcategory",
+        "support_primary_category",
+        "support_items",
         "summary",
         "detail_text",
         "attachment_text",
@@ -148,6 +151,9 @@ SELECT_COLUMNS = ",".join(
         "max_amount_type",
         "max_amount_numeric_manwon",
         "max_amount_evidence",
+        "amount_candidates",
+        "selected_amount_candidate",
+        "support_ratio",
         "required_documents_json",
         "temp_extraction_json",
     ]
@@ -174,6 +180,15 @@ def resolve_args() -> argparse.Namespace:
         help="Process only this policy_id. May be supplied multiple times.",
     )
     parser.add_argument("--limit", type=int, default=0, help="0 means all")
+    parser.add_argument(
+        "--eligible-policy-only",
+        action="store_true",
+        help=(
+            "Analyze only rows with core policy fields and at least one "
+            "support signal such as is_selected, amount candidates, selected "
+            "amount, support ratio, support items, or support category."
+        ),
+    )
     parser.add_argument(
         "--dry-run",
         type=int,
@@ -1210,12 +1225,7 @@ def normalize_package(
         numeric_value = None
 
     ratio = value.get("support_ratio")
-    try:
-        ratio_value = round(float(ratio), 2) if ratio is not None else None
-    except (TypeError, ValueError):
-        ratio_value = None
-    if ratio_value is not None and not 0 < ratio_value <= 100:
-        ratio_value = None
+    ratio_value = core.amount_utils.normalize_support_ratio(ratio)
 
     requested_roi_deductible = bool(value.get("roi_deductible"))
     roi_deductible = requested_roi_deductible
@@ -1637,14 +1647,15 @@ def build_support_items(
             continue
         amount = core.clean_text(package.get("amount_actual"), 160) or None
         numeric = package.get("amount_numeric_manwon")
-        ratio = package.get("support_ratio")
+        ratio = core.amount_utils.normalize_support_ratio(package.get("support_ratio"))
         if amount and re.search(r"\d", amount) and numeric is None and ratio is None:
             amount = None
         if not amount and ratio is not None:
+            ratio_percent = ratio * 100
             ratio_text = (
-                str(int(ratio))
-                if float(ratio).is_integer()
-                else str(ratio)
+                str(int(ratio_percent))
+                if float(ratio_percent).is_integer()
+                else str(round(ratio_percent, 2)).rstrip("0").rstrip(".")
             )
             amount = f"최대 {ratio_text}% 지원"
         item = {
@@ -1850,6 +1861,97 @@ def representative_amount_text(
     return f"{prefix}최대 {ratio_text}% 지원"
 
 
+def package_amount_type(package: dict[str, Any]) -> str:
+    package_type = core.clean_text(package.get("type"))
+    if package.get("support_ratio") is not None and package.get("amount_numeric_manwon") is None:
+        return "support_ratio"
+    if package_type in CASH_TYPES:
+        return "support_amount"
+    if package_type in NON_CASH_TYPES:
+        return "non_cash"
+    return "unknown"
+
+
+def package_roi_method(package: dict[str, Any], amount_type: str) -> str:
+    if amount_type == "support_ratio":
+        return "ratio_cap"
+    if amount_type in {"support_amount", "subsidy", "voucher"}:
+        return "subtract" if package.get("roi_deductible") else "review"
+    if amount_type == "non_cash":
+        return "recommend_only"
+    return "review"
+
+
+def package_to_amount_candidate(
+    package: dict[str, Any],
+    *,
+    selected_package: dict[str, Any] | None,
+) -> dict[str, Any]:
+    amount_type = package_amount_type(package)
+    roi_method = package_roi_method(package, amount_type)
+    evidence = core.clean_text(package.get("evidence"), 400)
+    candidate = {
+        "label": core.clean_text(package.get("name"), 120)
+        or core.clean_text(package.get("amount_role"), 120)
+        or "Gemini support item",
+        "raw_text": evidence or core.clean_text(package.get("amount_actual"), 400),
+        "amount_manwon": package.get("amount_numeric_manwon"),
+        "display_amount": representative_amount_text(package),
+        "support_ratio": package.get("support_ratio"),
+        "max_amount_type": amount_type,
+        "max_amount_type_ko": core.amount_utils.AMOUNT_TYPE_KO.get(
+            amount_type,
+            core.amount_utils.AMOUNT_TYPE_KO["unknown"],
+        ),
+        "roi_apply_method": roi_method,
+        "roi_apply_method_ko": core.amount_utils.ROI_METHOD_KO.get(
+            roi_method,
+            core.amount_utils.ROI_METHOD_KO["review"],
+        ),
+        "is_roi_usable": roi_method in {"subtract", "ratio_cap"},
+        "is_selected_amount": package is selected_package,
+        "evidence": evidence,
+        "reason": "Gemini v7 source-grounded support item review",
+        "source": ENRICHMENT_KEY,
+    }
+    for key in ["amount_role", "condition_label", "payer", "recipient", "status"]:
+        value = package.get(key)
+        if value is not None:
+            candidate[key] = value
+    return candidate
+
+
+def build_amount_candidate_update(
+    enrichment: dict[str, Any],
+) -> dict[str, Any]:
+    representative = enrichment.get("representative_package")
+    candidates = [
+        package_to_amount_candidate(
+            package,
+            selected_package=representative,
+        )
+        for package in enrichment.get("support_packages") or []
+        if package.get("status") == "확정" and package.get("evidence")
+    ]
+    selected = next(
+        (candidate for candidate in candidates if candidate.get("is_selected_amount")),
+        None,
+    )
+    support_ratio = None
+    if selected and selected.get("support_ratio") is not None:
+        support_ratio = core.amount_utils.normalize_support_ratio(selected.get("support_ratio"))
+    else:
+        for candidate in candidates:
+            if candidate.get("support_ratio") is not None:
+                support_ratio = core.amount_utils.normalize_support_ratio(candidate.get("support_ratio"))
+                break
+    return {
+        "amount_candidates": candidates,
+        "selected_amount_candidate": selected,
+        "support_ratio": support_ratio,
+    }
+
+
 def validate_result(
     raw_result: dict[str, Any],
     row: dict[str, Any],
@@ -1956,7 +2058,6 @@ def build_update_payload(
             "support_primary_category": enrichment.get(
                 "support_primary_category"
             ),
-            "support_categories": enrichment.get("support_categories") or [],
             "support_items": enrichment.get("support_items") or [],
         }
     )
@@ -2000,6 +2101,8 @@ def build_update_payload(
                 }
             )
 
+    update.update(build_amount_candidate_update(enrichment))
+
     if (
         enrichment.get("eligibility_text")
         and enrichment.get("eligibility_evidence")
@@ -2028,6 +2131,28 @@ def build_update_payload(
 
 def already_processed(row: dict[str, Any]) -> bool:
     return ENRICHMENT_KEY in as_dict(row.get("temp_extraction_json"))
+
+
+def has_required_policy_fields(row: dict[str, Any]) -> bool:
+    return all(
+        core.clean_text(row.get(field))
+        for field in ["policy_id", "title", "organization", "url", "summary"]
+    )
+
+
+def has_support_signal(row: dict[str, Any]) -> bool:
+    return (
+        bool(row.get("is_selected"))
+        or bool(as_list(row.get("amount_candidates")))
+        or bool(as_dict(row.get("selected_amount_candidate")))
+        or row.get("support_ratio") is not None
+        or bool(as_list(row.get("support_items")))
+        or bool(core.clean_text(row.get("support_primary_category")))
+    )
+
+
+def is_eligible_policy_row(row: dict[str, Any]) -> bool:
+    return has_required_policy_fields(row) and has_support_signal(row)
 
 
 def fetch_rows(
@@ -2124,6 +2249,9 @@ def main() -> None:
         args.source,
         args.policy_id,
     )
+    fetched_count = len(rows)
+    if args.eligible_policy_only:
+        rows = [row for row in rows if is_eligible_policy_row(row)]
     cache_path = Path(args.cache_path)
     cache = {} if args.no_cache else load_cache(cache_path)
 
@@ -2139,6 +2267,8 @@ def main() -> None:
     print(f"model={args.model}")
     print(f"dry_run={dry_run}")
     print(f"force={args.force}")
+    print(f"eligible_policy_only={args.eligible_policy_only}")
+    print(f"fetched_rows={fetched_count}")
     print(f"candidate_rows={len(rows)}")
 
     for row in rows:

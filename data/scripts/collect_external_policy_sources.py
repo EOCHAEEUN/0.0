@@ -3410,14 +3410,13 @@ def build_energy_temp_extraction(
             )
         )
     ]
-    best = (
-        sorted(candidates, key=lambda row: (row["score"], row["manwon"]), reverse=True)[0]
-        if candidates
-        else None
+    amount_candidates, selected_amount_candidate = core.amount_utils.normalize_candidate_selection(
+        candidates
     )
+    best = selected_amount_candidate
     temporary_amount = round(float(best["manwon"]), 2) if best else None
     evidence = (
-        core.clean_text(best.get("context"), 400)
+        core.clean_text(best.get("context") or best.get("raw_text"), 400)
         if best
         else core.clean_text(payload.get("max_amount_evidence"), 400)
     )

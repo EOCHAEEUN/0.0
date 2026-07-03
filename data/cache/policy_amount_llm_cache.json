@@ -1,0 +1,137 @@
+{
+  "version": 1,
+  "by_policy": {
+    "ENERGYAGENCY:23506": {
+      "context_hash": "52adbd1d08d58723f6ba0eaf954e66342a1bdcce9c554fff44948d8b3257c788",
+      "result": {
+        "max_amount_actual": "기업당 최대 3백만원",
+        "max_amount_status": "확정",
+        "max_amount_type": "subsidy",
+        "max_amount_numeric_manwon": 300.0,
+        "max_amount_evidence": "기업당 최대 3백만원으로 시험수수료 공급가액(VAT제외)의 30% 지원",
+        "max_amount_note": "LLM 원문 근거 기반 지원금 자동 추출"
+      },
+      "updated_at": "2026-06-23T07:45:28.373288"
+    },
+    "ENERGYAGENCY:22698": {
+      "context_hash": "5435342cfed69dd2ecbfc12ac7a5556133068ec87d38b1d4c8c7b4707924684a",
+      "result": {
+        "max_amount_actual": "최대 2,408,000,000원",
+        "max_amount_status": "확정",
+        "max_amount_type": "subsidy",
+        "max_amount_numeric_manwon": 240800000.0,
+        "max_amount_evidence": "국비 2,408,000,000",
+        "max_amount_note": "LLM 원문 근거 기반 지원금 자동 추출"
+      },
+      "updated_at": "2026-06-23T05:51:22.288715"
+    },
+    "PBLN_000000000121038": {
+      "context_hash": "7efd5637568825d5b438e4460bb462e1fff1773bc0904262874e20f228c0fa45",
+      "result": {
+        "max_amount_actual": "최대 80% 지원",
+        "max_amount_status": "비율 확인",
+        "max_amount_type": "support_ratio",
+        "max_amount_numeric_manwon": null,
+        "max_amount_evidence": "수수료 80% 지원 (KISA→시험대행기관)",
+        "max_amount_note": "LLM 원문 근거 기반 지원금 자동 추출",
+        "roi_direct_deductible": false
+      },
+      "updated_at": "2026-07-01T02:45:06.333678"
+    },
+    "PBLN_000000000119904": {
+      "context_hash": "9fb84484568d962ad0ec1d56c1e372e176af24d061142e272c15deecb74aa33f",
+      "result": {
+        "max_amount_actual": "전 과정 무상지원",
+        "max_amount_status": "비율 확인",
+        "max_amount_type": "support_ratio",
+        "max_amount_numeric_manwon": null,
+        "max_amount_evidence": "전 과정 무상지원",
+        "max_amount_note": "LLM 원문 근거 기반 지원금 자동 추출",
+        "roi_direct_deductible": false
+      },
+      "updated_at": "2026-07-01T02:45:23.949859"
+    },
+    "PBLN_000000000123530": {
+      "context_hash": "1547c6334f141848c891af287413d058c8c1463fc41f4e6cfb9aa1ebee756ae7",
+      "result": {
+        "max_amount_actual": "무료",
+        "max_amount_status": "확정",
+        "max_amount_type": "support_amount",
+        "max_amount_numeric_manwon": null,
+        "max_amount_evidence": "컨설팅비용:무료",
+        "max_amount_note": "LLM 원문 근거 기반 지원금 자동 추출"
+      },
+      "updated_at": "2026-07-01T02:49:43.333736"
+    }
+  },
+  "by_context": {
+    "d113aba54603873535b0349c111d4136571c630c50b47e7cba3b6bea745f5c6a": {
+      "result": {
+        "max_amount_actual": "기업당 최대 3백만원",
+        "max_amount_status": "확정",
+        "max_amount_type": "subsidy",
+        "max_amount_numeric_manwon": 300.0,
+        "max_amount_evidence": "기업당 최대 3백만원으로 시험수수료 공급가액(VAT제외)의 30% 지원",
+        "max_amount_note": "LLM 원문 근거 기반 지원금 자동 추출"
+      },
+      "updated_at": "2026-06-23T05:49:54.045063"
+    },
+    "5435342cfed69dd2ecbfc12ac7a5556133068ec87d38b1d4c8c7b4707924684a": {
+      "result": {
+        "max_amount_actual": "최대 2,408,000,000원",
+        "max_amount_status": "확정",
+        "max_amount_type": "subsidy",
+        "max_amount_numeric_manwon": 240800000.0,
+        "max_amount_evidence": "국비 2,408,000,000",
+        "max_amount_note": "LLM 원문 근거 기반 지원금 자동 추출"
+      },
+      "updated_at": "2026-06-23T05:51:22.288715"
+    },
+    "52adbd1d08d58723f6ba0eaf954e66342a1bdcce9c554fff44948d8b3257c788": {
+      "result": {
+        "max_amount_actual": "기업당 최대 3백만원",
+        "max_amount_status": "확정",
+        "max_amount_type": "subsidy",
+        "max_amount_numeric_manwon": 300.0,
+        "max_amount_evidence": "기업당 최대 3백만원으로 시험수수료 공급가액(VAT제외)의 30% 지원",
+        "max_amount_note": "LLM 원문 근거 기반 지원금 자동 추출"
+      },
+      "updated_at": "2026-06-23T07:45:28.373288"
+    },
+    "7efd5637568825d5b438e4460bb462e1fff1773bc0904262874e20f228c0fa45": {
+      "result": {
+        "max_amount_actual": "최대 80% 지원",
+        "max_amount_status": "비율 확인",
+        "max_amount_type": "support_ratio",
+        "max_amount_numeric_manwon": null,
+        "max_amount_evidence": "수수료 80% 지원 (KISA→시험대행기관)",
+        "max_amount_note": "LLM 원문 근거 기반 지원금 자동 추출",
+        "roi_direct_deductible": false
+      },
+      "updated_at": "2026-07-01T02:45:06.333678"
+    },
+    "9fb84484568d962ad0ec1d56c1e372e176af24d061142e272c15deecb74aa33f": {
+      "result": {
+        "max_amount_actual": "전 과정 무상지원",
+        "max_amount_status": "비율 확인",
+        "max_amount_type": "support_ratio",
+        "max_amount_numeric_manwon": null,
+        "max_amount_evidence": "전 과정 무상지원",
+        "max_amount_note": "LLM 원문 근거 기반 지원금 자동 추출",
+        "roi_direct_deductible": false
+      },
+      "updated_at": "2026-07-01T02:45:23.949859"
+    },
+    "1547c6334f141848c891af287413d058c8c1463fc41f4e6cfb9aa1ebee756ae7": {
+      "result": {
+        "max_amount_actual": "무료",
+        "max_amount_status": "확정",
+        "max_amount_type": "support_amount",
+        "max_amount_numeric_manwon": null,
+        "max_amount_evidence": "컨설팅비용:무료",
+        "max_amount_note": "LLM 원문 근거 기반 지원금 자동 추출"
+      },
+      "updated_at": "2026-07-01T02:49:43.333736"
+    }
+  }
+}

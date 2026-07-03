@@ -4,7 +4,10 @@ import type {
   DashboardEquipmentContract,
   DashboardMatchedPolicyContract,
   DashboardOnboardingMeResponse,
+  DashboardOverviewResponse,
 } from "../dashboard.contract"
+import { buildSupportProjectsPath } from "../../support/supportProjectsPaths"
+import { buildRoiPath } from "../../roi/roiPaths"
 
 export type InvestmentActionStatus = "empty" | "draft" | "completed"
 
@@ -28,6 +31,7 @@ export type DashboardDeadlineListItem = {
   policyTitle: string
   sourceName: string
   deadlineDisplay: string
+  deadlineDate: string | null
   daysRemaining: number
   dday: string
   urgency: "urgent" | "upcoming"
@@ -40,6 +44,11 @@ export type DashboardDeadlineList = {
   subtitle: string
   viewAllLabel: string
   emptyMessage: string
+  emptyState?: "none" | "snapshot_missing"
+  primaryActionLabel?: string
+  primaryActionPath?: string
+  secondaryActionLabel?: string
+  secondaryActionPath?: string
   items: DashboardDeadlineListItem[]
 }
 
@@ -56,6 +65,10 @@ export type DashboardAnalysisRow = {
   statusLabel: string
   summary: string
   detail: string
+  chips: string[]
+  roiText: string
+  annualSavingsText: string
+  utilizationText: string
   ctaLabel: string
   ctaPath: string
 }
@@ -99,6 +112,15 @@ export type DashboardWorkspace = {
   engiMessage: string
   analyses: DashboardAnalysisRow[]
   hasMoreAnalyses: boolean
+  equipmentManagePath?: string
+  newRoiPath?: string
+  newAnalysisPath?: string
+  heroSummary?: string
+  heroReason?: string
+  closingSoonCount?: number
+  legacyPolicyMissing?: boolean
+  priorityMetaText?: string
+  todayTaskNote?: string
 }
 
 export type CompanySummaryRow = {
@@ -122,6 +144,7 @@ export type DashboardViewModel = {
 type MapDashboardDataParams = {
   onboarding: DashboardOnboardingMeResponse | null
   analysis: DashboardAnalysisStorage | null
+  preferredAnalysisId?: string
 }
 
 function compactText(value: unknown) {
@@ -156,6 +179,65 @@ function formatPercent(value: number | null) {
   if (value === null || !Number.isFinite(value)) return "-"
   // roi_pct는 백엔드에서 이미 퍼센트 값(예: 15.5)으로 반환된다. 자동 스케일링 없음.
   return `${Math.round(value)}%`
+}
+
+function formatCompactSavings(manwon: number | null) {
+  if (manwon === null || !Number.isFinite(manwon)) return "-"
+  if (manwon >= 100) return `${Math.round(manwon / 100)}M`
+  return `${formatCommaNumber(manwon)}만`
+}
+
+function normalizeDeadlineDate(value: unknown) {
+  const text = compactText(value)
+  if (!text) return null
+  if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10)
+  const parsed = Date.parse(text)
+  if (!Number.isFinite(parsed)) return null
+  const date = new Date(parsed)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate(),
+  ).padStart(2, "0")}`
+}
+
+function mapOverviewDeadlineItem(
+  item: {
+    policy_id?: string | null
+    title: string
+    deadline?: string | null
+    deadline_display: string
+    d_day: string
+    days_remaining: number
+    status_hint: string
+    is_priority?: boolean
+  },
+  params: {
+    companyId: string
+    analysisId: string | null
+    equipmentId: string | null
+    policyPath: string
+  },
+): DashboardDeadlineListItem {
+  const policyId = item.policy_id ?? null
+  const daysRemaining = item.days_remaining
+  return {
+    policyId,
+    policyTitle: item.title,
+    sourceName: item.status_hint,
+    deadlineDisplay: `${item.deadline_display} 마감 · ${item.status_hint}`,
+    deadlineDate: normalizeDeadlineDate(item.deadline),
+    daysRemaining,
+    dday: item.d_day,
+    urgency: daysRemaining <= 7 ? "urgent" : "upcoming",
+    isPriority: Boolean(item.is_priority),
+    path:
+      policyId && params.analysisId
+        ? buildSupportProjectsPathWithQuery({
+            companyId: params.companyId,
+            analysisId: params.analysisId,
+            equipmentId: params.equipmentId || undefined,
+          })
+        : params.policyPath,
+  }
 }
 
 function formatPayback(value: number | null) {
@@ -266,6 +348,67 @@ function normalizePolicies(analysis: DashboardAnalysisStorage | null) {
   )
 }
 
+function getRoiOutputAnalysisId(
+  roiOutput: DashboardOnboardingMeResponse["latest_roi_output"],
+) {
+  return (
+    compactText(roiOutput?.analysis_id) ||
+    compactText((roiOutput as { analysisId?: string } | null)?.analysisId) ||
+    compactText(roiOutput?.id)
+  )
+}
+
+function getSnapshotPolicies(
+  roiOutput: DashboardOnboardingMeResponse["latest_roi_output"],
+  analysisId: string,
+) {
+  const snapshot = readRecord(roiOutput?.policy_snapshot)
+  if (!snapshot) return []
+
+  const snapshotAnalysisId = compactText(snapshot.analysis_id)
+  if (analysisId && snapshotAnalysisId && snapshotAnalysisId !== analysisId) return []
+
+  const snapshotPolicies = snapshot.policies
+  if (!Array.isArray(snapshotPolicies)) return []
+  return snapshotPolicies as DashboardMatchedPolicyContract[]
+}
+
+function isPolicySnapshotMissing(
+  roiOutput: DashboardOnboardingMeResponse["latest_roi_output"],
+  analysisId: string,
+) {
+  if (!analysisId) return false
+  const snapshot = readRecord(roiOutput?.policy_snapshot)
+  if (!snapshot) return true
+  if (!snapshot.snapshot_version) return true
+  if (!Array.isArray(snapshot.policies)) return true
+  return false
+}
+
+function getMatchedPoliciesFromOnboarding(
+  onboarding: DashboardOnboardingMeResponse | null | undefined,
+  analysisId: string,
+  equipmentId: string,
+) {
+  const matchedPolicies = onboarding?.matched_policies ?? []
+  if (!Array.isArray(matchedPolicies) || matchedPolicies.length === 0) return []
+
+  if (analysisId) {
+    const analysisScoped = matchedPolicies.filter(
+      (policy) => compactText(policy.analysis_id) === analysisId,
+    )
+    if (analysisScoped.length > 0) return analysisScoped
+  }
+
+  if (equipmentId) {
+    return matchedPolicies.filter(
+      (policy) => compactText(policy.equipment_id) === equipmentId,
+    )
+  }
+
+  return matchedPolicies
+}
+
 function mapRoiOutputToAnalysis(
   roiOutput: DashboardOnboardingMeResponse["latest_roi_output"],
   onboarding: DashboardOnboardingMeResponse | null | undefined,
@@ -273,16 +416,22 @@ function mapRoiOutputToAnalysis(
   if (!roiOutput?.roi_data) return null
 
   const equipments = onboarding?.equipments ?? []
+  const analysisId = getRoiOutputAnalysisId(roiOutput)
   const equipmentId = compactText(roiOutput.equipment_id)
   const equipment = equipments.find((item) =>
     [item.equipment_id, item.id].some((id) => compactText(id) === equipmentId),
   )
-  const matchedPolicies = (onboarding?.matched_policies ?? []).filter((policy) =>
-    !equipmentId || compactText(policy.equipment_id) === equipmentId,
-  )
+  const snapshotPolicies = getSnapshotPolicies(roiOutput, analysisId)
+  const policySnapshotMissing = isPolicySnapshotMissing(roiOutput, analysisId)
+  const matchedPolicies =
+    snapshotPolicies.length > 0
+      ? snapshotPolicies
+      : analysisId
+        ? []
+        : getMatchedPoliciesFromOnboarding(onboarding, analysisId, equipmentId)
 
   return {
-    id: compactText(roiOutput.id) || compactText(roiOutput.analysis_id),
+    id: analysisId,
     company_id: roiOutput.company_id,
     equipment_id: equipmentId,
     company: onboarding?.company ?? null,
@@ -292,6 +441,7 @@ function mapRoiOutputToAnalysis(
     roi_data: roiOutput.roi_data,
     matched_policies: matchedPolicies,
     createdAt: roiOutput.created_at,
+    policy_snapshot_missing: policySnapshotMissing,
   } as DashboardAnalysisStorage
 }
 
@@ -457,22 +607,47 @@ function getNearestDeadline(policies: DashboardMatchedPolicyContract[]) {
   return dated[0] ?? null
 }
 
-function getPolicyDetailPath(
-  analysisId: string,
-  policy: DashboardMatchedPolicyContract | undefined,
-) {
-  const policyId = getPolicyId(policy)
-  if (!analysisId) return "/support-projects"
-  return policyId
-    ? `/analysis/${analysisId}/policies/${policyId}`
-    : `/analysis/${analysisId}/policies`
+function buildSupportProjectsPathWithQuery(params: {
+  companyId?: string
+  analysisId?: string
+  equipmentId?: string
+  policyId?: string
+  view?: "priority" | "discovery"
+}) {
+  return buildSupportProjectsPath(params.view ?? "priority", {
+    companyId: params.companyId,
+    analysisId: params.analysisId,
+    equipmentId: params.equipmentId,
+    policyId: params.policyId,
+  })
 }
 
 function mapDeadlineList(
   policies: DashboardMatchedPolicyContract[],
   priorityPolicyId: string | null,
   analysisId: string,
+  companyId: string,
+  equipmentId: string,
+  options?: {
+    snapshotMissing?: boolean
+    reanalysisPath?: string
+  },
 ): DashboardDeadlineList {
+  if (options?.snapshotMissing) {
+    return {
+      title: "마감 일정",
+      subtitle: "정책 이력이 없어 마감 일정을 확인할 수 없습니다.",
+      viewAllLabel: "최신 지원사업 보기",
+      emptyMessage: "정책 이력이 없어 마감 일정을 확인할 수 없습니다.",
+      emptyState: "snapshot_missing",
+      primaryActionLabel: "투자 조건 다시 설정",
+      primaryActionPath: options.reanalysisPath || "/analysis/new",
+      secondaryActionLabel: "최신 지원사업 보기",
+      secondaryActionPath: "/support-projects/discovery",
+      items: [],
+    }
+  }
+
   const dated = policies
     .map((policy) => {
       const raw = getPolicyDateValue(policy)
@@ -508,6 +683,7 @@ function mapDeadlineList(
     subtitle,
     viewAllLabel: `전체 ${formatCount(policies.length)} 보기`,
     emptyMessage: "현재 확인 가능한 마감일이 있는 매칭 공고가 없습니다.",
+    emptyState: "none",
     items: visibleItems.map(({ policy, raw, daysRemaining }) => {
       const policyId = getPolicyId(policy)
       return {
@@ -515,11 +691,16 @@ function mapDeadlineList(
         policyTitle: compactText(policy.title) || "공고 확인 필요",
         sourceName: getPolicySourceName(policy),
         deadlineDisplay: formatDeadlineDisplay(raw),
+        deadlineDate: normalizeDeadlineDate(raw),
         daysRemaining,
         dday: `D-${Math.max(0, daysRemaining)}`,
         urgency: daysRemaining <= 7 ? "urgent" : "upcoming",
         isPriority: Boolean(priorityPolicyId && policyId === priorityPolicyId),
-        path: getPolicyDetailPath(analysisId, policy),
+        path: buildSupportProjectsPathWithQuery({
+          companyId,
+          analysisId,
+          equipmentId,
+        }),
       }
     }),
   }
@@ -748,29 +929,33 @@ function mapWorkspace(
   equipments: DashboardEquipmentContract[],
 ): DashboardWorkspace {
   const analysisRecord = readRecord(analysis)
+  const isSnapshotMissingLegacy = Boolean(analysis?.policy_snapshot_missing)
   const policies = normalizePolicies(analysis)
   const matchedCount = policies.length
   const status = getAnalysisStatus(analysis, matchedCount)
   const analysisId = getAnalysisId(analysis)
   const equipmentName = getEquipmentName(analysis, equipments)
   const priorityPolicy = getPriorityPolicy(policies)
-  const priorityPolicyTitle = compactText(priorityPolicy?.title) || "공고 확인 필요"
+  const companyId = compactText(company?.company_id)
+  const priorityPolicyTitle = isSnapshotMissingLegacy
+    ? "정책 이력 없음"
+    : compactText(priorityPolicy?.title) || "공고 확인 필요"
   const priorityPolicyId = getPolicyId(priorityPolicy)
   const nearestDeadline = getNearestDeadline(policies)
   const deadlinePolicy = nearestDeadline?.policy ?? priorityPolicy
   const deadlinePolicyId = getPolicyId(deadlinePolicy)
   const deadlineRaw = nearestDeadline?.raw || (deadlinePolicy ? getPolicyDateValue(deadlinePolicy) : "")
   const daysRemaining = deadlineRaw ? getDaysRemaining(deadlineRaw) : null
-  const policyPath = analysisId
-    ? priorityPolicyId
-      ? getPolicyDetailPath(analysisId, priorityPolicy)
-      : `/analysis/${analysisId}/policies`
-    : "/support-projects"
   const analysisEquipmentId = compactText(
     analysisRecord?.equipmentId ??
       analysisRecord?.equipment_id ??
       analysisRecord?.selected_equipment_id,
   )
+  const policyPath = buildSupportProjectsPathWithQuery({
+    companyId,
+    analysisId,
+    equipmentId: analysisEquipmentId,
+  })
   const draftPath =
     analysisId && analysisEquipmentId
       ? `/analysis/new?mode=reanalysis&equipmentId=${encodeURIComponent(analysisEquipmentId)}&parentAnalysisId=${encodeURIComponent(analysisId)}`
@@ -785,19 +970,36 @@ function mapWorkspace(
     findNumberByKeys(roiData, ["payback_years", "payback_months", "payback_period_months"])
   const progress = getProgressPercent(analysis)
   const policySummary = getPolicySummary(analysis, matchedCount)
-  const deadlineList = mapDeadlineList(policies, priorityPolicyId, analysisId)
+  const deadlineList = mapDeadlineList(
+    policies,
+    priorityPolicyId,
+    analysisId,
+    companyId,
+    analysisEquipmentId,
+    {
+      snapshotMissing: isSnapshotMissingLegacy,
+      reanalysisPath: draftPath,
+    },
+  )
   const companyName = getCompanyName(company)
   const industryLabel = getIndustryLabel(company)
   const regionLabel = getRegionLabel(company)
   const urgentActionCount = deadlineList.items.filter(
     (item) => item.urgency === "urgent",
   ).length
-  const actionCount = urgentActionCount > 0 ? urgentActionCount : status === "empty" ? 0 : 1
+  const actionCount = isSnapshotMissingLegacy
+    ? 0
+    : urgentActionCount > 0
+      ? urgentActionCount
+      : status === "empty"
+        ? 0
+        : 1
   const equipmentCount = equipments.length
   const priorityEquipmentCount = status === "empty" ? 0 : equipmentCount
   const recentAnalysisCount = analysisId ? 1 : 0
-  const nearestDeadlineSummary =
-    typeof daysRemaining === "number"
+  const nearestDeadlineSummary = isSnapshotMissingLegacy
+    ? "정책 이력이 없어 마감 일정을 확인할 수 없습니다."
+    : typeof daysRemaining === "number"
       ? `D-${Math.max(0, daysRemaining)} 공고 조건 확인`
       : "확인할 마감 일정 없음"
   const briefingTitle = companyName
@@ -844,7 +1046,7 @@ function mapWorkspace(
     matchedPolicyCount: formatCount(matchedCount),
     needsText: "세부 업종코드 · 제출서류",
     priorityChips: getPriorityChips(company, analysis?.equipment ?? equipments[0], priorityPolicy),
-    roiPath: analysisId ? `/roi?analysisId=${analysisId}` : "/roi",
+    roiPath: analysisId ? buildRoiPath("strategy", { analysisId }) : buildRoiPath("strategy"),
     policyPath,
     draftPath,
     advisorPath,
@@ -873,6 +1075,17 @@ function mapWorkspace(
     engiMessage: `Engi: ${daysRemaining === null ? "마감일 확인이 필요한 공고라" : `D-${Math.max(0, daysRemaining)} 공고라`} 업종코드와 제출서류를 먼저 확인해보세요.`,
     analyses: [],
     hasMoreAnalyses: false,
+  }
+
+  if (isSnapshotMissingLegacy) {
+    return {
+      ...completedWorkspace,
+      actionMessage: "이 분석은 정책 이력 저장 전 생성되었습니다.",
+      engiMessage:
+        "Engi: 정책 이력이 없어 당시 매칭 공고 마감일을 복원할 수 없습니다. 재분석 후 최신 정책 이력을 저장해 주세요.",
+      nextStepText: "다음 단계: 투자 조건 다시 설정 또는 최신 지원사업 확인",
+      summaryStatusText: "분석 완료 · 정책 이력 없음",
+    }
   }
 
   if (status === "empty") {
@@ -925,12 +1138,16 @@ function mapAnalysisRows(
           : "분석 필요",
     summary:
       workspace.status === "completed"
-        ? `ROI ${workspace.kpis[0].value} · 매칭 공고 ${workspace.matchedPolicyCount}`
+        ? `ROI ${workspace.kpis[0]?.value ?? "-"} · 매칭 공고 ${workspace.matchedPolicyCount}`
         : workspace.progressText.replace("작성 중: ", ""),
     detail:
       workspace.status === "completed"
         ? `우선 검토 정책 ${workspace.priorityPolicyTitle} · ${workspace.deadline.dday} 일정 확인 필요`
         : "투자금과 운영비 조건을 입력하면 ROI 분석을 이어갈 수 있습니다.",
+    chips: [workspace.equipmentName, workspace.industryLabel].filter(Boolean),
+    roiText: workspace.kpis[0]?.value ?? "-",
+    annualSavingsText: workspace.kpis[1]?.value ?? "-",
+    utilizationText: workspace.kpis[2]?.value ?? "-",
     ctaLabel: workspace.status === "completed" ? "결과 보기" : "이어서 작성",
     ctaPath:
       workspace.status === "completed" ? workspace.roiPath : workspace.draftPath,
@@ -939,12 +1156,93 @@ function mapAnalysisRows(
   return [row]
 }
 
+function normalizeAnalysisId(value: unknown) {
+  return compactText(value)
+}
+
+function findAnalysisById(
+  analyses: DashboardAnalysisStorage[],
+  analysisId: string,
+) {
+  if (!analysisId) return null
+  return analyses.find((item) => getAnalysisId(item) === analysisId) ?? null
+}
+
+function getOnboardingPreferredAnalysisId(
+  onboarding: DashboardOnboardingMeResponse | null,
+) {
+  return (
+    normalizeAnalysisId(onboarding?.active_analysis_id) ||
+    normalizeAnalysisId(onboarding?.activeAnalysisId) ||
+    normalizeAnalysisId(onboarding?.latest_analysis_id) ||
+    normalizeAnalysisId(onboarding?.latestAnalysisId)
+  )
+}
+
+function getAnalysisTimestamp(analysis: DashboardAnalysisStorage | null) {
+  if (!analysis) return Number.NEGATIVE_INFINITY
+  const record = readRecord(analysis)
+  const raw =
+    compactText(record?.updated_at) ||
+    compactText(record?.updatedAt) ||
+    compactText(record?.created_at) ||
+    compactText(record?.createdAt) ||
+    compactText(analysis.roi_output?.created_at)
+  if (!raw) return Number.NEGATIVE_INFINITY
+  const parsed = Date.parse(raw)
+  return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY
+}
+
+function getLatestAnalysis(analyses: DashboardAnalysisStorage[]) {
+  if (analyses.length === 0) return null
+  return [...analyses].sort(
+    (left, right) => getAnalysisTimestamp(right) - getAnalysisTimestamp(left),
+  )[0]
+}
+
+function selectEffectiveAnalysis(params: {
+  preferredAnalysisId?: string
+  storedAnalysis: DashboardAnalysisStorage | null
+  onboarding: DashboardOnboardingMeResponse | null
+  serverAnalyses: DashboardAnalysisStorage[]
+}) {
+  const { preferredAnalysisId, storedAnalysis, onboarding, serverAnalyses } = params
+  const routeAnalysisId = normalizeAnalysisId(preferredAnalysisId)
+  const storedAnalysisId = getAnalysisId(storedAnalysis)
+  const onboardingPreferredId = getOnboardingPreferredAnalysisId(onboarding)
+
+  const routeMatched = findAnalysisById(serverAnalyses, routeAnalysisId)
+  if (routeMatched) return routeMatched
+  if (routeAnalysisId && storedAnalysisId === routeAnalysisId && storedAnalysis) {
+    return storedAnalysis
+  }
+
+  const storedMatched = findAnalysisById(serverAnalyses, storedAnalysisId)
+  if (storedMatched) return storedMatched
+  if (storedAnalysisId && storedAnalysis) return storedAnalysis
+
+  const onboardingMatched = findAnalysisById(serverAnalyses, onboardingPreferredId)
+  if (onboardingMatched) return onboardingMatched
+
+  if (!routeAnalysisId && !storedAnalysisId && !onboardingPreferredId) {
+    return getLatestAnalysis(serverAnalyses)
+  }
+
+  return storedAnalysis ?? getLatestAnalysis(serverAnalyses)
+}
+
 export function mapDashboardData({
   onboarding,
   analysis,
+  preferredAnalysisId,
 }: MapDashboardDataParams): DashboardViewModel {
   const serverAnalyses = getServerAnalyses(onboarding)
-  const effectiveAnalysis = serverAnalyses[0] ?? analysis
+  const effectiveAnalysis = selectEffectiveAnalysis({
+    preferredAnalysisId,
+    storedAnalysis: analysis,
+    onboarding,
+    serverAnalyses,
+  })
   const company = onboarding?.company ?? effectiveAnalysis?.company ?? null
   const equipments = normalizeEquipments(onboarding, effectiveAnalysis)
   const workspace = mapWorkspace(company, effectiveAnalysis, equipments)
@@ -966,5 +1264,223 @@ export function mapDashboardData({
       hasMoreAnalyses: serverAnalyses.length > 5,
     },
     isFallback: !effectiveAnalysis,
+  }
+}
+
+function buildPaths(params: {
+  companyId?: string
+  analysisId?: string | null
+  equipmentId?: string | null
+  policyId?: string | null
+}) {
+  const analysisId = params.analysisId || ""
+
+  const equipmentManagePath = "/equipment"
+
+  const roiPath =
+    analysisId
+      ? `/analysis/${encodeURIComponent(analysisId)}/result`
+      : params.equipmentId
+        ? buildRoiPath("strategy", {
+            company_id: params.companyId || undefined,
+            equipment_id: params.equipmentId || undefined,
+            source: "dashboard",
+          })
+        : buildRoiPath("strategy", {
+            company_id: params.companyId || undefined,
+            source: "dashboard",
+          })
+
+  const newRoiPath = params.equipmentId
+    ? buildRoiPath("strategy", {
+        company_id: params.companyId || undefined,
+        equipment_id: params.equipmentId || undefined,
+        source: "dashboard",
+      })
+    : equipmentManagePath
+
+  const policyPath = analysisId
+    ? buildSupportProjectsPathWithQuery({
+        companyId: params.companyId,
+        analysisId,
+        equipmentId: params.equipmentId || undefined,
+      })
+    : buildSupportProjectsPathWithQuery({
+        companyId: params.companyId,
+        equipmentId: params.equipmentId || undefined,
+      })
+
+  const newAnalysisPath = params.companyId
+    ? `/analysis/new?company_id=${encodeURIComponent(params.companyId)}&source=dashboard`
+    : "/analysis/new?source=dashboard"
+
+  return {
+    equipmentManagePath,
+    roiPath,
+    newRoiPath,
+    policyPath,
+    newAnalysisPath,
+  }
+}
+
+export function mapDashboardOverview(
+  overview: DashboardOverviewResponse,
+): DashboardViewModel {
+  const company = overview.company
+  const active = overview.active_analysis
+  const counts = overview.counts
+  const hero = overview.hero
+  const tasks = overview.today_tasks
+  const priority = overview.priority_policy
+  const analysisId = active?.analysis_id || null
+  const equipmentId = analysisId
+    ? active?.equipment_id || null
+    : company?.representative_equipment_id || null
+  const policyId = priority?.policy_id || null
+  const legacyMissing = Boolean(priority?.legacy_missing)
+  const companyId = company?.company_id || ""
+  const paths = buildPaths({ companyId, analysisId, equipmentId, policyId })
+
+  const equipmentName =
+    active?.equipment_name || hero?.priority_equipment_name || "대표 설비"
+  const matchedCount = counts?.matched_policies ?? 0
+  const status: InvestmentActionStatus = !analysisId ? "empty" : "completed"
+
+  const deadlineItems: DashboardDeadlineListItem[] = (
+    overview.calendar_deadlines?.length
+      ? overview.calendar_deadlines
+      : overview.deadlines ?? []
+  ).map((item) =>
+    mapOverviewDeadlineItem(item, {
+      companyId,
+      analysisId,
+      equipmentId,
+      policyPath: paths.policyPath,
+    }),
+  )
+
+  const analyses: DashboardAnalysisRow[] = (overview.recent_analyses ?? []).map(
+    (row) => ({
+      id: row.analysis_id,
+      title: row.title,
+      equipmentName: row.equipment_name,
+      status: row.status === "검토 중" ? "draft" : row.analysis_id ? "completed" : "empty",
+      statusLabel: row.status,
+      summary: row.summary,
+      detail: row.detail,
+      chips: row.chips?.length ? row.chips : row.summary.split(" · ").filter(Boolean),
+      roiText: formatPercent(
+        typeof row.roi_pct === "number" ? row.roi_pct : readNumber(row.roi_pct),
+      ),
+      annualSavingsText: formatCompactSavings(
+        typeof row.annual_savings_manwon === "number"
+          ? row.annual_savings_manwon
+          : readNumber(row.annual_savings_manwon),
+      ),
+      utilizationText: formatPercent(
+        typeof row.utilization_improvement_pct === "number"
+          ? row.utilization_improvement_pct
+          : readNumber(row.utilization_improvement_pct),
+      ),
+      ctaLabel: "결과 보기",
+      ctaPath: `/analysis/${encodeURIComponent(row.analysis_id)}/result`,
+    }),
+  )
+
+  const workspace: DashboardWorkspace = {
+    status,
+    analysisId,
+    companyName: company?.company_name || "",
+    industryLabel: company?.industry_name || "",
+    regionLabel: company?.region || "",
+    actionCount: tasks?.count ?? 0,
+    equipmentCount: counts?.registered_equipment ?? overview.equipments?.length ?? 0,
+    priorityEquipmentCount: hero?.priority_equipment_count ?? 0,
+    recentAnalysisCount: counts?.recent_analyses ?? analyses.length,
+    nearestDeadlineSummary: tasks?.summary || "현재 확인할 마감 없음",
+    briefingTitle: company?.company_name
+      ? `${company.company_name}의 오늘 확인할 작업`
+      : "오늘 확인할 작업",
+    recentStatusMessage: hero?.reason || "",
+    equipmentName,
+    actionTitle: "오늘 확인할 작업",
+    actionMessage: priority?.reason || "지금은 이 지원사업의 조건을 확인하세요.",
+    priorityPolicyTitle: legacyMissing
+      ? "정책 이력 없음"
+      : priority?.title || "현재 분석에 연결된 지원사업이 없습니다",
+    priorityPolicyId: policyId,
+    deadlinePolicyId: deadlineItems[0]?.policyId ?? policyId,
+    matchedPolicyCount: String(matchedCount),
+    needsText: "",
+    priorityChips: priority?.tags ?? [],
+    roiPath: paths.roiPath,
+    policyPath: legacyMissing
+      ? buildSupportProjectsPath("priority", { analysisId: analysisId || "" })
+      : paths.policyPath,
+    draftPath: analysisId && policyId
+      ? `/analysis/${encodeURIComponent(analysisId)}/policies/${encodeURIComponent(policyId)}/application`
+      : paths.newAnalysisPath,
+    advisorPath: analysisId ? `/advisor?analysisId=${encodeURIComponent(analysisId)}` : "/advisor",
+    engiTitle: "Engi 추천",
+    kpis: [],
+    analysisMetricText: "",
+    recommendedScenarioName: "",
+    summaryStatusText: active?.status === "completed" ? "분석 완료" : "분석 필요",
+    policySummary: {
+      totalPolicyCount: String(matchedCount),
+      activePolicyCount: String(matchedCount),
+      matchedPolicyCount: String(matchedCount),
+    },
+    deadline: {
+      label: deadlineItems[0]?.dday || "마감 일정",
+      dday: deadlineItems[0]?.dday || "-",
+      policyTitle: deadlineItems[0]?.policyTitle || priority?.title || "-",
+      supportAmountText: "-",
+      deadlineDisplay: deadlineItems[0]?.deadlineDisplay || "-",
+      policyId: deadlineItems[0]?.policyId ?? policyId,
+    },
+    deadlineList: {
+      title: "마감일정",
+      subtitle: "날짜를 선택하면 아래에 마감 공고 리스트가 펼쳐집니다.",
+      viewAllLabel: "전체 보기",
+      emptyMessage: legacyMissing
+        ? "분석 당시 정책 이력이 없어 마감일을 확인할 수 없습니다."
+        : "확인할 마감 일정이 없습니다.",
+      emptyState: legacyMissing ? "snapshot_missing" : "none",
+      primaryActionLabel: "투자 조건 다시 설정",
+      primaryActionPath: paths.newAnalysisPath,
+      secondaryActionLabel: "최신 지원사업 보기",
+      secondaryActionPath: "/support-projects/discovery",
+      items: deadlineItems,
+    },
+    progressText: "",
+    nextStepText: "",
+    engiMessage: priority?.reason || "",
+    analyses,
+    hasMoreAnalyses: (overview.recent_analyses?.length ?? 0) >= 10,
+    equipmentManagePath: paths.equipmentManagePath,
+    newRoiPath: paths.newRoiPath,
+    newAnalysisPath: paths.newAnalysisPath,
+    heroSummary: hero?.summary || "",
+    heroReason: hero?.reason || "",
+    closingSoonCount: counts?.closing_soon ?? 0,
+    legacyPolicyMissing: legacyMissing,
+    priorityMetaText: [priority?.deadline, priority?.d_day].filter(Boolean).join(" · "),
+    todayTaskNote: tasks?.summary || "Engi가 우선 행동을 정리했어요.",
+  }
+
+  return {
+    companyRows: mapCompanyRows(company),
+    equipmentRows: mapEquipmentRows(
+      (overview.equipments ?? []).map((item) => ({
+        equipment_id: item.equipment_id,
+        name: item.name,
+        category: item.category,
+        process: item.process,
+        age_years: item.age_years,
+      })),
+    ),
+    workspace,
+    isFallback: false,
   }
 }

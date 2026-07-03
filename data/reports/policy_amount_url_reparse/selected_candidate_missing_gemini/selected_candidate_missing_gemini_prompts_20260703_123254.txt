@@ -1,0 +1,594 @@
+
+================================================================================
+SAMPLE 1
+너는 제조업/중소기업 지원사업 공고에서 대표 지원금 후보를 고르는 검수자다.
+아래 금액 후보 중 ROI 직접 차감 가능한 대표 지원금이 명확히 있으면 후보 index를 고르고, 없으면 없다고 판단해라.
+반드시 JSON 객체 하나만 반환해라.
+
+decision:
+- adopt_candidate: 후보 중 하나가 기업/과제/사업장 단위의 대표 현금성 지원금으로 명확함
+- keep_no_representative: 후보가 지원비율, 총지원규모, 매출조건, 자부담, 수수료, 교육/컨설팅/장비사용료, 금융성 한도 등이라 대표금액을 만들면 안 됨
+- hold: 표/문맥 연결이 불분명하거나 확신이 낮음
+
+주의:
+- 총사업비/총지원금/지원규모/전체예산/누적금액/매출액 조건은 대표 지원금이 아니다.
+- 융자/대출/보증/이차보전/팩토링은 ROI 직접 차감 대표금액이 아니다.
+- 교육비/컨설팅비/장비사용료/시험수수료/인증비는 보통 직접 차감 보조금이 아니라 recommend_only 또는 제외다.
+- 월별/명당/건당/점당 금액은 확신이 없으면 hold.
+- 확신이 낮으면 hold.
+
+공고:
+policy_id: PBLN_000000000117019
+title: 2026년 제조DX멘토단 활용지원사업 통합 공고
+organization: 중소벤처기업부
+url: https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000117019
+old_amount: 238.0
+old_amount_actual: 최대 238만원
+old_amount_type: subsidy
+analysis_group: mixed_with_unknown
+candidate_types: support_ratio:1 | total_support_scale:7 | unknown:6
+
+후보 목록(JSON):
+[
+  {
+    "index": 0,
+    "amount_manwon": 862000.0,
+    "display_amount": "최대 86.2억원",
+    "current_type": "total_support_scale",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "구축지도및운영애로사항해결지원□지원규모 : 총86.2억원"
+  },
+  {
+    "index": 1,
+    "amount_manwon": 238.0,
+    "display_amount": "최대 238만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "선정사전기획3개월(8회)500개사 내외238만원85%‘25"
+  },
+  {
+    "index": 2,
+    "amount_manwon": 476.0,
+    "display_amount": "최대 476만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "2월~수시수시AX기획200개사 내외476만원구축지도3개월(4회)400개사 내외119만원최종 협약 후 2주 이내사후관리4개월210개사 내외최대 1"
+  },
+  {
+    "index": 3,
+    "amount_manwon": 119.0,
+    "display_amount": "최대 119만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "2월~수시수시AX기획200개사 내외476만원구축지도3개월(4회)400개사 내외119만원최종 협약 후 2주 이내사후관리4개월210개사 내외최대 1"
+  },
+  {
+    "index": 4,
+    "amount_manwon": 1900.0,
+    "display_amount": "최대 1,900만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": 0.5,
+    "context": "2월~수시수시AX기획200개사 내외476만원구축지도3개월(4회)400개사 내외119만원최종 협약 후 2주 이내사후관리4개월210개사 내외최대 1,900만원50%’25"
+  },
+  {
+    "index": 5,
+    "amount_manwon": 238.0,
+    "display_amount": "최대 238만원",
+    "current_type": "total_support_scale",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "기술애로 해결 등 제조 노하우 전수 등□지원 규모 및 조건◦(지원규모)500개사내외◦(지원조건)총사업비의85%지원구 분지원방법지원기간사업비(분담비율)정부지원(85%)민간부담(15%)사전 기획DX멘토단 1인 x 8회최대 3개월238만원42만원□ 신청기간◦2026년2월2일(월)~예산소진시□ 신청방법◦스마트공장사업관리시스템(smart-factory"
+  },
+  {
+    "index": 6,
+    "amount_manwon": 42.0,
+    "display_amount": "최대 42만원",
+    "current_type": "total_support_scale",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "기술애로 해결 등 제조 노하우 전수 등□지원 규모 및 조건◦(지원규모)500개사내외◦(지원조건)총사업비의85%지원구 분지원방법지원기간사업비(분담비율)정부지원(85%)민간부담(15%)사전 기획DX멘토단 1인 x 8회최대 3개월238만원42만원□ 신청기간◦2026년2월2일(월)~예산소진시□ 신청방법◦스마트공장사업관리시스템(smart-factory"
+  },
+  {
+    "index": 7,
+    "amount_manwon": 476.0,
+    "display_amount": "최대 476만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "DX 멘토단 2인 x 8회최대 3개월476만원84만원□ 신청기간◦2026년2월2일(월)~예산소진시□ 신청방법◦스마트공장사업관리시스템(smart-factory"
+  },
+  {
+    "index": 8,
+    "amount_manwon": 84.0,
+    "display_amount": "최대 84만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "DX 멘토단 2인 x 8회최대 3개월476만원84만원□ 신청기간◦2026년2월2일(월)~예산소진시□ 신청방법◦스마트공장사업관리시스템(smart-factory"
+  },
+  {
+    "index": 9,
+    "amount_manwon": 119.0,
+    "display_amount": "최대 119만원",
+    "current_type": "total_support_scale",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "기술애로 해결 등 제조 노하우 전수 등□지원 규모 및 조건◦(지원규모)400개사내외◦(지원조건)총사업비의85%지원구 분지원방법지원기간사업비(분담비율)정부지원(85%)민간부담(15%)구축지도DX멘토단 1인 x 4회최대 3개월119만원21만원□ 신청기간◦선도형스마트공장구축지원사업최종선정및협약후2주이내 - 7 - □ 신청방법◦스마트공장사업관리시스템(smart-factory"
+  },
+  {
+    "index": 10,
+    "amount_manwon": 21.0,
+    "display_amount": "최대 21만원",
+    "current_type": "total_support_scale",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "기술애로 해결 등 제조 노하우 전수 등□지원 규모 및 조건◦(지원규모)400개사내외◦(지원조건)총사업비의85%지원구 분지원방법지원기간사업비(분담비율)정부지원(85%)민간부담(15%)구축지도DX멘토단 1인 x 4회최대 3개월119만원21만원□ 신청기간◦선도형스마트공장구축지원사업최종선정및협약후2주이내 - 7 - □ 신청방법◦스마트공장사업관리시스템(smart-factory"
+  },
+  {
+    "index": 11,
+    "amount_manwon": 1900.0,
+    "display_amount": "최대 1,900만원",
+    "current_type": "total_support_scale",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "kr) 확인서발급 메뉴를 통해 신청 가능 - 8 - □지원 규모 및 조건◦(지원규모)210개사내외◦(지원조건)총사업비의50%지원구 분지원방법지원기간사업비(분담비율)정부지원(50%)민간부담(50%)사후관리총 사업비의 50%4개월*최대 19백만원19백만원 * 사업기간은 연장신청을 통해 최대 2개월까지 연장 가능"
+  },
+  {
+    "index": 12,
+    "amount_manwon": 1900.0,
+    "display_amount": "최대 1,900만원",
+    "current_type": "total_support_scale",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "kr) 확인서발급 메뉴를 통해 신청 가능 - 8 - □지원 규모 및 조건◦(지원규모)210개사내외◦(지원조건)총사업비의50%지원구 분지원방법지원기간사업비(분담비율)정부지원(50%)민간부담(50%)사후관리총 사업비의 50%4개월*최대 19백만원19백만원 * 사업기간은 연장신청을 통해 최대 2개월까지 연장 가능"
+  },
+  {
+    "index": 13,
+    "amount_manwon": null,
+    "display_amount": "최대 85% 지원",
+    "current_type": "support_ratio",
+    "current_roi_method": "ratio_cap",
+    "support_ratio": 0.85,
+    "context": "2026년 제조DX멘토단 활용지원사업 통합 공고 중소벤처기업부 기업마당>정책정보>지원사업 공고 기업마당 본문 바로가기 주메뉴 바로가기 기업마당 > 정책정보 > 지원사업 공고 메뉴열기 로그인 정책정보 정책정보 지원사업 공고 품목별 법정의무 인증제도 행사정보 정책뉴스 입법·행정예고/고시 월간 중기누리 활용정보 활용정보 기업업무용 서식 입주기업 모집공고 온라인화상회의실 정책정보 개방 속보성 대시보드 고객알림 고객알림 공지사항 고객의 소리 자주하는질문 이용안내 이용안내"
+  }
+]
+
+반환 JSON 형식:
+{
+  "decision": "adopt_candidate|keep_no_representative|hold",
+  "candidate_index": 0,
+  "representative_amount_manwon": 1000,
+  "amount_type": "support_amount|subsidy|voucher|support_ratio|loan|guarantee|non_cash|total_support_scale|total_budget|total_project_cost|revenue_condition|fee|self_funding|education_fee|equipment_usage_fee|consulting_fee|unknown",
+  "roi_apply_method": "subtract|ratio_cap|recommend_only|exclude|review",
+  "confidence": "high|medium|low",
+  "reason": "한국어 한 문장",
+  "evidence_text": "근거 문구"
+}
+
+================================================================================
+SAMPLE 2
+너는 제조업/중소기업 지원사업 공고에서 대표 지원금 후보를 고르는 검수자다.
+아래 금액 후보 중 ROI 직접 차감 가능한 대표 지원금이 명확히 있으면 후보 index를 고르고, 없으면 없다고 판단해라.
+반드시 JSON 객체 하나만 반환해라.
+
+decision:
+- adopt_candidate: 후보 중 하나가 기업/과제/사업장 단위의 대표 현금성 지원금으로 명확함
+- keep_no_representative: 후보가 지원비율, 총지원규모, 매출조건, 자부담, 수수료, 교육/컨설팅/장비사용료, 금융성 한도 등이라 대표금액을 만들면 안 됨
+- hold: 표/문맥 연결이 불분명하거나 확신이 낮음
+
+주의:
+- 총사업비/총지원금/지원규모/전체예산/누적금액/매출액 조건은 대표 지원금이 아니다.
+- 융자/대출/보증/이차보전/팩토링은 ROI 직접 차감 대표금액이 아니다.
+- 교육비/컨설팅비/장비사용료/시험수수료/인증비는 보통 직접 차감 보조금이 아니라 recommend_only 또는 제외다.
+- 월별/명당/건당/점당 금액은 확신이 없으면 hold.
+- 확신이 낮으면 hold.
+
+공고:
+policy_id: PBLN_000000000117066
+title: 장애인고용개선장려금 사업 공고
+organization: 고용노동부
+url: https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000117066
+old_amount: 45.0
+old_amount_actual: 최대 45만원
+old_amount_type: support_amount
+analysis_group: mixed_with_unknown
+candidate_types: support_ratio:1 | unknown:2
+
+후보 목록(JSON):
+[
+  {
+    "index": 0,
+    "amount_manwon": 35.0,
+    "display_amount": "최대 35만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "지급 단가와 월임금액(최저임금에 산입되는 임금만을 포함)의 60%를 비교하여 낮은 단가를 적용 중증남성 35만원 중증여성 45만원"
+  },
+  {
+    "index": 1,
+    "amount_manwon": 45.0,
+    "display_amount": "최대 45만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "지급 단가와 월임금액(최저임금에 산입되는 임금만을 포함)의 60%를 비교하여 낮은 단가를 적용 중증남성 35만원 중증여성 45만원"
+  },
+  {
+    "index": 2,
+    "amount_manwon": null,
+    "display_amount": "최대 60% 지원",
+    "current_type": "support_ratio",
+    "current_roi_method": "ratio_cap",
+    "support_ratio": 0.6,
+    "context": "장애인고용개선장려금 사업 공고 고용노동부 기업마당>정책정보>지원사업 공고 기업마당 본문 바로가기 주메뉴 바로가기 기업마당 > 정책정보 > 지원사업 공고 메뉴열기 로그인 정책정보 정책정보 지원사업 공고 품목별 법정의무 인증제도 행사정보 정책뉴스 입법·행정예고/고시 월간 중기누리 활용정보 활용정보 기업업무용 서식 입주기업 모집공고 온라인화상회의실 정책정보 개방 속보성 대시보드 고객알림 고객알림 공지사항 고객의 소리 자주하는질문 이용안내 이용안내 개인정보처리방침 이메"
+  }
+]
+
+반환 JSON 형식:
+{
+  "decision": "adopt_candidate|keep_no_representative|hold",
+  "candidate_index": 0,
+  "representative_amount_manwon": 1000,
+  "amount_type": "support_amount|subsidy|voucher|support_ratio|loan|guarantee|non_cash|total_support_scale|total_budget|total_project_cost|revenue_condition|fee|self_funding|education_fee|equipment_usage_fee|consulting_fee|unknown",
+  "roi_apply_method": "subtract|ratio_cap|recommend_only|exclude|review",
+  "confidence": "high|medium|low",
+  "reason": "한국어 한 문장",
+  "evidence_text": "근거 문구"
+}
+
+================================================================================
+SAMPLE 3
+너는 제조업/중소기업 지원사업 공고에서 대표 지원금 후보를 고르는 검수자다.
+아래 금액 후보 중 ROI 직접 차감 가능한 대표 지원금이 명확히 있으면 후보 index를 고르고, 없으면 없다고 판단해라.
+반드시 JSON 객체 하나만 반환해라.
+
+decision:
+- adopt_candidate: 후보 중 하나가 기업/과제/사업장 단위의 대표 현금성 지원금으로 명확함
+- keep_no_representative: 후보가 지원비율, 총지원규모, 매출조건, 자부담, 수수료, 교육/컨설팅/장비사용료, 금융성 한도 등이라 대표금액을 만들면 안 됨
+- hold: 표/문맥 연결이 불분명하거나 확신이 낮음
+
+주의:
+- 총사업비/총지원금/지원규모/전체예산/누적금액/매출액 조건은 대표 지원금이 아니다.
+- 융자/대출/보증/이차보전/팩토링은 ROI 직접 차감 대표금액이 아니다.
+- 교육비/컨설팅비/장비사용료/시험수수료/인증비는 보통 직접 차감 보조금이 아니라 recommend_only 또는 제외다.
+- 월별/명당/건당/점당 금액은 확신이 없으면 hold.
+- 확신이 낮으면 hold.
+
+공고:
+policy_id: PBLN_000000000117463
+title: [강원] 2026년 글로벌 IP 스타기업 육성 해외등록비용 지원사업 공고
+organization: 강원특별자치도
+url: https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000117463
+old_amount: 144.0
+old_amount_actual: 최대 144만원
+old_amount_type: support_amount
+analysis_group: mixed_with_unknown
+candidate_types: total_support_scale:3 | unknown:6
+
+후보 목록(JSON):
+[
+  {
+    "index": 0,
+    "amount_manwon": 360.0,
+    "display_amount": "최대 360만원",
+    "current_type": "total_support_scale",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "지원규모 氠瑢 구분 세부사업명 지원한도 지원내용 전체 지원금 기업부담금 (현금) 해외 등록 비용 지원 미 국 3,600천원 2"
+  },
+  {
+    "index": 1,
+    "amount_manwon": 216.0,
+    "display_amount": "최대 216만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "600천원 2,160천원 이내 1"
+  },
+  {
+    "index": 2,
+    "amount_manwon": 144.0,
+    "display_amount": "최대 144만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "160천원 이내 1,440천원 해외 특허"
+  },
+  {
+    "index": 3,
+    "amount_manwon": 530.0,
+    "display_amount": "최대 530만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "디자인 출원의 설정등록에 필요한 등록비 지원 유 럽 5,300천원 3"
+  },
+  {
+    "index": 4,
+    "amount_manwon": 318.0,
+    "display_amount": "최대 318만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "300천원 3,180천원 이내 2"
+  },
+  {
+    "index": 5,
+    "amount_manwon": 212.0,
+    "display_amount": "최대 212만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "180천원 이내 2,120천원 중국‧일본‧기타 2"
+  },
+  {
+    "index": 6,
+    "amount_manwon": 200.0,
+    "display_amount": "최대 200만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "120천원 중국‧일본‧기타 2,000천원 1"
+  },
+  {
+    "index": 7,
+    "amount_manwon": 120.0,
+    "display_amount": "최대 120만원",
+    "current_type": "total_support_scale",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "000천원 1,200천원 이내 800천원 * 자부담금 : 현금 40% * 지원규모는 변경될 수 있으며"
+  },
+  {
+    "index": 8,
+    "amount_manwon": 80.0,
+    "display_amount": "최대 80만원",
+    "current_type": "total_support_scale",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "200천원 이내 800천원 * 자부담금 : 현금 40% * 지원규모는 변경될 수 있으며"
+  }
+]
+
+반환 JSON 형식:
+{
+  "decision": "adopt_candidate|keep_no_representative|hold",
+  "candidate_index": 0,
+  "representative_amount_manwon": 1000,
+  "amount_type": "support_amount|subsidy|voucher|support_ratio|loan|guarantee|non_cash|total_support_scale|total_budget|total_project_cost|revenue_condition|fee|self_funding|education_fee|equipment_usage_fee|consulting_fee|unknown",
+  "roi_apply_method": "subtract|ratio_cap|recommend_only|exclude|review",
+  "confidence": "high|medium|low",
+  "reason": "한국어 한 문장",
+  "evidence_text": "근거 문구"
+}
+
+================================================================================
+SAMPLE 4
+너는 제조업/중소기업 지원사업 공고에서 대표 지원금 후보를 고르는 검수자다.
+아래 금액 후보 중 ROI 직접 차감 가능한 대표 지원금이 명확히 있으면 후보 index를 고르고, 없으면 없다고 판단해라.
+반드시 JSON 객체 하나만 반환해라.
+
+decision:
+- adopt_candidate: 후보 중 하나가 기업/과제/사업장 단위의 대표 현금성 지원금으로 명확함
+- keep_no_representative: 후보가 지원비율, 총지원규모, 매출조건, 자부담, 수수료, 교육/컨설팅/장비사용료, 금융성 한도 등이라 대표금액을 만들면 안 됨
+- hold: 표/문맥 연결이 불분명하거나 확신이 낮음
+
+주의:
+- 총사업비/총지원금/지원규모/전체예산/누적금액/매출액 조건은 대표 지원금이 아니다.
+- 융자/대출/보증/이차보전/팩토링은 ROI 직접 차감 대표금액이 아니다.
+- 교육비/컨설팅비/장비사용료/시험수수료/인증비는 보통 직접 차감 보조금이 아니라 recommend_only 또는 제외다.
+- 월별/명당/건당/점당 금액은 확신이 없으면 hold.
+- 확신이 낮으면 hold.
+
+공고:
+policy_id: PBLN_000000000117654
+title: [강원] 2026년 중소ㆍ벤처기업 투자이음 강화 프로그램 참여기업 연중 상시접수 공고(강원 벤처투자 생태계 조성사업)
+organization: 강원특별자치도
+url: https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000117654
+old_amount: 650000.0
+old_amount_actual: 최대 65억원
+old_amount_type: support_amount
+analysis_group: unknown_only
+candidate_types: unknown:3
+
+후보 목록(JSON):
+[
+  {
+    "index": 0,
+    "amount_manwon": 650000.0,
+    "display_amount": "최대 65억원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "초기~7년 미만 농식품 경영체 인라이트벤처스 65억  대학창업펀드 12 대학창업 펀드 제1호/2호 초기기업"
+  },
+  {
+    "index": 1,
+    "amount_manwon": 280000.0,
+    "display_amount": "최대 28억원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "대학/학생 창업기업 강원대기술지주 28억/ 34억 氠瑢 湯湷 Ⅱ 지원내용 □ 지원방법"
+  },
+  {
+    "index": 2,
+    "amount_manwon": 340000.0,
+    "display_amount": "최대 34억원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "대학/학생 창업기업 강원대기술지주 28억/ 34억 氠瑢 湯湷 Ⅱ 지원내용 □ 지원방법"
+  }
+]
+
+반환 JSON 형식:
+{
+  "decision": "adopt_candidate|keep_no_representative|hold",
+  "candidate_index": 0,
+  "representative_amount_manwon": 1000,
+  "amount_type": "support_amount|subsidy|voucher|support_ratio|loan|guarantee|non_cash|total_support_scale|total_budget|total_project_cost|revenue_condition|fee|self_funding|education_fee|equipment_usage_fee|consulting_fee|unknown",
+  "roi_apply_method": "subtract|ratio_cap|recommend_only|exclude|review",
+  "confidence": "high|medium|low",
+  "reason": "한국어 한 문장",
+  "evidence_text": "근거 문구"
+}
+
+================================================================================
+SAMPLE 5
+너는 제조업/중소기업 지원사업 공고에서 대표 지원금 후보를 고르는 검수자다.
+아래 금액 후보 중 ROI 직접 차감 가능한 대표 지원금이 명확히 있으면 후보 index를 고르고, 없으면 없다고 판단해라.
+반드시 JSON 객체 하나만 반환해라.
+
+decision:
+- adopt_candidate: 후보 중 하나가 기업/과제/사업장 단위의 대표 현금성 지원금으로 명확함
+- keep_no_representative: 후보가 지원비율, 총지원규모, 매출조건, 자부담, 수수료, 교육/컨설팅/장비사용료, 금융성 한도 등이라 대표금액을 만들면 안 됨
+- hold: 표/문맥 연결이 불분명하거나 확신이 낮음
+
+주의:
+- 총사업비/총지원금/지원규모/전체예산/누적금액/매출액 조건은 대표 지원금이 아니다.
+- 융자/대출/보증/이차보전/팩토링은 ROI 직접 차감 대표금액이 아니다.
+- 교육비/컨설팅비/장비사용료/시험수수료/인증비는 보통 직접 차감 보조금이 아니라 recommend_only 또는 제외다.
+- 월별/명당/건당/점당 금액은 확신이 없으면 hold.
+- 확신이 낮으면 hold.
+
+공고:
+policy_id: PBLN_000000000117794
+title: [경북] 2026년 중소기업 정부기술개발공모사업 선정지원 참여기업 모집 공고
+organization: 경상북도
+url: https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000117794
+old_amount: 150.0
+old_amount_actual: 최대 150만원
+old_amount_type: support_amount
+analysis_group: mixed_with_unknown
+candidate_types: consulting_fee:6 | self_funding:2 | unknown:4
+
+후보 목록(JSON):
+[
+  {
+    "index": 0,
+    "amount_manwon": 30.0,
+    "display_amount": "최대 30만원",
+    "current_type": "consulting_fee",
+    "current_roi_method": "recommend_only",
+    "support_ratio": null,
+    "context": "/ 5회 中 선택 牭景 기획 컨설팅(기업부담금 30만원)"
+  },
+  {
+    "index": 1,
+    "amount_manwon": 50.0,
+    "display_amount": "최대 50만원",
+    "current_type": "consulting_fee",
+    "current_roi_method": "recommend_only",
+    "support_ratio": null,
+    "context": "주관기관 운영프로그램 참여 시 지원 牭景 발표평가 컨설팅 牭景 모의발표평가 牭景 재도전 컨설팅 牭景 차년도 R&D 컨설팅(기업부담금 50만원)"
+  },
+  {
+    "index": 2,
+    "amount_manwon": 150.0,
+    "display_amount": "최대 150만원",
+    "current_type": "consulting_fee",
+    "current_roi_method": "recommend_only",
+    "support_ratio": null,
+    "context": "사업계획서 작성방법 컨설팅 등 결 과 물: 컨설팅 일지 150 만원 漠杳 신청서 접수  漠杳 기업 현장점검  漠杳 승인 통보  漠杳 전문가 매칭  漠杳 컨설팅 진행  漠杳 결과보고서 제출  漠杳 사업"
+  },
+  {
+    "index": 3,
+    "amount_manwon": 270.0,
+    "display_amount": "최대 270만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "접수증 270 만원 TP부담 270만원"
+  },
+  {
+    "index": 4,
+    "amount_manwon": 270.0,
+    "display_amount": "최대 270만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "접수증 270 만원 TP부담 270만원"
+  },
+  {
+    "index": 5,
+    "amount_manwon": 30.0,
+    "display_amount": "최대 30만원",
+    "current_type": "self_funding",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "기업자부담 (기업에 직접지급)30만원 발표평가 지원대상: R&D사업 1차 선정기업 지원내용: 발표PPT 작성"
+  },
+  {
+    "index": 6,
+    "amount_manwon": 90.0,
+    "display_amount": "최대 90만원",
+    "current_type": "consulting_fee",
+    "current_roi_method": "recommend_only",
+    "support_ratio": null,
+    "context": "발표스킬 제고를 위한 컨설팅 결 과 물: 컨설팅 일지 90 만원 (필독) R&D사업 1차 선정 된 기업만 신청 가능 모의발표 평가 지원대상: R&D사업 1차 선정기업 지원내용: 사전질의서 작성 결 과 물:"
+  },
+  {
+    "index": 7,
+    "amount_manwon": 30.0,
+    "display_amount": "최대 30만원",
+    "current_type": "consulting_fee",
+    "current_roi_method": "recommend_only",
+    "support_ratio": null,
+    "context": "사전질의서 30 만원 재도전 지원대상: R&D사업 탈락기업 지원내용: 탈락사유에 대한 보완 컨설팅 결 과 물: 컨설팅 일지 90 만원 차년도 R&D컨설팅 (15건"
+  },
+  {
+    "index": 8,
+    "amount_manwon": 90.0,
+    "display_amount": "최대 90만원",
+    "current_type": "consulting_fee",
+    "current_roi_method": "recommend_only",
+    "support_ratio": null,
+    "context": "사전질의서 30 만원 재도전 지원대상: R&D사업 탈락기업 지원내용: 탈락사유에 대한 보완 컨설팅 결 과 물: 컨설팅 일지 90 만원 차년도 R&D컨설팅 (15건 내외) 지원대상: 차년도 R&D사업 신청예정 기업 지원내용: 공급기업을 통한 사업계획서 작성 지원 결 과 물: 컨"
+  },
+  {
+    "index": 9,
+    "amount_manwon": 450.0,
+    "display_amount": "최대 450만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "사업계획서 450만원 TP부담 450만원"
+  },
+  {
+    "index": 10,
+    "amount_manwon": 450.0,
+    "display_amount": "최대 450만원",
+    "current_type": "unknown",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "사업계획서 450만원 TP부담 450만원"
+  },
+  {
+    "index": 11,
+    "amount_manwon": 50.0,
+    "display_amount": "최대 50만원",
+    "current_type": "self_funding",
+    "current_roi_method": "review",
+    "support_ratio": null,
+    "context": "기업자부담 (기업에 직접지급)50만원 氠瑢 3 접수 및 신청방법 □ 신청"
+  }
+]
+
+반환 JSON 형식:
+{
+  "decision": "adopt_candidate|keep_no_representative|hold",
+  "candidate_index": 0,
+  "representative_amount_manwon": 1000,
+  "amount_type": "support_amount|subsidy|voucher|support_ratio|loan|guarantee|non_cash|total_support_scale|total_budget|total_project_cost|revenue_condition|fee|self_funding|education_fee|equipment_usage_fee|consulting_fee|unknown",
+  "roi_apply_method": "subtract|ratio_cap|recommend_only|exclude|review",
+  "confidence": "high|medium|low",
+  "reason": "한국어 한 문장",
+  "evidence_text": "근거 문구"
+}

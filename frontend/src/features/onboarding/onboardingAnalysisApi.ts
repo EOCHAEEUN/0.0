@@ -3,7 +3,10 @@ import type {
   AnalysisResultSnapshot,
   CompanyProfileDraft,
 } from "./onboardingState"
-import { ANALYSIS_RESULT_SCHEMA_VERSION } from "./onboardingState"
+import {
+  ANALYSIS_RESULT_SCHEMA_VERSION,
+  emptyAnalysisConditionDraft,
+} from "./onboardingState"
 import { resolveCanonicalPolicies } from "./analysisPolicySource"
 
 const API_BASE_URL =
@@ -306,6 +309,12 @@ function getPolicyTitle(policy: unknown) {
   )
 }
 
+function getPolicyId(policy: unknown) {
+  const record = asRecord(policy)
+  const id = record.policyId ?? record.policy_id ?? record.policyID ?? record.id
+  return id ? String(id) : ""
+}
+
 function getRecommendationDetail(roiResult: ApiRecord) {
   const ai = asRecord(roiResult.ai_recommendation)
   return getText(ai, "summary") || getText(roiResult, "summary", "message", "recommendation")
@@ -407,6 +416,7 @@ function buildSnapshot(
     "payback_period_years",
   )
   const priorityPolicyName = getPolicyTitle(policies[0])
+  const priorityPolicyId = getPolicyId(policies[0])
 
   console.debug("[onboarding-analysis] raw roi_result", {
     recommended: roiResult.recommended,
@@ -436,11 +446,11 @@ function buildSnapshot(
     matchedPolicies: policies.length,
     priorityPolicies: priorityPolicyName ? 1 : 0,
     priorityPolicyName,
+    priorityPolicyId: priorityPolicyId || undefined,
     recommendedScenario: recommended,
     companyId,
     equipmentId,
     roiResult: buildCompactRoiResult(roiResult),
-    policies,
     policyStatus:
       getText(asRecord(savedRoiOutput.policy_snapshot), "policy_status") ||
       (canonical.missingState === "missing" ? "missing" : "") ||
@@ -455,16 +465,33 @@ function buildCompanyPayload(profile: CompanyProfileDraft, primaryPurpose: strin
     .filter((value) => value.trim())
     .join(" ")
 
+  const purposeList =
+    primaryPurpose.length > 0
+      ? primaryPurpose
+      : profile.purpose && profile.purpose !== "선택 필요"
+        ? [profile.purpose]
+        : []
+
   return {
     company_name: profile.companyName || "미입력 기업",
-    business_registration_no: null,
+    business_registration_no: profile.businessNumber.trim() || null,
     industry_name: profile.industry || null,
     industry_code: splitIndustryCodes(profile.industryCode),
     region: region || "지역 미입력",
-    company_type: "제조업",
-    primary_purpose: primaryPurpose,
-    employee_count: parseEmployeeCount(profile.employeeRange),
-    annual_revenue: 0,
+    company_type:
+      profile.companyType && profile.companyType !== "선택 필요"
+        ? profile.companyType
+        : "중소기업",
+    primary_purpose: purposeList,
+    employee_count:
+      parseEmployeeCount(profile.employees) ??
+      parseEmployeeCount(profile.employeeRange),
+    annual_revenue: toOptionalNumber(profile.annualRevenue) ?? 0,
+    established_year: toOptionalNumber(profile.foundedYear),
+    workplace_type:
+      profile.businessSiteType && profile.businessSiteType !== "선택 필요"
+        ? profile.businessSiteType
+        : null,
   }
 }
 
@@ -685,6 +712,104 @@ function equipmentToSaved(value: unknown): SavedEquipment {
   }
 }
 
+function buildSnapshotFromStoredOutput(params: {
+  analysisId: string
+  companyId: string
+  equipmentId: string
+  equipmentName: string
+  roiOutput: ApiRecord
+  matchedPolicies: unknown[]
+}): AnalysisResultSnapshot {
+  const { analysisId, companyId, equipmentId, equipmentName, roiOutput, matchedPolicies } = params
+  const roiResult = getFirstRecord(roiOutput.roi_data, roiOutput.roi_result, roiOutput.roi)
+  const canonical = resolveCanonicalPolicies({
+    analysisId,
+    roiSnapshot: roiOutput.policy_snapshot,
+    matchedPolicies,
+    allowEquipmentFallback: false,
+  })
+  const policies = canonical.policies
+  const { recommended, selected } = getScenario(roiResult)
+  const roiPct = getNumber(selected, "roi_pct", "roi_percent", "roiPercent", "roi")
+  const paybackYears = getNumber(
+    selected,
+    "payback_years",
+    "paybackYears",
+    "payback",
+    "payback_period_years",
+  )
+  const priorityPolicyName = getPolicyTitle(policies[0])
+  const priorityPolicyId = getPolicyId(policies[0])
+
+  return {
+    schemaVersion: ANALYSIS_RESULT_SCHEMA_VERSION,
+    id: analysisId,
+    equipmentName,
+    recommendation: getRecommendationTitle(policies.length),
+    recommendationDetail: getRecommendationDetail(roiResult),
+    roiPct,
+    roiPercent: roiPct,
+    paybackYears,
+    matchedPolicies: policies.length,
+    priorityPolicies: priorityPolicyName ? 1 : 0,
+    priorityPolicyName,
+    priorityPolicyId: priorityPolicyId || undefined,
+    recommendedScenario: recommended,
+    companyId,
+    equipmentId,
+    roiResult: buildCompactRoiResult(roiResult),
+    policyStatus:
+      getText(asRecord(roiOutput.policy_snapshot), "policy_status") ||
+      (canonical.missingState === "missing" ? "missing" : undefined),
+    policyError: canonical.missingState === "missing" ? "정책 스냅샷 없음" : null,
+    createdAt: getText(roiOutput, "created_at") || new Date().toISOString(),
+  }
+}
+
+function findStoredRoiOutput(data: ApiRecord, analysisId: string) {
+  const roiOutputs = getFirstArray(data.roi_outputs).map(asRecord)
+  const matched = roiOutputs.find((item) => {
+    const id = getText(item, "id", "analysis_id", "analysisId")
+    return id === analysisId
+  })
+  if (matched && Object.keys(matched).length > 0) return matched
+
+  const latest = asRecord(data.latest_roi_output)
+  const latestId = getText(latest, "id", "analysis_id", "analysisId")
+  return latestId === analysisId ? latest : {}
+}
+
+export async function fetchAnalysisResultSnapshot(
+  analysisId: string,
+): Promise<AnalysisResultSnapshot | null> {
+  const json = await requestJson("/api/onboarding/me", { method: "GET" })
+  const data = unwrapData(json)
+  const roiOutput = findStoredRoiOutput(data, analysisId)
+  if (!Object.keys(roiOutput).length) return null
+
+  const companyId = getText(asRecord(data.company), "company_id")
+  const equipmentId = getText(roiOutput, "equipment_id", "equipmentId")
+  const equipments = getFirstArray(data.equipments).map(asRecord)
+  const matchedEquipment = equipments.find(
+    (item) => getText(item, "equipment_id", "equipmentId") === equipmentId,
+  )
+  const equipmentName = getText(asRecord(matchedEquipment), "name") || "검토 설비"
+  const matchedPolicies = getFirstArray(data.matched_policies).filter((policy) => {
+    const record = asRecord(policy)
+    const policyAnalysisId = getText(record, "analysis_id", "analysisId")
+    return !policyAnalysisId || policyAnalysisId === analysisId
+  })
+
+  return buildSnapshotFromStoredOutput({
+    analysisId,
+    companyId,
+    equipmentId,
+    equipmentName,
+    roiOutput,
+    matchedPolicies,
+  })
+}
+
 export async function fetchAnalysisEntryContext() {
   const json = await requestJson("/api/onboarding/me", { method: "GET" })
   const data = unwrapData(json)
@@ -718,4 +843,37 @@ export async function runExistingEquipmentAnalysis(
   return {
     ...buildSnapshot(id, condition, companyId, equipmentId, analyzeJson),
   }
+}
+
+export async function runSetupRoiAnalysis(
+  companyId: string,
+  equipmentId: string,
+  equipmentName = "검토 설비",
+): Promise<AnalysisResultSnapshot> {
+  const query = new URLSearchParams({
+    company_id: companyId,
+    equipment_id: equipmentId,
+  })
+  const analyzeJson = (await requestJson(`/api/analyze?${query.toString()}`, {
+    method: "POST",
+  })) as ApiRecord
+
+  const data = asRecord(analyzeJson.data)
+  const savedRoiOutput = getFirstRecord(
+    data.roi_output,
+    data.saved_roi_output,
+    analyzeJson.roi_output,
+  )
+  const analysisId =
+    getText(data, "analysis_id", "analysisId") ||
+    getText(savedRoiOutput, "id", "analysis_id", "analysisId") ||
+    getText(analyzeJson, "analysis_id", "analysisId") ||
+    `analysis-${Date.now()}`
+
+  const condition: AnalysisConditionDraft = {
+    ...emptyAnalysisConditionDraft,
+    equipmentName,
+  }
+
+  return buildSnapshot(analysisId, condition, companyId, equipmentId, analyzeJson)
 }

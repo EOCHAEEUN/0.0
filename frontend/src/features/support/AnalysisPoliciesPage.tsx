@@ -615,7 +615,7 @@ function LegacySnapshotMissingState({
         <button
           type="button"
           className="ff-policy-secondary"
-          onClick={() => navigate("/support-projects")}
+          onClick={() => navigate("/support-projects/priority")}
         >
           최신 지원사업 둘러보기
         </button>

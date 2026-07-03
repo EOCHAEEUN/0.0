@@ -78,7 +78,7 @@ export const serviceCards: ServiceCard[] = [
     description:
       "기업 조건과 설비투자 목적에 맞는 정부지원사업을 우선순위로 정리합니다.",
     badge: "POLICY",
-    path: "/support-projects",
+    path: "/support-projects/priority",
     tone: "green",
   },
   {
@@ -86,7 +86,7 @@ export const serviceCards: ServiceCard[] = [
     description:
       "총 투자금, 지원금, 절감액을 기준으로 실부담금과 회수기간을 계산합니다.",
     badge: "ROI",
-    path: "/roi",
+    path: "/roi/strategy",
     tone: "blue",
   },
   {

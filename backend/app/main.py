@@ -2,17 +2,22 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import (
     analyze,
+    application_draft,
     auth,
     chat,
     click_chat,
-    click_chat_two,
+    dashboard,
     documents,
     draft,
+    equipment_attachments,
+    equipment_guide_router,
     industry,
     onboarding,
     reports,
     safety,
+    safety_evidence,
     safety_preview,
+    support_projects,
 )
 
 app = FastAPI(
@@ -31,9 +36,6 @@ app.add_middleware(
         "http://localhost:5176",
         "http://localhost:5177",
         "http://localhost:5178",
-        "http://localhost:5179",
-        "http://localhost:5180",
-        "http://localhost:5181",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
@@ -41,9 +43,6 @@ app.add_middleware(
         "http://127.0.0.1:5176",
         "http://127.0.0.1:5177",
         "http://127.0.0.1:5178",
-        "http://127.0.0.1:5179",
-        "http://127.0.0.1:5180",
-        "http://127.0.0.1:5181",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -53,12 +52,18 @@ app.add_middleware(
 app.include_router(chat.router, prefix="/api", tags=["chat"])
 app.include_router(auth.router, prefix="/api", tags=["auth"])
 app.include_router(onboarding.router, prefix="/api", tags=["onboarding"])
+app.include_router(dashboard.router, prefix="/api", tags=["dashboard"])
+app.include_router(support_projects.router, prefix="/api", tags=["support-projects"])
 app.include_router(industry.router, prefix="/api", tags=["industry"])
 app.include_router(safety.router, prefix="/api", tags=["safety"])
+app.include_router(safety_evidence.router, prefix="/api", tags=["safety-evidence"])
 app.include_router(safety_preview.router, prefix="/api", tags=["safety-preview"])
 app.include_router(analyze.router, prefix="/api", tags=["analyze"])
 app.include_router(draft.router, prefix="/api", tags=["draft"])
+app.include_router(application_draft.router, prefix="/api", tags=["application-draft"])
+app.include_router(equipment_guide_router.router, prefix="/api", tags=["equipment-guide"])
+app.include_router(equipment_attachments.router, prefix="/api", tags=["equipment-attachments"])
 app.include_router(reports.router, prefix="/api", tags=["reports"])
 app.include_router(documents.router, prefix="/api", tags=["documents"])
 app.include_router(click_chat.router)
-app.include_router(click_chat_two.router, prefix="/api", tags=["click-chat-two"])
+

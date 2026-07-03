@@ -1,6 +1,6 @@
 export type DraftStatus = "idle" | "saved" | "downloadReady"
 export type ScenarioKey = "A" | "B"
-export type StatusTone = "ok" | "need" | "warn"
+export type StatusTone = "ok" | "need" | "warn" | "info"
 
 export type ChecklistItem = {
   label: string
@@ -23,40 +23,6 @@ export type DraftResult = {
   business_necessity?: string | null
   expected_effects?: string | null
   required_documents?: string[] | null
-  safety_improvement?: SafetyImprovement | null
-}
-
-export type SafetyImprovementItem = {
-  no?: number | null
-  viewpoint_key?: string | null
-  viewpoint_title?: string | null
-  current_judgement?: string | null
-  required_evidence_count?: number | null
-  required_evidences?: RequiredEvidence[] | null
-  matched_safety_rule_ids?: string[] | null
-  matched_rule_titles?: string[] | null
-  description?: string | null
-}
-
-export type RequiredEvidence =
-  | string
-  | {
-      label?: string | null
-      base_label?: string | null
-      context?: string | null
-      safety_rule_id?: string | null
-      safety_rule_title?: string | null
-      evidence_type?: string | null
-    }
-
-export type SafetyImprovement = {
-  source?: string | null
-  safety_viewer_policy_id?: string | null
-  equipment_name?: string | null
-  equipment_type?: string | null
-  generation_source?: string | null
-  usage_status?: string | null
-  items?: SafetyImprovementItem[] | null
 }
 
 export type CompanyInfo = {
@@ -184,4 +150,151 @@ export type ApplicationDraftSavePayload = {
   expected_effects: string
   required_documents: string[]
   saved_at: string
+}
+
+export type ReadinessItemStatus =
+  | "complete"
+  | "needs_revision"
+  | "needs_evidence"
+  | "legacy_missing"
+
+export type WorkspaceReadinessItem = {
+  status: ReadinessItemStatus
+  summary: string
+  missing_fields?: string[]
+}
+
+export type WorkspaceScenario = {
+  label?: string | null
+  investment_manwon?: number | null
+  subsidy_manwon?: number | null
+  net_investment_manwon?: number | null
+  payback_years?: number | null
+  payback_months?: number | null
+  roi_pct?: number | null
+  annual_net_benefit_manwon?: number | null
+}
+
+export type WorkspaceSafetyRow = {
+  no: number
+  viewpoint_key: string
+  viewpoint_label: string
+  current_status: string
+  evidence_status: "미첨부" | "일부 첨부" | "첨부됨" | "증빙 대상 없음" | string
+  description: string
+}
+
+export type SafetyEvidenceStatus = "미첨부" | "일부 첨부" | "첨부됨" | "증빙 대상 없음"
+
+export type SafetyEvidenceFile = {
+  file_id: string
+  file_name: string
+  uploaded_at?: string | null
+  verification_status?: "not_reviewed" | "reviewed_valid" | "reviewed_rejected" | string
+}
+
+export type SafetyRequiredEvidenceItem = {
+  evidence_label: string
+  base_evidence_label?: string | null
+  safety_rule_id: string
+  evidence_type: string
+  is_uploaded: boolean
+  files: SafetyEvidenceFile[]
+}
+
+export type SafetyEvidenceViewpoint = {
+  viewpoint_key: string
+  viewpoint_title: string
+  current_judgement: string
+  description?: string
+  required_count: number
+  uploaded_count: number
+  evidence_status: SafetyEvidenceStatus
+  verification_status: string
+  required_evidences: SafetyRequiredEvidenceItem[]
+}
+
+export type SafetyEvidenceSummary = {
+  analysis_id: string
+  policy_id: string
+  equipment_id: string
+  total_required_count: number
+  uploaded_required_count: number
+  viewpoints: SafetyEvidenceViewpoint[]
+  summary_updated_at?: string
+}
+
+export type ApplicationDraftWorkspaceData = {
+  state: "ready" | "analysis_required"
+  message?: string
+  analysis_id: string | null
+  company_id?: string
+  equipment_id?: string
+  policy_id?: string | null
+  company: {
+    company_name?: string | null
+    industry_name?: string | null
+    region?: string | null
+    company_type?: string | null
+  }
+  equipment: {
+    equipment_id?: string | null
+    name?: string | null
+    category?: string | null
+    age_years?: number | null
+    energy_cost_annual?: number | null
+  }
+  readiness: {
+    company: WorkspaceReadinessItem
+    equipment: WorkspaceReadinessItem
+    roi: WorkspaceReadinessItem
+    policy: WorkspaceReadinessItem
+  }
+  scenarios: {
+    selected: "a" | "b"
+    a: WorkspaceScenario
+    b: WorkspaceScenario
+  }
+  policy: {
+    policy_id?: string | null
+    title?: string | null
+    deadline?: string | null
+    source: "policy_snapshot" | "legacy_missing"
+    legacy_missing?: boolean
+  }
+  draft: {
+    exists: boolean
+    draft_result_id?: string | null
+    content: DraftResult & Record<string, unknown>
+    summary_paragraphs: string[]
+  }
+  safety: {
+    rows: WorkspaceSafetyRow[]
+    has_viewer_policy: boolean
+    message?: string | null
+    summary?: SafetyEvidenceSummary | null
+    draft_snapshot?: {
+      snapshot_at?: string | null
+      total_required_count?: number
+      uploaded_required_count?: number
+      viewpoints?: Array<{
+        viewpoint_key: string
+        viewpoint_title: string
+        required_count: number
+        uploaded_count: number
+        evidence_status: string
+        missing_labels?: string[]
+        uploaded_files?: Array<{ file_name: string; evidence_label: string }>
+      }>
+    } | null
+    is_snapshot_outdated?: boolean
+  }
+}
+
+export type ApplicationDraftReportParams = {
+  companyId: string
+  equipmentId: string
+  policyId: string
+  analysisId?: string
+  draftResultId?: string
 }

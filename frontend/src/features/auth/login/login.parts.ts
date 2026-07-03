@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react"
 
-import type { LoginFeatureCard, LoginPreviewData } from "./login.contract"
+import type { LoginFeatureCard } from "./login.contract"
 
 export const loginFeatureCards: LoginFeatureCard[] = [
   ["◎", "맞춤형", "지원사업 추천"],
@@ -8,21 +8,6 @@ export const loginFeatureCards: LoginFeatureCard[] = [
   ["▤", "신청 서류 준비", "자동화"],
   ["◇", "마감 알림 &", "일정 관리"],
 ].map(([icon, line1, line2]) => ({ icon, line1, line2 }))
-
-export const loginPreviewData: LoginPreviewData = {
-  availablePolicyCount: "8건",
-  expectedSupportAmount: "8,200만원",
-  expectedRoi: "98%",
-  recommendedPolicies: [
-    "스마트공장 고도화",
-    "설비투자 정책자금",
-    "ESG 개선사업",
-  ],
-  policyNews: [
-    "스마트공장 고도화 지원사업 추가 모집 공고",
-    "설비투자 활성화 정책자금 지원 확대",
-  ],
-}
 
 export const inputStyle: CSSProperties = {
   height: "56px",

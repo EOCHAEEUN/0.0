@@ -7,6 +7,7 @@ import {
   getCompanyProfileDraft,
   saveAnalysisResult,
 } from "../onboardingState"
+import { buildRoiPath } from "../../roi/roiPaths"
 
 const categoryLabels: Record<string, string> = {
   press: "프레스",
@@ -56,7 +57,7 @@ export default function AnalysisReviewPage() {
     try {
       const result = await runOnboardingAnalysis(draftId, profile, condition)
       saveAnalysisResult(result)
-      navigate(`/roi?analysisId=${draftId}`)
+      navigate(buildRoiPath("strategy", { analysisId: draftId }))
     } catch (error) {
       setErrorMessage(
         error instanceof Error

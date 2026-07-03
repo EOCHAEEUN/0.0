@@ -103,6 +103,30 @@
   align-items: start;
 }
 
+/* Stage 3 — MyPage Standard Field (Field / SelectField / label-wrapped inputs) */
+.ff-mypage-page-shell label > input:not([type="file"]):not([hidden]),
+.ff-mypage-page-shell label > select {
+  height: 52px;
+  padding: 0 var(--space-16);
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: #ffffff;
+  color: #061b34;
+  font-size: 15px;
+  font-weight: 800;
+  outline: none;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.ff-mypage-page-shell label > input:not([type="file"]):not([hidden]):focus,
+.ff-mypage-page-shell label > input:not([type="file"]):not([hidden]):focus-visible,
+.ff-mypage-page-shell label > select:focus,
+.ff-mypage-page-shell label > select:focus-visible {
+  border-color: var(--blue);
+  box-shadow: var(--focus-ring);
+}
+
 .ff-mypage-password-meta {
   display: grid;
   gap: 10px;

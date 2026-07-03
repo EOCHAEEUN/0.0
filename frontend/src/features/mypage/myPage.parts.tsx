@@ -1156,19 +1156,6 @@ export function Field({
         inputMode={inputMode}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
-        style={{
-          height: "52px",
-          borderRadius: "18px",
-          border: "1px solid #E2E8F0",
-          background: "#FFFFFF",
-          color: "#061B34",
-          padding: "0 16px",
-          fontSize: "15px",
-          fontWeight: 800,
-          outline: "none",
-          boxSizing: "border-box",
-          width: "100%",
-        }}
       />
 
       {helperText && (
@@ -1224,19 +1211,6 @@ export function SelectField({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        style={{
-          height: "52px",
-          borderRadius: "18px",
-          border: "1px solid #E2E8F0",
-          background: "#FFFFFF",
-          color: "#061B34",
-          padding: "0 16px",
-          fontSize: "15px",
-          fontWeight: 800,
-          outline: "none",
-          boxSizing: "border-box",
-          width: "100%",
-        }}
       >
         {options.map((option) => (
           <option key={option} value={option}>

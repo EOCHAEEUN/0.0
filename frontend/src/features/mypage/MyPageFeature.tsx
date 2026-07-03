@@ -1554,7 +1554,6 @@ export default function MyPage() {
                     style={{
                       height: "52px",
                       borderRadius: "18px",
-                      border: "1px solid #E2E8F0",
                       background: "#FFFFFF",
                       color: "#061B34",
                       padding: "0 16px",
@@ -1731,7 +1730,6 @@ export default function MyPage() {
                       style={{
                         height: "52px",
                         borderRadius: "18px",
-                        border: "1px solid #E2E8F0",
                         background: "#FFFFFF",
                         color: "#061B34",
                         padding: "0 16px",

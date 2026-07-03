@@ -1844,8 +1844,8 @@
 }
 
 .ff-status-badge.completed {
-  background: #e8f5ef;
-  color: #0b7a53;
+  background: var(--status-success-soft);
+  color: var(--status-success);
 }
 
 .ff-status-badge.draft {

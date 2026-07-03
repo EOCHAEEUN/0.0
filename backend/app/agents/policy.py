@@ -205,15 +205,30 @@ def policy_matching_node(state: FactofitState) -> FactofitState:
         retrieved_policies=sorted_policies if sorted_policies else "검색된 공고 없음",
     )
 
-    response = llm.invoke(
-        [
-            SystemMessage(content=prompt),
-            HumanMessage(content=state.get("user_query", "")),
+    try:
+        response = llm.invoke(
+            [
+                SystemMessage(content=prompt),
+                HumanMessage(content=state.get("user_query", "")),
+            ]
+        )
+        raw_content = response.content
+    except Exception as llm_exc:
+        print(f"[policy_matching_node] LLM 호출 실패: {llm_exc}")
+        state["matched_policies"] = [
+            {
+                **policy,
+                "eligible": True,
+                "reason": "업종/지역/기업규모 기반 매칭",
+                "llm_score": "●●●○○",
+            }
+            for policy in sorted_policies[:5]
         ]
-    )
+        state["final_response"] = ""
+        return state
 
     try:
-        content = response.content.strip()
+        content = raw_content.strip()
         if content.startswith("```"):
             content = content.split("```", 2)[1]
             if content.startswith("json"):
@@ -272,7 +287,7 @@ def policy_matching_node(state: FactofitState) -> FactofitState:
             }
             for policy in sorted_policies[:5]
         ]
-        state["final_response"] = response.content
+        state["final_response"] = raw_content
 
     return state
 

@@ -37,7 +37,7 @@
 
 .ff-mypage-profile-main {
   display: grid;
-  gap: 16px;
+  gap: var(--space-16);
   min-width: 0;
 }
 
@@ -389,7 +389,7 @@
 .ff-mypage-secondary {
   margin-top: 28px;
   display: grid;
-  gap: 16px;
+  gap: var(--space-16);
 }
 
 .ff-mypage-secondary .card {

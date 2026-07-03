@@ -1438,6 +1438,8 @@ async def get_support_projects(
             },
         }
     except Exception as exc:
+        import traceback
+        traceback.print_exc()
         return JSONResponse(
             status_code=500,
             content={

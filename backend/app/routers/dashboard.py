@@ -9,6 +9,7 @@ from app.services.dashboard_overview import (
     load_dashboard_overview,
     set_representative_equipment,
 )
+from app.services.login_briefing import load_login_briefing
 
 
 router = APIRouter()
@@ -43,6 +44,30 @@ async def get_dashboard_overview(
         raise HTTPException(
             status_code=500,
             detail="대시보드 정보를 불러오지 못했습니다.",
+        ) from exc
+
+    return {"success": True, "data": data}
+
+
+@router.get("/login/briefing")
+async def get_login_briefing(
+    analysis_id: str | None = Query(default=None),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    try:
+        data = load_login_briefing(
+            user_id=current_user.id,
+            analysis_id=analysis_id,
+        )
+    except Exception as exc:
+        logger.exception(
+            "login briefing failed analysis_id=%s user_id=%s",
+            analysis_id,
+            current_user.id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="진단 정보를 불러오지 못했습니다.",
         ) from exc
 
     return {"success": True, "data": data}

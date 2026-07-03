@@ -248,17 +248,7 @@ export default function DashboardWorkspaceSidebar({ paths }: DashboardWorkspaceS
               )
             }
 
-            return (
-              <button
-                key={item.key}
-                type="button"
-                className={isActive ? "is-active" : ""}
-                onClick={() => navigate(item.path)}
-              >
-                <Icon aria-hidden="true" size={17} />
-                {item.label}
-              </button>
-            )
+            return null
           })}
         </nav>
       </div>

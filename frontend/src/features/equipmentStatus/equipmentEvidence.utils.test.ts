@@ -15,7 +15,7 @@ function buildRecord(
     equipment_id: "eq-1",
     company_id: "co-1",
     user_id: "user-1",
-    evidence_type: "safety_inspection",
+    evidence_type: "안전장치 점검",
     evidence_date: "2026-06-01",
     title: "테스트",
     summary: "요약",

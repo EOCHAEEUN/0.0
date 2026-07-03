@@ -1,9 +1,11 @@
 export type AdvisorScreen =
   | "home"
   | "intro"
+  | "dashboard"
   | "roi"
   | "support"
   | "draft"
+  | "advisor"
   | "company"
   | "safety"
 
@@ -39,4 +41,57 @@ export type AdvisorDraftProgress = {
   title: string
   description: string
   status: "done" | "writing" | "wait"
+}
+
+export type AdvisorDashboardStat = {
+  icon: string
+  label: string
+  value: string
+}
+
+export type AdvisorDashboardDeadline = {
+  dday: string
+  tone: "red" | "orange" | "blue"
+  title: string
+}
+
+export type AdvisorRecentAnalysis = {
+  no: string
+  title: string
+  status: string
+  tone: "green" | "orange" | "blue"
+}
+
+export type GuestChatAction = {
+  id: string
+  label: string
+  icon: string
+  screen: AdvisorScreen
+}
+
+export type AdvisorTopPick = {
+  badge: string
+  title: string
+  tags: string[]
+  score: number
+  max: number
+}
+
+export type AdvisorOtherProject = {
+  dday: string
+  tone: "green" | "blue" | "orange"
+  title: string
+}
+
+export type AdvisorDraftHighlight = {
+  icon: string
+  title: string
+  desc: string
+}
+
+export type AdvisorDraftStatus = {
+  icon: string
+  title: string
+  status: string
+  tone: "red" | "yellow" | "blue"
 }

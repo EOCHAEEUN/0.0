@@ -38,9 +38,10 @@ export function useLoginForm() {
 
   const handleContinue = () => {
     setModalType(null)
-    // ?redirect= 파라미터가 있으면 원래 접근하려던 경로로 복귀
     const redirectParam = searchParams.get("redirect")
-    const destination = redirectParam ? decodeURIComponent(redirectParam) : resolvePostLoginPath()
+    const destination = redirectParam
+      ? decodeURIComponent(redirectParam)
+      : resolvePostLoginPath()
     navigate(destination, { replace: true })
   }
 

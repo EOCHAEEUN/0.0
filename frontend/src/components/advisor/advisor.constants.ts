@@ -1,35 +1,113 @@
 import type {
+  AdvisorDraftHighlight,
   AdvisorDraftProgress,
+  AdvisorDraftStatus,
+  AdvisorOtherProject,
   AdvisorQuickMenu,
   AdvisorRequirement,
   AdvisorResultCard,
   AdvisorSupportProject,
+  AdvisorTopPick,
+  AdvisorDashboardStat,
+  AdvisorDashboardDeadline,
+  AdvisorRecentAnalysis,
+  GuestChatAction,
 } from "./advisor.types"
+
+export const GUEST_COMPANY_NAME = "강승우 제조"
+
+export const ANALYSIS_STEPS = ["필수 정보 입력", "AI 자동 분석", "결과 저장"] as const
 
 export const QUICK_MENUS: AdvisorQuickMenu[] = [
   { id: "intro", label: "팩토핏 소개", icon: "F" },
-  { id: "company", label: "회원가입 안내", icon: "👤" },
-  { id: "roi", label: "ROI 분석 문의", icon: "▥" },
+  { id: "dashboard", label: "대시보드", icon: "▦" },
+  { id: "roi", label: "ROI 분석", icon: "▥" },
   { id: "support", label: "지원사업 추천", icon: "◎" },
   { id: "draft", label: "신청서 초안", icon: "▤" },
-  { id: "company", label: "기업정보 입력 도움", icon: "♙" },
-  { id: "safety", label: "안전점검 안내", icon: "盾" },
-  { id: "home", label: "상담 연결", icon: "☎" },
+  { id: "advisor", label: "AI Advisor", icon: "AI" },
 ]
 
+export const DASHBOARD_STATS: AdvisorDashboardStat[] = [
+  { icon: "⚙", label: "설비", value: "1" },
+  { icon: "◷", label: "마감 임박", value: "1" },
+  { icon: "◎", label: "매칭 정책", value: "10" },
+  { icon: "▥", label: "분석", value: "1" },
+]
+
+export const DASHBOARD_DEADLINES: AdvisorDashboardDeadline[] = [
+  { dday: "D-3", tone: "red", title: "AX 선도모델" },
+  { dday: "D-7", tone: "orange", title: "스마트공장 구축" },
+  { dday: "D-12", tone: "blue", title: "제조혁신 바우처" },
+]
+
+export const DASHBOARD_RECENT_ANALYSIS: AdvisorRecentAnalysis[] = [
+  { no: "01", title: "프레스 1 투자분석", status: "완료", tone: "green" },
+  { no: "02", title: "프레스 1 부분교체", status: "검토", tone: "orange" },
+  { no: "03", title: "에너지 비용 절감안", status: "저장", tone: "blue" },
+]
+
+export const GUEST_CHAT_ACTIONS: GuestChatAction[] = [
+  { id: "roi-detail", label: "ROI 상세", icon: "▥", screen: "roi" },
+  { id: "ab-compare", label: "A/B 비교", icon: "⇄", screen: "roi" },
+  { id: "investment", label: "투자금 변경", icon: "₩", screen: "roi" },
+  { id: "support", label: "매칭 지원사업", icon: "🏛", screen: "support" },
+  { id: "draft", label: "신청서 초안", icon: "▤", screen: "draft" },
+  { id: "dashboard", label: "종합현황", icon: "▦", screen: "dashboard" },
+]
+
+export const GUEST_SUGGESTION_CHIPS = [
+  "현재 분석 요약해줘",
+  "추천 시나리오 근거 알려줘",
+  "A안/B안 차이 쉽게 설명해줘",
+  "지금 바로 해야 할 일 정리해줘",
+] as const
+
+export const GUEST_ENGI_GREETING =
+  "안녕하세요. 작업형 AI 어드바이저 Engi입니다. 어떤 점을 도와드릴까요?"
+
 export const ROI_REQUIREMENTS: AdvisorRequirement[] = [
-  { icon: "▥", title: "설비명" },
-  { icon: "▣", title: "설비 사용연수" },
+  { icon: "⚙", title: "설비" },
+  { icon: "▦", title: "사용연수" },
   { icon: "ϟ", title: "연간 에너지 비용" },
-  { icon: "🔧", title: "유지보수 비용" },
-  { icon: "△", title: "불량률" },
-  { icon: "◎", title: "예상 투자비" },
+  { icon: "₩", title: "예상 투자비" },
 ]
 
 export const ROI_RESULTS: AdvisorResultCard[] = [
-  { icon: "◔", title: "예상 ROI", description: "투자 대비 수익률" },
+  { icon: "◔", title: "ROI", description: "투자 대비 수익률" },
   { icon: "◷", title: "회수기간", description: "투자금 회수 기간" },
-  { icon: "▥", title: "지원사업 연계", description: "연계 가능 사업 안내" },
+  { icon: "🏛", title: "지원사업 연계", description: "연계 가능 사업 안내" },
+]
+
+export const SUPPORT_TOP_PICK: AdvisorTopPick = {
+  badge: "TOP 추천",
+  title: "상생형 AI 전환(AX) 선도모델 구축지원",
+  tags: ["스마트공장", "전체교체", "금천구", "프레스 1"],
+  score: 81,
+  max: 100,
+}
+
+export const SUPPORT_OTHER_PROJECTS: AdvisorOtherProject[] = [
+  { dday: "D-1", tone: "green", title: "2차 자동차 산업 · 기업 도약 패키지" },
+  { dday: "D-14", tone: "blue", title: "중소기업 환경개선자금 이자지원 계획" },
+  { dday: "D-21", tone: "orange", title: "스마트공장 고도화 지원사업" },
+]
+
+export const DRAFT_HIGHLIGHTS: AdvisorDraftHighlight[] = [
+  { icon: "🏭", title: "설비 노후화", desc: "프레스 1호기 9년 경과" },
+  { icon: "AI", title: "AI 전환 필요", desc: "모니터링 · 스마트화 추진" },
+  { icon: "↗", title: "생산성 · 안전성 개선", desc: "효율 · 품질 향상 기대" },
+]
+
+export const DRAFT_SAFETY_STATUS: AdvisorDraftStatus[] = [
+  { icon: "⚠", title: "작업자 위험 노출 감소", status: "개선 필요", tone: "red" },
+  { icon: "⚙", title: "설비 운영 안정성 개선", status: "일부 보유", tone: "yellow" },
+  { icon: "☑", title: "교체 후 안전관리 체계 구축", status: "설치 후 준비 예정", tone: "blue" },
+]
+
+export const DRAFT_SECTIONS: AdvisorDraftHighlight[] = [
+  { icon: "PDF", title: "사업 필요성", desc: "노후 · 비용 · 품질" },
+  { icon: "▤", title: "추진 내용", desc: "교체 · 도입 · 실행" },
+  { icon: "▥", title: "기대효과", desc: "절감 · 개선 · 관리" },
 ]
 
 export const SUPPORT_PROJECTS: AdvisorSupportProject[] = [

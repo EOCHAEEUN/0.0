@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
 import { useLocation } from "react-router-dom"
 import botIcon from "../../assets/advisor/factofit-ai-bot.png"
+import { OPEN_AI_ADVISOR_EVENT } from "../auth/login/loginPreview.utils"
 import { AdvisorFloatingButton } from "./components/AdvisorFloatingButton"
 import { AdvisorFloatingButton as GuestAdvisorFloatingButton } from "../../components/advisor/AdvisorFloatingButton"
 import { AdvisorMobilePanel } from "../../components/advisor/AdvisorMobilePanel"
@@ -57,6 +58,12 @@ export function GlobalAiAdvisor() {
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [open])
+
+  useEffect(() => {
+    const openAdvisor = () => setOpen(true)
+    window.addEventListener(OPEN_AI_ADVISOR_EVENT, openAdvisor)
+    return () => window.removeEventListener(OPEN_AI_ADVISOR_EVENT, openAdvisor)
+  }, [])
 
   if (isEquipmentPage || isEmbeddedAdvisorHost || activeAdvisorRoute) {
     return null

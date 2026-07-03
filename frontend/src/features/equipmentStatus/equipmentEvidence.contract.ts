@@ -1,8 +1,7 @@
 export type EvidenceType =
-  | "safety_inspection"
-  | "safety_improvement"
-  | "maintenance_record"
-  | "maintenance_plan"
+  | "안전장치 점검"
+  | "유지보수"
+  | "안전교육"
 
 export type EvidenceReviewStatus = "draft" | "approved" | "rejected"
 
@@ -109,10 +108,9 @@ export type UpsertApplicationEvidenceSelectionPayload = {
 }
 
 export const EVIDENCE_TYPE_OPTIONS: Array<{ value: EvidenceType; label: string }> = [
-  { value: "safety_inspection", label: "안전점검" },
-  { value: "safety_improvement", label: "안전개선" },
-  { value: "maintenance_record", label: "정비기록" },
-  { value: "maintenance_plan", label: "정비계획" },
+  { value: "안전장치 점검", label: "안전장치 점검" },
+  { value: "유지보수", label: "유지보수" },
+  { value: "안전교육", label: "안전교육" },
 ]
 
 export const EVIDENCE_STRUCTURED_ITEM_STATUS_OPTIONS: Array<{
@@ -143,8 +141,7 @@ export const REVIEW_STATUS_LABELS: Record<EvidenceReviewStatus, string> = {
 }
 
 export const EVIDENCE_TYPE_LABELS: Record<EvidenceType, string> = {
-  safety_inspection: "안전점검",
-  safety_improvement: "안전개선",
-  maintenance_record: "정비기록",
-  maintenance_plan: "정비계획",
+  "안전장치 점검": "안전장치 점검",
+  유지보수: "유지보수",
+  안전교육: "안전교육",
 }

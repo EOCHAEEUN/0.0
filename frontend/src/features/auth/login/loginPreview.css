@@ -1,0 +1,340 @@
+.ff-login-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(6, 27, 52, 0.52);
+  backdrop-filter: blur(10px);
+}
+
+.ff-login-preview-modal {
+  width: min(620px, 100%);
+  max-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 24px;
+  background: #ffffff;
+  color: #061b34;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 34px 100px rgba(6, 27, 52, 0.24);
+}
+
+.ff-login-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 24px 18px;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.ff-login-preview-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.ff-login-preview-brand-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #061b34 0%, #344ba0 100%);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.ff-login-preview-brand-copy strong {
+  display: block;
+  color: #1e3a8a;
+  font-size: 22px;
+  line-height: 1.1;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.ff-login-preview-brand-copy span {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.ff-login-preview-close {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #64748b;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.ff-login-preview-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px 24px 18px;
+}
+
+.ff-login-preview-hero {
+  text-align: center;
+  margin-bottom: 22px;
+}
+
+.ff-login-preview-hero h2 {
+  margin: 0 0 10px;
+  color: #0f2748;
+  font-size: clamp(24px, 4vw, 28px);
+  line-height: 1.3;
+  letter-spacing: -0.04em;
+  font-weight: 900;
+}
+
+.ff-login-preview-hero p {
+  margin: 0 auto;
+  max-width: 520px;
+  color: #475467;
+  font-size: 15px;
+  line-height: 1.7;
+  font-weight: 700;
+}
+
+.ff-login-preview-metrics {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.ff-login-preview-metric-card {
+  min-height: 84px;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.ff-login-preview-metric-card span {
+  color: #475467;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.ff-login-preview-metric-card strong {
+  color: #1e3a8a;
+  font-size: clamp(28px, 5vw, 40px);
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+}
+
+.ff-login-preview-metric-card strong.is-muted {
+  color: #64748b;
+  font-size: 18px;
+}
+
+.ff-login-preview-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ff-login-preview-metric-grid .ff-login-preview-metric-card {
+  min-height: 108px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.ff-login-preview-metric-grid .ff-login-preview-metric-card strong {
+  font-size: clamp(24px, 4vw, 30px);
+}
+
+.ff-login-preview-metric-hint {
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.ff-login-preview-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.ff-login-preview-section h3 {
+  margin: 0 0 12px;
+  color: #0f2748;
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.ff-login-preview-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.ff-login-preview-list li {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 8px;
+  align-items: start;
+  color: #344054;
+  font-size: 13px;
+  line-height: 1.55;
+  font-weight: 800;
+}
+
+.ff-login-preview-list .ff-login-preview-rank {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #eef4ff;
+  color: #1e3a8a;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ff-login-preview-notice-item {
+  padding: 10px 0;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.ff-login-preview-notice-item:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.ff-login-preview-notice-item strong {
+  display: block;
+  color: #344054;
+  font-size: 13px;
+  line-height: 1.55;
+  font-weight: 800;
+}
+
+.ff-login-preview-notice-item span {
+  display: block;
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ff-login-preview-empty {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+  font-weight: 700;
+}
+
+.ff-login-preview-error {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b42318;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.ff-login-preview-error button {
+  margin-top: 10px;
+  border: 0;
+  border-radius: 10px;
+  background: #1e3a8a;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.ff-login-preview-skeleton {
+  display: inline-block;
+  width: 88px;
+  height: 28px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #eef2f7 25%, #f8fafc 50%, #eef2f7 75%);
+  background-size: 200% 100%;
+  animation: ff-login-preview-shimmer 1.2s infinite;
+}
+
+@keyframes ff-login-preview-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.ff-login-preview-footer {
+  flex-shrink: 0;
+  padding: 0 24px 24px;
+}
+
+.ff-login-preview-cta {
+  width: 100%;
+  min-height: 56px;
+  border: 0;
+  border-radius: 14px;
+  background: #1e3a8a;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 18px 38px rgba(30, 58, 138, 0.22);
+}
+
+.ff-login-preview-cta:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .ff-login-preview-overlay {
+    padding: 12px;
+  }
+
+  .ff-login-preview-modal {
+    max-height: calc(100vh - 24px);
+    border-radius: 20px;
+  }
+
+  .ff-login-preview-body {
+    padding: 20px 18px 16px;
+  }
+
+  .ff-login-preview-columns,
+  .ff-login-preview-metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ff-login-preview-metric-card strong {
+    font-size: 28px;
+  }
+}

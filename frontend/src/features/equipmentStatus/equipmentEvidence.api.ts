@@ -4,6 +4,7 @@ import type {
   EquipmentEvidenceRecordsResponse,
   UpdateEquipmentEvidencePayload,
 } from "./equipmentEvidence.contract"
+import type { EvidenceType } from "./equipmentEvidence.contract"
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") || "http://127.0.0.1:8000/api"
@@ -71,6 +72,32 @@ function authHeaders(extra?: HeadersInit): HeadersInit {
   }
 }
 
+function normalizeEvidenceType(value: string | undefined | null): EvidenceType {
+  if (
+    value === "유지보수" ||
+    value === "maintenance_related" ||
+    value === "maintenance_record" ||
+    value === "maintenance_plan"
+  ) {
+    return "유지보수"
+  }
+  if (
+    value === "안전교육" ||
+    value === "safety_education" ||
+    value === "safety_training"
+  ) {
+    return "안전교육"
+  }
+  return "안전장치 점검"
+}
+
+function normalizeEvidenceRecord(record: EquipmentEvidenceRecord): EquipmentEvidenceRecord {
+  return {
+    ...record,
+    evidence_type: normalizeEvidenceType(record.evidence_type),
+  }
+}
+
 export async function fetchEquipmentEvidenceRecords(
   equipmentId: string,
 ): Promise<EquipmentEvidenceRecordsResponse> {
@@ -82,7 +109,11 @@ export async function fetchEquipmentEvidenceRecords(
       credentials: "include",
     },
   )
-  return parseJson<EquipmentEvidenceRecordsResponse>(response)
+  const payload = await parseJson<EquipmentEvidenceRecordsResponse>(response)
+  return {
+    ...payload,
+    records: (payload.records || []).map(normalizeEvidenceRecord),
+  }
 }
 
 export async function createEquipmentEvidenceRecord(params: {
@@ -98,7 +129,11 @@ export async function createEquipmentEvidenceRecord(params: {
       body: JSON.stringify(params.payload),
     },
   )
-  return parseJson<{ record: EquipmentEvidenceRecord; total_count: number }>(response)
+  const payload = await parseJson<{ record: EquipmentEvidenceRecord; total_count: number }>(response)
+  return {
+    ...payload,
+    record: normalizeEvidenceRecord(payload.record),
+  }
 }
 
 export async function updateEquipmentEvidenceRecord(params: {
@@ -117,7 +152,11 @@ export async function updateEquipmentEvidenceRecord(params: {
       body: JSON.stringify(params.payload),
     },
   )
-  return parseJson<{ record: EquipmentEvidenceRecord }>(response)
+  const payload = await parseJson<{ record: EquipmentEvidenceRecord }>(response)
+  return {
+    ...payload,
+    record: normalizeEvidenceRecord(payload.record),
+  }
 }
 
 export async function deleteEquipmentEvidenceRecord(params: {

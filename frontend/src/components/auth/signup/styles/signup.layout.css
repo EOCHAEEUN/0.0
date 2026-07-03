@@ -2,36 +2,52 @@
   position: fixed;
   inset: 0;
   z-index: 1200;
-  background: rgba(15, 27, 51, 0.62);
-  backdrop-filter: blur(14px);
+  background: rgba(15, 27, 51, 0.52);
+  backdrop-filter: blur(10px);
   display: flex;
   justify-content: center;
-  align-items: flex-start;
-  padding: 44px 20px;
-  overflow-y: auto;
+  align-items: center;
+  padding: 12px;
+  overflow: hidden;
 }
 
 .ff-signup-panel {
   position: relative;
-  width: min(920px, 100%);
-  border-radius: 36px;
+  display: flex;
+  flex-direction: column;
+  width: min(760px, 100%);
+  max-height: calc(100dvh - 24px);
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
   background: #ffffff;
-  box-shadow: 0 34px 110px rgba(15, 27, 51, 0.26);
-  padding: 42px;
-  color: #0f1b33;
+  box-shadow: 0 28px 80px rgba(15, 27, 51, 0.18);
+  padding: 20px 28px 16px;
+  color: #0f2748;
+  overflow: hidden;
+}
+
+.ff-signup-body {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: visible;
 }
 
 .ff-signup-close {
   position: absolute;
-  top: 28px;
-  right: 30px;
-  width: 56px;
-  height: 56px;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  border: 0;
   border-radius: 999px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background: #ffffff;
-  color: #0f1b33;
-  font-size: 34px;
+  background: transparent;
+  color: #64748b;
+  font-size: 26px;
   line-height: 1;
   cursor: pointer;
+}
+
+.ff-signup-close:hover {
+  color: #0f2748;
 }

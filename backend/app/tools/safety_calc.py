@@ -63,6 +63,28 @@ RISK_LEVEL_ORDER = {"critical": 0, "high": 1, "medium": 2}
 PRIORITY_DUE_THRESHOLD_DAYS = 10
 
 
+PURPOSE_ORDER = ["안전장치점검", "유지보수점검", "안전교육"]
+
+
+def normalize_inspection_purpose(value: str | None) -> str:
+    """
+    inspection_purpose를 화면 표준 3분류로 정규화합니다.
+    DB에 과거 값(예: 안전점검/정비기록 등)이 남아있어도 집계가 깨지지 않도록 보정합니다.
+    """
+    raw = str(value or "").strip()
+    if not raw:
+        return "유지보수점검"
+    if raw in PURPOSE_ORDER:
+        return raw
+
+    compact = raw.replace(" ", "")
+    if any(token in compact for token in ("교육", "훈련", "오리엔테이션")):
+        return "안전교육"
+    if any(token in compact for token in ("정비", "유지보수", "보전", "수리", "유지관리", "계획")):
+        return "유지보수점검"
+    return "안전장치점검"
+
+
 # ==================== 0. 기초 유틸 ====================
 def get_applicable_rules(
     equipment_category: str,
@@ -262,15 +284,10 @@ def calculate_purpose_breakdown(all_items: list[dict]) -> list[dict]:
     그룹 순서는 안전장치점검 → 유지보수점검 → 안전교육으로 고정합니다
     (화면 디자인의 고정 순서와 맞추기 위함).
     """
-    PURPOSE_ORDER = ["안전장치점검", "유지보수점검", "안전교육"]
-
     breakdown = {p: {"incomplete_count": 0, "total_count": 0} for p in PURPOSE_ORDER}
 
     for item in all_items:
-        purpose = item["rule"].inspection_purpose
-        if purpose not in breakdown:
-            # 스키마에 정의되지 않은 값이 들어온 경우를 대비한 방어적 처리
-            breakdown[purpose] = {"incomplete_count": 0, "total_count": 0}
+        purpose = normalize_inspection_purpose(item["rule"].inspection_purpose)
 
         breakdown[purpose]["total_count"] += 1
 

@@ -1,4 +1,4 @@
-import { ExternalLink, Plus, Trash2 } from "lucide-react"
+import { ExternalLink } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import type { EquipmentAttachmentItem } from "../equipmentAttachments.contract"
 import type {
@@ -106,37 +106,6 @@ export default function EquipmentEvidenceDrawer({
     return Boolean(form.title.trim() && form.attachment_id)
   }, [form.attachment_id, form.title])
 
-  const updateStructuredItem = (
-    index: number,
-    patch: Partial<EvidenceStructuredItem>,
-  ) => {
-    setForm((current) => ({
-      ...current,
-      structured_items: current.structured_items.map((item, itemIndex) =>
-        itemIndex === index ? { ...item, ...patch } : item,
-      ),
-    }))
-  }
-
-  const addStructuredItem = () => {
-    setForm((current) => ({
-      ...current,
-      structured_items: [
-        ...current.structured_items,
-        { item_name: "", status: "good", note: "" },
-      ],
-    }))
-  }
-
-  const removeStructuredItem = (index: number) => {
-    setForm((current) => ({
-      ...current,
-      structured_items: current.structured_items.filter(
-        (_, itemIndex) => itemIndex !== index,
-      ),
-    }))
-  }
-
   const handleReviewStatusChange = (status: EvidenceReviewStatus) => {
     if (isDemo) return
     if (status === "approved") {
@@ -167,10 +136,9 @@ export default function EquipmentEvidenceDrawer({
         evidenceId: record?.evidence_id,
         payload: {
           ...form,
+          application_sentence: "",
           review_status: reviewStatus,
-          structured_items: form.structured_items.filter(
-            (item) => item.item_name.trim() || item.note.trim(),
-          ),
+          structured_items: [],
         },
       })
       onClose()
@@ -277,8 +245,8 @@ export default function EquipmentEvidenceDrawer({
         </div>
 
         <p className="ff-evidence-form-note">
-          자동 추출이 아닌 직접 입력 근거입니다. 핵심 요약과 신청서 문장은 사용자가 직접
-          작성·검토해야 합니다.
+          자동 추출이 아닌 직접 입력 근거입니다. 신청서 문장은 사용자가 직접 작성·검토해야
+          합니다.
         </p>
 
         {isDemo ? (
@@ -330,106 +298,6 @@ export default function EquipmentEvidenceDrawer({
             placeholder="예: 비상정지 버튼 및 안전커버 점검"
             onChange={(event) =>
               setForm((current) => ({ ...current, title: event.target.value }))
-            }
-          />
-        </label>
-
-        <label className="ff-evidence-form-field">
-          <span>핵심 요약</span>
-          <textarea
-            rows={4}
-            value={form.summary}
-            disabled={saving || isDemo}
-            placeholder="2~4문장으로 핵심 내용을 직접 정리해 주세요."
-            onChange={(event) =>
-              setForm((current) => ({ ...current, summary: event.target.value }))
-            }
-          />
-          <small>신청서에 자동 반영되지 않습니다. 검토용 요약입니다.</small>
-        </label>
-
-        <div className="ff-evidence-form-field">
-          <div className="ff-evidence-form-field-head">
-            <span>세부 항목 목록</span>
-            <button
-              type="button"
-              className="ff-equipment-secondary-btn"
-              disabled={saving || isDemo}
-              onClick={addStructuredItem}
-            >
-              <Plus aria-hidden="true" size={14} />
-              항목 추가
-            </button>
-          </div>
-          <div className="ff-evidence-structured-list">
-            {form.structured_items.map((item, index) => (
-              <div key={`structured-${index}`} className="ff-evidence-structured-item">
-                <label>
-                  <span>항목명</span>
-                  <input
-                    type="text"
-                    value={item.item_name}
-                    disabled={saving || isDemo}
-                    onChange={(event) =>
-                      updateStructuredItem(index, { item_name: event.target.value })
-                    }
-                  />
-                </label>
-                <label>
-                  <span>상태</span>
-                  <select
-                    value={item.status}
-                    disabled={saving || isDemo}
-                    onChange={(event) =>
-                      updateStructuredItem(index, {
-                        status: event.target.value as EvidenceStructuredItem["status"],
-                      })
-                    }
-                  >
-                    {EVIDENCE_STRUCTURED_ITEM_STATUS_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span>비고</span>
-                  <input
-                    type="text"
-                    value={item.note}
-                    disabled={saving || isDemo}
-                    onChange={(event) =>
-                      updateStructuredItem(index, { note: event.target.value })
-                    }
-                  />
-                </label>
-                <button
-                  type="button"
-                  className="ff-equipment-attachment-delete"
-                  aria-label="세부 항목 삭제"
-                  disabled={saving || isDemo || form.structured_items.length <= 1}
-                  onClick={() => removeStructuredItem(index)}
-                >
-                  <Trash2 aria-hidden="true" size={16} />
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <label className="ff-evidence-form-field">
-          <span>신청서 반영 후보 문장</span>
-          <textarea
-            rows={4}
-            value={form.application_sentence}
-            disabled={saving || isDemo}
-            placeholder="설비 안전점검 결과 비상정지 기능과 안전커버 상태가 정상으로 확인되었으며, 경고표지 보강 및 누유 부위 개선 조치를 완료하였습니다."
-            onChange={(event) =>
-              setForm((current) => ({
-                ...current,
-                application_sentence: event.target.value,
-              }))
             }
           />
         </label>

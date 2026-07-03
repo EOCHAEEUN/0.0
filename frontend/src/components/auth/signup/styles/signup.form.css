@@ -1,113 +1,129 @@
 .ff-signup-section {
-  margin-top: 34px;
+  margin-top: 10px;
+}
+
+.ff-signup-section--account {
+  margin-top: 0;
+}
+
+.ff-signup-section--user {
+  margin-top: 8px;
 }
 
 .ff-signup-section h3 {
-  font-size: 28px;
+  font-size: 17px;
   font-weight: 900;
-  letter-spacing: -0.05em;
-  margin: 0 0 22px;
+  letter-spacing: -0.03em;
+  margin: 0 0 8px;
+  color: #0f2748;
 }
 
 .ff-signup-two-col {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+  gap: 10px;
   align-items: start;
 }
 
+.ff-signup-verify-row {
+  margin-bottom: 2px;
+}
+
 .ff-signup-password-row {
-  align-items: start;
+  margin-top: 2px;
+}
+
+.ff-signup-two-col .ff-signup-field {
+  margin-bottom: 0;
 }
 
 .ff-signup-field {
   position: relative;
   display: grid;
   align-content: start;
-  gap: 10px;
-  margin-bottom: 18px;
-}
-
-.ff-signup-password-confirm-field {
-  align-self: start;
+  gap: 5px;
+  margin-bottom: 10px;
 }
 
 .ff-signup-label-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
 }
 
 .ff-signup-label-row label {
-  color: #64748b;
-  font-size: 15px;
-  font-weight: 900;
+  color: #475467;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .ff-signup-label-row label b {
   color: #ef4444;
-  margin-left: 3px;
-}
-
-.ff-signup-label-row span {
-  height: 24px;
-  border-radius: 999px;
-  background: #f1f5f9;
-  color: #64748b;
-  padding: 0 9px;
-  display: inline-flex;
-  align-items: center;
-  font-size: 11px;
-  font-weight: 900;
+  margin-left: 2px;
 }
 
 .ff-signup-field input,
 .ff-signup-field select {
   width: 100%;
-  height: 64px;
-  border-radius: 22px;
-  border: 1px solid rgba(15, 23, 42, 0.1);
+  height: 42px;
+  border-radius: 10px;
+  border: 1px solid #d7e2ef;
   background: #ffffff;
-  color: #0f1b33;
-  padding: 0 22px;
-  font-size: 18px;
-  font-weight: 900;
+  color: #0f2748;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 700;
   outline: none;
 }
 
 .ff-signup-field input::placeholder {
-  color: #9ca3af;
+  color: #94a3b8;
+  font-weight: 600;
 }
 
 .ff-signup-field input:focus,
 .ff-signup-field select:focus {
-  border-color: rgba(77, 87, 184, 0.55);
-  box-shadow: 0 0 0 4px rgba(77, 87, 184, 0.09);
+  border-color: #7c9cff;
+  box-shadow: 0 0 0 3px rgba(52, 75, 160, 0.1);
+}
+
+.ff-signup-field input:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  border-color: #e2e8f0;
+  cursor: not-allowed;
 }
 
 .ff-signup-inline {
   display: grid;
-  grid-template-columns: 1fr 148px;
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) 112px;
+  gap: 8px;
 }
 
 .ff-signup-inline button {
-  height: 64px;
+  height: 42px;
   border: 0;
-  border-radius: 22px;
-  background: #4d57b8;
+  border-radius: 10px;
+  background: #1e3a8a;
   color: #ffffff;
-  font-size: 15px;
-  font-weight: 900;
+  font-size: 12px;
+  font-weight: 800;
   cursor: pointer;
+  white-space: nowrap;
+  padding: 0 8px;
+}
+
+.ff-signup-inline button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .ff-signup-message {
-  margin: -2px 0 0;
-  font-size: 13px;
-  line-height: 1.5;
-  font-weight: 900;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 700;
 }
 
 .ff-signup-message.is-success {

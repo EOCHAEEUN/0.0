@@ -44,7 +44,7 @@ export function createEmptyStructuredItem() {
 export function createEmptyEvidenceDraft(attachmentId: string) {
   return {
     attachment_id: attachmentId,
-    evidence_type: "safety_inspection" as EvidenceType,
+    evidence_type: "안전장치 점검" as EvidenceType,
     evidence_date: new Date().toISOString().slice(0, 10),
     title: "",
     summary: "",
@@ -136,9 +136,9 @@ export function isEvidenceAttachmentType(type: EquipmentAttachmentType) {
 export function suggestEvidenceTypeForAttachment(
   attachmentType: EquipmentAttachmentType,
 ): EvidenceType {
-  if (attachmentType === "maintenance_record") return "maintenance_record"
-  if (attachmentType === "safety_evidence") return "safety_inspection"
-  return "safety_inspection"
+  if (attachmentType === "maintenance_record") return "유지보수"
+  if (attachmentType === "safety_evidence") return "안전장치 점검"
+  return "안전장치 점검"
 }
 
 export function filterEvidenceRecords(

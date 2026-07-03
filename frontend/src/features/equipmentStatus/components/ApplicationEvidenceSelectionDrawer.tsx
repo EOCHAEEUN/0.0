@@ -186,10 +186,9 @@ export default function ApplicationEvidenceSelectionDrawer({
           {(
             [
               ["all", "전체"],
-              ["safety_inspection", "안전점검"],
-              ["safety_improvement", "안전개선"],
-              ["maintenance_record", "정비기록"],
-              ["maintenance_plan", "정비계획"],
+              ["안전장치 점검", "안전장치 점검"],
+              ["유지보수", "유지보수"],
+              ["안전교육", "안전교육"],
               ["approved_only", "승인 완료만"],
             ] as const
           ).map(([value, label]) => (

@@ -225,6 +225,7 @@
   font-weight: 900;
   cursor: pointer;
   border: 1px solid transparent;
+  transition: var(--transition-base);
 }
 
 .ff-mypage-btn.ghost {

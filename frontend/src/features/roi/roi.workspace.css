@@ -995,16 +995,17 @@
 
 .ff-roi-btn.primary.light {
   min-height: 44px;
-  padding: 0 18px;
+  padding: 0 var(--space-16);
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-small);
   background: #123b6d;
   color: #fff;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 900;
   cursor: pointer;
   font-family: inherit;
   white-space: nowrap;
+  transition: var(--transition-base);
 }
 
 .ff-roi-analysis-kpi-row {

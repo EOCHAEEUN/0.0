@@ -383,14 +383,15 @@
   justify-content: center;
   gap: 8px;
   min-height: 44px;
-  padding: 0 18px;
+  padding: 0 var(--space-16);
   border: 0;
-  border-radius: 10px;
-  font-size: 14px;
+  border-radius: var(--radius-small);
+  font-size: 15px;
   font-weight: 900;
   cursor: pointer;
   font-family: inherit;
   white-space: nowrap;
+  transition: var(--transition-base);
 }
 
 .ff-hero-btn.primary,
@@ -682,12 +683,14 @@
   gap: 8px;
   width: 100%;
   min-height: 44px;
+  padding: 0 var(--space-16);
   border: 0;
-  border-radius: 10px;
-  font-size: 14px;
+  border-radius: var(--radius-small);
+  font-size: 15px;
   font-weight: 900;
   cursor: pointer;
   font-family: inherit;
+  transition: var(--transition-base);
 }
 
 .ff-panel-btn.primary {
@@ -1349,10 +1352,11 @@
   justify-content: center;
   gap: 8px;
   min-height: 44px;
-  padding: 0 16px;
-  border-radius: 8px;
+  padding: 0 var(--space-16);
+  border-radius: var(--radius-small);
   font-size: 15px;
   font-weight: 900;
+  transition: var(--transition-base);
 }
 
 .ff-workspace-btn.primary {

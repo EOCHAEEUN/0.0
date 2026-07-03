@@ -1,0 +1,22 @@
+{
+  "policy_id": "hwaseong-supplychain-rnd-2026-001",
+  "title": "2026년 화성시 공급망 확대 사업화 R&D 지원사업",
+  "organization": "화성산업진흥원",
+  "max_amount": null,
+  "deadline": "2026-03-05",
+  "deadline_note": "2026년 3월 5일 마감",
+  "policy_category": "양산성능평가",
+  "policy_subcategory": "공급망 사업화·양산검증",
+  "industry_codes": [
+    "C24",
+    "C25",
+    "C22",
+    "C29"
+  ],
+  "region": "경기도 화성시",
+  "url": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000118624",
+  "summary": "화성시 관내 제조업 중소기업을 대상으로 공급망 안정화를 위한 기술개발 및 사업화 비용을 지원. 재료비, 시험·평가비, 전문가 활용비 등을 포함.",
+  "max_employee_count": null,
+  "min_revenue": null,
+  "max_revenue": null
+}

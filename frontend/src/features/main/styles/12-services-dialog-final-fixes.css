@@ -1,0 +1,505 @@
+/* Services 목업 슬라이더 복구/최종 고정 */
+
+/* =========================================================
+   SERVICES Dialog - Restore final mockup slider layout
+   목적:
+   - Dashboard premium 적용 후 주요서비스가 구버전 카드형으로 되돌아가는 문제 방지
+   - 주요서비스 UX Flow Preview는 실제 목업 가로 슬라이드 형태로 유지
+   ========================================================= */
+
+.ff-services-mockup-preview {
+  border-radius: 32px;
+  border: 1px solid var(--ff-line);
+  background:
+    radial-gradient(circle at 88% 8%, rgba(204, 232, 183, 0.2), transparent 28%),
+    linear-gradient(180deg, #f8fafc 0%, #f4f7fb 100%);
+  padding: 32px;
+  overflow: visible;
+  position: relative;
+}
+
+.ff-services-flow-preview {
+  display: none !important;
+}
+
+.ff-services-mockup-track {
+  display: grid !important;
+  grid-auto-flow: column !important;
+  grid-auto-columns: 286px !important;
+  gap: 22px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  padding: 4px 4px 10px !important;
+  cursor: grab;
+  user-select: none;
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.ff-services-mockup-track::-webkit-scrollbar {
+  display: none;
+}
+
+.ff-services-mockup-card {
+  scroll-snap-align: start;
+  display: grid;
+  gap: 12px;
+}
+
+.ff-service-device {
+  width: 100%;
+  height: 548px;
+  border-radius: 38px;
+  background: #0b1220;
+  padding: 10px;
+  box-shadow: 0 24px 66px rgba(6, 27, 52, 0.18);
+  position: relative;
+  overflow: hidden;
+}
+
+.ff-service-device-screen {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  border-radius: 31px;
+  background: #ffffff;
+}
+
+.ff-services-mockup-guide {
+  position: relative;
+  z-index: 50;
+}
+
+.ff-services-mockup-guide::before,
+.ff-services-mockup-guide::after {
+  display: none !important;
+  content: none !important;
+}
+
+.ff-services-mockup-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 18px);
+  z-index: 99999;
+  width: 380px;
+  max-width: min(380px, calc(100vw - 64px));
+  padding: 13px 16px;
+  border-radius: 18px;
+  background: rgba(6, 27, 52, 0.98);
+  color: #ffffff;
+  font-size: 11px;
+  line-height: 1.55;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  text-align: left;
+  box-shadow:
+    0 22px 54px rgba(6, 27, 52, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 8px);
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+
+.ff-services-mockup-tooltip::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
+  background: rgba(6, 27, 52, 0.98);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.ff-services-mockup-guide:hover .ff-services-mockup-tooltip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+@media (max-width: 1180px) {
+  .ff-services-mockup-track {
+    grid-auto-columns: 276px !important;
+  }
+
+  .ff-service-device {
+    height: 530px;
+  }
+}
+
+@media (max-width: 720px) {
+  .ff-services-mockup-track {
+    grid-auto-columns: 256px !important;
+  }
+
+  .ff-service-device {
+    height: 510px;
+  }
+
+  .ff-services-mockup-tooltip {
+    left: 0;
+    width: min(330px, calc(100vw - 48px));
+    transform: translate(0, 8px);
+  }
+
+  .ff-services-mockup-guide:hover .ff-services-mockup-tooltip {
+    transform: translate(0, 0);
+  }
+
+  .ff-services-mockup-tooltip::after {
+    left: 34px;
+  }
+}
+
+
+/* =========================================================
+   FINAL FIX - Services mockup slider + Dashboard flow removal
+   목적:
+   - Dashboard Experience의 01~04 가로 플로우 영역 제거
+   - 주요서비스 UX Flow Preview를 실제 목업 가로 슬라이드 형태로 강제 고정
+   - 이전 CSS 중복/병합 충돌로 인한 비율 깨짐 방지
+   ========================================================= */
+
+/* Dashboard: 요청한 01 결과 저장 → 04 안전 알림 플로우 통삭제 */
+.ff-dashboard-premium-flow {
+  display: none !important;
+}
+
+/* Services: 전체 다이얼로그 비율 안정화 */
+.ff-services-premium-dialog {
+  display: grid !important;
+  gap: 24px !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}
+
+/* Services: 히어로는 첨부 기준처럼 네이비 상단 카드 유지 */
+.ff-services-premium-hero {
+  width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+/* Services: 4개 핵심 카드가 목업 슬라이더와 충돌하지 않도록 고정 */
+.ff-services-premium-card-grid {
+  width: 100% !important;
+  min-width: 0 !important;
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: 18px !important;
+  overflow: visible !important;
+}
+
+.ff-services-premium-card {
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+/* 예전 추상 UX 카드 영역이 남아 있을 경우 완전 숨김 */
+.ff-services-flow-preview {
+  display: none !important;
+}
+
+/* Services: UX Flow Preview 영역은 실제 목업 슬라이드 컨테이너로 고정 */
+.ff-services-mockup-preview {
+  position: relative !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  border-radius: 32px !important;
+  border: 1px solid var(--ff-line) !important;
+  background:
+    radial-gradient(circle at 88% 8%, rgba(204, 232, 183, 0.2), transparent 28%),
+    linear-gradient(180deg, #f8fafc 0%, #f4f7fb 100%) !important;
+  padding: 32px !important;
+  overflow: hidden !important;
+}
+
+/* 좌우 가장자리만 은은하게 페이드 */
+.ff-services-mockup-preview::before,
+.ff-services-mockup-preview::after {
+  content: "" !important;
+  position: absolute !important;
+  z-index: 3 !important;
+  top: 170px !important;
+  bottom: 24px !important;
+  width: 42px !important;
+  pointer-events: none !important;
+}
+
+.ff-services-mockup-preview::before {
+  left: 0 !important;
+  background: linear-gradient(90deg, #f8fafc, rgba(248, 250, 252, 0)) !important;
+}
+
+.ff-services-mockup-preview::after {
+  right: 0 !important;
+  background: linear-gradient(270deg, #f8fafc, rgba(248, 250, 252, 0)) !important;
+}
+
+.ff-services-mockup-head {
+  position: relative !important;
+  z-index: 4 !important;
+  display: grid !important;
+  grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr) !important;
+  gap: 44px !important;
+  align-items: end !important;
+  margin-bottom: 24px !important;
+  min-width: 0 !important;
+}
+
+.ff-services-mockup-guide {
+  position: relative !important;
+  z-index: 10 !important;
+  width: fit-content !important;
+  min-height: 38px !important;
+  margin: -4px 0 22px 0 !important;
+  padding: 0 15px !important;
+  border-radius: 999px !important;
+  background: #ffffff !important;
+  border: 1px solid rgba(226, 232, 240, 0.95) !important;
+  box-shadow: 0 12px 32px rgba(6, 27, 52, 0.055) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 9px !important;
+  color: var(--ff-navy) !important;
+  overflow: visible !important;
+}
+
+.ff-services-mockup-guide span {
+  color: var(--ff-blue) !important;
+  font-size: 10px !important;
+  font-weight: 900 !important;
+  letter-spacing: 1.8px !important;
+  text-transform: uppercase !important;
+}
+
+.ff-services-mockup-guide strong {
+  color: #526071 !important;
+  font-size: 12px !important;
+  font-weight: 900 !important;
+}
+
+.ff-services-mockup-guide em {
+  color: var(--ff-gold) !important;
+  font-style: normal !important;
+  font-size: 16px !important;
+  font-weight: 900 !important;
+}
+
+/* 기존 pseudo tooltip 충돌 제거 */
+.ff-services-mockup-guide::before,
+.ff-services-mockup-guide::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* 실제 div tooltip */
+.ff-services-mockup-tooltip {
+  position: absolute !important;
+  left: 50% !important;
+  bottom: calc(100% + 18px) !important;
+  z-index: 99999 !important;
+  width: 380px !important;
+  max-width: min(380px, calc(100vw - 64px)) !important;
+  padding: 13px 16px !important;
+  border-radius: 18px !important;
+  background: rgba(6, 27, 52, 0.98) !important;
+  color: #ffffff !important;
+  font-size: 11px !important;
+  line-height: 1.55 !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.02em !important;
+  text-align: left !important;
+  box-shadow:
+    0 22px 54px rgba(6, 27, 52, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translate(-50%, 8px) !important;
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease !important;
+}
+
+.ff-services-mockup-tooltip::after {
+  content: "" !important;
+  position: absolute !important;
+  left: 50% !important;
+  bottom: -6px !important;
+  width: 12px !important;
+  height: 12px !important;
+  background: rgba(6, 27, 52, 0.98) !important;
+  transform: translateX(-50%) rotate(45deg) !important;
+}
+
+.ff-services-mockup-guide:hover .ff-services-mockup-tooltip {
+  opacity: 1 !important;
+  transform: translate(-50%, 0) !important;
+}
+
+/* 핵심: grid 대신 flex로 고정해서 진짜 가로 슬라이드가 되게 함 */
+.ff-services-mockup-track {
+  position: relative !important;
+  z-index: 2 !important;
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  gap: 22px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  padding: 4px 4px 10px !important;
+  cursor: grab !important;
+  user-select: none !important;
+  scroll-snap-type: x proximity !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  touch-action: pan-x !important;
+  overscroll-behavior-x: contain !important;
+}
+
+.ff-services-mockup-track::-webkit-scrollbar {
+  display: none !important;
+}
+
+.ff-services-mockup-track[data-dragging="true"] {
+  cursor: grabbing !important;
+  scroll-snap-type: none !important;
+}
+
+.ff-services-mockup-track[data-dragging="true"] .ff-services-mockup-card {
+  pointer-events: none !important;
+}
+
+.ff-services-mockup-card {
+  flex: 0 0 286px !important;
+  width: 286px !important;
+  min-width: 286px !important;
+  max-width: 286px !important;
+  scroll-snap-align: start !important;
+  display: grid !important;
+  gap: 12px !important;
+  box-sizing: border-box !important;
+}
+
+/* 목업 폰 비율 고정 */
+.ff-service-device {
+  width: 100% !important;
+  height: 548px !important;
+  border-radius: 38px !important;
+  background: #0b1220 !important;
+  padding: 10px !important;
+  box-shadow: 0 24px 66px rgba(6, 27, 52, 0.18) !important;
+  position: relative !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  flex: none !important;
+}
+
+.ff-service-device-screen {
+  position: relative !important;
+  overflow: hidden !important;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 31px !important;
+  background: #ffffff !important;
+}
+
+/* 제목/칩 비율 고정 */
+.ff-services-mockup-title {
+  min-height: 50px !important;
+  display: grid !important;
+  align-content: end !important;
+  gap: 7px !important;
+}
+
+.ff-services-mockup-title strong {
+  color: var(--ff-navy) !important;
+  font-size: 18px !important;
+  line-height: 1.15 !important;
+  letter-spacing: -0.6px !important;
+  font-weight: 900 !important;
+}
+
+.ff-services-mockup-title span {
+  width: fit-content !important;
+  padding: 7px 10px !important;
+  border-radius: 999px !important;
+  background: #ffffff !important;
+  border: 1px solid var(--ff-line) !important;
+  color: #718096 !important;
+  font-size: 10.5px !important;
+  line-height: 1 !important;
+  font-weight: 900 !important;
+}
+
+/* Dialog 패널 내부에서 가로 넘침이 생기지 않도록 안정화 */
+.ff-dialog-panel {
+  overflow-x: hidden !important;
+}
+
+/* 반응형 */
+@media (max-width: 1180px) {
+  .ff-services-premium-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .ff-services-mockup-head {
+    grid-template-columns: 1fr !important;
+  }
+
+  .ff-services-mockup-card {
+    flex-basis: 276px !important;
+    width: 276px !important;
+    min-width: 276px !important;
+    max-width: 276px !important;
+  }
+
+  .ff-service-device {
+    height: 530px !important;
+  }
+}
+
+@media (max-width: 720px) {
+  .ff-services-premium-card-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .ff-services-mockup-preview {
+    padding: 24px !important;
+  }
+
+  .ff-services-mockup-card {
+    flex-basis: 256px !important;
+    width: 256px !important;
+    min-width: 256px !important;
+    max-width: 256px !important;
+  }
+
+  .ff-service-device {
+    height: 510px !important;
+  }
+
+  .ff-services-mockup-tooltip {
+    left: 0 !important;
+    width: min(330px, calc(100vw - 48px)) !important;
+    transform: translate(0, 8px) !important;
+  }
+
+  .ff-services-mockup-guide:hover .ff-services-mockup-tooltip {
+    transform: translate(0, 0) !important;
+  }
+
+  .ff-services-mockup-tooltip::after {
+    left: 34px !important;
+  }
+}

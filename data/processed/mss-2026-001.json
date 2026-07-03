@@ -1,0 +1,22 @@
+{
+  "policy_id": "mss-2026-001",
+  "title": "2026년 정부형 스마트공장 구축 지원사업",
+  "organization": "중소벤처기업부",
+  "max_amount": 20000,
+  "deadline": null,
+  "deadline_note": "2025년 11월~2026년 1월 신청접수 예정",
+  "industry_codes": [
+    "C24",
+    "C25",
+    "C22",
+    "C29"
+  ],
+  "region": null,
+  "url": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000116022",
+  "summary": "국내 중소·중견 제조기업의 제조공정 최적화를 위해 스마트공장 솔루션, 자동화장비, 제어기, 센서 구축을 지원. 최대 2억원.",
+  "max_employee_count": null,
+  "min_revenue": null,
+  "max_revenue": null,
+  "policy_category": "스마트공장",
+  "policy_subcategory": "정부형 스마트공장"
+}

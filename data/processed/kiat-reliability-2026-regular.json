@@ -1,0 +1,22 @@
+{
+  "policy_id": "kiat-reliability-2026-regular",
+  "title": "2026년도 신뢰성기반활용지원사업 정기형",
+  "organization": "한국산업기술진흥원",
+  "max_amount": 15000,
+  "deadline": "2026-03-06",
+  "deadline_note": "2026년 3월 6일 18:00 신청완료 마감",
+  "policy_category": "신뢰성기반활용",
+  "policy_subcategory": "정기형 바우처",
+  "industry_codes": [
+    "C24",
+    "C25",
+    "C22",
+    "C29"
+  ],
+  "region": null,
+  "url": "https://www.motir.go.kr/kor/article/ATCL2826a2625/70822/view",
+  "summary": "국내 소재부품기업을 대상으로 연구개발기관의 시설·장비와 전문 서비스를 활용하여 신뢰성 및 소재 성능 향상을 지원. 정기형 Track 기술사업화·국산화는 최대 1.5억원, 기술개선·고도화는 최대 1.2억원.",
+  "max_employee_count": null,
+  "min_revenue": null,
+  "max_revenue": null
+}

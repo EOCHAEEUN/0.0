@@ -1,0 +1,22 @@
+{
+  "policy_id": "mss-2026-013",
+  "title": "2026년 자동화공정 구축 지원사업",
+  "organization": "국가뿌리산업진흥센터",
+  "max_amount": 9500,
+  "deadline": null,
+  "deadline_note": "2025년 12월~2026년 1월 신청접수 예정",
+  "industry_codes": [
+    "C24",
+    "C25",
+    "C22",
+    "C29"
+  ],
+  "region": null,
+  "url": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000116022",
+  "summary": "제조기업의 생산성 제고와 인력 부족 해소를 위해 노동부하가 높은 수작업 공정을 대상으로 자동화설비 구축을 지원. 최대 9,500만원.",
+  "max_employee_count": null,
+  "min_revenue": null,
+  "max_revenue": null,
+  "policy_category": "제조로봇/자동화공정",
+  "policy_subcategory": "자동화공정 구축"
+}

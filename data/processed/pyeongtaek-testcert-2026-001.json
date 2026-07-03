@@ -1,0 +1,22 @@
+{
+  "policy_id": "pyeongtaek-testcert-2026-001",
+  "title": "2026년 평택시 시험·인증 지원사업",
+  "organization": "평택산업진흥원",
+  "max_amount": null,
+  "deadline": "2026-04-09",
+  "deadline_note": "2026년 4월 9일 마감",
+  "policy_category": "신뢰성기반활용",
+  "policy_subcategory": "시험·분석·성능평가·인증",
+  "industry_codes": [
+    "C24",
+    "C25",
+    "C22",
+    "C29"
+  ],
+  "region": "경기도 평택시",
+  "url": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000119460",
+  "summary": "평택 관내 중소 제조기업을 대상으로 제품 시험·분석, 성능·품질 검사·평가 및 인증 취득에 소요되는 비용을 지원.",
+  "max_employee_count": null,
+  "min_revenue": null,
+  "max_revenue": null
+}

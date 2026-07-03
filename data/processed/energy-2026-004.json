@@ -1,0 +1,19 @@
+{
+  "policy_id": "energy-2026-004",
+  "title": "전동식 사출성형기 지원",
+  "organization": "한국전력공사",
+  "max_amount": null,
+  "deadline": null,
+  "deadline_note": "예산 소진 시까지",
+  "industry_codes": [
+    "C22"
+  ],
+  "region": null,
+  "url": "https://www.welfarehello.com/policy/c53b93d3-94d2-41fa-ac77-da17932398e8",
+  "summary": "유압·하이브리드 사출성형기 보유 사업장을 대상으로 전동식 사출성형기 교체를 지원. 플라스틱 성형업과 직접 관련성이 높음.",
+  "max_employee_count": null,
+  "min_revenue": null,
+  "max_revenue": null,
+  "policy_category": "에너지효율",
+  "policy_subcategory": "전동식 사출성형기"
+}

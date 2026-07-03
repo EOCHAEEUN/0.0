@@ -1,0 +1,22 @@
+{
+  "policy_id": "mss-2026-017",
+  "title": "2026년 AI 응용제품 신속 상용화 지원사업",
+  "organization": "중소벤처기업부",
+  "max_amount": 300000,
+  "deadline": null,
+  "deadline_note": "2026년 1월 신청접수 예정",
+  "industry_codes": [
+    "C24",
+    "C25",
+    "C22",
+    "C29"
+  ],
+  "region": null,
+  "url": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000116022",
+  "summary": "중소 제조현장의 AI 전환을 촉진하기 위해 공정혁신형, 지역주력산업형, 수요형 AI 제품·서비스 상용화를 지원. 최대 30억원.",
+  "max_employee_count": null,
+  "min_revenue": null,
+  "max_revenue": null,
+  "policy_category": "제조데이터/제조AI",
+  "policy_subcategory": "AI 응용제품 신속 상용화"
+}

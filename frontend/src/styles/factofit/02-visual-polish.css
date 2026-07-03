@@ -1,0 +1,250 @@
+/* ===== Manufacturing + MOTIE mood upgrade: UX preserved ===== */
+
+/* 1) Hero: make the first screen feel like an industrial motion scene */
+.hero{
+  position:relative !important;
+  isolation:isolate;
+  background:
+    linear-gradient(90deg,rgba(6,27,52,.96) 0%,rgba(6,27,52,.88) 44%,rgba(6,27,52,.60) 100%),
+    url('https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=1900&q=84') !important;
+  background-size:cover !important;
+  background-position:center !important;
+  overflow:hidden !important;
+}
+
+
+.hero::after{
+  content:'';
+  position:absolute;
+  inset:auto -20% -35% -20%;
+  height:48%;
+  z-index:0;
+  pointer-events:none;
+  background:radial-gradient(circle,rgba(0,71,160,.30),rgba(0,71,160,0) 68%) !important;
+}
+.hero-inner{position:relative;z-index:2}
+.hero-proof{
+  position:relative;
+  z-index:2;
+  border:1px solid rgba(255,255,255,.22) !important;
+  background:rgba(6,27,52,.26) !important;
+  box-shadow:0 28px 70px rgba(0,0,0,.22);
+}
+.hero-proof div{
+  background:rgba(255,255,255,.10) !important;
+}
+
+
+
+/* 2) Section watermarks: add subtle CAD / factory blueprint feeling without changing layout */
+.section,
+.diagnosis-accordion-section{
+  position:relative;
+  overflow:hidden;
+}
+.section > .container,
+.diagnosis-accordion{
+  position:relative;
+  z-index:1;
+}
+
+
+
+
+
+
+
+
+
+/* 3) B2B industrial card polish: stronger hierarchy, still same UX */
+.card,
+.summary-hero-card,
+.summary-signal,
+.policy-card,
+.policy-stat,
+.month-card,
+.roi-result-card,
+.ai-reason-card,
+.evidence-card,
+.application-accordion,
+.diagnosis-accordion,
+.safety-score-card,
+.safety-status-card{
+  border-color:#D8E1EC !important;
+}
+.card:hover,
+.policy-card:hover,
+.month-card:hover,
+.summary-signal:hover,
+.safety-status-card:hover{
+  transform:translateY(-2px);
+  box-shadow:0 22px 54px rgba(6,27,52,.12) !important;
+  transition:transform .18s ease, box-shadow .18s ease;
+}
+.summary-hero-card,
+.roi-result-card{
+  box-shadow:0 28px 74px rgba(6,27,52,.14) !important;
+}
+.ai-reason-card,
+.safety-score-card{
+  background:
+    linear-gradient(135deg,rgba(255,255,255,.07),rgba(255,255,255,0) 38%),
+    linear-gradient(180deg,var(--navy),#071D39) !important;
+}
+
+/* 4) Data numbers: subtle count-up / pop-in motion for presentation feel */
+.hero-proof b,
+.summary-kpi b,
+.policy-stat b,
+.roi-number b,
+.ready-score b,
+.safety-score-card b,
+.safety-status-card b,
+.month-card b{
+  animation:dataPop .7s cubic-bezier(.2,.8,.2,1) both;
+}
+@keyframes dataPop{
+  0%{opacity:0;transform:translateY(10px) scale(.96);filter:blur(2px)}
+  100%{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}
+}
+
+/* 5) Industrial line accents: clearer section separation */
+.section-head{
+  position:relative;
+}
+.section-head::after{
+  content:'';
+  position:absolute;
+  left:0;
+  bottom:-20px;
+  width:96px;
+  height:3px;
+  border-radius:999px;
+  background:linear-gradient(90deg,var(--blue),rgba(0,71,160,0));
+}
+.screen-tag{
+  box-shadow:0 10px 22px rgba(6,27,52,.16);
+}
+
+/* 6) Floating chatbot: more premium industrial service button */
+.chat-button{
+  background:linear-gradient(135deg,#D08A3D,#B86E21) !important;
+  box-shadow:0 18px 42px rgba(119,72,25,.34),0 0 0 8px rgba(208,138,61,.10) !important;
+}
+.chat-box{
+  border-color:#D8E1EC !important;
+}
+
+/* 7) Keep motion accessibility sane */
+@media (prefers-reduced-motion: reduce){
+  
+
+}
+
+
+/* ===== Background-only correction: clean enterprise B2B style ===== */
+:root{
+  --bg:#F8FAFC;
+  --bg-soft:#F1F5F9;
+  --surface:#FFFFFF;
+  --hero-solid:#061B34;
+}
+
+/* Entire page: remove visual noise, keep calm enterprise canvas */
+body{
+  background:#F8FAFC !important;
+}
+.page{
+  background:#F8FAFC !important;
+}
+
+/* Hero: solid, heavy navy without photo, grid, animated sweep, or watermark */
+.hero{
+  background:var(--hero-solid) !important;
+  background-image:none !important;
+}
+.hero::before,
+.hero::after{
+  content:none !important;
+  display:none !important;
+  background:none !important;
+  animation:none !important;
+}
+
+/* Solid section separation using only surface and cool-gray planes */
+.diagnosis-accordion-section{
+  background:#F8FAFC !important;
+}
+.service-nav{
+  background:rgba(255,255,255,.92) !important;
+}
+.section{
+  background:#F8FAFC !important;
+}
+.section.white,
+#screen01,
+#screen03{
+  background:#FFFFFF !important;
+}
+#screen02,
+#screen04{
+  background:#F1F5F9 !important;
+}
+
+/* Remove all decorative pseudo backgrounds / text watermarks */
+.section::before,
+.section::after,
+.diagnosis-accordion-section::before,
+.diagnosis-accordion-section::after,
+#screen01::before,
+#screen01::after,
+#screen02::before,
+#screen02::after,
+#screen03::before,
+#screen03::after,
+#screen04::before,
+#screen04::after{
+  content:none !important;
+  display:none !important;
+  background:none !important;
+  animation:none !important;
+}
+
+/* Preserve components but make them sit clearly on solid background planes */
+.card,
+.summary-hero-card,
+.summary-signal,
+.month-card,
+.policy-card,
+.policy-stat,
+.roi-result-card,
+.ai-reason-card,
+.evidence-card,
+.application-accordion,
+.diagnosis-accordion,
+.safety-score-card,
+.safety-status-card,
+.ready-card,
+.draft-preview-card{
+  background:#FFFFFF !important;
+}
+.ai-reason-card,
+.safety-score-card{
+  background:var(--navy) !important;
+}
+
+/* Keep Hero proof area clean and calm */
+.hero-proof{
+  background:rgba(255,255,255,.10) !important;
+  border-color:rgba(255,255,255,.18) !important;
+}
+.hero-proof div{
+  background:rgba(255,255,255,.06) !important;
+}
+
+/* Ensure no leftover CSS animation affects background */
+*{
+  animation-name:none;
+}
+
+

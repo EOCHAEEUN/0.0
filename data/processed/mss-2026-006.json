@@ -1,0 +1,22 @@
+{
+  "policy_id": "mss-2026-006",
+  "title": "2026년 자율형공장 구축 지원사업",
+  "organization": "중소벤처기업부",
+  "max_amount": 60000,
+  "deadline": null,
+  "deadline_note": "2025년 11월~2026년 1월 신청접수 예정",
+  "industry_codes": [
+    "C24",
+    "C25",
+    "C22",
+    "C29"
+  ],
+  "region": null,
+  "url": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000116022",
+  "summary": "AI·디지털트윈 기반 실시간 관제, 분석, 예측 등 작업자 개입을 최소화하는 자율형공장 구축을 지원. 최대 2년, 최대 6억원.",
+  "max_employee_count": null,
+  "min_revenue": null,
+  "max_revenue": null,
+  "policy_category": "스마트공장",
+  "policy_subcategory": "자율형공장"
+}

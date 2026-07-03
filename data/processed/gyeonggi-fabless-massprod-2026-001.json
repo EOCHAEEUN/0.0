@@ -1,0 +1,20 @@
+{
+  "policy_id": "gyeonggi-fabless-massprod-2026-001",
+  "title": "2026년 경기도 팹리스 수요연계 양산지원 사업 양산성능평가",
+  "organization": "차세대융합기술연구원",
+  "max_amount": 30000,
+  "deadline": "2026-03-13",
+  "deadline_note": "2026년 3월 13일 18:00 마감",
+  "policy_category": "양산성능평가",
+  "policy_subcategory": "수요처 연계 양산성능평가",
+  "industry_codes": [
+    "C26",
+    "C29"
+  ],
+  "region": "경기도 소재 팹리스 기업",
+  "url": "https://thevc.kr/grants/77b4c48e49f55bea2721b261",
+  "summary": "경기도 소재 팹리스 기업을 주관기관으로 하여 양산성능 평가·검증, 인증 획득, 수율 개선, 공정 최적화 등 사업화 연계 비용을 지원. 과제당 최대 3억원.",
+  "max_employee_count": null,
+  "min_revenue": null,
+  "max_revenue": null
+}

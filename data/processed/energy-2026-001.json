@@ -1,0 +1,21 @@
+{
+  "policy_id": "energy-2026-001",
+  "title": "에너지효율시장 조성사업",
+  "organization": "한국에너지공단",
+  "max_amount": 30000,
+  "deadline": "2026-04-10",
+  "deadline_note": "2026년 4월 10일 18:00 마감",
+  "industry_codes": [
+    "C24",
+    "C25",
+    "C22"
+  ],
+  "region": null,
+  "url": "https://www.energy.or.kr/front/conts/105002004002000.do",
+  "summary": "중소·중견기업 사업장을 대상으로 고효율 설비·시스템 설치와 절감량 성과 계측을 지원. 최대 3억원.",
+  "max_employee_count": null,
+  "min_revenue": null,
+  "max_revenue": null,
+  "policy_category": "에너지효율",
+  "policy_subcategory": "에너지효율시장 조성"
+}

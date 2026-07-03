@@ -1,0 +1,105 @@
+/* Sustainability 이미지 배경 업그레이드 */
+
+/* =========================================================
+   FactoFit MainPage - SUSTAINABILITY image background upgrade
+   적용 위치: frontend/src/pages/MainPage.css 맨 아래에 추가
+   이미지 경로:
+   - /images/sustainability-road.jpg
+
+   목적:
+   - 기존 UX/UI, 문구, 레이아웃, 버튼 유지
+   - 왼쪽 지속가능경영 이미지 영역에만 사진 배경 추가
+   - 네이비 그라데이션으로 기존 톤 유지
+   ========================================================= */
+
+/* SUSTAINABILITY 왼쪽 이미지 영역: 기존 크기/배치 유지 + 사진만 추가 */
+.ff-sustainability-media {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(6, 27, 52, 0.08) 0%,
+      rgba(6, 27, 52, 0.26) 38%,
+      rgba(6, 27, 52, 0.68) 76%,
+      rgba(6, 27, 52, 0.9) 100%
+    ),
+    linear-gradient(
+      90deg,
+      rgba(6, 27, 52, 0.22) 0%,
+      rgba(6, 27, 52, 0.08) 48%,
+      rgba(6, 27, 52, 0.18) 100%
+    ),
+    url("/images/sustainability-road.jpg") !important;
+  background-size: cover !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
+}
+
+/* 이미지가 너무 자연/여행 느낌으로 튀지 않게 FactoFit 네이비 톤으로 묶기 */
+.ff-sustainability-media::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      circle at 28% 78%,
+      rgba(201, 151, 63, 0.18) 0%,
+      rgba(201, 151, 63, 0) 34%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(6, 27, 52, 0.02) 0%,
+      rgba(6, 27, 52, 0.2) 48%,
+      rgba(6, 27, 52, 0.72) 100%
+    );
+}
+
+/* 기존 문구/버튼이 사진 위에서 안정적으로 보이도록 레이어만 올림 */
+.ff-sustainability-media > div {
+  position: relative;
+  z-index: 1;
+}
+
+/* 기존 글자체/사이즈 유지, 사진 위 가독성만 보강 */
+.ff-sustainability-media h3 {
+  text-shadow: 0 14px 36px rgba(0, 0, 0, 0.38);
+}
+
+.ff-sustainability-media button {
+  backdrop-filter: blur(8px);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.16);
+  transition:
+    transform 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.ff-sustainability-media button:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.52);
+}
+
+/* 모바일에서도 이미지가 너무 흐려지거나 글씨가 묻히지 않도록 */
+@media (max-width: 900px) {
+  .ff-sustainability-media {
+    min-height: 520px;
+    background-position: center center !important;
+  }
+}
+
+@media (max-width: 560px) {
+  .ff-sustainability-media {
+    min-height: 460px;
+    padding: 42px 28px;
+  }
+
+  .ff-sustainability-media h3 {
+    font-size: 32px;
+    letter-spacing: -1.4px;
+  }
+}

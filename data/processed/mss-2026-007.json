@@ -1,0 +1,22 @@
+{
+  "policy_id": "mss-2026-007",
+  "title": "2026년 제조AI특화 스마트공장 지원사업",
+  "organization": "중소벤처기업부",
+  "max_amount": 20000,
+  "deadline": null,
+  "deadline_note": "2026년 3월~4월 신청접수 예정",
+  "industry_codes": [
+    "C24",
+    "C25",
+    "C22",
+    "C29"
+  ],
+  "region": null,
+  "url": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000116022",
+  "summary": "AI에이전트, 온디바이스AI 등을 활용해 공정최적화와 예측유지보수를 지원하는 AI 스마트공장 구축 지원. 최대 2억원.",
+  "max_employee_count": null,
+  "min_revenue": null,
+  "max_revenue": null,
+  "policy_category": "제조데이터/제조AI",
+  "policy_subcategory": "제조AI특화 스마트공장"
+}

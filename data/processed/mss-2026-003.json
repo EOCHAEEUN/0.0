@@ -1,0 +1,22 @@
+{
+  "policy_id": "mss-2026-003",
+  "title": "2026년 지역특화형 스마트공장 구축 지원사업",
+  "organization": "중소벤처기업부",
+  "max_amount": 20000,
+  "deadline": null,
+  "deadline_note": "2026년 2월~3월 신청접수 예정",
+  "industry_codes": [
+    "C24",
+    "C25",
+    "C22",
+    "C29"
+  ],
+  "region": "지역특화형 사업 참여 지자체 소재 제조기업",
+  "url": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000116022",
+  "summary": "지역 특화산업 육성과 지역 현안 해결을 위해 지자체와 정부가 매칭하여 스마트공장 구축을 지원. 고도화 기준 최대 2억원.",
+  "max_employee_count": null,
+  "min_revenue": null,
+  "max_revenue": null,
+  "policy_category": "스마트공장",
+  "policy_subcategory": "지역특화형 스마트공장"
+}

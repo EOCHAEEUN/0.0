@@ -1,0 +1,919 @@
+/* Why FactoFit 프리미엄 다이얼로그 v1~v3 */
+
+/* =========================================================
+   WHY FACTOFIT Dialog - Premium redesign
+   목적:
+   - 헤더 클릭 팝업 중 Why FactoFit만 고급 SaaS 소개 섹션으로 개선
+   - MainPage, Services, Dashboard, Support 팝업 구조는 변경하지 않음
+   ========================================================= */
+
+.ff-why-premium-dialog {
+  display: grid;
+  gap: 26px;
+  padding-bottom: 4px;
+}
+
+.ff-why-premium-hero {
+  position: relative;
+  overflow: hidden;
+  min-height: 410px;
+  border-radius: 34px;
+  background:
+    radial-gradient(circle at 82% 24%, rgba(204, 232, 183, 0.25), transparent 28%),
+    radial-gradient(circle at 76% 78%, rgba(201, 151, 63, 0.22), transparent 30%),
+    linear-gradient(135deg, #061b34 0%, #132846 48%, #2f3b57 100%);
+  color: #ffffff;
+  padding: 50px 54px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) 0.92fr;
+  gap: 46px;
+  align-items: center;
+  box-shadow: 0 28px 78px rgba(6, 27, 52, 0.22);
+}
+
+.ff-why-premium-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.08), transparent 42%),
+    repeating-linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.045) 0,
+      rgba(255, 255, 255, 0.045) 1px,
+      transparent 1px,
+      transparent 18px
+    );
+  opacity: 0.7;
+}
+
+.ff-why-premium-hero-copy,
+.ff-why-premium-hero-panel {
+  position: relative;
+  z-index: 1;
+}
+
+.ff-why-premium-hero .ff-gold-line {
+  margin-bottom: 20px;
+}
+
+.ff-why-premium-hero .ff-section-label {
+  color: #cce8b7;
+  margin-bottom: 24px;
+}
+
+.ff-why-premium-hero h2 {
+  color: #ffffff;
+  font-size: clamp(40px, 3.7vw, 62px);
+  line-height: 1.12;
+  letter-spacing: -2.7px;
+  font-weight: 900;
+  margin: 0 0 26px;
+}
+
+.ff-why-premium-hero-copy p {
+  color: #d8e4f2;
+  font-size: 17px;
+  line-height: 1.82;
+  font-weight: 900;
+  max-width: 700px;
+  margin: 0;
+}
+
+.ff-why-premium-hero-copy p + p {
+  margin-top: 14px;
+  color: #ffffff;
+}
+
+.ff-why-premium-hero-panel {
+  min-height: 310px;
+  border-radius: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.08)),
+    rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  padding: 28px;
+  display: grid;
+  align-content: end;
+  gap: 14px;
+}
+
+.ff-why-premium-orbit {
+  position: absolute;
+  inset: 26px 28px auto auto;
+  width: 176px;
+  height: 176px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.16) 0 30%, transparent 31%),
+    conic-gradient(
+      from 120deg,
+      rgba(204, 232, 183, 0.42),
+      rgba(201, 151, 63, 0.34),
+      rgba(77, 87, 184, 0.4),
+      rgba(204, 232, 183, 0.42)
+    );
+}
+
+.ff-why-premium-orbit span {
+  position: absolute;
+  height: 30px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: var(--ff-navy);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 1.4px;
+  box-shadow: 0 10px 28px rgba(6, 27, 52, 0.18);
+}
+
+.ff-why-premium-orbit span:nth-child(1) {
+  left: -14px;
+  top: 44px;
+}
+
+.ff-why-premium-orbit span:nth-child(2) {
+  right: -28px;
+  top: 86px;
+}
+
+.ff-why-premium-orbit span:nth-child(3) {
+  left: 58px;
+  bottom: -14px;
+}
+
+.ff-why-premium-signal-card {
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--ff-navy);
+  padding: 22px 24px;
+  box-shadow: 0 20px 52px rgba(6, 27, 52, 0.22);
+}
+
+.ff-why-premium-signal-card small {
+  display: block;
+  color: var(--ff-blue);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 2.6px;
+  margin-bottom: 10px;
+}
+
+.ff-why-premium-signal-card strong {
+  display: block;
+  color: var(--ff-navy);
+  font-size: 42px;
+  line-height: 1;
+  letter-spacing: -1.6px;
+  font-weight: 900;
+  margin-bottom: 8px;
+}
+
+.ff-why-premium-signal-card span {
+  color: var(--ff-muted);
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 900;
+}
+
+.ff-why-premium-value-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+}
+
+.ff-why-premium-value-card {
+  min-height: 232px;
+  border-radius: 28px;
+  border: 1px solid var(--ff-line);
+  background:
+    linear-gradient(180deg, #ffffff 0%, #ffffff 62%, #f8fafc 100%);
+  padding: 28px 24px;
+  box-shadow: 0 16px 46px rgba(6, 27, 52, 0.055);
+}
+
+.ff-why-premium-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.ff-why-premium-card-top span {
+  color: var(--ff-blue);
+  font-size: 25px;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: -0.6px;
+}
+
+.ff-why-premium-card-top small {
+  color: #98a2b3;
+  font-size: 10px;
+  line-height: 1.2;
+  font-weight: 900;
+  letter-spacing: 1.6px;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.ff-why-premium-value-card h3 {
+  color: var(--ff-navy);
+  font-size: 21px;
+  line-height: 1.28;
+  letter-spacing: -0.8px;
+  font-weight: 900;
+  margin: 0 0 14px;
+}
+
+.ff-why-premium-value-card p {
+  color: var(--ff-muted);
+  font-size: 14px;
+  line-height: 1.72;
+  font-weight: 900;
+  margin: 0;
+}
+
+.ff-why-premium-flow {
+  border-radius: 32px;
+  border: 1px solid var(--ff-line);
+  background: #f8fafc;
+  padding: 24px;
+  display: grid;
+  grid-template-columns: 1fr 64px 1fr;
+  gap: 18px;
+  align-items: stretch;
+}
+
+.ff-why-premium-flow-card {
+  border-radius: 26px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  padding: 28px 30px;
+  min-height: 170px;
+  display: grid;
+  align-content: center;
+}
+
+.ff-why-premium-flow-card span {
+  display: inline-flex;
+  width: fit-content;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  align-items: center;
+  background: #eef4ff;
+  color: var(--ff-blue);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 1.2px;
+  margin-bottom: 18px;
+}
+
+.ff-why-premium-flow-card h3 {
+  color: var(--ff-navy);
+  font-size: 24px;
+  line-height: 1.25;
+  letter-spacing: -0.9px;
+  font-weight: 900;
+  margin: 0 0 12px;
+}
+
+.ff-why-premium-flow-card p {
+  color: var(--ff-muted);
+  font-size: 15px;
+  line-height: 1.75;
+  font-weight: 900;
+  margin: 0;
+}
+
+.ff-why-premium-flow-card.is-after {
+  background:
+    radial-gradient(circle at 90% 12%, rgba(204, 232, 183, 0.38), transparent 28%),
+    linear-gradient(135deg, #ffffff 0%, #f7fbf5 100%);
+  border-color: rgba(90, 141, 94, 0.24);
+}
+
+.ff-why-premium-flow-card.is-after span {
+  background: #eef8ea;
+  color: #3b8b62;
+}
+
+.ff-why-premium-flow-arrow {
+  width: 64px;
+  border-radius: 22px;
+  background: var(--ff-navy);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+  font-weight: 900;
+}
+
+@media (max-width: 1180px) {
+  .ff-why-premium-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .ff-why-premium-hero-panel {
+    min-height: 260px;
+  }
+
+  .ff-why-premium-value-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .ff-why-premium-flow {
+    grid-template-columns: 1fr;
+  }
+
+  .ff-why-premium-flow-arrow {
+    width: 100%;
+    height: 52px;
+  }
+}
+
+@media (max-width: 720px) {
+  .ff-why-premium-hero {
+    padding: 36px 28px;
+  }
+
+  .ff-why-premium-hero h2 {
+    font-size: 36px;
+  }
+
+  .ff-why-premium-value-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* =========================================================
+   WHY FACTOFIT Dialog - Premium v2 refinement
+   개선 내용:
+   - 제목 타이포그래피 크기와 줄바꿈 안정화
+   - ROI / POLICY / DATA hover tooltip 추가
+   - 오른쪽 패널 은은한 홀로그램 hover
+   - 기존 방식 → FactoFit 방식 화살표를 가벼운 전환 브릿지로 변경
+   ========================================================= */
+
+.ff-why-premium-dialog {
+  gap: 24px;
+}
+
+.ff-why-premium-hero {
+  min-height: 390px;
+  padding: 48px 54px;
+  grid-template-columns: minmax(0, 1.14fr) minmax(390px, 0.86fr);
+  gap: 42px;
+  align-items: center;
+}
+
+.ff-why-premium-hero-copy {
+  max-width: 760px;
+}
+
+.ff-why-premium-hero .ff-gold-line {
+  width: 136px;
+  height: 4px;
+  margin-bottom: 22px;
+}
+
+.ff-why-premium-hero .ff-section-label {
+  font-size: 12px;
+  letter-spacing: 5px;
+  margin-bottom: 28px;
+}
+
+.ff-why-premium-hero h2 {
+  max-width: 760px;
+  color: #ffffff;
+  font-size: clamp(38px, 2.75vw, 54px);
+  line-height: 1.18;
+  letter-spacing: -2.1px;
+  word-break: keep-all;
+  text-wrap: balance;
+  margin-bottom: 28px;
+}
+
+.ff-why-premium-hero-copy p {
+  max-width: 720px;
+  color: #d8e4f2;
+  font-size: clamp(15px, 0.92vw, 17px);
+  line-height: 1.86;
+  letter-spacing: -0.035em;
+  font-weight: 900;
+}
+
+.ff-why-premium-hero-copy p + p {
+  margin-top: 12px;
+}
+
+.ff-why-premium-hero-panel {
+  position: relative;
+  min-height: 300px;
+  max-width: 520px;
+  justify-self: end;
+  transition:
+    transform 0.28s ease,
+    box-shadow 0.28s ease,
+    border-color 0.28s ease;
+}
+
+.ff-why-premium-hero-panel::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      120deg,
+      transparent 0%,
+      rgba(204, 232, 183, 0.22) 24%,
+      rgba(255, 255, 255, 0.24) 36%,
+      transparent 52%
+    );
+  opacity: 0;
+  transform: translateX(-18%);
+  transition:
+    opacity 0.28s ease,
+    transform 0.72s ease;
+}
+
+.ff-why-premium-hero-panel:hover {
+  transform: translateY(-4px);
+  border-color: rgba(204, 232, 183, 0.32);
+  box-shadow:
+    0 26px 70px rgba(6, 27, 52, 0.26),
+    0 0 38px rgba(204, 232, 183, 0.13);
+}
+
+.ff-why-premium-hero-panel:hover::before {
+  opacity: 1;
+  transform: translateX(16%);
+}
+
+.ff-why-premium-signal-card {
+  position: relative;
+  z-index: 2;
+  transition:
+    transform 0.24s ease,
+    box-shadow 0.24s ease;
+}
+
+.ff-why-premium-hero-panel:hover .ff-why-premium-signal-card:first-of-type {
+  transform: translateY(-2px);
+}
+
+.ff-why-premium-hero-panel:hover .ff-why-premium-signal-card:last-of-type {
+  transform: translateY(2px);
+}
+
+.ff-why-premium-orbit {
+  z-index: 3;
+  transition:
+    transform 0.5s ease,
+    filter 0.3s ease;
+}
+
+.ff-why-premium-hero-panel:hover .ff-why-premium-orbit {
+  transform: rotate(3deg) scale(1.025);
+  filter: drop-shadow(0 0 22px rgba(204, 232, 183, 0.2));
+}
+
+.ff-why-premium-token {
+  position: absolute;
+  cursor: default;
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    background 0.22s ease;
+}
+
+.ff-why-premium-token::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 12px);
+  z-index: 5;
+  width: max-content;
+  max-width: 250px;
+  padding: 10px 13px;
+  border-radius: 14px;
+  background: rgba(6, 27, 52, 0.96);
+  color: #ffffff;
+  font-size: 11px;
+  line-height: 1.45;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  white-space: normal;
+  text-align: center;
+  box-shadow: 0 16px 34px rgba(6, 27, 52, 0.24);
+  opacity: 0;
+  transform: translate(-50%, -4px);
+  pointer-events: none;
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+
+.ff-why-premium-token::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 4px);
+  z-index: 6;
+  width: 10px;
+  height: 10px;
+  background: rgba(6, 27, 52, 0.96);
+  opacity: 0;
+  transform: translateX(-50%) rotate(45deg);
+  transition: opacity 0.18s ease;
+}
+
+.ff-why-premium-token:hover {
+  transform: translateY(-4px) scale(1.05);
+  background: #ffffff;
+  box-shadow:
+    0 14px 30px rgba(6, 27, 52, 0.22),
+    0 0 24px rgba(204, 232, 183, 0.22);
+}
+
+.ff-why-premium-token:hover::after,
+.ff-why-premium-token:hover::before {
+  opacity: 1;
+}
+
+.ff-why-premium-token.is-policy::after {
+  left: auto;
+  right: 0;
+  transform: translate(0, -4px);
+}
+
+.ff-why-premium-token.is-policy:hover::after {
+  transform: translate(0, 0);
+}
+
+.ff-why-premium-token.is-policy::before {
+  left: auto;
+  right: 24px;
+  transform: rotate(45deg);
+}
+
+.ff-why-premium-value-card {
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
+}
+
+.ff-why-premium-value-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(77, 87, 184, 0.22);
+  box-shadow: 0 22px 54px rgba(6, 27, 52, 0.08);
+}
+
+.ff-why-premium-flow {
+  grid-template-columns: minmax(0, 1fr) 76px minmax(0, 1fr);
+  gap: 20px;
+  align-items: center;
+}
+
+.ff-why-premium-flow-bridge {
+  position: relative;
+  min-height: 174px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+}
+
+.ff-why-premium-flow-bridge::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 18px;
+  bottom: 18px;
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(77, 87, 184, 0.28),
+    rgba(201, 151, 63, 0.24),
+    transparent
+  );
+}
+
+.ff-why-premium-flow-bridge span {
+  position: relative;
+  z-index: 1;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 72% 22%, rgba(204, 232, 183, 0.9), transparent 36%),
+    linear-gradient(135deg, #ffffff, #eef4ff);
+  color: var(--ff-blue);
+  border: 1px solid rgba(77, 87, 184, 0.18);
+  font-size: 26px;
+  font-weight: 900;
+  box-shadow: 0 14px 36px rgba(6, 27, 52, 0.08);
+}
+
+.ff-why-premium-flow-bridge small {
+  position: relative;
+  z-index: 1;
+  color: #98a2b3;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1.8px;
+}
+
+.ff-why-premium-flow-card {
+  min-height: 174px;
+  padding: 30px 34px;
+}
+
+.ff-why-premium-flow-card h3 {
+  font-size: 23px;
+  letter-spacing: -0.8px;
+}
+
+.ff-why-premium-flow-card p {
+  font-size: 14.5px;
+  line-height: 1.72;
+}
+
+@media (max-width: 1180px) {
+  .ff-why-premium-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .ff-why-premium-hero-panel {
+    max-width: none;
+    justify-self: stretch;
+  }
+
+  .ff-why-premium-flow {
+    grid-template-columns: 1fr;
+  }
+
+  .ff-why-premium-flow-bridge {
+    min-height: 66px;
+  }
+
+  .ff-why-premium-flow-bridge::before {
+    left: 18px;
+    right: 18px;
+    top: 50%;
+    bottom: auto;
+    width: auto;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(77, 87, 184, 0.28),
+      rgba(201, 151, 63, 0.24),
+      transparent
+    );
+  }
+
+  .ff-why-premium-flow-bridge span {
+    width: 54px;
+    height: 54px;
+  }
+}
+
+@media (max-width: 720px) {
+  .ff-why-premium-hero {
+    padding: 34px 26px;
+  }
+
+  .ff-why-premium-hero h2 {
+    font-size: 34px;
+    letter-spacing: -1.4px;
+  }
+
+  .ff-why-premium-hero-copy p {
+    font-size: 14px;
+  }
+
+  .ff-why-premium-orbit {
+    transform: scale(0.82);
+    transform-origin: top right;
+  }
+
+  .ff-why-premium-token::after,
+  .ff-why-premium-token::before {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ff-why-premium-hero-panel,
+  .ff-why-premium-hero-panel::before,
+  .ff-why-premium-orbit,
+  .ff-why-premium-token,
+  .ff-why-premium-value-card,
+  .ff-why-premium-signal-card {
+    transition: none;
+  }
+}
+
+
+/* =========================================================
+   WHY FACTOFIT Dialog - Premium v3 visual fix
+   개선 내용:
+   - 오른쪽 그래픽의 큰 원이 텍스트를 가리는 문제 해결
+   - ROI / POLICY / DATA는 제거하지 않고 상단 시그널 칩으로 정리
+   - hover tooltip 유지
+   - 카드 텍스트 가독성 우선
+   ========================================================= */
+
+.ff-why-premium-hero-panel {
+  min-height: 318px;
+  padding: 26px;
+  display: grid;
+  grid-template-rows: auto 1fr 1fr;
+  align-content: stretch;
+  gap: 14px;
+  overflow: visible;
+}
+
+.ff-why-premium-hero-panel::after {
+  content: "";
+  position: absolute;
+  right: 24px;
+  top: 78px;
+  width: 170px;
+  height: 170px;
+  border-radius: 50%;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.32) 0 18%, transparent 19%),
+    conic-gradient(
+      from 120deg,
+      rgba(111, 103, 200, 0.28),
+      rgba(201, 151, 63, 0.2),
+      rgba(204, 232, 183, 0.2),
+      rgba(111, 103, 200, 0.28)
+    );
+  filter: blur(0.2px);
+  opacity: 0.38;
+  transform: none;
+  transition:
+    opacity 0.26s ease,
+    transform 0.26s ease;
+}
+
+.ff-why-premium-hero-panel:hover::after {
+  opacity: 0.54;
+  transform: scale(1.03) rotate(5deg);
+}
+
+.ff-why-premium-orbit {
+  position: relative;
+  inset: auto;
+  z-index: 5;
+  width: 100%;
+  height: auto;
+  border-radius: 0;
+  border: 0;
+  background: transparent;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  transform: none;
+  filter: none;
+}
+
+.ff-why-premium-hero-panel:hover .ff-why-premium-orbit {
+  transform: none;
+  filter: none;
+}
+
+.ff-why-premium-orbit span,
+.ff-why-premium-token {
+  position: relative;
+  inset: auto !important;
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(247, 250, 252, 0.96));
+  color: var(--ff-navy);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1.8px;
+  box-shadow: 0 12px 28px rgba(6, 27, 52, 0.13);
+  border: 1px solid rgba(226, 232, 240, 0.92);
+}
+
+.ff-why-premium-token.is-roi {
+  color: #4d57b8;
+}
+
+.ff-why-premium-token.is-policy {
+  color: #3b8b62;
+}
+
+.ff-why-premium-token.is-data {
+  color: #9a6b24;
+}
+
+.ff-why-premium-token:hover {
+  transform: translateY(-3px);
+  background: #ffffff;
+  box-shadow:
+    0 16px 32px rgba(6, 27, 52, 0.18),
+    0 0 22px rgba(204, 232, 183, 0.16);
+}
+
+.ff-why-premium-token::after {
+  top: calc(100% + 10px);
+  max-width: 210px;
+  font-size: 10.5px;
+  z-index: 30;
+}
+
+.ff-why-premium-token.is-policy::after {
+  left: 50%;
+  right: auto;
+  transform: translate(-50%, -4px);
+}
+
+.ff-why-premium-token.is-policy:hover::after {
+  transform: translate(-50%, 0);
+}
+
+.ff-why-premium-token.is-policy::before {
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.ff-why-premium-signal-card {
+  z-index: 2;
+  min-height: 108px;
+  padding: 20px 24px;
+  display: grid;
+  align-content: center;
+}
+
+.ff-why-premium-signal-card small {
+  font-size: 10.5px;
+  letter-spacing: 2.4px;
+}
+
+.ff-why-premium-signal-card strong {
+  font-size: 38px;
+}
+
+.ff-why-premium-signal-card span {
+  font-size: 13.5px;
+}
+
+.ff-why-premium-hero-panel:hover .ff-why-premium-signal-card:first-of-type,
+.ff-why-premium-hero-panel:hover .ff-why-premium-signal-card:last-of-type {
+  transform: translateY(-2px);
+}
+
+@media (max-width: 720px) {
+  .ff-why-premium-hero-panel {
+    padding: 22px;
+    grid-template-rows: auto auto auto;
+  }
+
+  .ff-why-premium-orbit {
+    grid-template-columns: 1fr;
+  }
+
+  .ff-why-premium-orbit span,
+  .ff-why-premium-token {
+    height: 36px;
+  }
+
+  .ff-why-premium-hero-panel::after {
+    width: 130px;
+    height: 130px;
+    top: 96px;
+    right: 18px;
+  }
+}
+
+

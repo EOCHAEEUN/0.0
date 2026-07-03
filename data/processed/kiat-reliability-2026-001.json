@@ -1,0 +1,22 @@
+{
+  "policy_id": "kiat-reliability-2026-001",
+  "title": "2026년도 신뢰성기반활용지원사업 수시형 1차",
+  "organization": "한국산업기술진흥원",
+  "max_amount": 2000,
+  "deadline": "2026-05-07",
+  "deadline_note": "2026년 5월 7일 18:00 마감",
+  "policy_category": "신뢰성기반활용",
+  "policy_subcategory": "신뢰성 평가·고장분석·소재 성능평가",
+  "industry_codes": [
+    "C24",
+    "C25",
+    "C22",
+    "C29"
+  ],
+  "region": null,
+  "url": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000120908",
+  "summary": "국내 중소·중견 소재·부품·장비 기업을 대상으로 신뢰성 평가, 고장분석, 평가기반 개발, 물성·성능 분석, 소재 공정 테스트베드 등 연구개발기관의 서비스를 바우처 방식으로 지원. 수시형 1차 기준 기업당 최대 2,000만원.",
+  "max_employee_count": null,
+  "min_revenue": null,
+  "max_revenue": null
+}

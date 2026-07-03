@@ -1,0 +1,243 @@
+/* 기본 반응형 처리 */
+
+@media (max-width: 1200px) {
+  :root {
+    --ff-container: min(100vw - 48px, 100%);
+    --ff-wide: min(100vw - 48px, 100%);
+  }
+
+  .ff-main-nav {
+    display: none;
+  }
+
+  .ff-main-header {
+    padding: 0 24px;
+  }
+
+  .ff-business-card-copy {
+    left: 36px;
+    right: 32px;
+    bottom: 40px;
+  }
+
+  .ff-business-card-copy h3 {
+    font-size: 30px;
+  }
+
+  .ff-dialog-panel {
+    width: 90vw;
+    height: 86vh;
+    padding: 50px 38px;
+  }
+
+  .ff-dashboard-summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .ff-dashboard-summary-card {
+    min-height: 250px;
+  }
+
+  .ff-dashboard-summary-card strong {
+    font-size: 46px;
+  }
+
+  .ff-dashboard-compare-card {
+    padding: 42px;
+  }
+
+  .ff-dashboard-compare-card h3 {
+    font-size: 40px;
+  }
+
+  .ff-dashboard-compare-card ul {
+    font-size: 18px;
+  }
+
+  .ff-dashboard-compare-card-dark {
+    padding-right: 42px;
+  }
+
+  .ff-dashboard-compare-button {
+    position: static;
+    margin-top: 28px;
+    align-self: flex-start;
+  }
+}
+
+@media (max-width: 900px) {
+  .ff-hero-metrics,
+  .ff-business-card-grid,
+  .ff-split-head,
+  .ff-dashboard-summary-grid,
+  .ff-dashboard-compare-shell,
+  .ff-sustainability-head,
+  .ff-sustainability-board,
+  .ff-sustainability-value-grid,
+  .ff-insights-panel,
+  .ff-dialog-title-row,
+  .ff-why-problem-grid,
+  .ff-why-flow-card,
+  .ff-service-flow-row,
+  .ff-service-step-box,
+  .ff-dashboard-dialog-visual-grid,
+  .ff-dashboard-dialog-timeline,
+  .ff-dashboard-dialog-cta,
+  .ff-support-menu-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ff-section-transition span::before,
+  .ff-section-transition span::after {
+    width: 58px;
+  }
+
+  .ff-why-teaser-copy {
+    width: 100%;
+  }
+
+  .ff-why-teaser-section {
+    min-height: 820px;
+    padding: 120px 0;
+  }
+
+  .ff-why-teaser-media {
+    top: 80px;
+    right: -10%;
+    width: 80%;
+    height: 560px;
+    opacity: 0.55;
+  }
+
+  .ff-business-card {
+    height: 420px;
+  }
+
+  .ff-dashboard-summary-shell {
+    padding: 28px;
+  }
+
+  .ff-dashboard-summary-card {
+    min-height: auto;
+  }
+
+  .ff-dashboard-summary-card strong {
+    font-size: 42px;
+  }
+
+  .ff-dashboard-section-gap {
+    height: 72px;
+  }
+
+  .ff-dashboard-compare-card {
+    min-height: auto;
+    padding: 38px 30px;
+  }
+
+  .ff-dashboard-compare-card h3 {
+    font-size: 34px;
+  }
+
+  .ff-dashboard-compare-card ul {
+    padding-left: 24px;
+    font-size: 17px;
+    gap: 16px;
+  }
+
+  .ff-sustainability-value-grid {
+    padding: 52px 32px;
+  }
+
+  .ff-insights-panel {
+    width: min(100vw - 40px, 100%);
+    grid-template-columns: 1fr;
+    padding: 48px 32px;
+    gap: 48px;
+  }
+
+  .ff-insight-chip-grid,
+  .ff-newsletter-form {
+    grid-template-columns: 1fr;
+  }
+
+  .ff-dialog-overlay {
+    padding: 4vh 4vw;
+  }
+
+  .ff-dialog-panel {
+    width: 92vw;
+    height: 88vh;
+    padding: 46px 28px;
+  }
+
+  .ff-dialog-close {
+    margin-top: -26px;
+    margin-right: -16px;
+  }
+
+  .ff-dialog-title-row h2 {
+    font-size: 36px;
+    letter-spacing: -1.8px;
+  }
+
+  .ff-dialog-side-desc {
+    font-size: 16px;
+  }
+
+  .ff-service-step-box {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .ff-main-header {
+    height: 68px;
+  }
+
+  .ff-main-logo-copy strong {
+    font-size: 19px;
+  }
+
+  .ff-main-logo-copy small {
+    font-size: 10px;
+  }
+
+  .ff-main-logo-mark,
+  .ff-main-icon-button {
+    width: 40px;
+    height: 40px;
+  }
+
+  .ff-hero-section {
+    padding: 120px 24px 80px;
+  }
+
+  .ff-hero-content h1 {
+    font-size: 40px;
+    letter-spacing: -2px;
+  }
+
+  .ff-hero-description {
+    font-size: 16px;
+  }
+
+  .ff-why-teaser-section,
+  .ff-business-section,
+  .ff-dashboard-section,
+  .ff-insights-section {
+    padding-top: 90px;
+    padding-bottom: 90px;
+  }
+
+  .ff-why-teaser-copy h2,
+  .ff-split-head h2,
+  .ff-sustainability-head h2,
+  .ff-insights-copy h2 {
+    font-size: 38px;
+    letter-spacing: -1.8px;
+  }
+
+  .ff-main-footer {
+    padding: 42px 24px 34px;
+  }
+}

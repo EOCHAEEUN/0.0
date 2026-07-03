@@ -1,0 +1,22 @@
+{
+  "policy_id": "mss-2026-008",
+  "title": "2026년 대중소 상생형 스마트공장 지원사업",
+  "organization": "중소벤처기업부",
+  "max_amount": 12000,
+  "deadline": null,
+  "deadline_note": "2026년 3월~4월 신청접수 예정",
+  "industry_codes": [
+    "C24",
+    "C25",
+    "C22",
+    "C29"
+  ],
+  "region": null,
+  "url": "https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId=PBLN_000000000116022",
+  "summary": "대기업·중견기업·공공기관 등과 중소·중견기업이 협력하여 스마트공장을 구축할 경우 정부가 구축비 일부를 지원. 최대 1.2억원.",
+  "max_employee_count": null,
+  "min_revenue": null,
+  "max_revenue": null,
+  "policy_category": "스마트공장",
+  "policy_subcategory": "대중소 상생형"
+}

@@ -1,0 +1,21 @@
+{
+  "policy_id": "root-seoul-automation-2026-001",
+  "title": "2026년도 서울시 뿌리기업 자동화 지원사업",
+  "organization": "서울경제진흥원",
+  "max_amount": null,
+  "deadline": null,
+  "deadline_note": "공고문 기준 확인 필요",
+  "policy_category": "설비특화",
+  "policy_subcategory": "뿌리산업·금형·자동화",
+  "industry_codes": [
+    "C24",
+    "C25",
+    "C29"
+  ],
+  "region": "서울특별시",
+  "url": "https://www.bizinfo.go.kr/cmm/fms/fileDown.do?atchFileId=FILE_000000000747260&fileSn=0",
+  "summary": "서울시 뿌리기업과 기계금속 소공인의 노후화된 제조환경에 자동화 공정을 지원하여 생산성 향상을 돕는 사업.",
+  "max_employee_count": null,
+  "min_revenue": null,
+  "max_revenue": null
+}

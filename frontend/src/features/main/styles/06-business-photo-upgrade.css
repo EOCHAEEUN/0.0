@@ -1,0 +1,158 @@
+/* OUR BUSINESS 사진 그라데이션 업그레이드 */
+
+/* =========================================================
+   FactoFit MainPage - OUR BUSINESS photo gradient upgrade
+   적용 위치: frontend/src/pages/MainPage.css 맨 아래에 추가
+   이미지 경로:
+   - /images/business-roi.jpg
+   - /images/business-support.jpg
+   - /images/business-safety.jpg
+   ========================================================= */
+
+/* OUR BUSINESS 카드 3개: 기존 구조/문구/버튼 유지 + 사진 배경 + 하단 그라데이션 */
+.ff-business-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-end !important;
+  text-align: left;
+  background: #061B34 !important;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  box-shadow: 0 18px 42px rgba(6, 27, 52, 0.06);
+  transition:
+    transform 0.28s ease,
+    box-shadow 0.28s ease,
+    border-color 0.28s ease;
+}
+
+/* 이미지 레이어: 카드 전체에 크게 깔림 */
+.ff-business-media {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 0;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  background-size: cover !important;
+  background-position: center center !important;
+  background-repeat: no-repeat !important;
+  transform: scale(1);
+  transition:
+    transform 0.42s ease,
+    filter 0.42s ease;
+  filter: saturate(0.9) contrast(1.05) brightness(0.94);
+}
+
+/* 사진 위 그라데이션: 위 55~60%는 사진이 보이고, 아래 글씨 영역은 진한 네이비 */
+.ff-business-media::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(6, 27, 52, 0.06) 0%,
+      rgba(6, 27, 52, 0.12) 30%,
+      rgba(6, 27, 52, 0.34) 52%,
+      rgba(6, 27, 52, 0.76) 72%,
+      rgba(6, 27, 52, 0.96) 100%
+    );
+  transition: background 0.28s ease;
+}
+
+/* 카드별 사진 */
+.ff-business-media-1 {
+  background-image: url("/images/business-roi.jpg") !important;
+  background-position: 58% center !important;
+}
+
+.ff-business-media-2 {
+  background-image: url("/images/business-support.jpg") !important;
+  background-position: center center !important;
+}
+
+.ff-business-media-3 {
+  background-image: url("/images/business-safety.jpg") !important;
+  background-position: 44% center !important;
+}
+
+/* 텍스트 레이어: 기존 문구/위계 유지, 아래쪽에 안정적으로 배치 */
+.ff-business-card-copy {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  margin-top: auto;
+  color: #FFFFFF;
+  text-shadow: 0 10px 28px rgba(0, 0, 0, 0.34);
+}
+
+/* 기존 글자체/크기 흐름을 유지하되 사진 위에서도 더 선명하게 */
+.ff-business-card-copy span {
+  color: #D7E9FF !important;
+  font-weight: 900;
+}
+
+.ff-business-card-copy h3 {
+  color: #FFFFFF !important;
+  text-shadow: 0 12px 30px rgba(0, 0, 0, 0.36);
+}
+
+.ff-business-card-copy p {
+  color: #E5EEF8 !important;
+  text-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+/* hover: 첨부 레퍼런스처럼 선택된 카드가 또렷하게 보이도록 */
+.ff-business-card:hover {
+  transform: translateY(-8px);
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 34px 74px rgba(6, 27, 52, 0.22);
+}
+
+.ff-business-card:hover .ff-business-media {
+  transform: scale(1.045);
+  filter: saturate(0.98) contrast(1.09) brightness(1.0);
+}
+
+.ff-business-card:hover .ff-business-media::after {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(6, 27, 52, 0.02) 0%,
+      rgba(6, 27, 52, 0.10) 28%,
+      rgba(6, 27, 52, 0.30) 50%,
+      rgba(6, 27, 52, 0.72) 72%,
+      rgba(6, 27, 52, 0.96) 100%
+    );
+}
+
+.ff-business-card:focus-visible {
+  outline: 3px solid rgba(74, 144, 226, 0.78);
+  outline-offset: 4px;
+}
+
+/* 모바일/태블릿에서도 사진이 썸네일처럼 작아지지 않게 유지 */
+@media (max-width: 1024px) {
+  .ff-business-card {
+    min-height: 460px;
+  }
+}
+
+@media (max-width: 720px) {
+  .ff-business-card {
+    min-height: 420px;
+  }
+
+  .ff-business-media::after {
+    background:
+      linear-gradient(
+        180deg,
+        rgba(6, 27, 52, 0.08) 0%,
+        rgba(6, 27, 52, 0.18) 32%,
+        rgba(6, 27, 52, 0.48) 58%,
+        rgba(6, 27, 52, 0.94) 100%
+      );
+  }
+}

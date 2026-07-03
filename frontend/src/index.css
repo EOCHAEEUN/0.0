@@ -51,6 +51,56 @@
   --shadow-deep: 0 16px 48px rgba(6, 27, 52, 0.13);
 
   --radius: 28px;
+
+  /* Stage 1 — foundation aliases (reuse in later stages; no visual change) */
+
+  /* Interaction / surface */
+  --blue-hover: #00377d;
+  --surface-subtle: #F8FAFC;
+  --focus-ring: 0 0 0 4px rgba(0, 71, 160, 0.08);
+
+  /* Spacing scale */
+  --space-4: 4px;
+  --space-8: 8px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-20: 20px;
+  --space-24: 24px;
+  --space-32: 32px;
+  --space-40: 40px;
+  --space-48: 48px;
+  --space-64: 64px;
+
+  /* Radius scale */
+  --radius-small: 8px;
+  --radius-control: 12px;
+  --radius-card: 16px;
+  --radius-large: var(--radius);
+  --radius-pill: 999px;
+
+  /* Border / line */
+  --border-default: 1px solid var(--line);
+  --border-strong: 1px solid var(--line-dark);
+  --border-selected: 2px solid var(--blue);
+
+  /* Shadow / elevation */
+  --shadow-modal: 0 24px 48px rgba(15, 29, 53, 0.18);
+
+  /* Card / surface */
+  --surface-card: var(--card);
+
+  /* Semantic status */
+  --status-success: var(--green);
+  --status-success-soft: var(--green-soft);
+  --status-warning: var(--orange);
+  --status-warning-soft: var(--orange-soft);
+  --status-error: var(--red);
+  --status-error-soft: var(--red-soft);
+  --status-info: var(--blue);
+  --status-info-soft: var(--blue-soft);
+
+  /* Motion */
+  --transition-base: 0.18s ease;
 }
 
 * {

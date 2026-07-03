@@ -599,8 +599,8 @@
   min-height: 250px;
   padding: 18px;
   border: 1px solid #e8edf5;
-  border-radius: 16px;
-  background: #fff;
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
 }
 
@@ -1131,9 +1131,9 @@
   gap: 18px;
   align-items: center;
   padding: 18px 20px;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  background: #fff;
+  border: var(--border-default);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
 }
 
 .ff-support-priority-list-left p,

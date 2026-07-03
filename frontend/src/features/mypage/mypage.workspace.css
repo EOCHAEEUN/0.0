@@ -42,8 +42,8 @@
 }
 
 .ff-mypage-section-card {
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  background: var(--surface-card);
+  border: var(--border-default);
   border-radius: 18px;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
   overflow: hidden;
@@ -271,8 +271,8 @@
 .ff-mypage-status-sidebar {
   position: sticky;
   top: 24px;
-  background: #fff;
-  border: 1px solid #e2e8f0;
+  background: var(--surface-card);
+  border: var(--border-default);
   border-radius: 18px;
   padding: 22px 20px;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);

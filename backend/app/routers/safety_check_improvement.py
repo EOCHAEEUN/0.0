@@ -1,13 +1,14 @@
 """
 Safety Check Improvement 라우터
+- Supabase 클라이언트 방식
+- chat_id 제거, equipment_id + company_id 기준
 - FastAPI 엔드포인트 정의
-- 요청 검증 및 응답 반환
 """
 
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from supabase import Client
 
 from app.core.database import get_db
 from app.models.safety_check_improvement import (
@@ -31,32 +32,26 @@ router = APIRouter(
 @router.post("/create", response_model=SafetyCheckImprovementResponse)
 async def create_safety_check(
     request: SafetyCheckImprovementCreate,
-    db: Session = Depends(get_db),
+    supabase: Client = Depends(get_db),
 ):
     """
     [설비관리 탭] - 근거 등록
     
-    근거 유형을 선택하고 파일을 업로드하면:
-    - inspection_purpose: 근거 유형 (safety_device, maintenance, safety_training)
-    - current_safety_measures: 근거 제목 (사용자 입력)
-    - pdf_file_url: Supabase Storage URL
-    
     Args:
         request: SafetyCheckImprovementCreate
-        - chat_id: 신청서 ID
+        - company_id: 회사 ID (필수)
+        - equipment_id: 설비 ID (필수)
         - inspection_purpose: 점검 목적
-        - current_safety_measures: 근거 제목
+        - current_safety_measures: 현재 상태
         - inspection_pdf_file: PDF 파일명
         - pdf_file_url: Supabase URL
-    
-    Returns:
-        생성된 항목 정보
     """
     
-    # 중복 체크 (선택사항)
+    # 중복 체크
     if SafetyCheckImprovementService.check_exists(
-        db,
-        request.chat_id,
+        supabase,
+        request.company_id,
+        request.equipment_id,
         request.inspection_purpose,
         request.inspection_rule_id or "",
     ):
@@ -66,8 +61,9 @@ async def create_safety_check(
         )
     
     item = SafetyCheckImprovementService.create(
-        db=db,
-        chat_id=request.chat_id,
+        supabase=supabase,
+        company_id=request.company_id,
+        user_id=request.user_id if hasattr(request, 'user_id') else UUID('00000000-0000-0000-0000-000000000000'),
         equipment_id=request.equipment_id,
         equipment_name=request.equipment_name,
         inspection_purpose=request.inspection_purpose,
@@ -80,60 +76,66 @@ async def create_safety_check(
         current_safety_measures=request.current_safety_measures,
     )
     
-    return SafetyCheckImprovementResponse.from_orm(item)
+    if not item:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="데이터 저장 실패",
+        )
+    
+    return SafetyCheckImprovementResponse(**item)
 
 
 # ============================================================================
 # [신청서 탭] 2단계 - 데이터 조회
 # ============================================================================
 
-@router.get("/{chat_id}", response_model=SafetyCheckImprovementListResponse)
-async def get_all_by_chat(
-    chat_id: str,
-    db: Session = Depends(get_db),
+@router.get("/{company_id}/{equipment_id}", response_model=SafetyCheckImprovementListResponse)
+async def get_all_by_company_and_equipment(
+    company_id: UUID,
+    equipment_id: UUID,
+    supabase: Client = Depends(get_db),
 ):
     """
-    [신청서 탭] - chat_id의 모든 점검항목 조회
-    
-    신청서 탭에서 표를 렌더링할 때 모든 점검항목을 가져옴
-    (안전장치점검, 유지보수점검, 안전교육)
+    [신청서 탭] - company_id와 equipment_id의 모든 점검항목 조회
     
     Args:
-        chat_id: 신청서 ID
+        company_id: 회사 ID
+        equipment_id: 설비 ID
     
     Returns:
         점검항목 목록
     """
     
-    items = SafetyCheckImprovementService.get_by_chat_id(db, chat_id)
+    items = SafetyCheckImprovementService.get_by_company_and_equipment(
+        supabase, company_id, equipment_id
+    )
     
     return SafetyCheckImprovementListResponse(
-        items=[SafetyCheckImprovementResponse.from_orm(item) for item in items],
+        items=[SafetyCheckImprovementResponse(**item) for item in items],
         total_count=len(items),
     )
 
 
-@router.get("/{chat_id}/{inspection_purpose}", response_model=list[SafetyCheckImprovementResponse])
-async def get_by_chat_and_purpose(
-    chat_id: str,
+@router.get("/{company_id}/{equipment_id}/{inspection_purpose}", response_model=list[SafetyCheckImprovementResponse])
+async def get_by_company_equipment_and_purpose(
+    company_id: UUID,
+    equipment_id: UUID,
     inspection_purpose: str,
-    db: Session = Depends(get_db),
+    supabase: Client = Depends(get_db),
 ):
     """
     [신청서 탭] - 특정 점검목적의 항목만 조회
     
-    예: /api/safety-check/chat_xxx/safety_device
-    → 안전장치점검 항목들만 반환
-    
     Args:
-        chat_id: 신청서 ID
+        company_id: 회사 ID
+        equipment_id: 설비 ID
         inspection_purpose: safety_device, maintenance, safety_training
     
     Returns:
         해당 점검목적의 항목 목록
     """
     
-    # 유효한 inspection_purpose 검증 (선택사항)
+    # 유효한 inspection_purpose 검증
     valid_purposes = ["safety_device", "maintenance", "safety_training"]
     if inspection_purpose not in valid_purposes:
         raise HTTPException(
@@ -141,44 +143,48 @@ async def get_by_chat_and_purpose(
             detail=f"Invalid inspection_purpose. Must be one of {valid_purposes}",
         )
     
-    items = SafetyCheckImprovementService.get_by_chat_and_purpose(
-        db, chat_id, inspection_purpose
+    items = SafetyCheckImprovementService.get_by_company_equipment_and_purpose(
+        supabase, company_id, equipment_id, inspection_purpose
     )
     
-    return [SafetyCheckImprovementResponse.from_orm(item) for item in items]
+    return [SafetyCheckImprovementResponse(**item) for item in items]
 
 
 # ============================================================================
-# [신청서 탭] 2단계 - 개선대책 저장
+# [신청서 탭] 2단계 - 향후 관리 계획 저장
 # ============================================================================
 
 @router.patch("/{item_id}/improvement", response_model=SafetyCheckImprovementResponse)
 async def update_improvement(
     item_id: UUID,
     request: SafetyCheckImprovementUpdate,
-    db: Session = Depends(get_db),
+    supabase: Client = Depends(get_db),
 ):
     """
-    [신청서 탭] - 개선대책 저장/수정
+    [신청서 탭] - 향후 관리 계획 저장/수정
     
-    사용자가 신청서 탭에서 개선대책을 입력하고 저장하거나 수정할 때 호출
-    (처음 저장하든, 이미 있는 값을 수정하든 동일하게 작동)
-    ...
+    Args:
+        item_id: 항목 ID
+        request: SafetyCheckImprovementUpdate
+        - improvement_plan: 향후 관리 계획
+    
+    Returns:
+        업데이트된 항목 정보
     """
     
-    try:
-        item = SafetyCheckImprovementService.update_improvement(
-            db=db,
-            item_id=item_id,
-            improvement_plan=request.improvement_plan,
-        )
-        return SafetyCheckImprovementResponse.from_orm(item)
+    item = SafetyCheckImprovementService.update_improvement(
+        supabase=supabase,
+        item_id=item_id,
+        improvement_plan=request.improvement_plan,
+    )
     
-    except ValueError as e:
+    if not item:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="업데이트 실패",
         )
+    
+    return SafetyCheckImprovementResponse(**item)
 
 
 # ============================================================================
@@ -188,7 +194,7 @@ async def update_improvement(
 @router.delete("/{item_id}")
 async def delete_safety_check(
     item_id: UUID,
-    db: Session = Depends(get_db),
+    supabase: Client = Depends(get_db),
 ):
     """
     항목 삭제
@@ -200,7 +206,7 @@ async def delete_safety_check(
         삭제 성공 여부
     """
     
-    if not SafetyCheckImprovementService.delete(db, item_id):
+    if not SafetyCheckImprovementService.delete(supabase, item_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Item not found",
@@ -212,25 +218,25 @@ async def delete_safety_check(
     }
 
 
-@router.delete("/{chat_id}/{inspection_purpose}")
-async def delete_by_chat_and_purpose(
-    chat_id: str,
-    inspection_purpose: str,
-    db: Session = Depends(get_db),
+@router.delete("/{company_id}/{equipment_id}")
+async def delete_by_company_and_equipment(
+    company_id: UUID,
+    equipment_id: UUID,
+    supabase: Client = Depends(get_db),
 ):
     """
-    특정 chat_id와 inspection_purpose의 모든 항목 삭제
+    특정 company_id와 equipment_id의 모든 항목 삭제
     
     Args:
-        chat_id: 신청서 ID
-        inspection_purpose: 점검 목적
+        company_id: 회사 ID
+        equipment_id: 설비 ID
     
     Returns:
         삭제된 항목 개수
     """
     
-    count = SafetyCheckImprovementService.delete_by_chat_and_purpose(
-        db, chat_id, inspection_purpose
+    count = SafetyCheckImprovementService.delete_by_company_and_equipment(
+        supabase, company_id, equipment_id
     )
     
     return {
@@ -240,24 +246,29 @@ async def delete_by_chat_and_purpose(
     }
 
 
-@router.get("/{chat_id}/count")
-async def count_by_chat(
-    chat_id: str,
-    db: Session = Depends(get_db),
+@router.get("/{company_id}/{equipment_id}/count")
+async def count_by_company_and_equipment(
+    company_id: UUID,
+    equipment_id: UUID,
+    supabase: Client = Depends(get_db),
 ):
     """
-    chat_id의 항목 개수 조회
+    company_id와 equipment_id의 항목 개수 조회
     
     Args:
-        chat_id: 신청서 ID
+        company_id: 회사 ID
+        equipment_id: 설비 ID
     
     Returns:
         항목 개수
     """
     
-    count = SafetyCheckImprovementService.count_by_chat_id(db, chat_id)
+    count = SafetyCheckImprovementService.count_by_company_and_equipment(
+        supabase, company_id, equipment_id
+    )
     
     return {
-        "chat_id": chat_id,
+        "company_id": str(company_id),
+        "equipment_id": str(equipment_id),
         "total_count": count,
     }

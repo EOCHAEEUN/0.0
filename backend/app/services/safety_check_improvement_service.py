@@ -1,7 +1,9 @@
 """
 Safety Check Improvement Service
+- Supabase 클라이언트 방식
+- chat_id 제거, equipment_id + company_id 기준
 - 설비관리 탭: 근거 등록 (CREATE + 파일 업로드)
-- 신청서 탭: 데이터 조회 (READ), 개선대책 저장 (UPDATE)
+- 신청서 탭: 데이터 조회 (READ), 향후 관리 계획 저장 (UPDATE)
 - 삭제 (DELETE)
 """
 
@@ -11,37 +13,36 @@ from uuid import UUID
 from pathlib import Path
 
 from fastapi import HTTPException, status, UploadFile
-from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from supabase import Client
 
-from app.core.database import get_db
 from app.models.safety_check_improvement import (
-    SafetyCheckImprovement,
     InspectionStatusEnum,
 )
 
 # Storage 설정
 STORAGE_BUCKET = "inspection-files"
 MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+TABLE_NAME = "safety_check_improvement"
 
 
 class SafetyCheckImprovementService:
-    """Safety Check Improvement CRUD 서비스"""
+    """Safety Check Improvement CRUD 서비스 (Supabase 클라이언트 방식)"""
     
     @staticmethod
     async def create_with_file_upload(
-        db: Session,
-        chat_id: str,
+        supabase: Client,
+        company_id: UUID,
+        user_id: UUID,
+        equipment_id: UUID,
         inspection_purpose: str,
         current_safety_measures: str,
         pdf_file: UploadFile,
-        equipment_id: str | None = None,
         equipment_name: str | None = None,
         inspection_purpose_label: str | None = None,
         inspection_rule_id: str | None = None,
         check_item: str | None = None,
         check_content: str | None = None,
-    ) -> SafetyCheckImprovement:
+    ) -> dict:
         """
         [설비관리 탭] - 근거 등록 + 파일 업로드
         
@@ -49,25 +50,6 @@ class SafetyCheckImprovementService:
         2. Supabase Storage에 업로드
         3. DB에 저장
         4. 에러 시 스토리지 파일 삭제 (롤백)
-        
-        Args:
-            db: Database 세션
-            chat_id: 신청서 ID
-            inspection_purpose: 점검 목적 (safety_device, maintenance, safety_training)
-            current_safety_measures: 근거 제목
-            pdf_file: 업로드된 PDF 파일
-            equipment_id: 설비 ID (문자열)
-            equipment_name: 설비명
-            inspection_purpose_label: 한글 레이블
-            inspection_rule_id: 규칙 ID
-            check_item: 점검항목
-            check_content: 점검내용
-        
-        Returns:
-            생성된 SafetyCheckImprovement 객체
-        
-        Raises:
-            HTTPException: 파일 검증 또는 업로드 실패
         """
         
         # 1️⃣ 파일 검증
@@ -109,19 +91,12 @@ class SafetyCheckImprovementService:
         storage_path = f"{inspection_purpose}/{final_filename}"
         
         # 3️⃣ Supabase Storage에 업로드
-        supabase = get_db()
-        
         try:
             supabase.storage.from_(STORAGE_BUCKET).upload(
                 path=storage_path,
                 file=file_content,
                 file_options={
                     "content-type": "application/pdf",
-                    "metadata": {
-                        "chat_id": chat_id,
-                        "inspection_purpose": inspection_purpose,
-                        "uploaded_at": datetime.utcnow().isoformat(),
-                    }
                 }
             )
         except Exception as e:
@@ -136,34 +111,27 @@ class SafetyCheckImprovementService:
         
         # 5️⃣ DB에 저장
         try:
-            # equipment_id가 문자열이면 UUID로 변환 (선택사항)
-            converted_equipment_id = None
-            if equipment_id:
-                try:
-                    converted_equipment_id = UUID(equipment_id)
-                except (ValueError, TypeError):
-                    converted_equipment_id = None
+            data = {
+                "company_id": str(company_id),
+                "user_id": str(user_id),
+                "equipment_id": str(equipment_id),
+                "equipment_name": equipment_name,
+                "inspection_purpose": inspection_purpose,
+                "inspection_purpose_label": inspection_purpose_label,
+                "inspection_rule_id": inspection_rule_id,
+                "check_item": check_item,
+                "check_content": check_content,
+                "inspection_pdf_file": final_filename,
+                "pdf_file_url": public_url,
+                "current_safety_measures": current_safety_measures,
+                "pdf_uploaded_at": datetime.utcnow().isoformat(),
+                "status": InspectionStatusEnum.SAVED.value,
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat(),
+            }
             
-            item = SafetyCheckImprovement(
-                chat_id=chat_id,
-                equipment_id=converted_equipment_id,
-                equipment_name=equipment_name,
-                inspection_purpose=inspection_purpose,
-                inspection_purpose_label=inspection_purpose_label,
-                inspection_rule_id=inspection_rule_id,
-                check_item=check_item,
-                check_content=check_content,
-                inspection_pdf_file=final_filename,
-                pdf_file_url=public_url,
-                current_safety_measures=current_safety_measures,
-                pdf_uploaded_at=datetime.utcnow(),
-                status=InspectionStatusEnum.SAVED.value,
-            )
-            
-            db.add(item)
-            db.commit()
-            db.refresh(item)
-            return item
+            response = supabase.table(TABLE_NAME).insert(data).execute()
+            return response.data[0] if response.data else None
         
         except Exception as e:
             # 에러 발생 시 업로드된 파일 삭제 (롤백)
@@ -179,259 +147,259 @@ class SafetyCheckImprovementService:
     
     @staticmethod
     def create(
-        db: Session,
-        chat_id: str,
+        supabase: Client,
+        company_id: UUID,
+        user_id: UUID,
+        equipment_id: UUID,
         inspection_purpose: str,
         current_safety_measures: str,
         inspection_pdf_file: str,
         pdf_file_url: str,
-        equipment_id: UUID | None = None,
         equipment_name: str | None = None,
         inspection_purpose_label: str | None = None,
         inspection_rule_id: str | None = None,
         check_item: str | None = None,
         check_content: str | None = None,
-    ) -> SafetyCheckImprovement:
+    ) -> dict:
         """
-        [설비관리 탭] - 근거 등록 (기존 방식, 파일 없이 URL만 저장)
-        
-        Args:
-            chat_id: 신청서 ID
-            inspection_purpose: safety_device, maintenance, safety_training
-            current_safety_measures: 근거 제목 (사용자 입력)
-            inspection_pdf_file: PDF 파일명
-            pdf_file_url: Supabase URL
-            equipment_id: 설비 ID
-            equipment_name: 설비명
-            inspection_purpose_label: 한글 레이블
-            inspection_rule_id: 규칙 ID
-            check_item: 점검항목
-            check_content: 점검내용
-        
-        Returns:
-            생성된 SafetyCheckImprovement 객체
+        [설비관리 탭] - 근거 등록 (파일 없이 URL만 저장)
         """
         
-        item = SafetyCheckImprovement(
-            chat_id=chat_id,
-            equipment_id=equipment_id,
-            equipment_name=equipment_name,
-            inspection_purpose=inspection_purpose,
-            inspection_purpose_label=inspection_purpose_label,
-            inspection_rule_id=inspection_rule_id,
-            check_item=check_item,
-            check_content=check_content,
-            inspection_pdf_file=inspection_pdf_file,
-            pdf_file_url=pdf_file_url,
-            current_safety_measures=current_safety_measures,
-            pdf_uploaded_at=datetime.utcnow(),
-            status=InspectionStatusEnum.SAVED.value,
-        )
+        try:
+            data = {
+                "company_id": str(company_id),
+                "user_id": str(user_id),
+                "equipment_id": str(equipment_id),
+                "equipment_name": equipment_name,
+                "inspection_purpose": inspection_purpose,
+                "inspection_purpose_label": inspection_purpose_label,
+                "inspection_rule_id": inspection_rule_id,
+                "check_item": check_item,
+                "check_content": check_content,
+                "inspection_pdf_file": inspection_pdf_file,
+                "pdf_file_url": pdf_file_url,
+                "current_safety_measures": current_safety_measures,
+                "pdf_uploaded_at": datetime.utcnow().isoformat(),
+                "status": InspectionStatusEnum.SAVED.value,
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat(),
+            }
+            
+            response = supabase.table(TABLE_NAME).insert(data).execute()
+            return response.data[0] if response.data else None
         
-        db.add(item)
-        db.commit()
-        db.refresh(item)
-        return item
-    
-    @staticmethod
-    def get_by_chat_id(
-        db: Session,
-        chat_id: str,
-    ) -> list[SafetyCheckImprovement]:
-        """
-        [신청서 탭] - chat_id의 모든 점검항목 조회
-        
-        Args:
-            chat_id: 신청서 ID
-        
-        Returns:
-            SafetyCheckImprovement 리스트
-        """
-        return (
-            db.query(SafetyCheckImprovement)
-            .filter(SafetyCheckImprovement.chat_id == chat_id)
-            .all()
-        )
-    
-    @staticmethod
-    def get_by_chat_and_purpose(
-        db: Session,
-        chat_id: str,
-        inspection_purpose: str,
-    ) -> list[SafetyCheckImprovement]:
-        """
-        [신청서 탭] - 특정 점검목적의 항목들만 조회
-        
-        Args:
-            chat_id: 신청서 ID
-            inspection_purpose: safety_device, maintenance, safety_training
-        
-        Returns:
-            해당 inspection_purpose의 항목들
-        """
-        return (
-            db.query(SafetyCheckImprovement)
-            .filter(
-                and_(
-                    SafetyCheckImprovement.chat_id == chat_id,
-                    SafetyCheckImprovement.inspection_purpose == inspection_purpose,
-                )
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"데이터 저장 실패: {str(e)}",
             )
-            .all()
-        )
+    
+    @staticmethod
+    def get_by_company_and_equipment(
+        supabase: Client,
+        company_id: UUID,
+        equipment_id: UUID,
+    ) -> list[dict]:
+        """
+        [신청서 탭] - company_id와 equipment_id의 모든 점검항목 조회
+        """
+        try:
+            response = (
+                supabase.table(TABLE_NAME)
+                .select("*")
+                .eq("company_id", str(company_id))
+                .eq("equipment_id", str(equipment_id))
+                .execute()
+            )
+            return response.data if response.data else []
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"데이터 조회 실패: {str(e)}",
+            )
+    
+    @staticmethod
+    def get_by_company_equipment_and_purpose(
+        supabase: Client,
+        company_id: UUID,
+        equipment_id: UUID,
+        inspection_purpose: str,
+    ) -> list[dict]:
+        """
+        [신청서 탭] - company_id, equipment_id, inspection_purpose로 조회
+        """
+        try:
+            response = (
+                supabase.table(TABLE_NAME)
+                .select("*")
+                .eq("company_id", str(company_id))
+                .eq("equipment_id", str(equipment_id))
+                .eq("inspection_purpose", inspection_purpose)
+                .execute()
+            )
+            return response.data if response.data else []
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"데이터 조회 실패: {str(e)}",
+            )
     
     @staticmethod
     def get_by_id(
-        db: Session,
+        supabase: Client,
         item_id: UUID,
-    ) -> SafetyCheckImprovement | None:
+    ) -> dict | None:
         """
         ID로 단일 항목 조회
-        
-        Args:
-            item_id: 항목 ID
-        
-        Returns:
-            SafetyCheckImprovement 객체 또는 None
         """
-        return (
-            db.query(SafetyCheckImprovement)
-            .filter(SafetyCheckImprovement.id == item_id)
-            .first()
-        )
+        try:
+            response = (
+                supabase.table(TABLE_NAME)
+                .select("*")
+                .eq("id", str(item_id))
+                .execute()
+            )
+            return response.data[0] if response.data else None
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"데이터 조회 실패: {str(e)}",
+            )
     
     @staticmethod
     def update_improvement(
-        db: Session,
+        supabase: Client,
         item_id: UUID,
         improvement_plan: str,
-    ) -> SafetyCheckImprovement:
+    ) -> dict:
         """
-        [신청서 탭] - 개선대책 저장/수정
-        
-        Args:
-            item_id: 항목 ID
-            improvement_plan: 개선대책 (사용자 입력)
-        
-        Returns:
-            업데이트된 SafetyCheckImprovement 객체
-        
-        Raises:
-            ValueError: 항목이 없을 경우
+        [신청서 탭] - 향후 관리 계획 저장/수정
         """
-        item = SafetyCheckImprovementService.get_by_id(db, item_id)
         
+        # 항목 존재 확인
+        item = SafetyCheckImprovementService.get_by_id(supabase, item_id)
         if not item:
-            raise ValueError(f"Safety check improvement item not found: {item_id}")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Safety check improvement item not found: {item_id}",
+            )
         
-        item.improvement_plan = improvement_plan
-        item.improvement_saved_at = datetime.utcnow()
-        item.status = InspectionStatusEnum.SAVED.value
-        item.updated_at = datetime.utcnow()
+        try:
+            data = {
+                "improvement_plan": improvement_plan,
+                "improvement_saved_at": datetime.utcnow().isoformat(),
+                "status": InspectionStatusEnum.SAVED.value,
+                "updated_at": datetime.utcnow().isoformat(),
+            }
+            
+            response = (
+                supabase.table(TABLE_NAME)
+                .update(data)
+                .eq("id", str(item_id))
+                .execute()
+            )
+            return response.data[0] if response.data else None
         
-        db.commit()
-        db.refresh(item)
-        return item
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"데이터 수정 실패: {str(e)}",
+            )
     
     @staticmethod
     def delete(
-        db: Session,
+        supabase: Client,
         item_id: UUID,
     ) -> bool:
         """
         항목 삭제
-        
-        Args:
-            item_id: 항목 ID
-        
-        Returns:
-            삭제 성공 여부
         """
-        item = SafetyCheckImprovementService.get_by_id(db, item_id)
-        
-        if not item:
-            return False
-        
-        db.delete(item)
-        db.commit()
-        return True
-    
-    @staticmethod
-    def delete_by_chat_and_purpose(
-        db: Session,
-        chat_id: str,
-        inspection_purpose: str,
-    ) -> int:
-        """
-        특정 chat_id와 inspection_purpose의 모든 항목 삭제
-        
-        Args:
-            chat_id: 신청서 ID
-            inspection_purpose: 점검 목적
-        
-        Returns:
-            삭제된 행의 개수
-        """
-        count = (
-            db.query(SafetyCheckImprovement)
-            .filter(
-                and_(
-                    SafetyCheckImprovement.chat_id == chat_id,
-                    SafetyCheckImprovement.inspection_purpose == inspection_purpose,
-                )
+        try:
+            response = (
+                supabase.table(TABLE_NAME)
+                .delete()
+                .eq("id", str(item_id))
+                .execute()
             )
-            .delete()
-        )
-        db.commit()
-        return count
+            return len(response.data) > 0
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"데이터 삭제 실패: {str(e)}",
+            )
     
     @staticmethod
-    def count_by_chat_id(
-        db: Session,
-        chat_id: str,
+    def delete_by_company_and_equipment(
+        supabase: Client,
+        company_id: UUID,
+        equipment_id: UUID,
     ) -> int:
         """
-        chat_id의 항목 개수 조회
-        
-        Args:
-            chat_id: 신청서 ID
-        
-        Returns:
-            항목 개수
+        특정 company_id와 equipment_id의 모든 항목 삭제
         """
-        return (
-            db.query(SafetyCheckImprovement)
-            .filter(SafetyCheckImprovement.chat_id == chat_id)
-            .count()
-        )
+        try:
+            response = (
+                supabase.table(TABLE_NAME)
+                .delete()
+                .eq("company_id", str(company_id))
+                .eq("equipment_id", str(equipment_id))
+                .execute()
+            )
+            return len(response.data) if response.data else 0
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"데이터 삭제 실패: {str(e)}",
+            )
+    
+    @staticmethod
+    def count_by_company_and_equipment(
+        supabase: Client,
+        company_id: UUID,
+        equipment_id: UUID,
+    ) -> int:
+        """
+        company_id와 equipment_id의 항목 개수 조회
+        """
+        try:
+            response = (
+                supabase.table(TABLE_NAME)
+                .select("id", count="exact")
+                .eq("company_id", str(company_id))
+                .eq("equipment_id", str(equipment_id))
+                .execute()
+            )
+            return response.count if hasattr(response, 'count') else 0
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"개수 조회 실패: {str(e)}",
+            )
     
     @staticmethod
     def check_exists(
-        db: Session,
-        chat_id: str,
+        supabase: Client,
+        company_id: UUID,
+        equipment_id: UUID,
         inspection_purpose: str,
         inspection_rule_id: str,
     ) -> bool:
         """
         중복 항목 존재 여부 확인
-        
-        Args:
-            chat_id: 신청서 ID
-            inspection_purpose: 점검 목적
-            inspection_rule_id: 규칙 ID
-        
-        Returns:
-            존재 여부
         """
-        return (
-            db.query(SafetyCheckImprovement)
-            .filter(
-                and_(
-                    SafetyCheckImprovement.chat_id == chat_id,
-                    SafetyCheckImprovement.inspection_purpose == inspection_purpose,
-                    SafetyCheckImprovement.inspection_rule_id == inspection_rule_id,
-                )
+        try:
+            response = (
+                supabase.table(TABLE_NAME)
+                .select("id")
+                .eq("company_id", str(company_id))
+                .eq("equipment_id", str(equipment_id))
+                .eq("inspection_purpose", inspection_purpose)
+                .eq("inspection_rule_id", inspection_rule_id or "")
+                .execute()
             )
-            .first()
-            is not None
-        )
+            return len(response.data) > 0 if response.data else False
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"존재 확인 실패: {str(e)}",
+            )

@@ -26,7 +26,7 @@ from reportlab.platypus import (
 )
 
 from app.core.database import get_db
-
+from app.agents.draft import generate_final_recommendation
 
 REPORT_TITLE = "AI 신청서 초안 · 고도화 버전"
 DEFAULT_FONT_PATHS = (
@@ -375,6 +375,7 @@ def load_application_report_data(
     breakdown = scenario.get("breakdown") or {}
     benchmark = roi_data.get("benchmark") or {}
     draft_sections = _draft_sections(draft.get("draft_content"))
+    additional_info = str(draft.get("additional_info") or "").strip()
 
     investment = _number(scenario.get("investment_manwon"))
     subsidy = _number(scenario.get("subsidy_manwon"))
@@ -786,21 +787,36 @@ def load_application_report_data(
             "불량률을 동일한 주기로 기록합니다. 담당자와 승인자를 분리하고, 수치 변경 이력과 "
             "증빙 파일을 함께 보관합니다. 해당 관리체계는 사업 완료보고와 사후점검의 근거입니다."
         )
-        final_recommendation = (
-            f"종합적으로 본 사업은 정책 적합도 {match_score:.1f}점과 업종·기업 규모 조건을 "
-            "기준으로 신청 검토가 가능한 사업입니다. 다만 예상 회수기간 "
-            f"{payback_months:,.1f}개월은 현재 입력값 기준으로 장기입니다. "
-            "따라서 신청 전 실제 견적과 지원 비율을 확정하고, AI 기능 도입으로 발생하는 "
-            "생산성 개선 효과를 추가 산정합니다. 정량 근거가 보완된 이후 투자 규모와 "
-            "자기부담금의 적정성을 최종 확정합니다."
-            if payback_months
-            else (
-                f"종합적으로 본 사업은 정책 적합도 {match_score:.1f}점과 업종·기업 규모 조건을 "
-                "기준으로 신청 검토가 가능한 사업입니다. 회수기간 산정에 필요한 실제 견적과 "
-                "성과 가정의 확정이 필요합니다. 정량 근거가 보완된 이후 투자 규모와 "
-                "자기부담금의 적정성을 최종 확정합니다."
+
+        try:
+            final_recommendation = generate_final_recommendation(
+                company_name=company_name,
+                equipment_name=equipment_name,
+                payback_months=payback_months,
+                annual_benefit=annual_net_benefit,
+                investment=investment,
+                subsidy=subsidy,
+                policy_title=policy_title,
+                match_score=match_score,
+                additional_info=additional_info,
             )
-        )
+        except Exception:
+            # LLM 호출 실패 시 기존 하드코딩 문구로 폴백
+            final_recommendation = (
+                f"종합적으로 본 사업은 정책 적합도 {match_score:.1f}점과 업종·기업 규모 조건을 "
+                "기준으로 신청 검토가 가능한 사업입니다. 다만 예상 회수기간 "
+                f"{payback_months:,.1f}개월은 현재 입력값 기준으로 장기입니다. "
+                "따라서 신청 전 실제 견적과 지원 비율을 확정하고, AI 기능 도입으로 발생하는 "
+                "생산성 개선 효과를 추가 산정합니다. 정량 근거가 보완된 이후 투자 규모와 "
+                "자기부담금의 적정성을 최종 확정합니다."
+                if payback_months
+                else (
+                    f"종합적으로 본 사업은 정책 적합도 {match_score:.1f}점과 업종·기업 규모 조건을 "
+                    "기준으로 신청 검토가 가능한 사업입니다. 회수기간 산정에 필요한 실제 견적과 "
+                    "성과 가정의 확정이 필요합니다. 정량 근거가 보완된 이후 투자 규모와 "
+                    "자기부담금의 적정성을 최종 확정합니다."
+                )
+            )
 
         _validate_submission_narratives(
             {

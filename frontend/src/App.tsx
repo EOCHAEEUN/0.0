@@ -130,6 +130,7 @@ function App() {
 
           {/* 설비 관리 / 마이페이지 */}
           <Route path="/equipment" element={<EquipmentStatusPage />} />
+          <Route path="/safety-check" element={<Navigate to="/application-draft" replace />} />
           <Route path="/mypage" element={<MyPage />} />
           <Route path="/company" element={<MyPage />} />
         </Route>

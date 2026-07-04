@@ -16,5 +16,6 @@
 @import "./styles/factofit/09-mypage-equipment-tooltip.css";
 @import "./features/dashboard/dashboard.workspace.css";
 @import "./features/equipmentStatus/equipmentStatus.workspace.css";
+@import "./features/safetyCheck/safetyCheck.workspace.css";
 @import "./features/equipmentStatus/equipmentGuideChat.css";
 @import "./features/onboarding/onboarding.css";

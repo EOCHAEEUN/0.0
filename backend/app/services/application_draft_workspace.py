@@ -805,6 +805,35 @@ def load_application_draft_workspace(
         policy_detail.get("deadline_display"),
         policy_detail.get("deadline"),
     )
+    policy_options: list[dict[str, Any]] = []
+    if not legacy_missing:
+        for row in _snapshot_policy_rows(snapshot)[:5]:
+            option_id = _safe_text(row.get("policy_id"))
+            if not option_id:
+                continue
+            policy_options.append(
+                {
+                    "policy_id": option_id,
+                    "title": _safe_text(row.get("title")) or "정책명 미확인",
+                    "deadline": _safe_text(
+                        row.get("deadline_display"),
+                        row.get("deadline"),
+                        default="마감일 미정",
+                    ),
+                }
+            )
+    if (
+        resolved_policy_id
+        and not any(_safe_text(item.get("policy_id")) == resolved_policy_id for item in policy_options)
+    ):
+        policy_options.insert(
+            0,
+            {
+                "policy_id": resolved_policy_id,
+                "title": policy_title or "현재 선택 정책",
+                "deadline": policy_deadline or "마감일 미정",
+            },
+        )
 
     return {
         "state": "ready",
@@ -837,6 +866,7 @@ def load_application_draft_workspace(
             "deadline": policy_deadline or None,
             "source": "policy_snapshot" if not legacy_missing else "legacy_missing",
             "legacy_missing": legacy_missing,
+            "options": policy_options[:5],
         },
         "draft": {
             "exists": bool(draft_row),

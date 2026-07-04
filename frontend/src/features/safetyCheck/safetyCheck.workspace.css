@@ -524,15 +524,50 @@
   line-height: 1.45;
 }
 
+.ff-draft-workspace-page .ff-draft-safety-card .safety-check-page--embedded {
+  --sc-navy: #0f172a;
+  --sc-blue: #1a2744;
+  --sc-blue-dark: #24345a;
+  --sc-blue-button: #1a2744;
+  --sc-blue-soft: #f8fafc;
+  --sc-bg: transparent;
+  --sc-card: #ffffff;
+  --sc-line: #e5eaf2;
+  --sc-muted: #64748b;
+  --sc-text: #334155;
+  --sc-green: #2f6f47;
+  --sc-green-soft: #edf7f0;
+  --sc-red: #b42318;
+  --sc-red-soft: #feefef;
+  --sc-shadow-sm: none;
+}
+
 .ff-draft-safety-card .safety-check-page--embedded .tabs {
   gap: 4px;
   margin-bottom: 12px;
+}
+
+.ff-draft-workspace-page .ff-draft-safety-card .safety-check-page--embedded .tabs {
+  gap: 10px;
+  padding: 0 2px;
+  border-bottom: 1px solid var(--sc-line);
 }
 
 .ff-draft-safety-card .safety-check-page--embedded .tab-button {
   padding: 8px 14px;
   font-size: 13px;
   border-bottom-width: 2px;
+}
+
+.ff-draft-workspace-page .ff-draft-safety-card .safety-check-page--embedded .tab-button {
+  padding: 8px 2px 10px;
+  color: var(--sc-muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.ff-draft-workspace-page .ff-draft-safety-card .safety-check-page--embedded .tab-button.active {
+  color: var(--sc-blue);
 }
 
 .ff-draft-safety-card .safety-check-page--embedded .alert {
@@ -559,6 +594,13 @@
   box-shadow: none;
   border: 1px solid #e8edf5;
   background: #fafbfd;
+}
+
+.ff-draft-workspace-page .ff-draft-safety-card .safety-check-page--embedded .card,
+.ff-draft-workspace-page .ff-draft-safety-card .safety-check-page--embedded .card-compact {
+  border-color: var(--sc-line);
+  border-radius: 12px;
+  background: var(--sc-card);
 }
 
 .ff-draft-safety-card .safety-check-page--embedded .equipment-head {
@@ -643,6 +685,11 @@
   border-radius: 8px;
 }
 
+.ff-draft-workspace-page .ff-draft-safety-card .safety-check-page--embedded .empty-state--compact {
+  border-color: var(--sc-line);
+  border-radius: 10px;
+}
+
 .ff-draft-safety-card .safety-check-page--embedded .empty-state--compact .empty-state-icon {
   font-size: 22px;
   margin-bottom: 0;
@@ -663,6 +710,13 @@
   padding: 0;
 }
 
+.ff-draft-workspace-page .ff-draft-safety-card .safety-check-page--embedded .section-block {
+  padding: 10px 12px;
+  border: 1px solid var(--sc-line);
+  border-radius: 12px;
+  background: var(--sc-card);
+}
+
 .ff-draft-safety-card .safety-check-page--embedded .section-block--empty {
   padding: 14px;
   border: 1px dashed #dbe3ef;
@@ -670,6 +724,13 @@
   background: #fafbfd;
   font-size: 13px;
   color: #64748b;
+}
+
+.ff-draft-workspace-page .ff-draft-safety-card .safety-check-page--embedded .section-block--empty {
+  border-color: var(--sc-line);
+  border-style: solid;
+  border-radius: 10px;
+  background: var(--sc-card);
 }
 
 .ff-draft-safety-card .safety-check-page--embedded .section-block--empty p {
@@ -706,6 +767,19 @@
 
 .ff-draft-safety-card .safety-check-page--embedded td:last-child {
   white-space: nowrap;
+}
+
+.ff-draft-workspace-page .ff-draft-safety-card .safety-check-page--embedded .ff-draft-safety-save-btn {
+  min-height: 34px;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 800;
+  background: var(--sc-blue-button);
+  color: #fff;
+}
+
+.ff-draft-workspace-page .ff-draft-safety-card .safety-check-page--embedded .ff-draft-safety-save-btn:hover:not(:disabled) {
+  background: var(--sc-blue-dark);
 }
 
 .ff-draft-safety-card .safety-check-modal .button-group,

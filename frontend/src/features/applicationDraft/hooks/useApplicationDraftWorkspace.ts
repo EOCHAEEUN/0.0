@@ -72,12 +72,17 @@ export function useApplicationDraftWorkspace(route: RouteContext) {
   const [manualScenarioKey, setManualScenarioKey] = useState<ScenarioKey>("A")
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false)
   const [generateError, setGenerateError] = useState("")
+  const [activePolicyId, setActivePolicyId] = useState(route.policyId || "")
 
   const companyId = resolveCompanyId(route)
   const analysisId = route.analysisId
   const policyId = route.policyId
 
-  const reload = useCallback(async () => {
+  useEffect(() => {
+    setActivePolicyId(route.policyId || "")
+  }, [route.policyId])
+
+  const reload = useCallback(async (overridePolicyId?: string) => {
     if (!companyId) {
       setWorkspaceState({
         kind: "error",
@@ -100,7 +105,7 @@ export function useApplicationDraftWorkspace(route: RouteContext) {
       const data = await fetchApplicationDraftWorkspace({
         companyId,
         analysisId,
-        policyId,
+        policyId: overridePolicyId || activePolicyId || policyId,
       })
 
       if (data.state === "analysis_required") {
@@ -122,7 +127,7 @@ export function useApplicationDraftWorkspace(route: RouteContext) {
             : "신청서 초안 화면 데이터를 불러오지 못했습니다.",
       })
     }
-  }, [analysisId, companyId, policyId])
+  }, [activePolicyId, analysisId, companyId, policyId])
 
   useEffect(() => {
     void reload()
@@ -165,6 +170,33 @@ export function useApplicationDraftWorkspace(route: RouteContext) {
       setGenerateError(
         error instanceof Error ? error.message : "신청서 초안 생성에 실패했습니다.",
       )
+    } finally {
+      setIsGeneratingDraft(false)
+    }
+  }
+
+  const applyPolicyAndRegenerate = async (nextPolicyId: string) => {
+    if (!data?.company_id || !data.equipment_id) return
+    const normalizedPolicyId = nextPolicyId.trim()
+    if (!normalizedPolicyId) return
+
+    setIsGeneratingDraft(true)
+    setGenerateError("")
+
+    try {
+      await requestApplicationDraftGeneration({
+        companyId: data.company_id,
+        equipmentId: data.equipment_id,
+        policyId: normalizedPolicyId,
+        analysisId: data.analysis_id || analysisId,
+      })
+      setActivePolicyId(normalizedPolicyId)
+      await reload(normalizedPolicyId)
+    } catch (error) {
+      setGenerateError(
+        error instanceof Error ? error.message : "지원사업 변경 반영에 실패했습니다.",
+      )
+      throw error
     } finally {
       setIsGeneratingDraft(false)
     }
@@ -223,6 +255,7 @@ export function useApplicationDraftWorkspace(route: RouteContext) {
     isGeneratingDraft,
     generateError,
     handleGenerateDraft,
+    applyPolicyAndRegenerate,
     reload,
     reportParams,
     pdfPreview,

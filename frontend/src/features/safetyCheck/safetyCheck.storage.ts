@@ -1,4 +1,5 @@
 import { buildApiUrl, getAccessToken } from "../mypage/myPage.parts"
+import { markAuthExpired } from "../../services/auth"
 import { validateInspectionPdfFile } from "./safetyCheck.utils"
 
 type EquipmentAttachmentUploadResponse = {
@@ -55,6 +56,9 @@ export async function uploadInspectionPdf(params: {
   }
 
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      markAuthExpired("로그인이 만료되었습니다. 다시 로그인해주세요.")
+    }
     const debugPath = `safety/<user>/<company>/${params.equipmentId}/<uuid>.pdf`
     const detail =
       payload?.detail?.trim() ||

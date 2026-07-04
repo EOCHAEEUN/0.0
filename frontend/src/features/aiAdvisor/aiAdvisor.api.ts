@@ -1,4 +1,7 @@
-import { getAccessToken as getStoredAccessToken } from "../../services/auth"
+import {
+  getAccessToken as getStoredAccessToken,
+  markAuthExpired,
+} from "../../services/auth"
 import type { AdvisorApiResponse, AdvisorMessage } from "./aiAdvisor.contract"
 
 const API_BASE_URL = (
@@ -108,6 +111,7 @@ export async function requestAdvisorAnswer(
 
   if (!response.ok) {
     if (response.status === 401) {
+      markAuthExpired("로그인이 만료되었습니다. 다시 로그인해주세요.")
       throw new Error("로그인이 만료되었습니다. 다시 로그인한 뒤 ROI 상세를 다시 시도해 주세요.")
     }
 
@@ -162,6 +166,9 @@ export async function requestAdvisorSimulation(params: {
   })
   const payload = await response.json().catch(() => null)
   if (!response.ok || payload?.success === false) {
+    if (response.status === 401 || response.status === 403) {
+      markAuthExpired("로그인이 만료되었습니다. 다시 로그인해주세요.")
+    }
     throw new Error(
       payload?.detail ||
         payload?.message ||
@@ -193,6 +200,9 @@ export async function fetchAdvisorChatSessions(companyId: string) {
   )
   const payload = await response.json().catch(() => null)
   if (!response.ok || payload?.success === false) {
+    if (response.status === 401 || response.status === 403) {
+      markAuthExpired("로그인이 만료되었습니다. 다시 로그인해주세요.")
+    }
     throw new Error(
       payload?.detail ||
         payload?.message ||
@@ -215,6 +225,9 @@ export async function fetchAdvisorChatSessionDetail(
   )
   const payload = await response.json().catch(() => null)
   if (!response.ok || payload?.success === false) {
+    if (response.status === 401 || response.status === 403) {
+      markAuthExpired("로그인이 만료되었습니다. 다시 로그인해주세요.")
+    }
     throw new Error(
       payload?.detail ||
         payload?.message ||
@@ -240,6 +253,9 @@ export async function createAdvisorChatSession(params: {
   })
   const payload = await response.json().catch(() => null)
   if (!response.ok || payload?.success === false) {
+    if (response.status === 401 || response.status === 403) {
+      markAuthExpired("로그인이 만료되었습니다. 다시 로그인해주세요.")
+    }
     throw new Error(
       payload?.detail ||
         payload?.message ||
@@ -259,6 +275,9 @@ export async function deleteAdvisorChatSession(companyId: string, sessionId: str
   )
   const payload = await response.json().catch(() => null)
   if (!response.ok || payload?.success === false) {
+    if (response.status === 401 || response.status === 403) {
+      markAuthExpired("로그인이 만료되었습니다. 다시 로그인해주세요.")
+    }
     throw new Error(
       payload?.detail ||
         payload?.message ||

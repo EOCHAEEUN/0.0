@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react"
 import SignupModal from "../../../components/auth/SignupModal"
+import { consumeAuthExpiredMessage } from "../../../services/auth"
 
 import { LoginHeroSection } from "./components/LoginHeroSection"
 import { LoginFormPanel } from "./components/LoginFormPanel"
@@ -7,6 +9,12 @@ import { useLoginForm } from "./hooks/useLoginForm"
 
 export default function LoginFeature() {
   const login = useLoginForm()
+  const [authExpiredMessage, setAuthExpiredMessage] = useState("")
+
+  useEffect(() => {
+    const message = consumeAuthExpiredMessage()
+    if (message) setAuthExpiredMessage(message)
+  }, [])
 
   return (
     <main
@@ -92,6 +100,27 @@ export default function LoginFeature() {
           padding: "clamp(72px, 8vh, 110px) clamp(64px, 5vw, 86px)",
         }}
       >
+        {authExpiredMessage ? (
+          <div
+            style={{
+              position: "absolute",
+              top: "20px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 31,
+              padding: "10px 16px",
+              borderRadius: "12px",
+              border: "1px solid rgba(255,255,255,.35)",
+              background: "rgba(255,255,255,.2)",
+              color: "#fff",
+              fontSize: "13px",
+              fontWeight: 800,
+              backdropFilter: "blur(8px)",
+            }}
+          >
+            {authExpiredMessage}
+          </div>
+        ) : null}
         <LoginHeroSection />
 
         <LoginFormPanel

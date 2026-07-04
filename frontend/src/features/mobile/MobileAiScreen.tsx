@@ -8,6 +8,7 @@ import {
   requestAdvisorAnswer,
   type AdvisorChatSessionItem,
 } from "../aiAdvisor/aiAdvisor.api"
+import { MobileTopBar } from "./components/MobileTopBar"
 import { resolveMobileFlowContext } from "./mobileFlowContext"
 
 type MobileMessage = {
@@ -111,22 +112,21 @@ export default function MobileAiScreen() {
 
   const contextLabel = useMemo(() => {
     if (flowContext.policyId) {
-      return `${workspace.equipmentName || "대표설비"} · 정책 ${flowContext.policyId}`
+      return `${workspace.equipmentName || "대표설비"} · 정책 연결됨`
     }
     return `${workspace.equipmentName || "대표설비"} 기준`
   }, [flowContext.policyId, workspace.equipmentName])
 
   return (
     <section className="ff-mobile-screen">
-      <header className="ff-mobile-header" style={{ background: "var(--navy)", color: "#fff" }}>
-        <div>
-          <h1 style={{ color: "#fff" }}>AI 현장 도우미</h1>
-          <p style={{ color: "#D8E6F5" }}>{contextLabel}</p>
-        </div>
-      </header>
+      <MobileTopBar companyName={workspace.companyName} subtitle="AI Advisor" showSubtitle />
 
-      <article className="ff-mobile-card" style={{ background: "var(--navy)", color: "#fff" }}>
-        <h2 style={{ color: "#fff" }}>추천 질문</h2>
+      <article className="ff-mobile-card ff-mobile-card-navy">
+        <span className="ff-mobile-section-label" style={{ color: "#9EC5F3" }}>
+          AI ADVISOR
+        </span>
+        <h2>현장 AI 도우미</h2>
+        <p>{contextLabel}</p>
         <div className="ff-mobile-chip-row">
           {QUICK_QUESTIONS.map((question) => (
             <button
@@ -144,13 +144,13 @@ export default function MobileAiScreen() {
       <article className="ff-mobile-card">
         <h2>최근 대화</h2>
         {recentSessions.length === 0 ? (
-          <p>최근 대화 이력이 없습니다.</p>
+          <p className="ff-mobile-empty-inline">최근 대화 이력이 없습니다.</p>
         ) : (
           <div className="ff-mobile-list">
             {recentSessions.map((session) => (
               <div key={session.session_id || session.chat_id} className="ff-mobile-list-item">
                 <h3>{session.title || "새 대화"}</h3>
-                <p>{session.preview || "(미리보기 없음)"}</p>
+                <p>{session.preview || "-"}</p>
               </div>
             ))}
           </div>

@@ -18,6 +18,7 @@ export function MobileTabBar() {
     policyId: searchParams.get("policyId") || undefined,
     equipmentId: searchParams.get("equipmentId") || undefined,
   }
+
   return (
     <nav className="ff-mobile-tabbar" aria-label="모바일 탭">
       <div className="ff-mobile-tabbar-inner">
@@ -26,14 +27,15 @@ export function MobileTabBar() {
           const isActive =
             location.pathname === tab.path ||
             (tab.path === "/mobile" && location.pathname === "/mobile/") ||
-            (tab.path === "/mobile/application" && location.pathname === "/mobile/safety")
+            (tab.path === "/mobile/application" &&
+              (location.pathname === "/mobile/safety" || location.pathname === "/mobile/application"))
           return (
             <NavLink
               key={tab.path}
               to={buildMobilePath(tab.path, context)}
               className={`ff-mobile-tab${isActive ? " is-active" : ""}`}
             >
-              <Icon size={18} />
+              <Icon size={18} strokeWidth={isActive ? 2.4 : 2} />
               <span>{tab.label}</span>
             </NavLink>
           )

@@ -1,4 +1,4 @@
-import { getAccessToken } from "../../services/auth"
+import { getAccessToken, markAuthExpired } from "../../services/auth"
 
 
 
@@ -181,6 +181,9 @@ export async function fetchSupportProjectsOverview({
 
 
       if (!response.ok || json.success === false) {
+        if (response.status === 401 || response.status === 403) {
+          markAuthExpired("로그인이 만료되었습니다. 다시 로그인해주세요.")
+        }
 
         throw new SupportProjectsOverviewApiError(
 
@@ -273,6 +276,9 @@ export async function refreshLiveMatchedPolicies({
 
 
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      markAuthExpired("로그인이 만료되었습니다. 다시 로그인해주세요.")
+    }
 
     const json = (await response.json().catch(() => ({}))) as { message?: string; detail?: string }
 

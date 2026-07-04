@@ -62,6 +62,7 @@ export async function requestAdvisorAnswer(
   options?: {
     companyId?: string
     selectedEquipmentId?: string
+    policyId?: string
     policyIntentChoice?: string
     analysisId?: string
     action?: string
@@ -74,6 +75,7 @@ export async function requestAdvisorAnswer(
   const {
     companyId,
     selectedEquipmentId,
+    policyId,
     policyIntentChoice,
     analysisId,
     action,
@@ -91,6 +93,7 @@ export async function requestAdvisorAnswer(
       message,
       chat_history: history ?? [],
       selected_equipment_id: selectedEquipmentId ?? getSelectedEquipmentId(),
+      policy_id: policyId ?? "",
       policy_intent_choice: policyIntentChoice ?? "",
       analysis_id: analysisId ?? "",
       action: action ?? "",

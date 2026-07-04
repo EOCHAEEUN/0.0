@@ -21,6 +21,8 @@ export default function AuthenticatedLayout() {
     location.pathname.startsWith("/advisor/") ||
     location.pathname === "/ai" ||
     location.pathname === "/ai-advisor" ||
+    location.pathname === "/mobile" ||
+    location.pathname.startsWith("/mobile/") ||
     location.pathname === "/mypage" ||
     location.pathname === "/company"
   const hasToken = !!getAccessToken()

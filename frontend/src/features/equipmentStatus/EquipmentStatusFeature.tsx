@@ -1,5 +1,6 @@
 import { Bot, CircleHelp, Info, Plus } from "lucide-react"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import DashboardWorkspaceSidebar from "../../components/layout/DashboardWorkspaceSidebar"
 import {
   fetchDashboardOnboarding,
@@ -8,6 +9,9 @@ import {
   patchRepresentativeEquipment,
 } from "../dashboard/dashboard.api"
 import { useDashboardData } from "../dashboard/hooks/useDashboardData"
+import { runSetupRoiAnalysis } from "../onboarding/onboardingAnalysisApi"
+import { saveAnalysisResult } from "../onboarding/onboardingState"
+import { buildRoiPath } from "../roi/roiPaths"
 import {
   EQUIPMENT_CATEGORY_OPTIONS,
   Field,
@@ -27,6 +31,7 @@ import {
   mapRemoteEquipment,
 } from "./equipmentStatus.mapper"
 import EquipmentRegisteredList from "./EquipmentRegisteredList"
+import { isEquipmentRegisterIntent } from "./equipmentStatusPaths"
 
 function getStringValue(value: unknown) {
   if (value === null || value === undefined) return ""
@@ -42,6 +47,9 @@ function getObject(value: unknown): Record<string, unknown> | null {
 export default function EquipmentStatusFeature() {
   const { dashboard, loading: dashboardLoading } = useDashboardData()
   const workspace = dashboard.workspace
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const autoRegisterHandledRef = useRef(false)
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -108,6 +116,28 @@ export default function EquipmentStatusFeature() {
     setFeedback("")
   }
 
+  useEffect(() => {
+    if (autoRegisterHandledRef.current) return
+    if (!isEquipmentRegisterIntent(searchParams)) return
+    if (loading || dashboardLoading || editingId !== null) return
+
+    autoRegisterHandledRef.current = true
+    const next = createEmptyEquipment(nextLocalId)
+    setDraftEquipment(next)
+    setEditingId(next.id)
+    setFeedback("")
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete("register")
+    setSearchParams(nextParams, { replace: true })
+  }, [
+    dashboardLoading,
+    editingId,
+    loading,
+    nextLocalId,
+    searchParams,
+    setSearchParams,
+  ])
+
   const startEdit = (equipment: EquipmentInfo) => {
     setDraftEquipment({ ...equipment })
     setEditingId(equipment.id)
@@ -162,6 +192,24 @@ export default function EquipmentStatusFeature() {
       setDraftEquipment(null)
       setEditingId(null)
       notifyDashboardRefresh()
+
+      const shouldAutoStartAnalysis = searchParams.get("source") === "analysis"
+      if (shouldAutoStartAnalysis) {
+        const savedEquipmentId = equipmentId || draftEquipment.equipmentId
+        if (!savedEquipmentId) {
+          window.alert("설비 저장은 완료됐지만 설비 ID를 찾지 못해 자동 분석을 시작할 수 없습니다.")
+          return
+        }
+
+        const result = await runSetupRoiAnalysis(
+          companyId,
+          savedEquipmentId,
+          savedEquipment.name || "검토 설비",
+        )
+        saveAnalysisResult(result)
+        navigate(buildRoiPath("strategy", { analysisId: result.id }), { replace: true })
+        return
+      }
     } catch (error) {
       window.alert(getErrorMessage(error))
     } finally {

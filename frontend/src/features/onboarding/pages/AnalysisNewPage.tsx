@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react"
-import { useNavigate, useSearchParams } from "react-router-dom"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Navigate, useNavigate, useSearchParams } from "react-router-dom"
+import { buildEquipmentRegisterPath } from "../../equipmentStatus/equipmentStatusPaths"
 import {
   fetchAnalysisEntryContext,
   runExistingEquipmentAnalysis,
@@ -77,6 +78,10 @@ export default function AnalysisNewPage() {
   const rawMode = searchParams.get("mode")
   const equipmentId = searchParams.get("equipmentId")
   const parentAnalysisId = searchParams.get("parentAnalysisId")
+  const autoRunRequested = ["1", "true", "yes"].includes(
+    String(searchParams.get("autoRun") ?? "").toLowerCase(),
+  )
+  const autoRunHandledRef = useRef(false)
   const mode: AnalysisMode =
     rawMode === "new"
       ? "new_equipment"
@@ -185,7 +190,7 @@ export default function AnalysisNewPage() {
   const update = (patch: Partial<AnalysisConditionDraft>) =>
     setCondition((current) => ({ ...current, ...patch }))
 
-  const handleAnalyze = async () => {
+  const handleAnalyze = useCallback(async () => {
     if (!condition.equipmentCategory || !condition.equipmentName || !condition.investmentAmount) {
       setError("설비 종류, 검토 설비명, A안 투자금을 입력해주세요.")
       return
@@ -211,7 +216,7 @@ export default function AnalysisNewPage() {
     } finally {
       setIsAnalyzing(false)
     }
-  }
+  }, [companyId, condition, equipmentId, mode, navigate, profile])
 
   const needsEquipmentLoading =
     (mode === "existing_equipment" || mode === "reanalysis") &&
@@ -226,6 +231,30 @@ export default function AnalysisNewPage() {
         : mode === "existing_equipment" && !equipmentId
           ? "분석할 설비 정보가 없습니다."
           : ""
+
+  useEffect(() => {
+    if (!autoRunRequested) return
+    if (autoRunHandledRef.current) return
+    if (mode !== "existing_equipment") return
+    if (!equipmentId || isLoadingEquipment || isAnalyzing) return
+    if (loadError || invalidReanalysisMessage) return
+
+    autoRunHandledRef.current = true
+    void handleAnalyze()
+  }, [
+    autoRunRequested,
+    mode,
+    equipmentId,
+    isLoadingEquipment,
+    isAnalyzing,
+    loadError,
+    invalidReanalysisMessage,
+    handleAnalyze,
+  ])
+
+  if (mode === "new_equipment") {
+    return <Navigate to={buildEquipmentRegisterPath({ source: "analysis" })} replace />
+  }
 
   if (invalidReanalysisMessage) {
     return (
@@ -279,7 +308,7 @@ export default function AnalysisNewPage() {
           {!showEquipmentList ? (
             <div className="ff-edit-form-panel ff-setup-actions">
               <button className="ff-primary-action" onClick={handleShowEquipmentList}>등록된 설비 재분석</button>
-              <button className="ff-secondary-action" onClick={() => navigate("/analysis/new?mode=new")}>새 설비 등록 후 분석</button>
+              <button className="ff-secondary-action" onClick={() => navigate(buildEquipmentRegisterPath({ source: "analysis" }))}>새 설비 등록 후 분석</button>
             </div>
           ) : (
             <div className="ff-edit-form-panel">
@@ -295,7 +324,7 @@ export default function AnalysisNewPage() {
                 ))}
                 {!isLoadingEquipmentList && equipments.length === 0 && <p>등록된 설비가 없습니다.</p>}
               </div>
-              <button className="ff-secondary-action" onClick={() => navigate("/analysis/new?mode=new")}>+ 새 설비 등록 후 분석</button>
+              <button className="ff-secondary-action" onClick={() => navigate(buildEquipmentRegisterPath({ source: "analysis" }))}>+ 새 설비 등록 후 분석</button>
             </div>
           )}
           {error && <p className="ff-field-error">{error}</p>}

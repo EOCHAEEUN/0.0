@@ -84,6 +84,7 @@ import {
   getPasswordStrength,
   getCurrentUserId,
   FieldLabel,
+  RequiredMark,
   EquipmentCategoryHelpTooltip,
   IndustryRemoveButton,
   Field,
@@ -1859,7 +1860,8 @@ export default function MyPage() {
                     <tr>
                       <td>
                         {PREVIOUS_YEAR}
-                        <span style={{ color: "#94a3b8", fontWeight: 700 }}> (추정)</span>
+                        <span style={{ color: "#94a3b8", fontWeight: 700 }}> (직전)</span>
+                        <RequiredMark />
                       </td>
                       <td>
                         <input

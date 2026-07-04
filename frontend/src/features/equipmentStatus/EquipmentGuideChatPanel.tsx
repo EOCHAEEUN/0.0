@@ -1,6 +1,5 @@
 import { Info, Send } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
-import { createPortal } from "react-dom"
 import botIcon from "../../assets/advisor/factofit-ai-bot.png"
 import "../aiAdvisor/aiAdvisor.css"
 import {
@@ -52,6 +51,15 @@ export default function EquipmentGuideChatPanel({
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [open, onClose])
 
+  useEffect(() => {
+    if (!open) return
+    const previous = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => {
+      document.body.style.overflow = previous
+    }
+  }, [open])
+
   const sendMessage = async (text: string) => {
     const trimmed = text.trim()
     if (!trimmed || isSending) return
@@ -87,9 +95,9 @@ export default function EquipmentGuideChatPanel({
     }
   }
 
-  if (!open || typeof document === "undefined") return null
+  if (!open) return null
 
-  return createPortal(
+  return (
     <section
       className="ff-advisor-popup-shell ff-equipment-guide-popup-shell"
       aria-label="설비 등록 도우미"
@@ -216,7 +224,6 @@ export default function EquipmentGuideChatPanel({
           </div>
         </div>
       </div>
-    </section>,
-    document.body,
+    </section>
   )
 }

@@ -52,6 +52,25 @@ function numberValue(value: string | undefined) {
   return digits ? Number(digits).toLocaleString("ko-KR") : ""
 }
 
+function RequiredMark() {
+  return <em className="ff-required-mark">*</em>
+}
+
+function FieldLabel({
+  label,
+  required = false,
+}: {
+  label: string
+  required?: boolean
+}) {
+  return (
+    <span>
+      {label}
+      {required ? <RequiredMark /> : null}
+    </span>
+  )
+}
+
 export default function AnalysisNewPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -287,6 +306,7 @@ export default function AnalysisNewPage() {
 
   const readOnlyEquipment = mode !== "new_equipment"
   const isReanalysis = mode === "reanalysis"
+  const isNewEquipment = mode === "new_equipment"
   const title =
     mode === "new_equipment"
       ? "새 설비 투자 분석"
@@ -304,24 +324,32 @@ export default function AnalysisNewPage() {
     label: string,
     key: keyof AnalysisConditionDraft,
     unit: string,
-    disabled = false,
-  ) => (
-    <label>
-      <span>{label}</span>
-      <div className="ff-input-with-unit">
-        <input
-          inputMode="numeric"
-          value={numberValue(String(condition[key] ?? ""))}
-          disabled={disabled}
-          onChange={(event) => update({ [key]: event.target.value.replace(/,/g, "") })}
-        />
-        <span className="ff-input-unit">{unit}</span>
-      </div>
-    </label>
-  )
+    options?: {
+      disabled?: boolean
+      placeholder?: string
+      required?: boolean
+    },
+  ) => {
+    const disabled = options?.disabled ?? false
+    return (
+      <label>
+        <FieldLabel label={label} required={options?.required} />
+        <div className="ff-input-with-unit">
+          <input
+            inputMode="numeric"
+            placeholder={options?.placeholder}
+            value={numberValue(String(condition[key] ?? ""))}
+            disabled={disabled}
+            onChange={(event) => update({ [key]: event.target.value.replace(/,/g, "") })}
+          />
+          <span className="ff-input-unit">{unit}</span>
+        </div>
+      </label>
+    )
+  }
 
   return (
-    <main className="ff-onboarding-page">
+    <main className={`ff-onboarding-page${isNewEquipment ? " ff-analysis-page--new-equipment" : ""}`}>
       <header className="ff-setup-header"><button className="ff-logo-button" onClick={() => navigate("/dashboard")}>FactoFit</button></header>
       <section className="ff-analysis-shell">
         <div className="ff-edit-header">
@@ -331,17 +359,39 @@ export default function AnalysisNewPage() {
         </div>
         <section className="ff-edit-form-panel">
           <p className="ff-edit-section-title">설비 기본 정보</p>
-          <div className="ff-placeholder-form">
+          <div
+            className={
+              isNewEquipment
+                ? "ff-placeholder-form ff-analysis-field-grid ff-analysis-field-grid--two"
+                : "ff-placeholder-form"
+            }
+          >
             <label>
-              <span>설비 종류</span>
+              <FieldLabel label="설비 종류" required />
               <select disabled={readOnlyEquipment} value={condition.equipmentCategory} onChange={(event) => update({ equipmentCategory: event.target.value })}>
                 <option value="">설비 종류 선택</option>
                 {categoryOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </label>
-            <label><span>검토 설비명</span><input disabled={readOnlyEquipment} value={condition.equipmentName} onChange={(event) => update({ equipmentName: event.target.value })} /></label>
-            {readOnlyEquipment && <label><span>공정</span><input disabled value={condition.process || selectedEquipment?.process || ""} /></label>}
-            {numericField("사용연수", "ageYears", "년", readOnlyEquipment)}
+            <label>
+              <FieldLabel label="검토 설비명" required />
+              <input
+                disabled={readOnlyEquipment}
+                placeholder="예: 프레스 1호기"
+                value={condition.equipmentName}
+                onChange={(event) => update({ equipmentName: event.target.value })}
+              />
+            </label>
+            {readOnlyEquipment && (
+              <label>
+                <span>공정</span>
+                <input disabled placeholder="예: 프레스" value={condition.process || selectedEquipment?.process || ""} />
+              </label>
+            )}
+            {numericField("사용연수", "ageYears", "년", {
+              disabled: readOnlyEquipment,
+              placeholder: "예: 10",
+            })}
           </div>
           {readOnlyEquipment && <p className="ff-setup-helper">설비 기본 정보를 수정하려면 설비 관리에서 변경하세요. <button className="ff-edit-company-edit-btn" onClick={() => navigate("/company")}>설비 관리로 이동</button></p>}
           <hr className="ff-edit-divider" />
@@ -349,19 +399,73 @@ export default function AnalysisNewPage() {
           <div className="ff-placeholder-form">
             {!isReanalysis && (
               <div className="ff-purpose-field">
-                <span className="ff-field-label">주요 목적</span>
+                <span className="ff-field-label">
+                  주요 목적
+                  <RequiredMark />
+                </span>
                 <div className="ff-purpose-chips">
                   {purposeOptions.map((purpose) => <button type="button" key={purpose} className={`ff-purpose-chip${condition.purpose === purpose ? " selected" : ""}`} onClick={() => update({ purpose })}>{purpose}</button>)}
                 </div>
               </div>
             )}
-            {numericField("연간 에너지 비용", "energyCostAnnual", "만원")}
-            {numericField("월 유지보수 비용", "monthlyMaintenanceCost", "만원")}
-            {numericField("불량률", "defectRate", "%")}
-            {numericField("생산량", "monthlyProduction", "개/월")}
-            {numericField("공헌이익", "contributionMarginWon", "원")}
-            {numericField("A안 투자금", "investmentAmount", "만원")}
-            {numericField("B안 투자금", "scenarioBInvestmentManwon", "만원")}
+            {isNewEquipment ? (
+              <>
+                <div className="ff-analysis-field-grid ff-analysis-field-grid--two">
+                  {numericField("A안 투자금", "investmentAmount", "만원", {
+                    placeholder: "예: 7,000",
+                    required: true,
+                  })}
+                </div>
+                <details className="ff-analysis-optional">
+                  <summary>선택 정보를 입력하면 ROI 정확도가 높아집니다</summary>
+                  <div className="ff-optional-inner ff-analysis-field-grid ff-analysis-field-grid--two">
+                    {numericField("연간 에너지 비용", "energyCostAnnual", "만원", {
+                      placeholder: "예: 5,000",
+                    })}
+                    {numericField("월 유지보수 비용", "monthlyMaintenanceCost", "만원", {
+                      placeholder: "예: 100",
+                    })}
+                    {numericField("불량률", "defectRate", "%", {
+                      placeholder: "예: 3",
+                    })}
+                    {numericField("생산량", "monthlyProduction", "개/월", {
+                      placeholder: "예: 500",
+                    })}
+                    {numericField("공헌이익", "contributionMarginWon", "원", {
+                      placeholder: "예: 12,000",
+                    })}
+                    {numericField("B안 투자금", "scenarioBInvestmentManwon", "만원", {
+                      placeholder: "예: 4,994",
+                    })}
+                  </div>
+                </details>
+              </>
+            ) : (
+              <>
+                {numericField("연간 에너지 비용", "energyCostAnnual", "만원", {
+                  placeholder: "예: 5,000",
+                })}
+                {numericField("월 유지보수 비용", "monthlyMaintenanceCost", "만원", {
+                  placeholder: "예: 100",
+                })}
+                {numericField("불량률", "defectRate", "%", {
+                  placeholder: "예: 3",
+                })}
+                {numericField("생산량", "monthlyProduction", "개/월", {
+                  placeholder: "예: 500",
+                })}
+                {numericField("공헌이익", "contributionMarginWon", "원", {
+                  placeholder: "예: 12,000",
+                })}
+                {numericField("A안 투자금", "investmentAmount", "만원", {
+                  placeholder: "예: 7,000",
+                  required: true,
+                })}
+                {numericField("B안 투자금", "scenarioBInvestmentManwon", "만원", {
+                  placeholder: "예: 4,994",
+                })}
+              </>
+            )}
           </div>
           {error && <p className="ff-field-error" role="alert">{error}</p>}
           <div className="ff-edit-actions">

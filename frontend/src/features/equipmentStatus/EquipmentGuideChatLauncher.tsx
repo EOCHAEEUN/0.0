@@ -1,5 +1,4 @@
-import { useState } from "react"
-import { createPortal } from "react-dom"
+import { useEffect, useState } from "react"
 import { AdvisorFloatingButton } from "../aiAdvisor/components/AdvisorFloatingButton"
 import "../aiAdvisor/aiAdvisor.css"
 import EquipmentGuideChatPanel from "./EquipmentGuideChatPanel"
@@ -7,9 +6,13 @@ import EquipmentGuideChatPanel from "./EquipmentGuideChatPanel"
 export default function EquipmentGuideChatLauncher() {
   const [open, setOpen] = useState(false)
 
-  if (typeof document === "undefined") return null
+  useEffect(() => {
+    return () => {
+      document.body.style.overflow = ""
+    }
+  }, [])
 
-  return createPortal(
+  return (
     <div className="ff-equipment-guide-chat-launcher" data-open={open ? "true" : "false"}>
       <AdvisorFloatingButton
         open={open}
@@ -17,7 +20,6 @@ export default function EquipmentGuideChatLauncher() {
         onClick={() => setOpen((value) => !value)}
       />
       <EquipmentGuideChatPanel open={open} onClose={() => setOpen(false)} />
-    </div>,
-    document.body,
+    </div>
   )
 }

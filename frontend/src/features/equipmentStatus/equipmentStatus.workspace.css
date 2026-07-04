@@ -1,5 +1,11 @@
 .ff-dashboard-main-content.ff-equipment-workspace-content {
   min-width: 0;
+  z-index: 1;
+}
+
+.ff-dashboard-workspace-page .ff-dashboard-sidebar,
+.ff-dashboard-workspace-page .ff-dashboard-sidebar * {
+  pointer-events: auto !important;
 }
 
 .ff-equipment-workspace-inner {
@@ -118,6 +124,20 @@
 .ff-equipment-secondary-btn:hover {
   border-color: #b8c9de;
   background: #f8fafc;
+}
+
+.ff-equipment-hero-card .ff-equipment-hero-action-btn {
+  min-height: 48px;
+  padding: 0 20px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  font-size: 15px;
+}
+
+.ff-equipment-hero-card .ff-equipment-hero-action-btn:hover {
+  border-color: rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .ff-equipment-danger-btn {
@@ -293,10 +313,55 @@
   font-weight: 900;
 }
 
-.ff-equipment-form-grid {
+.ff-equipment-form-required,
+.ff-equipment-form-optional-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px 18px;
+  align-items: start;
+}
+
+.ff-equipment-form-required > label,
+.ff-equipment-form-optional-grid > label {
+  margin: 0;
+  min-width: 0;
+}
+
+.ff-equipment-form-optional-hint {
+  margin: 6px 0 16px;
+  padding: 14px 16px;
+  border: 1px solid #e8eef5;
+  border-radius: 10px;
+  background: #f8faff;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.55;
+}
+
+.ff-equipment-form-card label input,
+.ff-equipment-form-card label select {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #061b34;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.ff-equipment-form-card label input::placeholder {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.ff-equipment-form-card label input:focus,
+.ff-equipment-form-card label select:focus {
+  outline: 3px solid rgba(0, 71, 160, 0.12);
+  border-color: #2563eb;
 }
 
 .ff-equipment-form-actions {
@@ -471,7 +536,8 @@
     align-items: stretch;
   }
 
-  .ff-equipment-form-grid {
+  .ff-equipment-form-required,
+  .ff-equipment-form-optional-grid {
     grid-template-columns: 1fr;
   }
 

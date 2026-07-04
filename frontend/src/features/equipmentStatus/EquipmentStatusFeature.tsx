@@ -26,7 +26,6 @@ import {
   getCategoryLabel,
   mapRemoteEquipment,
 } from "./equipmentStatus.mapper"
-import EquipmentGuideChatLauncher from "./EquipmentGuideChatLauncher"
 import EquipmentRegisteredList from "./EquipmentRegisteredList"
 
 function getStringValue(value: unknown) {
@@ -257,7 +256,7 @@ export default function EquipmentStatusFeature() {
               </p>
             </div>
             {!editingId ? (
-              <button type="button" className="ff-equipment-primary-btn" onClick={startCreate}>
+              <button type="button" className="ff-equipment-secondary-btn ff-equipment-hero-action-btn" onClick={startCreate}>
                 <Plus aria-hidden="true" size={18} />
                 내 설비 등록
               </button>
@@ -313,7 +312,7 @@ export default function EquipmentStatusFeature() {
                     </button>
                   </header>
 
-                  <div className="ff-equipment-form-grid">
+                  <div className="ff-equipment-form-required">
                     <SelectField
                       label="설비 종류"
                       required
@@ -346,14 +345,23 @@ export default function EquipmentStatusFeature() {
                       inputMode="numeric"
                       onChange={(value) => updateDraft("annualEnergyCost", value)}
                     />
+                  </div>
+
+                  <p className="ff-equipment-form-optional-hint">
+                    선택 정보를 입력하면 ROI 정확도가 높아집니다
+                  </p>
+
+                  <div className="ff-equipment-form-optional-grid">
                     <Field
                       label="공정"
+                      selectable
                       value={draftEquipment.process}
                       placeholder="예: 프레스공정"
                       onChange={(value) => updateDraft("process", value)}
                     />
                     <Field
                       label="불량률"
+                      selectable
                       value={draftEquipment.defectRate}
                       placeholder="예: 3.5"
                       helperText="단위: %"
@@ -362,6 +370,7 @@ export default function EquipmentStatusFeature() {
                     />
                     <Field
                       label="월 유지보수 비용"
+                      selectable
                       value={draftEquipment.maintenanceCostAnnual}
                       placeholder="예: 80"
                       helperText="단위: 만원"
@@ -370,6 +379,7 @@ export default function EquipmentStatusFeature() {
                     />
                     <Field
                       label="전체교체 투자금(A안)"
+                      selectable
                       value={draftEquipment.scenarioAInvestment}
                       placeholder="예: 20,000"
                       helperText="단위: 만원"
@@ -378,6 +388,7 @@ export default function EquipmentStatusFeature() {
                     />
                     <Field
                       label="부분교체 투자금(B안)"
+                      selectable
                       value={draftEquipment.scenarioBInvestment}
                       placeholder="예: 4,000"
                       helperText="단위: 만원"
@@ -429,7 +440,6 @@ export default function EquipmentStatusFeature() {
           </div>
         </div>
       </div>
-      <EquipmentGuideChatLauncher />
     </main>
   )
 }

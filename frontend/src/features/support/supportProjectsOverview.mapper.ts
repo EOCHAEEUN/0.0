@@ -85,6 +85,7 @@ function mapPolicyCard(raw: unknown): SupportProjectsPolicyCard | null {
 
   return {
     rank: toNumberOrNull(record.rank),
+    match_score: toNumberOrNull(record.match_score ?? record.matchScore),
     policy_id: policyId,
     title: pickString(record.title, "공고명 미확인"),
     organization: pickString(record.organization, "-"),

@@ -21,6 +21,7 @@ export type SupportProjectsPreflightCheck = {
 
 export type SupportProjectsPolicyCard = {
   rank?: number | null
+  match_score: number | null
   policy_id: string
   title: string
   organization: string

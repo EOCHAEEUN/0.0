@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom"
 
 import DashboardWorkspaceSidebar from "../../components/layout/DashboardWorkspaceSidebar"
@@ -14,11 +14,20 @@ import { useSupportProjectsOverview } from "./hooks/useSupportProjectsOverview"
 import type { SupportProject } from "./supportProjects.contract"
 import {
   computeSupportTypeGuideStats,
-  matchesPolicySearch,
+  matchesPolicyFilters,
 } from "./supportProjectsDisplay.utils"
+import {
+  getEquipmentGroupLabel,
+  isEquipmentGroup,
+  resolveEquipmentGroupFromCategory,
+  type EquipmentGroup,
+} from "./supportProjectsEquipmentGroups"
 import { filterPriorityPolicies } from "./supportProjectsFilters"
-import { buildSupportProjectsPath, type SupportProjectsView } from "./supportProjectsPaths"
+import {
+  type SupportProjectsView,
+} from "./supportProjectsPaths"
 import type {
+  SupportProjectsOverviewViewModel,
   SupportProjectsPolicyCard,
 } from "./supportProjectsOverview.types"
 import "../dashboard/dashboard.workspace.css"
@@ -114,6 +123,57 @@ function getProjectPolicyId(project: SupportProject) {
 
 }
 
+function normalizeDateKey(value: string) {
+  const match = value.trim().match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})/)
+  if (!match) return ""
+  const [, year, month, day] = match
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`
+}
+
+function getPolicyDeadlineDate(policy: SupportProjectsPolicyCard) {
+  const raw = pickString(policy.deadline, policy.deadline_display)
+  return raw ? normalizeDateKey(raw) : ""
+}
+
+function isRollingPolicy(policy: SupportProjectsPolicyCard) {
+  const raw = pickString(policy.deadline, policy.deadline_display)
+  if (getPolicyDeadlineDate(policy)) return false
+  return /상시|수시|예산|소진|미정|확인/.test(raw)
+}
+
+function matchesCalendarQuery(
+  policy: SupportProjectsPolicyCard,
+  selectedDate: string,
+  rollingOnly: boolean,
+) {
+  if (selectedDate) return getPolicyDeadlineDate(policy) === selectedDate
+  if (rollingOnly) return isRollingPolicy(policy)
+  return true
+}
+
+function collectSearchablePolicies(
+  model: SupportProjectsOverviewViewModel,
+  excludePolicyId?: string,
+) {
+  const seen = new Set<string>()
+  const result: SupportProjectsPolicyCard[] = []
+  const pool = [
+    ...model.priorityPolicies,
+    ...model.liveDiscovery.items,
+    ...model.allMatched,
+    ...(model.priorityPolicy ? [model.priorityPolicy] : []),
+  ]
+
+  for (const policy of pool) {
+    if (!policy.policy_id || seen.has(policy.policy_id)) continue
+    if (excludePolicyId && policy.policy_id === excludePolicyId) continue
+    seen.add(policy.policy_id)
+    result.push(policy)
+  }
+
+  return result
+}
+
 
 
 export default function SupportProjectsFeature({ view }: { view: SupportProjectsView }) {
@@ -122,17 +182,20 @@ export default function SupportProjectsFeature({ view }: { view: SupportProjects
 
   const navigate = useNavigate()
 
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [detailPolicy, setDetailPolicy] = useState<SupportProjectsPolicyCard | null>(null)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [showAllUrgent, setShowAllUrgent] = useState(false)
+  const [searchInput, setSearchInput] = useState("")
+  const [activeSearchQuery, setActiveSearchQuery] = useState("")
+  const shouldFocusSearch = searchParams.get("focus") === "search"
+  const selectedDeadlineDate = normalizeDateKey(searchParams.get("date") || "")
+  const rollingOnly = searchParams.get("filter") === "rolling"
+  const supportType = searchParams.get("supportType") || "all"
+  const purpose = searchParams.get("purpose") || "all"
 
-  useEffect(() => {
-    setShowAllUrgent(false)
-  }, [view, searchQuery])
-
-
+  const urgentListKey = `${view}:${activeSearchQuery}:${selectedDeadlineDate}:${rollingOnly ? "rolling" : "dated"}`
+  const [urgentListState, setUrgentListState] = useState({ expanded: false, key: urgentListKey })
+  const showAllUrgent = urgentListState.expanded && urgentListState.key === urgentListKey
 
   const analysisId = useMemo(() => {
 
@@ -210,27 +273,75 @@ export default function SupportProjectsFeature({ view }: { view: SupportProjects
 
   })
 
+  const syncFiltersToUrl = useCallback(
+    (updates: Record<string, string | undefined>) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.delete("q")
+          for (const [key, value] of Object.entries(updates)) {
+            const trimmed = value?.trim() ?? ""
+            if (trimmed && trimmed !== "all") {
+              next.set(key, trimmed)
+            } else {
+              next.delete(key)
+            }
+          }
+          return next
+        },
+        { replace: true },
+      )
+    },
+    [setSearchParams],
+  )
+
+  const handleSearch = useCallback(() => {
+    const trimmed = searchInput.trim()
+    setActiveSearchQuery(trimmed)
+  }, [searchInput])
+
+  const handleEquipmentGroupChange = useCallback(
+    (value: EquipmentGroup) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.delete("q")
+          next.set("equipmentGroup", value)
+          return next
+        },
+        { replace: true },
+      )
+    },
+    [setSearchParams],
+  )
+
+  const handleSupportTypeChange = useCallback(
+    (value: string) => {
+      syncFiltersToUrl({ supportType: value })
+    },
+    [syncFiltersToUrl],
+  )
+
+  const handlePurposeChange = useCallback(
+    (value: string) => {
+      syncFiltersToUrl({ purpose: value })
+    },
+    [syncFiltersToUrl],
+  )
+
 
 
   const buildPolicyDetailPath = useCallback(
 
     (policy: SupportProjectsPolicyCard) => {
 
-      const query = new URLSearchParams()
-
-      if (companyId) query.set("company_id", companyId)
-
-      if (analysisId) query.set("analysis_id", analysisId)
-
-      if (equipmentId) query.set("equipment_id", equipmentId)
-
-      if (policy.policy_id) query.set("policy_id", policy.policy_id)
-
-      return `/support-projects/${view}?${query.toString()}`
+      const next = new URLSearchParams(searchParams)
+      if (policy.policy_id) next.set("policy_id", policy.policy_id)
+      return `/support-projects/${view}?${next.toString()}`
 
     },
 
-    [analysisId, companyId, equipmentId, view],
+    [searchParams, view],
 
   )
 
@@ -240,28 +351,17 @@ export default function SupportProjectsFeature({ view }: { view: SupportProjects
 
     setDetailPolicy(null)
 
-    const next = new URLSearchParams(searchParams)
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete("policy_id")
+        next.delete("policyId")
+        return next
+      },
+      { replace: true },
+    )
 
-    const hadPolicyInQuery = next.has("policy_id") || next.has("policyId")
-
-    next.delete("policy_id")
-
-    next.delete("policyId")
-
-    if (hadPolicyInQuery) {
-
-      const qs = next.toString()
-
-      navigate(
-        qs
-          ? `/support-projects/${view}?${qs}`
-          : `/support-projects/${view}`,
-        { replace: true },
-      )
-
-    }
-
-  }, [navigate, searchParams, view])
+  }, [setSearchParams])
 
 
 
@@ -435,6 +535,52 @@ export default function SupportProjectsFeature({ view }: { view: SupportProjects
 
       : null
 
+  const defaultEquipmentGroup = useMemo(
+    () => resolveEquipmentGroupFromCategory(model?.equipmentCategory),
+    [model?.equipmentCategory],
+  )
+
+  const equipmentGroupFromUrl = searchParams.get("equipmentGroup")
+  const equipmentGroup: EquipmentGroup =
+    equipmentGroupFromUrl && isEquipmentGroup(equipmentGroupFromUrl)
+      ? equipmentGroupFromUrl
+      : defaultEquipmentGroup
+
+  const equipmentGroupLabel =
+    equipmentGroup === "all" ? undefined : getEquipmentGroupLabel(equipmentGroup)
+
+  const filterCriteria = useMemo(
+    () => ({
+      query: activeSearchQuery,
+      equipmentGroup,
+      supportType,
+      purpose,
+      defaultEquipmentGroup,
+    }),
+    [activeSearchQuery, defaultEquipmentGroup, equipmentGroup, purpose, supportType],
+  )
+
+  const matchesActiveFilters = useCallback(
+    (policy: SupportProjectsPolicyCard) =>
+      matchesPolicyFilters(policy, filterCriteria) &&
+      matchesCalendarQuery(policy, selectedDeadlineDate, rollingOnly),
+    [filterCriteria, rollingOnly, selectedDeadlineDate],
+  )
+
+  const toolbarProps = {
+    searchInput,
+    onSearchInputChange: setSearchInput,
+    onSearch: handleSearch,
+    isSearching: false,
+    equipmentGroup,
+    onEquipmentGroupChange: handleEquipmentGroupChange,
+    supportType,
+    onSupportTypeChange: handleSupportTypeChange,
+    purpose,
+    onPurposeChange: handlePurposeChange,
+    autoFocusSearch: shouldFocusSearch,
+  }
+
 
 
   const autoOpenPolicy = useMemo(() => {
@@ -483,17 +629,18 @@ export default function SupportProjectsFeature({ view }: { view: SupportProjects
 
       : "/analysis/new"
 
+  const discoveryProjectsPath = useMemo(() => {
+    const qs = searchParams.toString()
+    return qs ? `/support-projects/discovery?${qs}` : "/support-projects/discovery"
+  }, [searchParams])
 
-
-  const supportProjectsPath = buildSupportProjectsPath("priority", {
-    analysisId,
-    companyId,
-  })
-
-  const discoveryProjectsPath = buildSupportProjectsPath("discovery", {
-    analysisId,
-    companyId,
-  })
+  const supportProjectsPath = useMemo(() => {
+    const next = new URLSearchParams(searchParams)
+    next.delete("policy_id")
+    next.delete("policyId")
+    const qs = next.toString()
+    return qs ? `/support-projects/priority?${qs}` : "/support-projects/priority"
+  }, [searchParams])
 
   const isPriorityView = view === "priority"
   const isDiscoveryView = view === "discovery"
@@ -508,18 +655,46 @@ export default function SupportProjectsFeature({ view }: { view: SupportProjects
     [searchablePolicies],
   )
 
+  const calendarFilteredLiveDiscovery = useMemo(() => {
+    if (!model) return null
+    return {
+      ...model.liveDiscovery,
+      items: model.liveDiscovery.items.filter((policy) => matchesActiveFilters(policy)),
+    }
+  }, [matchesActiveFilters, model])
+
   const filteredDiscoveryPolicies = useMemo(() => {
     if (!model) return [] as SupportProjectsPolicyCard[]
     const base = model.isAnalysisMode ? filtered.visibleList : model.priorityPolicies
-    return base.filter((policy) => matchesPolicySearch(policy, searchQuery))
-  }, [filtered.visibleList, model, searchQuery])
+    return base.filter((policy) => matchesActiveFilters(policy))
+  }, [filtered.visibleList, matchesActiveFilters, model])
 
-  const visiblePriorityPolicy = useMemo(() => {
+  const roiPriorityPolicy = useMemo(() => {
     if (!model) return null
-    const candidate = model.isAnalysisMode ? filtered.visibleMain : model.priorityPolicy
-    if (!candidate) return null
-    return matchesPolicySearch(candidate, searchQuery) ? candidate : null
-  }, [filtered.visibleMain, model, searchQuery])
+    return model.isAnalysisMode ? filtered.visibleMain : model.priorityPolicy
+  }, [filtered.visibleMain, model])
+
+  const hasActiveSearch = activeSearchQuery.trim().length > 0
+
+  const searchResultPolicies = useMemo(() => {
+    if (!model || !hasActiveSearch) return [] as SupportProjectsPolicyCard[]
+    const query = activeSearchQuery.trim().toLowerCase()
+    return collectSearchablePolicies(model).filter((policy) => {
+      const haystack = [
+        policy.title,
+        policy.organization,
+        policy.recommendation_summary,
+        policy.match_reason,
+        policy.support_type_label,
+        policy.support_amount_text,
+        ...(policy.tags ?? []),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+      return haystack.includes(query)
+    })
+  }, [activeSearchQuery, hasActiveSearch, model])
 
 
 
@@ -623,11 +798,7 @@ export default function SupportProjectsFeature({ view }: { view: SupportProjects
 
               {isPriorityView ? (
                 <>
-                  <SupportProjectsToolbar
-                    searchQuery={searchQuery}
-                    onSearchChange={setSearchQuery}
-                    equipmentLabel={model.equipmentName || "전체 설비"}
-                  />
+                  <SupportProjectsToolbar {...toolbarProps} />
 
                   <section className="ff-support-state-card">
                     <span className="ff-support-badge purple">정책 이력 없음</span>
@@ -662,12 +833,16 @@ export default function SupportProjectsFeature({ view }: { view: SupportProjects
               ) : null}
 
               {isDiscoveryView ? (
-                <LiveDiscoverySection
-                  liveDiscovery={model.liveDiscovery}
-                  onOpenDetail={handleOpenDetail}
-                  onViewAll={() => navigate(discoveryProjectsPath)}
-                  searchQuery={searchQuery}
-                />
+                <>
+                  <SupportProjectsToolbar {...toolbarProps} />
+                  <LiveDiscoverySection
+                    liveDiscovery={calendarFilteredLiveDiscovery ?? model.liveDiscovery}
+                    items={calendarFilteredLiveDiscovery?.items}
+                    onOpenDetail={handleOpenDetail}
+                    onViewAll={() => navigate(discoveryProjectsPath)}
+                    onRetry={() => void reload()}
+                  />
+                </>
               ) : null}
 
             </>
@@ -682,11 +857,7 @@ export default function SupportProjectsFeature({ view }: { view: SupportProjects
 
               {isPriorityView ? (
                 <>
-                  <SupportProjectsToolbar
-                    searchQuery={searchQuery}
-                    onSearchChange={setSearchQuery}
-                    equipmentLabel={model.equipmentName || "전체 설비"}
-                  />
+                  <SupportProjectsToolbar {...toolbarProps} />
 
                   <section className="ff-support-state-card">
                     <h2>표시할 우선 검토 정책이 없습니다</h2>
@@ -701,12 +872,16 @@ export default function SupportProjectsFeature({ view }: { view: SupportProjects
               ) : null}
 
               {isDiscoveryView ? (
-                <LiveDiscoverySection
-                  liveDiscovery={model.liveDiscovery}
-                  onOpenDetail={handleOpenDetail}
-                  onViewAll={() => navigate(discoveryProjectsPath)}
-                  searchQuery={searchQuery}
-                />
+                <>
+                  <SupportProjectsToolbar {...toolbarProps} />
+                  <LiveDiscoverySection
+                    liveDiscovery={calendarFilteredLiveDiscovery ?? model.liveDiscovery}
+                    items={calendarFilteredLiveDiscovery?.items}
+                    onOpenDetail={handleOpenDetail}
+                    onViewAll={() => navigate(discoveryProjectsPath)}
+                    onRetry={() => void reload()}
+                  />
+                </>
               ) : null}
 
             </>
@@ -721,46 +896,61 @@ export default function SupportProjectsFeature({ view }: { view: SupportProjects
 
               {isPriorityView ? (
                 <>
-                  <SupportProjectsToolbar
-                    searchQuery={searchQuery}
-                    onSearchChange={setSearchQuery}
-                    equipmentLabel={model.equipmentName || "전체 설비"}
-                  />
+                  <SupportProjectsToolbar {...toolbarProps} />
 
-                  {visiblePriorityPolicy ? (
+                  {roiPriorityPolicy ? (
                     <PriorityPolicyCard
-                      policy={visiblePriorityPolicy}
+                      policy={roiPriorityPolicy}
                       onOpenDetail={handleOpenDetail}
                     />
-                  ) : (
-                    <section className="ff-support-state-card compact">
-                      <h2>검색 조건에 맞는 최우선 지원사업이 없습니다</h2>
-                      <p>검색어를 바꾸거나 추가 맞춤 지원사업 탭에서 후보를 확인해 주세요.</p>
-                    </section>
-                  )}
+                  ) : null}
 
                   <SupportTypeGuideSection
                     stats={guideStats}
                     onViewDiscovery={() => navigate(discoveryProjectsPath)}
                   />
+
+                  {hasActiveSearch ? (
+                    <PriorityPolicyList
+                      policies={searchResultPolicies}
+                      variant="list"
+                      onOpenDetail={handleOpenDetail}
+                      hasActiveSearch={hasActiveSearch}
+                    />
+                  ) : null}
                 </>
               ) : null}
 
               {isDiscoveryView ? (
                 <>
+                  <SupportProjectsToolbar {...toolbarProps} />
+
                   <PriorityPolicyList
                     policies={filteredDiscoveryPolicies}
                     expanded={showAllUrgent}
-                    onViewMore={() => setShowAllUrgent(true)}
+                    onViewMore={() =>
+                      setUrgentListState({ expanded: true, key: urgentListKey })
+                    }
                     onOpenDetail={handleOpenDetail}
+                    equipmentGroupLabel={equipmentGroupLabel}
                   />
 
                   <LiveDiscoverySection
-                    liveDiscovery={model.liveDiscovery}
+                    liveDiscovery={calendarFilteredLiveDiscovery ?? model.liveDiscovery}
+                    items={calendarFilteredLiveDiscovery?.items}
                     onOpenDetail={handleOpenDetail}
                     onViewAll={() => navigate(discoveryProjectsPath)}
-                    searchQuery={searchQuery}
+                    onRetry={() => void reload()}
                   />
+
+                  {hasActiveSearch ? (
+                    <PriorityPolicyList
+                      policies={searchResultPolicies}
+                      variant="list"
+                      onOpenDetail={handleOpenDetail}
+                      hasActiveSearch={hasActiveSearch}
+                    />
+                  ) : null}
                 </>
               ) : null}
 

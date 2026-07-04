@@ -16,19 +16,21 @@
 
 .ff-support-toolbar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   margin-bottom: 18px;
+  overflow-x: auto;
 }
 
 .ff-support-toolbar-search {
   display: flex;
   align-items: center;
-  gap: 10px;
-  flex: 1 1 320px;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 160px;
   min-height: 46px;
-  padding: 0 14px;
+  padding: 0 12px;
   border: 1px solid #dbe3ee;
   border-radius: 12px;
   background: #fff;
@@ -50,11 +52,32 @@
   color: #94a3b8;
 }
 
-.ff-support-toolbar-filters {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
+.ff-support-toolbar-search-btn,
+.ff-support-toolbar-search-submit {
+  border: 0;
+  background: transparent;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.ff-support-toolbar-search-btn:disabled,
+.ff-support-toolbar-search-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ff-support-toolbar-search-submit {
+  padding: 0 4px;
+  color: #2563eb;
+  white-space: nowrap;
+}
+
+.ff-support-toolbar-select {
+  flex-shrink: 0;
 }
 
 .ff-support-toolbar-select select {
@@ -70,19 +93,67 @@
   cursor: pointer;
 }
 
-.ff-support-toolbar-detail {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 46px;
-  padding: 0 14px;
-  border: 0;
-  background: transparent;
+.ff-support-search-loading,
+.ff-support-search-empty,
+.ff-support-live-error {
+  padding: 28px 24px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.ff-support-search-loading {
   color: #64748b;
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ff-support-search-empty h3,
+.ff-support-live-error p {
+  margin: 0 0 8px;
+  color: #0f172a;
+  font-size: 16px;
   font-weight: 800;
-  cursor: pointer;
-  font-family: inherit;
+}
+
+.ff-support-search-empty p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.ff-support-search-loading-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.ff-support-search-skeleton {
+  min-height: 220px;
+  border-radius: 18px;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: ff-support-skeleton 1.2s ease-in-out infinite;
+}
+
+.ff-support-urgent-match-reason,
+.ff-support-discovery-match {
+  display: block;
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+@keyframes ff-support-skeleton {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 .ff-support-page-intro {

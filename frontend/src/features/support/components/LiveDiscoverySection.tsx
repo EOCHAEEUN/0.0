@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import { ChevronDown, ChevronRight, Lightbulb } from "lucide-react"
 
 import type { SupportProjectsLiveDiscovery, SupportProjectsPolicyCard } from "../supportProjectsOverview.types"
@@ -23,37 +23,26 @@ function formatAmountLabel(policy: SupportProjectsPolicyCard) {
 
 export function LiveDiscoverySection({
   liveDiscovery,
+  items,
   onOpenDetail,
   onViewAll,
-  searchQuery = "",
+  onRetry,
+  isLoading = false,
 }: {
   liveDiscovery: SupportProjectsLiveDiscovery
+  items?: SupportProjectsPolicyCard[]
   onOpenDetail: (policy: SupportProjectsPolicyCard) => void
   onViewAll: () => void
-  searchQuery?: string
+  onRetry?: () => void
+  isLoading?: boolean
 }) {
   const [page, setPage] = useState(1)
 
-  const filteredItems = useMemo(() => {
-    const normalized = searchQuery.trim().toLowerCase()
-    if (!normalized) return liveDiscovery.items
-    return liveDiscovery.items.filter((policy) => {
-      const haystack = [
-        policy.title,
-        policy.organization,
-        policy.support_type_label,
-        policy.support_amount_text,
-        ...(policy.tags ?? []),
-      ]
-        .join(" ")
-        .toLowerCase()
-      return haystack.includes(normalized)
-    })
-  }, [liveDiscovery.items, searchQuery])
+  const displayItems = items ?? liveDiscovery.items
 
-  const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE))
+  const totalPages = Math.max(1, Math.ceil(displayItems.length / PAGE_SIZE))
   const currentPage = Math.min(page, totalPages)
-  const visibleItems = filteredItems.slice(0, currentPage * PAGE_SIZE)
+  const visibleItems = displayItems.slice(0, currentPage * PAGE_SIZE)
   const canLoadMore = currentPage < totalPages
 
   const banner = (
@@ -73,7 +62,14 @@ export function LiveDiscoverySection({
       <section className="ff-support-discovery-section">
         <div className="ff-support-discovery-shell">
           {banner}
-          <div className="ff-support-live-error">{liveDiscovery.error}</div>
+          <div className="ff-support-live-error">
+            <p>{liveDiscovery.error}</p>
+            {onRetry ? (
+              <button type="button" className="ff-support-secondary-btn" onClick={onRetry}>
+                다시 시도
+              </button>
+            ) : null}
+          </div>
         </div>
       </section>
     )
@@ -84,7 +80,9 @@ export function LiveDiscoverySection({
       <div className="ff-support-discovery-shell">
         {banner}
 
-        {filteredItems.length === 0 ? (
+        {isLoading ? (
+          <div className="ff-support-search-loading">지원사업을 찾는 중입니다...</div>
+        ) : displayItems.length === 0 ? (
           <div className="ff-support-live-empty">현재 기본 조건으로 추가 후보를 찾지 못했습니다.</div>
         ) : (
           <>
@@ -99,6 +97,9 @@ export function LiveDiscoverySection({
                     <div className="ff-support-discovery-row-main">
                       <p className="ff-support-discovery-meta">{formatDiscoveryMeta(policy)}</p>
                       <strong>{policy.title}</strong>
+                      {policy.match_reason ? (
+                        <span className="ff-support-discovery-match">{policy.match_reason}</span>
+                      ) : null}
                     </div>
 
                     <div className="ff-support-discovery-row-side">

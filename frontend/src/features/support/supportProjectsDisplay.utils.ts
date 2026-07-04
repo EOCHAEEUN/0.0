@@ -1,4 +1,10 @@
 import type { SupportProjectsPolicyCard } from "./supportProjectsOverview.types"
+import {
+  matchesEquipmentGroupFilter,
+  matchesPurposeFilter,
+  matchesSupportTypeFilter,
+  type EquipmentGroup,
+} from "./supportProjectsEquipmentGroups"
 
 export function matchesPolicySearch(policy: SupportProjectsPolicyCard, query: string) {
   const normalized = query.trim().toLowerCase()
@@ -17,6 +23,26 @@ export function matchesPolicySearch(policy: SupportProjectsPolicyCard, query: st
     .toLowerCase()
 
   return haystack.includes(normalized)
+}
+
+export function matchesPolicyFilters(
+  policy: SupportProjectsPolicyCard,
+  filters: {
+    query: string
+    equipmentGroup: EquipmentGroup
+    supportType: string
+    purpose: string
+    defaultEquipmentGroup?: EquipmentGroup
+  },
+) {
+  return (
+    matchesPolicySearch(policy, filters.query) &&
+    matchesEquipmentGroupFilter(policy, filters.equipmentGroup, {
+      defaultGroup: filters.defaultEquipmentGroup,
+    }) &&
+    matchesSupportTypeFilter(policy, filters.supportType) &&
+    matchesPurposeFilter(policy, filters.purpose)
+  )
 }
 
 export function getUrgentCardTone(policy: SupportProjectsPolicyCard) {

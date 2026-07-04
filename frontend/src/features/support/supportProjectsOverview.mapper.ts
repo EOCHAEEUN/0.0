@@ -191,6 +191,7 @@ export function mapSupportProjectsOverview(
     : priorityPolicies
 
   const equipmentName = pickString(equipment?.name, "현재 설비")
+  const equipmentCategory = pickString(equipment?.category) || null
   const priorityCount = counts.priority_policy_count || (priorityPolicy ? 1 : 0) + priorityPolicies.length
 
   return {
@@ -199,6 +200,7 @@ export function mapSupportProjectsOverview(
     companyId: pickString(company.company_id, params.companyId),
     companyName: pickString(company.company_name, "-"),
     equipmentName,
+    equipmentCategory,
     analysisId: params.analysisId,
     heroTrustLabel: `FACTOFIT POLICY DATABASE · 제조기업 지원정책 ${counts.policy_db_total.toLocaleString("ko-KR")}건 보유`,
     heroTitle: `지금 신청을 검토할 지원사업 ${priorityCount}건을 정리했어요`,

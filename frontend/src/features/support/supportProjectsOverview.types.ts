@@ -115,6 +115,7 @@ export type SupportProjectsOverviewViewModel = {
   companyId: string
   companyName: string
   equipmentName: string
+  equipmentCategory?: string | null
   analysisId?: string
   heroTrustLabel: string
   heroTitle: string

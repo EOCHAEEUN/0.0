@@ -73,9 +73,14 @@ export default function MobileAiScreen() {
         },
       )
       setMessages((prev) => {
-        const next = [...prev, { id: crypto.randomUUID(), role: "assistant", text: response.text }]
-        messagesRef.current = next
-        return next
+        const assistantMessage: MobileMessage = {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          text: response.text,
+        }
+        const nextMessages: MobileMessage[] = [...prev, assistantMessage]
+        messagesRef.current = nextMessages
+        return nextMessages
       })
     } catch (nextError) {
       setError(nextError instanceof Error ? nextError.message : "AI 응답을 불러오지 못했습니다.")

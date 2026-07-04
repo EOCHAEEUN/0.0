@@ -1,3 +1,4 @@
+import { getAccessToken as getStoredAccessToken } from "../../services/auth"
 import type { AdvisorApiResponse, AdvisorMessage } from "./aiAdvisor.contract"
 
 const API_BASE_URL = (
@@ -6,8 +7,10 @@ const API_BASE_URL = (
 ).replace(/\/$/, "")
 
 function getAccessToken() {
+  if (typeof window === "undefined") return ""
+
   return (
-    window.localStorage.getItem("factofit_access_token") ||
+    getStoredAccessToken() ||
     window.localStorage.getItem("access_token") ||
     window.localStorage.getItem("token") ||
     ""
@@ -101,6 +104,10 @@ export async function requestAdvisorAnswer(
   const payload = await response.json().catch(() => null)
 
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("로그인이 만료되었습니다. 다시 로그인한 뒤 ROI 상세를 다시 시도해 주세요.")
+    }
+
     throw new Error(
       payload?.detail ||
         payload?.message ||

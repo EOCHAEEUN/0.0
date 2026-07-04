@@ -4,7 +4,7 @@ import json
 import re
 from typing import Any
 
-from app.agents.capex import compare_scenarios, format_roi_result
+from app.agents.capex import compare_scenarios
 from app.agents.equipment_safety import build_safety_snapshot
 from app.core.database import get_db
 from app.models.equipment import EquipmentInput
@@ -322,14 +322,19 @@ def roi_snapshot_node(state: FactofitState) -> FactofitState:
         text = "저장된 분석 기준 A/B 비교입니다.\n\n" + compare_scenarios(roi_data)
         cards = [{"type": "roi_compare", "data": {"scenario_a": scenario_a, "scenario_b": scenario_b, "recommended": recommended}}]
     elif action == "roi_detail":
-        target = scenario_a if recommended == "A" else scenario_b
-        text = (
-            "현재 분석 결과를 정리했어요.\n\n"
-            f"추천 {recommended}안 · 투자금 {target['investment']:,}만원 · "
-            f"실부담 {target['net_investment']:,}만원 · ROI {target['roi_pct']:.1f}% · "
-            f"회수기간 {target['payback_years']:.2f}년\n\n"
-            f"{format_roi_result(roi_data)}"
-        )
+        label = "전체 교체" if recommended == "A" else "부분 교체"
+        ai_rec = _as_dict(roi_data.get("ai_recommendation"))
+        summary = _as_text(ai_rec.get("summary"))
+        reason_bullets = ai_rec.get("reason_bullets")
+        reason_bullets = reason_bullets if isinstance(reason_bullets, list) else []
+        lines = [f"추천 {recommended}안({label}) 상세입니다."]
+        if summary:
+            lines.extend(["", summary])
+        if reason_bullets:
+            lines.append("")
+            for reason in reason_bullets[:2]:
+                lines.append(f"• {str(reason).strip()}")
+        text = "\n".join(lines)
         cards = [{"type": "roi_snapshot", "data": {"scenario_a": scenario_a, "scenario_b": scenario_b, "recommended": recommended}}]
     else:
         target = scenario_a if recommended == "A" else scenario_b
@@ -414,6 +419,23 @@ def calendar_snapshot_node(state: FactofitState) -> FactofitState:
 def draft_status_node(state: FactofitState) -> FactofitState:
     draft_row = _as_dict(state.get("draft_snapshot"))
     analysis_id = _as_text(state.get("analysis_id"))
+    selected_policy_id = _as_text(state.get("policy_id"))
+    policy_snapshot = _as_dict(state.get("policy_snapshot"))
+    policy_rows = policy_snapshot.get("policies") if isinstance(policy_snapshot.get("policies"), list) else []
+    policy_cards = []
+    for row in policy_rows[:5]:
+        item = _as_dict(row)
+        policy_id = _as_text(item.get("policy_id"))
+        if not policy_id:
+            continue
+        policy_cards.append(
+            {
+                "policy_id": policy_id,
+                "title": _as_text(item.get("title")) or "정책명 미확인",
+                "deadline": _as_text(item.get("deadline_display") or item.get("deadline")) or "마감일 미정",
+            }
+        )
+
     if draft_row:
         content = draft_row.get("draft_content")
         preview = ""
@@ -424,7 +446,16 @@ def draft_status_node(state: FactofitState) -> FactofitState:
         _response_payload(
             state,
             text=f"신청서 초안이 준비되어 있습니다.\n{preview[:360]}",
-            cards=[{"type": "application_draft_status", "data": {"status": "ready", "analysis_id": analysis_id, "preview": preview[:240]}}],
+            cards=[{
+                "type": "application_draft_status",
+                "data": {
+                    "status": "ready",
+                    "analysis_id": analysis_id,
+                    "policy_id": selected_policy_id,
+                    "policies": policy_cards,
+                    "preview": preview[:240],
+                },
+            }],
             intent="draft",
             answer_source="database",
         )
@@ -432,8 +463,16 @@ def draft_status_node(state: FactofitState) -> FactofitState:
 
     _response_payload(
         state,
-        text="현재 분석에 연결된 신청서 초안이 아직 없습니다. 신청서 탭에서 초안을 생성해 주세요.",
-        cards=[{"type": "application_draft_status", "data": {"status": "missing", "analysis_id": analysis_id}}],
+        text="현재 분석에 연결된 신청서 초안이 아직 없습니다. 아래에서 정책과 반영 요청을 입력해 초안을 생성할 수 있습니다.",
+        cards=[{
+            "type": "application_draft_status",
+            "data": {
+                "status": "missing",
+                "analysis_id": analysis_id,
+                "policy_id": selected_policy_id,
+                "policies": policy_cards,
+            },
+        }],
         intent="draft",
         answer_source="database",
     )

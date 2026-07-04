@@ -369,7 +369,7 @@ export default function EquipmentStatusFeature() {
                       onChange={(value) => updateDraft("maintenanceCostAnnual", value)}
                     />
                     <Field
-                      label="A안 투자금"
+                      label="전체교체 투자금(A안)"
                       value={draftEquipment.scenarioAInvestment}
                       placeholder="예: 20,000"
                       helperText="단위: 만원"
@@ -377,7 +377,7 @@ export default function EquipmentStatusFeature() {
                       onChange={(value) => updateDraft("scenarioAInvestment", value)}
                     />
                     <Field
-                      label="B안 투자금"
+                      label="부분교체 투자금(B안)"
                       value={draftEquipment.scenarioBInvestment}
                       placeholder="예: 4,000"
                       helperText="단위: 만원"

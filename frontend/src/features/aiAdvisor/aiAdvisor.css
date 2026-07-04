@@ -758,6 +758,15 @@
   margin-top: 8px;
 }
 
+.ff-advisor-card-detail {
+  margin-top: 8px;
+}
+
+.ff-advisor-card-detail h4 {
+  font-size: 12px;
+  margin: 0 0 6px;
+}
+
 .ff-advisor-card-grid h4 {
   font-size: 12px;
   margin: 0 0 6px;
@@ -800,6 +809,41 @@
   display: flex;
   gap: 8px;
   margin-top: 8px;
+}
+
+.ff-advisor-draft-form {
+  border: 1px solid #e4e7ec;
+  border-radius: 10px;
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px;
+  background: #ffffff;
+}
+
+.ff-advisor-draft-field {
+  display: grid;
+  gap: 6px;
+}
+
+.ff-advisor-draft-field span {
+  color: #344054;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ff-advisor-draft-field select,
+.ff-advisor-draft-field textarea {
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  font-size: 12px;
+  padding: 8px 10px;
+  width: 100%;
+}
+
+.ff-advisor-draft-field textarea {
+  line-height: 1.45;
+  resize: vertical;
 }
 
 .ff-advisor-simulation-shell {

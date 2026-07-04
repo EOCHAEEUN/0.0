@@ -17,6 +17,7 @@ import {
   requestAdvisorAnswer,
   type AdvisorChatSessionItem,
 } from "../features/aiAdvisor/aiAdvisor.api"
+import { requestApplicationDraftGeneration } from "../features/applicationDraft/applicationDraft.api"
 import { fetchDashboardOnboarding } from "../features/dashboard/dashboard.api"
 import type { DashboardOnboardingMeResponse } from "../features/dashboard/dashboard.contract"
 
@@ -592,6 +593,50 @@ export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boole
     }
   }
 
+  const applyDraftRequirements = async (params: {
+    analysisId?: string
+    policyId?: string
+    mustIncludeText?: string
+  }) => {
+    const targetAnalysisId = readText(
+      params.analysisId,
+      selectedContext?.analysisId,
+      selectedAnalysisId,
+    )
+    const targetPolicyId = readText(params.policyId)
+    const targetContext =
+      contexts.find((item) => item.analysisId === targetAnalysisId) || selectedContext
+    const targetCompanyId = readText(targetContext?.companyId, companyId)
+    const targetEquipmentId = readText(targetContext?.equipmentId, selectedEquipmentId)
+
+    if (!targetCompanyId || !targetEquipmentId || !targetPolicyId) {
+      throw new Error("분석/설비/정책 정보가 부족해 신청서 초안을 반영할 수 없습니다.")
+    }
+
+    const generated = await requestApplicationDraftGeneration({
+      companyId: targetCompanyId,
+      equipmentId: targetEquipmentId,
+      policyId: targetPolicyId,
+      analysisId: targetAnalysisId || undefined,
+      mustIncludeText: params.mustIncludeText,
+    })
+
+    const payload = asRecord(generated)
+    const data = asRecord(payload.data || payload)
+    const draftResult = asRecord(data.draft_result)
+    const preview = readText(draftResult.business_necessity, draftResult.application_purpose)
+    const message = preview
+      ? `요청 내용을 반영해 신청서 초안을 업데이트했습니다.\n\n${preview.slice(0, 220)}`
+      : "요청 내용을 반영해 신청서 초안을 업데이트했습니다."
+
+    setMessages((prev) => [...prev, createChatMessage("assistant", message)])
+    setChatError("")
+    setActionError("")
+    await reloadSessions().catch(() => {
+      // 세션 목록 갱신 실패는 화면 반영 흐름을 막지 않는다.
+    })
+  }
+
   const openSession = async (session: AdvisorChatSessionItem) => {
     if (!companyId) return
     try {
@@ -795,6 +840,7 @@ export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boole
                           cards={message.cards}
                           analysisId={selectedContext?.analysisId}
                           inPopup={isEmbeddedAdvisor}
+                          onApplyDraftRequirements={applyDraftRequirements}
                         />
                       ) : null}
                     </div>

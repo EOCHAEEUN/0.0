@@ -106,6 +106,7 @@ export async function requestApplicationDraftGeneration(params: {
   equipmentId: string
   policyId: string
   analysisId?: string
+  mustIncludeText?: string
 }) {
   if (!params.companyId || !params.equipmentId || !params.policyId) {
     throw new Error(
@@ -126,6 +127,9 @@ export async function requestApplicationDraftGeneration(params: {
       equipment_id: params.equipmentId,
       policy_id: params.policyId,
       ...(params.analysisId ? { analysis_id: params.analysisId } : {}),
+      ...(params.mustIncludeText
+        ? { must_include_text: params.mustIncludeText }
+        : {}),
     }),
   })
 

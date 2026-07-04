@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { createPortal } from "react-dom"
 import { AdvisorFloatingButton } from "../aiAdvisor/components/AdvisorFloatingButton"
+import "../aiAdvisor/aiAdvisor.css"
 import EquipmentGuideChatPanel from "./EquipmentGuideChatPanel"
 
 export default function EquipmentGuideChatLauncher() {

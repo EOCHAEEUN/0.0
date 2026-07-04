@@ -43,12 +43,17 @@ export type DashboardDeadlineList = {
   title: string
   subtitle: string
   viewAllLabel: string
+  viewAllPath?: string
+  searchActionLabel?: string
+  searchActionPath?: string
   emptyMessage: string
   emptyState?: "none" | "snapshot_missing"
   primaryActionLabel?: string
   primaryActionPath?: string
   secondaryActionLabel?: string
   secondaryActionPath?: string
+  rollingCount?: number
+  rollingActionPath?: string
   items: DashboardDeadlineListItem[]
 }
 
@@ -227,7 +232,7 @@ function mapOverviewDeadlineItem(
     deadlineDate: normalizeDeadlineDate(item.deadline),
     daysRemaining,
     dday: item.d_day,
-    urgency: daysRemaining <= 7 ? "urgent" : "upcoming",
+    urgency: daysRemaining <= 3 ? "urgent" : "upcoming",
     isPriority: Boolean(item.is_priority),
     path:
       policyId && params.analysisId
@@ -235,6 +240,7 @@ function mapOverviewDeadlineItem(
             companyId: params.companyId,
             analysisId: params.analysisId,
             equipmentId: params.equipmentId || undefined,
+            policyId,
           })
         : params.policyPath,
   }
@@ -622,6 +628,16 @@ function buildSupportProjectsPathWithQuery(params: {
   })
 }
 
+function appendQuery(path: string, values: Record<string, string | undefined>) {
+  const [pathname, search = ""] = path.split("?")
+  const query = new URLSearchParams(search)
+  Object.entries(values).forEach(([key, value]) => {
+    if (value) query.set(key, value)
+  })
+  const qs = query.toString()
+  return qs ? `${pathname}?${qs}` : pathname
+}
+
 function mapDeadlineList(
   policies: DashboardMatchedPolicyContract[],
   priorityPolicyId: string | null,
@@ -664,16 +680,27 @@ function mapDeadlineList(
 
   const urgent = dated.filter((item) => item.daysRemaining <= 7)
   const sourceItems = urgent.length > 0 ? urgent : dated
-  const visibleItems = sourceItems.slice(0, 3)
+  const visibleItems = sourceItems.slice(0, 60)
+  const searchPath = appendQuery(
+    buildSupportProjectsPathWithQuery({
+      companyId,
+      analysisId,
+      equipmentId,
+      view: "discovery",
+    }),
+    { focus: "search" },
+  )
+  const rollingCount = policies.filter((policy) => {
+    const raw = getPolicyDateValue(policy)
+    return !raw || getDaysRemaining(raw) === null
+  }).length
   const title =
     dated.length === 0
-      ? "마감 일정"
-      : urgent.length > 0
-        ? "마감 임박 매칭 공고"
-        : "다가오는 마감 일정"
+      ? "마감일정"
+      : "마감일정"
   const subtitle =
     dated.length === 0
-      ? "현재 확인 가능한 마감일이 있는 매칭 공고가 없습니다."
+      ? "대표설비 분석 후 맞춤 마감 일정을 확인할 수 있습니다."
       : urgent.length > 0
         ? `D-7 이내 ${formatCount(urgent.length)}`
         : `가장 가까운 마감 ${formatCount(visibleItems.length)}`
@@ -681,25 +708,39 @@ function mapDeadlineList(
   return {
     title,
     subtitle,
-    viewAllLabel: `전체 ${formatCount(policies.length)} 보기`,
-    emptyMessage: "현재 확인 가능한 마감일이 있는 매칭 공고가 없습니다.",
+    viewAllLabel: "전체 보기",
+    viewAllPath: buildSupportProjectsPathWithQuery({
+      companyId,
+      analysisId,
+      equipmentId,
+      view: "discovery",
+    }),
+    searchActionLabel: "공고 검색",
+    searchActionPath: searchPath,
+    emptyMessage: "대표설비 분석 후 맞춤 마감 일정을 확인할 수 있습니다.",
     emptyState: "none",
+    rollingCount,
+    rollingActionPath: appendQuery(searchPath, { filter: "rolling" }),
     items: visibleItems.map(({ policy, raw, daysRemaining }) => {
       const policyId = getPolicyId(policy)
       return {
         policyId,
         policyTitle: compactText(policy.title) || "공고 확인 필요",
-        sourceName: getPolicySourceName(policy),
+        sourceName:
+          compactText(policy.reason) ||
+          compactText(policy.scenario_label) ||
+          getPolicySourceName(policy),
         deadlineDisplay: formatDeadlineDisplay(raw),
         deadlineDate: normalizeDeadlineDate(raw),
         daysRemaining,
         dday: `D-${Math.max(0, daysRemaining)}`,
-        urgency: daysRemaining <= 7 ? "urgent" : "upcoming",
+        urgency: daysRemaining <= 3 ? "urgent" : "upcoming",
         isPriority: Boolean(priorityPolicyId && policyId === priorityPolicyId),
         path: buildSupportProjectsPathWithQuery({
           companyId,
           analysisId,
           equipmentId,
+          policyId: policyId || undefined,
         }),
       }
     }),
@@ -1451,6 +1492,21 @@ export function mapDashboardOverview(
       primaryActionPath: paths.newAnalysisPath,
       secondaryActionLabel: "최신 지원사업 보기",
       secondaryActionPath: "/support-projects/discovery",
+      viewAllPath: buildSupportProjectsPath("discovery", {
+        analysisId: analysisId || undefined,
+        companyId,
+        equipmentId: equipmentId || undefined,
+      }),
+      searchActionLabel: "공고 검색",
+      searchActionPath: appendQuery(
+        buildSupportProjectsPath("discovery", {
+          analysisId: analysisId || undefined,
+          companyId,
+          equipmentId: equipmentId || undefined,
+        }),
+        { focus: "search" },
+      ),
+      rollingCount: 0,
       items: deadlineItems,
     },
     progressText: "",

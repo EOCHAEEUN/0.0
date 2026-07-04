@@ -109,6 +109,26 @@ function getTodayDateKey() {
   ).padStart(2, "0")}`
 }
 
+function getInitialDeadlineDate(items: DashboardDeadlineListItem[], todayKey: string) {
+  const futureDates = items
+    .map((item) => item.deadlineDate)
+    .filter((date): date is string => Boolean(date))
+    .filter((date) => date >= todayKey)
+    .sort()
+
+  return futureDates[0] ?? todayKey
+}
+
+function appendPathQuery(path: string, values: Record<string, string | undefined>) {
+  const [pathname, search = ""] = path.split("?")
+  const query = new URLSearchParams(search)
+  Object.entries(values).forEach(([key, value]) => {
+    if (value) query.set(key, value)
+  })
+  const qs = query.toString()
+  return qs ? `${pathname}?${qs}` : pathname
+}
+
 function buildMonthCalendar(monthKey: string) {
   const [yearText, monthText] = monthKey.split("-")
   const year = Number(yearText)
@@ -212,15 +232,19 @@ function AnalysisRow({
 function DeadlineCalendarPanel({
   list,
   onNavigate,
-  onViewAll,
 }: {
   list: DashboardDeadlineList
   onNavigate: (path: string) => void
-  onViewAll: () => void
 }) {
   const todayKey = getTodayDateKey()
-  const [monthKey, setMonthKey] = useState(todayKey.slice(0, 7))
-  const [selectedDate, setSelectedDate] = useState(todayKey)
+  const initialSelectedDate = useMemo(
+    () => getInitialDeadlineDate(list.items, todayKey),
+    [list.items, todayKey],
+  )
+  const [selectedDateOverride, setSelectedDateOverride] = useState<string | null>(null)
+  const selectedDate = selectedDateOverride ?? initialSelectedDate
+  const [monthKeyOverride, setMonthKeyOverride] = useState<string | null>(null)
+  const monthKey = monthKeyOverride ?? selectedDate.slice(0, 7)
   const [expanded, setExpanded] = useState(true)
 
   const deadlinesByDate = useMemo(() => {
@@ -236,12 +260,17 @@ function DeadlineCalendarPanel({
 
   const calendarDays = useMemo(() => buildMonthCalendar(monthKey), [monthKey])
   const selectedItems = deadlinesByDate.get(selectedDate) ?? []
+  const previewItems = selectedItems.slice(0, 2)
+  const hiddenSelectedCount = Math.max(0, selectedItems.length - previewItems.length)
+  const viewAllPath = list.viewAllPath || list.secondaryActionPath || "/support-projects/discovery"
+  const searchActionPath = list.searchActionPath || appendPathQuery(viewAllPath, { focus: "search" })
+  const selectedDatePath = appendPathQuery(viewAllPath, { date: selectedDate })
 
   const shiftMonth = (offset: number) => {
     const [yearText, monthText] = monthKey.split("-")
     const next = new Date(Number(yearText), Number(monthText) - 1 + offset, 1)
     const nextKey = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`
-    setMonthKey(nextKey)
+    setMonthKeyOverride(nextKey)
   }
 
   return (
@@ -250,9 +279,14 @@ function DeadlineCalendarPanel({
         number="2"
         title={list.title}
         action={
-          <button type="button" onClick={onViewAll}>
-            {list.viewAllLabel} &gt;
-          </button>
+          <div className="ff-deadline-heading-actions">
+            <button type="button" onClick={() => onNavigate(searchActionPath)}>
+              {list.searchActionLabel || "공고 검색"}
+            </button>
+            <button type="button" onClick={() => onNavigate(viewAllPath)}>
+              {list.viewAllLabel} &gt;
+            </button>
+          </div>
         }
       />
 
@@ -275,7 +309,7 @@ function DeadlineCalendarPanel({
               </button>
             </div>
           ) : (
-            <button type="button" onClick={onViewAll}>
+            <button type="button" onClick={() => onNavigate(viewAllPath)}>
               전체 매칭 공고 보기
             </button>
           )}
@@ -314,11 +348,16 @@ function DeadlineCalendarPanel({
                     className={`ff-deadline-calendar-day${isSelected ? " is-selected" : ""}${
                       isToday ? " is-today" : ""
                     }`}
-                    onClick={() => setSelectedDate(day.date as string)}
+                    onClick={() => setSelectedDateOverride(day.date as string)}
                   >
                     <em>{day.dayNumber}</em>
                     {dayItems.length > 0 ? (
-                      <i className={dayItems.some((item) => item.urgency === "urgent") ? "urgent" : "upcoming"} />
+                      <span className="ff-deadline-day-dots" aria-hidden="true">
+                        <i className="upcoming" />
+                        {dayItems.some((item) => item.daysRemaining <= 3) ? (
+                          <i className="urgent" />
+                        ) : null}
+                      </span>
                     ) : null}
                   </button>
                 )
@@ -344,7 +383,8 @@ function DeadlineCalendarPanel({
           {expanded ? (
             <div className="ff-deadline-list">
               {selectedItems.length > 0 ? (
-                selectedItems.map((item) => (
+                <>
+                {previewItems.map((item) => (
                   <button
                     key={`${item.policyId ?? item.policyTitle}-${item.deadlineDate}`}
                     type="button"
@@ -356,11 +396,31 @@ function DeadlineCalendarPanel({
                     <em>{item.sourceName}</em>
                     <b>공고 조건 확인 →</b>
                   </button>
-                ))
+                ))}
+                {hiddenSelectedCount > 0 ? (
+                  <button
+                    type="button"
+                    className="ff-deadline-list-more"
+                    onClick={() => onNavigate(selectedDatePath)}
+                  >
+                    + {hiddenSelectedCount}건 전체 보기
+                  </button>
+                ) : null}
+                </>
               ) : (
                 <p className="ff-deadline-calendar-hint">{list.subtitle}</p>
               )}
             </div>
+          ) : null}
+
+          {list.rollingCount && list.rollingCount > 0 && list.rollingActionPath ? (
+            <button
+              type="button"
+              className="ff-deadline-rolling-link"
+              onClick={() => onNavigate(list.rollingActionPath as string)}
+            >
+              상시 모집 공고 {list.rollingCount}건 보기 &gt;
+            </button>
           ) : null}
         </>
       )}
@@ -612,7 +672,6 @@ export default function DashboardFeature() {
                   <DeadlineCalendarPanel
                     list={workspace.deadlineList}
                     onNavigate={navigate}
-                    onViewAll={handlePolicyNavigate}
                   />
                 </div>
               )}

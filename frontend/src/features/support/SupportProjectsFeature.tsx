@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useMemo, useState } from "react"
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom"
 
 import DashboardWorkspaceSidebar from "../../components/layout/DashboardWorkspaceSidebar"
@@ -114,6 +114,34 @@ function getProjectPolicyId(project: SupportProject) {
 
 }
 
+function normalizeDateKey(value: string) {
+  const match = value.trim().match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})/)
+  if (!match) return ""
+  const [, year, month, day] = match
+  return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`
+}
+
+function getPolicyDeadlineDate(policy: SupportProjectsPolicyCard) {
+  const raw = pickString(policy.deadline, policy.deadline_display)
+  return raw ? normalizeDateKey(raw) : ""
+}
+
+function isRollingPolicy(policy: SupportProjectsPolicyCard) {
+  const raw = pickString(policy.deadline, policy.deadline_display)
+  if (getPolicyDeadlineDate(policy)) return false
+  return /상시|수시|예산|소진|미정|확인/.test(raw)
+}
+
+function matchesCalendarQuery(
+  policy: SupportProjectsPolicyCard,
+  selectedDate: string,
+  rollingOnly: boolean,
+) {
+  if (selectedDate) return getPolicyDeadlineDate(policy) === selectedDate
+  if (rollingOnly) return isRollingPolicy(policy)
+  return true
+}
+
 
 
 export default function SupportProjectsFeature({ view }: { view: SupportProjectsView }) {
@@ -126,11 +154,12 @@ export default function SupportProjectsFeature({ view }: { view: SupportProjects
 
   const [detailPolicy, setDetailPolicy] = useState<SupportProjectsPolicyCard | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
-  const [showAllUrgent, setShowAllUrgent] = useState(false)
-
-  useEffect(() => {
-    setShowAllUrgent(false)
-  }, [view, searchQuery])
+  const shouldFocusSearch = searchParams.get("focus") === "search"
+  const selectedDeadlineDate = normalizeDateKey(searchParams.get("date") || "")
+  const rollingOnly = searchParams.get("filter") === "rolling"
+  const urgentListKey = `${view}:${searchQuery}:${selectedDeadlineDate}:${rollingOnly ? "rolling" : "dated"}`
+  const [urgentListState, setUrgentListState] = useState({ expanded: false, key: urgentListKey })
+  const showAllUrgent = urgentListState.expanded && urgentListState.key === urgentListKey
 
 
 
@@ -508,18 +537,35 @@ export default function SupportProjectsFeature({ view }: { view: SupportProjects
     [searchablePolicies],
   )
 
+  const calendarFilteredLiveDiscovery = useMemo(() => {
+    if (!model) return null
+    return {
+      ...model.liveDiscovery,
+      items: model.liveDiscovery.items.filter((policy) =>
+        matchesCalendarQuery(policy, selectedDeadlineDate, rollingOnly),
+      ),
+    }
+  }, [model, rollingOnly, selectedDeadlineDate])
+
   const filteredDiscoveryPolicies = useMemo(() => {
     if (!model) return [] as SupportProjectsPolicyCard[]
     const base = model.isAnalysisMode ? filtered.visibleList : model.priorityPolicies
-    return base.filter((policy) => matchesPolicySearch(policy, searchQuery))
-  }, [filtered.visibleList, model, searchQuery])
+    return base.filter(
+      (policy) =>
+        matchesPolicySearch(policy, searchQuery) &&
+        matchesCalendarQuery(policy, selectedDeadlineDate, rollingOnly),
+    )
+  }, [filtered.visibleList, model, rollingOnly, searchQuery, selectedDeadlineDate])
 
   const visiblePriorityPolicy = useMemo(() => {
     if (!model) return null
     const candidate = model.isAnalysisMode ? filtered.visibleMain : model.priorityPolicy
     if (!candidate) return null
-    return matchesPolicySearch(candidate, searchQuery) ? candidate : null
-  }, [filtered.visibleMain, model, searchQuery])
+    return matchesPolicySearch(candidate, searchQuery) &&
+      matchesCalendarQuery(candidate, selectedDeadlineDate, rollingOnly)
+      ? candidate
+      : null
+  }, [filtered.visibleMain, model, rollingOnly, searchQuery, selectedDeadlineDate])
 
 
 
@@ -627,6 +673,7 @@ export default function SupportProjectsFeature({ view }: { view: SupportProjects
                     searchQuery={searchQuery}
                     onSearchChange={setSearchQuery}
                     equipmentLabel={model.equipmentName || "전체 설비"}
+                    autoFocusSearch={shouldFocusSearch}
                   />
 
                   <section className="ff-support-state-card">
@@ -662,12 +709,20 @@ export default function SupportProjectsFeature({ view }: { view: SupportProjects
               ) : null}
 
               {isDiscoveryView ? (
-                <LiveDiscoverySection
-                  liveDiscovery={model.liveDiscovery}
-                  onOpenDetail={handleOpenDetail}
-                  onViewAll={() => navigate(discoveryProjectsPath)}
-                  searchQuery={searchQuery}
-                />
+                <>
+                  <SupportProjectsToolbar
+                    searchQuery={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    equipmentLabel={model.equipmentName || "전체 설비"}
+                    autoFocusSearch={shouldFocusSearch}
+                  />
+                  <LiveDiscoverySection
+                    liveDiscovery={calendarFilteredLiveDiscovery ?? model.liveDiscovery}
+                    onOpenDetail={handleOpenDetail}
+                    onViewAll={() => navigate(discoveryProjectsPath)}
+                    searchQuery={searchQuery}
+                  />
+                </>
               ) : null}
 
             </>
@@ -686,6 +741,7 @@ export default function SupportProjectsFeature({ view }: { view: SupportProjects
                     searchQuery={searchQuery}
                     onSearchChange={setSearchQuery}
                     equipmentLabel={model.equipmentName || "전체 설비"}
+                    autoFocusSearch={shouldFocusSearch}
                   />
 
                   <section className="ff-support-state-card">
@@ -701,12 +757,20 @@ export default function SupportProjectsFeature({ view }: { view: SupportProjects
               ) : null}
 
               {isDiscoveryView ? (
-                <LiveDiscoverySection
-                  liveDiscovery={model.liveDiscovery}
-                  onOpenDetail={handleOpenDetail}
-                  onViewAll={() => navigate(discoveryProjectsPath)}
-                  searchQuery={searchQuery}
-                />
+                <>
+                  <SupportProjectsToolbar
+                    searchQuery={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    equipmentLabel={model.equipmentName || "전체 설비"}
+                    autoFocusSearch={shouldFocusSearch}
+                  />
+                  <LiveDiscoverySection
+                    liveDiscovery={calendarFilteredLiveDiscovery ?? model.liveDiscovery}
+                    onOpenDetail={handleOpenDetail}
+                    onViewAll={() => navigate(discoveryProjectsPath)}
+                    searchQuery={searchQuery}
+                  />
+                </>
               ) : null}
 
             </>
@@ -725,6 +789,7 @@ export default function SupportProjectsFeature({ view }: { view: SupportProjects
                     searchQuery={searchQuery}
                     onSearchChange={setSearchQuery}
                     equipmentLabel={model.equipmentName || "전체 설비"}
+                    autoFocusSearch={shouldFocusSearch}
                   />
 
                   {visiblePriorityPolicy ? (
@@ -748,15 +813,22 @@ export default function SupportProjectsFeature({ view }: { view: SupportProjects
 
               {isDiscoveryView ? (
                 <>
+                  <SupportProjectsToolbar
+                    searchQuery={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    equipmentLabel={model.equipmentName || "전체 설비"}
+                    autoFocusSearch={shouldFocusSearch}
+                  />
+
                   <PriorityPolicyList
                     policies={filteredDiscoveryPolicies}
                     expanded={showAllUrgent}
-                    onViewMore={() => setShowAllUrgent(true)}
+                    onViewMore={() => setUrgentListState({ expanded: true, key: urgentListKey })}
                     onOpenDetail={handleOpenDetail}
                   />
 
                   <LiveDiscoverySection
-                    liveDiscovery={model.liveDiscovery}
+                    liveDiscovery={calendarFilteredLiveDiscovery ?? model.liveDiscovery}
                     onOpenDetail={handleOpenDetail}
                     onViewAll={() => navigate(discoveryProjectsPath)}
                     searchQuery={searchQuery}

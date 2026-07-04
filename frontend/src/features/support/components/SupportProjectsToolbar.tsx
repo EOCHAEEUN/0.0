@@ -1,4 +1,5 @@
 import { Search, SlidersHorizontal } from "lucide-react"
+import { useEffect, useRef } from "react"
 
 import "../supportProjects.workspace.css"
 
@@ -6,18 +7,28 @@ type SupportProjectsToolbarProps = {
   searchQuery: string
   onSearchChange: (value: string) => void
   equipmentLabel?: string
+  autoFocusSearch?: boolean
 }
 
 export function SupportProjectsToolbar({
   searchQuery,
   onSearchChange,
   equipmentLabel = "전체 설비",
+  autoFocusSearch = false,
 }: SupportProjectsToolbarProps) {
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
+
+  useEffect(() => {
+    if (!autoFocusSearch) return
+    searchInputRef.current?.focus()
+  }, [autoFocusSearch])
+
   return (
     <section className="ff-support-toolbar" aria-label="지원사업 검색 및 필터">
       <div className="ff-support-toolbar-search">
         <Search size={18} aria-hidden="true" />
         <input
+          ref={searchInputRef}
           type="search"
           value={searchQuery}
           onChange={(event) => onSearchChange(event.target.value)}

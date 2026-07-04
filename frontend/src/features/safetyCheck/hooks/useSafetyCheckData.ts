@@ -150,6 +150,7 @@ export function useSafetyCheckData() {
       const uploaded = await uploadInspectionPdf({
         file: params.file,
         inspectionPurpose: params.inspectionPurpose,
+        equipmentId: params.equipment.equipmentId,
       })
 
       const created = await createSafetyCheckItem({

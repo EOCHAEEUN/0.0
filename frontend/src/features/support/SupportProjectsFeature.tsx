@@ -187,6 +187,7 @@ export default function SupportProjectsFeature({ view }: { view: SupportProjects
   const [detailPolicy, setDetailPolicy] = useState<SupportProjectsPolicyCard | null>(null)
   const [searchInput, setSearchInput] = useState("")
   const [activeSearchQuery, setActiveSearchQuery] = useState("")
+  const [hasSubmittedSearch, setHasSubmittedSearch] = useState(false)
   const shouldFocusSearch = searchParams.get("focus") === "search"
   const selectedDeadlineDate = normalizeDateKey(searchParams.get("date") || "")
   const rollingOnly = searchParams.get("filter") === "rolling"
@@ -298,6 +299,7 @@ export default function SupportProjectsFeature({ view }: { view: SupportProjects
   const handleSearch = useCallback(() => {
     const trimmed = searchInput.trim()
     setActiveSearchQuery(trimmed)
+    setHasSubmittedSearch(true)
   }, [searchInput])
 
   const handleEquipmentGroupChange = useCallback(
@@ -676,25 +678,22 @@ export default function SupportProjectsFeature({ view }: { view: SupportProjects
 
   const hasActiveSearch = activeSearchQuery.trim().length > 0
 
-  const searchResultPolicies = useMemo(() => {
-    if (!model || !hasActiveSearch) return [] as SupportProjectsPolicyCard[]
-    const query = activeSearchQuery.trim().toLowerCase()
-    return collectSearchablePolicies(model).filter((policy) => {
-      const haystack = [
-        policy.title,
-        policy.organization,
-        policy.recommendation_summary,
-        policy.match_reason,
-        policy.support_type_label,
-        policy.support_amount_text,
-        ...(policy.tags ?? []),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-      return haystack.includes(query)
-    })
-  }, [activeSearchQuery, hasActiveSearch, model])
+  const hasUserChangedEquipmentGroup =
+    equipmentGroupFromUrl &&
+    isEquipmentGroup(equipmentGroupFromUrl) &&
+    equipmentGroupFromUrl !== defaultEquipmentGroup
+
+  const hasActiveToolbarFilters =
+    hasSubmittedSearch ||
+    hasActiveSearch ||
+    supportType !== "all" ||
+    purpose !== "all" ||
+    Boolean(hasUserChangedEquipmentGroup)
+
+  const filteredSearchPolicies = useMemo(() => {
+    if (!model) return [] as SupportProjectsPolicyCard[]
+    return collectSearchablePolicies(model).filter((policy) => matchesActiveFilters(policy))
+  }, [matchesActiveFilters, model])
 
 
 
@@ -910,9 +909,9 @@ export default function SupportProjectsFeature({ view }: { view: SupportProjects
                     onViewDiscovery={() => navigate(discoveryProjectsPath)}
                   />
 
-                  {hasActiveSearch ? (
+                  {hasActiveToolbarFilters ? (
                     <PriorityPolicyList
-                      policies={searchResultPolicies}
+                      policies={filteredSearchPolicies}
                       variant="list"
                       onOpenDetail={handleOpenDetail}
                       hasActiveSearch={hasActiveSearch}
@@ -943,14 +942,7 @@ export default function SupportProjectsFeature({ view }: { view: SupportProjects
                     onRetry={() => void reload()}
                   />
 
-                  {hasActiveSearch ? (
-                    <PriorityPolicyList
-                      policies={searchResultPolicies}
-                      variant="list"
-                      onOpenDetail={handleOpenDetail}
-                      hasActiveSearch={hasActiveSearch}
-                    />
-                  ) : null}
+                  
                 </>
               ) : null}
 

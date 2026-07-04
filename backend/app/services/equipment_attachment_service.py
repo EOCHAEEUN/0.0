@@ -62,6 +62,11 @@ def _safe_filename(filename: str) -> str:
     return (cleaned or "file")[:180]
 
 
+def _safe_original_filename(filename: str) -> str:
+    base = Path(filename or "file.pdf").name.strip()
+    return (base or "file.pdf")[:255]
+
+
 def _extension_for_filename(filename: str) -> str:
     return Path(filename or "").suffix.lower()
 
@@ -383,13 +388,24 @@ def upload_equipment_attachment(
 
     attachment_id = str(uuid4())
     safe_name = _safe_filename(filename)
+    original_filename = _safe_original_filename(filename)
     storage_path = "/".join(
-        [
-            _sanitize_storage_segment(user_id),
-            _sanitize_storage_segment(company_id),
-            _sanitize_storage_segment(equipment_id),
-            f"{attachment_id}_{safe_name}",
-        ]
+        (
+            [
+                "safety",
+                _sanitize_storage_segment(user_id),
+                _sanitize_storage_segment(company_id),
+                _sanitize_storage_segment(equipment_id),
+                f"{attachment_id}{extension}",
+            ]
+            if normalized_type == "safety_evidence"
+            else [
+                _sanitize_storage_segment(user_id),
+                _sanitize_storage_segment(company_id),
+                _sanitize_storage_segment(equipment_id),
+                f"{attachment_id}_{safe_name}",
+            ]
+        )
     )
     mime_type = _guess_mime_type(extension, content_type)
 
@@ -418,7 +434,7 @@ def upload_equipment_attachment(
         "company_id": company_id,
         "user_id": user_id,
         "attachment_type": normalized_type,
-        "original_filename": Path(filename or safe_name).name,
+        "original_filename": original_filename,
         "storage_bucket": EQUIPMENT_ATTACHMENTS_BUCKET,
         "storage_path": storage_path,
         "mime_type": mime_type,

@@ -1,64 +1,93 @@
-import { getAccessToken } from "../mypage/myPage.parts"
-import { buildInspectionStoragePath, validateInspectionPdfFile } from "./safetyCheck.utils"
+import { buildApiUrl, getAccessToken } from "../mypage/myPage.parts"
+import { validateInspectionPdfFile } from "./safetyCheck.utils"
 
-const STORAGE_BUCKET = "inspection-files"
+type EquipmentAttachmentUploadResponse = {
+  success?: boolean
+  data?: {
+    attachment?: {
+      original_filename?: string
+      signed_url?: string
+      download_url?: string
+      preview_url?: string
+    }
+  }
+  detail?: string
+  message?: string
+}
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL?.replace(/\/+$/, "") ?? ""
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim() ?? ""
+const EQUIPMENT_ATTACHMENTS_BUCKET = "equipment-attachments"
 
 export async function uploadInspectionPdf(params: {
   file: File
   inspectionPurpose: string
+  equipmentId: string
 }): Promise<{ fileName: string; publicUrl: string; storagePath: string }> {
   validateInspectionPdfFile(params.file)
-
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    throw new Error(
-      "Supabase Storage 설정이 필요합니다. VITE_SUPABASE_URL과 VITE_SUPABASE_ANON_KEY를 확인해주세요.",
-    )
-  }
 
   const accessToken = getAccessToken()
   if (!accessToken) {
     throw new Error("로그인이 필요합니다. 다시 로그인해주세요.")
   }
 
-  const { storagePath, fileName } = buildInspectionStoragePath(
-    params.inspectionPurpose,
-    params.file.name,
-  )
+  const body = new FormData()
+  body.set("attachment_type", "safety_evidence")
+  body.set("is_primary_photo", "false")
+  body.set("file", params.file)
 
   const response = await fetch(
-    `${SUPABASE_URL}/storage/v1/object/${STORAGE_BUCKET}/${storagePath}`,
+    buildApiUrl(`/api/equipment/${encodeURIComponent(params.equipmentId)}/attachments`),
     {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        apikey: SUPABASE_ANON_KEY,
-        "Content-Type": "application/pdf",
-        "x-upsert": "false",
       },
-      body: params.file,
+      credentials: "include",
+      body,
     },
   )
 
-  if (!response.ok) {
-    let detail = "파일 업로드에 실패했습니다."
-    try {
-      const payload = (await response.json()) as { message?: string; error?: string }
-      detail = payload.message || payload.error || detail
-    } catch {
-      const text = await response.text()
-      if (text.trim()) detail = text.slice(0, 180)
-    }
-    throw new Error(detail)
+  const text = await response.text()
+  let payload: EquipmentAttachmentUploadResponse | null = null
+  try {
+    payload = JSON.parse(text) as EquipmentAttachmentUploadResponse
+  } catch {
+    payload = null
   }
 
-  const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${storagePath}`
+  if (!response.ok) {
+    const debugPath = `safety/<user>/<company>/${params.equipmentId}/<uuid>.pdf`
+    const detail =
+      payload?.detail?.trim() ||
+      payload?.message?.trim() ||
+      text.slice(0, 180) ||
+      "unknown error"
+    console.error("[SafetyCheckUpload] upload failed", {
+      bucket: EQUIPMENT_ATTACHMENTS_BUCKET,
+      storagePath: debugPath,
+      statusCode: response.status,
+      errorMessage: detail,
+    })
+    throw new Error(
+      "PDF 업로드에 실패했습니다. 잠시 후 다시 시도해주세요.",
+    )
+  }
+
+  const attachment = payload?.data?.attachment
+  const publicUrl =
+    attachment?.download_url?.trim() ||
+    attachment?.signed_url?.trim() ||
+    attachment?.preview_url?.trim() ||
+    ""
+
+  if (!publicUrl) {
+    throw new Error("첨부파일 URL 생성에 실패했습니다.")
+  }
+
+  const fileName = attachment?.original_filename?.trim() || params.file.name
 
   return {
     fileName,
     publicUrl,
-    storagePath,
+    storagePath: "",
   }
 }

@@ -4,7 +4,9 @@ export function sanitizePdfFilename(filename: string) {
   const trimmed = filename.trim()
   const lastDot = trimmed.lastIndexOf(".")
   const stem = (lastDot > 0 ? trimmed.slice(0, lastDot) : trimmed)
-    .replace(/[^\w\uAC00-\uD7A3.-]+/g, "_")
+    .normalize("NFKD")
+    .replace(/[^\x00-\x7F]/g, "_")
+    .replace(/[^a-zA-Z0-9_-]+/g, "_")
     .replace(/_+/g, "_")
     .replace(/^_+|_+$/g, "")
   const ext = lastDot > 0 ? trimmed.slice(lastDot).toLowerCase() : ".pdf"
@@ -22,7 +24,7 @@ export function buildInspectionStoragePath(inspectionPurpose: string, filename: 
   const sanitized = sanitizePdfFilename(filename)
   const finalFilename = `${timestamp}_${sanitized}`
   return {
-    storagePath: `${inspectionPurpose}/${finalFilename}`,
+    storagePath: `${inspectionPurpose}_${finalFilename}`,
     fileName: finalFilename,
   }
 }

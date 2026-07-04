@@ -170,7 +170,7 @@ export async function mockUpdateEquipmentEvidenceRecord(params: {
   await delay()
   const store = getStore(params.equipmentId)
   const index = store.records.findIndex((record) => record.evidence_id === params.evidenceId)
-  if (index < 0) throw new Error("근거를 찾을 수 없습니다.")
+  if (index < 0) throw new Error("안전 점검을 찾을 수 없습니다.")
   store.records[index] = {
     ...store.records[index],
     ...params.payload,

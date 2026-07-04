@@ -1,8 +1,11 @@
 import { useState } from "react"
 import type { EquipmentInfo } from "../mypage/myPage.parts"
 import SafetyCheckApplicationTab from "./components/SafetyCheckApplicationTab"
+import SafetyCheckConfirmDialog from "./components/SafetyCheckConfirmDialog"
+import SafetyCheckCreateModal from "./components/SafetyCheckCreateModal"
 import SafetyCheckEquipmentEvidenceTab from "./components/SafetyCheckEquipmentEvidenceTab"
 import { useSafetyCheckData, type SafetyCheckTab } from "./hooks/useSafetyCheckData"
+import type { SafetyCheckItem } from "./safetyCheck.contract"
 
 export default function SafetyCheckEmbeddedPanel() {
   const {
@@ -26,6 +29,8 @@ export default function SafetyCheckEmbeddedPanel() {
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [createModalEquipment, setCreateModalEquipment] = useState<EquipmentInfo | null>(null)
   const [createSubmitting, setCreateSubmitting] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<SafetyCheckItem | null>(null)
+  const [deletePending, setDeletePending] = useState(false)
 
   const openCreateModal = (equipment: EquipmentInfo) => {
     setCreateModalEquipment(equipment)
@@ -36,6 +41,13 @@ export default function SafetyCheckEmbeddedPanel() {
     if (createSubmitting) return
     setCreateModalOpen(false)
     setCreateModalEquipment(null)
+  }
+
+  const switchTab = (tab: SafetyCheckTab) => {
+    if (tab === activeTab) return
+    closeCreateModal()
+    setDeleteTarget(null)
+    setActiveTab(tab)
   }
 
   return (
@@ -62,7 +74,7 @@ export default function SafetyCheckEmbeddedPanel() {
           role="tab"
           aria-selected={activeTab === "equipment"}
           className={`tab-button ${activeTab === "equipment" ? "active" : ""}`}
-          onClick={() => setActiveTab("equipment")}
+          onClick={() => switchTab("equipment")}
         >
           📋 설비관리 탭
         </button>
@@ -71,7 +83,7 @@ export default function SafetyCheckEmbeddedPanel() {
           role="tab"
           aria-selected={activeTab === "application"}
           className={`tab-button ${activeTab === "application" ? "active" : ""}`}
-          onClick={() => setActiveTab("application")}
+          onClick={() => switchTab("application")}
         >
           📝 신청서 탭
         </button>
@@ -79,48 +91,74 @@ export default function SafetyCheckEmbeddedPanel() {
 
       {loading ? (
         <p className="loading-text">안전·정비 증빙을 불러오는 중...</p>
-      ) : (
-        <>
-          {refreshing ? (
-            <p className="loading-text">최신 데이터를 반영하는 중...</p>
-          ) : null}
+      ) : null}
 
-          {activeTab === "equipment" ? (
-            <SafetyCheckEquipmentEvidenceTab
-              equipmentList={equipmentList}
-              itemsByEquipmentId={itemsByEquipmentId}
-              onOpenCreate={openCreateModal}
-              createModalEquipment={createModalEquipment}
-              createModalOpen={createModalOpen}
-              createSubmitting={createSubmitting}
-              onCloseCreateModal={closeCreateModal}
-              onCreateSubmit={async (params) => {
-                setCreateSubmitting(true)
-                try {
-                  await createEvidence({
-                    equipment: params.equipment,
-                    inspectionPurpose: params.inspectionPurpose,
-                    currentSafetyMeasures: params.currentSafetyMeasures,
-                    file: params.file,
-                  })
-                } finally {
-                  setCreateSubmitting(false)
-                }
-              }}
-              onDeleteItem={removeEvidence}
-            />
-          ) : (
-            <SafetyCheckApplicationTab
-              representativeEquipment={representativeEquipment}
-              representativeEquipmentId={representativeEquipmentId}
-              items={representativeItems}
-              onGoToEquipmentTab={() => setActiveTab("equipment")}
-              onSaveImprovement={saveImprovementPlan}
-              onClearImprovement={clearImprovementPlan}
-            />
-          )}
-        </>
-      )}
+      {!loading && refreshing ? (
+        <p className="loading-text">최신 데이터를 반영하는 중...</p>
+      ) : null}
+
+      {!loading && activeTab === "equipment" ? (
+        <SafetyCheckEquipmentEvidenceTab
+          equipmentList={equipmentList}
+          itemsByEquipmentId={itemsByEquipmentId}
+          onOpenCreate={openCreateModal}
+          onDeleteItem={(item) => setDeleteTarget(item)}
+        />
+      ) : null}
+
+      {!loading && activeTab === "application" ? (
+        <SafetyCheckApplicationTab
+          representativeEquipment={representativeEquipment}
+          representativeEquipmentId={representativeEquipmentId}
+          items={representativeItems}
+          onGoToEquipmentTab={() => switchTab("equipment")}
+          onSaveImprovement={saveImprovementPlan}
+          onClearImprovement={clearImprovementPlan}
+        />
+      ) : null}
+
+      <SafetyCheckCreateModal
+        open={createModalOpen}
+        equipment={createModalEquipment}
+        submitting={createSubmitting}
+        onClose={closeCreateModal}
+        onSubmit={async (params) => {
+          if (!createModalEquipment) return
+          setCreateSubmitting(true)
+          try {
+            await createEvidence({
+              equipment: createModalEquipment,
+              inspectionPurpose: params.inspectionPurpose,
+              currentSafetyMeasures: params.currentSafetyMeasures,
+              file: params.file,
+            })
+            closeCreateModal()
+          } finally {
+            setCreateSubmitting(false)
+          }
+        }}
+      />
+
+      <SafetyCheckConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="점검 증빙 삭제"
+        message="이 파일을 삭제하시겠습니까? 신청서 탭에서도 함께 제거됩니다."
+        confirmLabel="삭제"
+        pending={deletePending}
+        onClose={() => {
+          if (!deletePending) setDeleteTarget(null)
+        }}
+        onConfirm={async () => {
+          if (!deleteTarget) return
+          setDeletePending(true)
+          try {
+            await removeEvidence(deleteTarget)
+            setDeleteTarget(null)
+          } finally {
+            setDeletePending(false)
+          }
+        }}
+      />
     </div>
   )
 }

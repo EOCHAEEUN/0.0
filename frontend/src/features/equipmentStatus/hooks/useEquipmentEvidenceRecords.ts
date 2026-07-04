@@ -56,7 +56,7 @@ export function useEquipmentEvidenceRecords({
       setError(
         nextError instanceof Error
           ? nextError.message
-          : "안전·정비 근거를 불러오지 못했습니다.",
+          : "안전·정비 점검을 불러오지 못했습니다.",
       )
     } finally {
       setLoading(false)
@@ -89,7 +89,7 @@ export function useEquipmentEvidenceRecords({
         const message =
           nextError instanceof Error
             ? nextError.message
-            : "근거 저장에 실패했습니다."
+            : "안전 점검 저장에 실패했습니다."
         setError(message)
         throw nextError
       } finally {
@@ -110,7 +110,7 @@ export function useEquipmentEvidenceRecords({
         const message =
           nextError instanceof Error
             ? nextError.message
-            : "근거 삭제에 실패했습니다."
+            : "안전 점검 삭제에 실패했습니다."
         setError(message)
         throw nextError
       }

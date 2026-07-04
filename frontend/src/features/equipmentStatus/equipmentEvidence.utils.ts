@@ -69,7 +69,7 @@ export function computeAttachmentEvidenceSummary(
       draftCount: 0,
       approvedCount: 0,
       rejectedCount: 0,
-      statusLabel: "근거 미등록",
+      statusLabel: "안전 점검 미등록",
       statusTone: "empty",
       hasDemoOnly: false,
     }
@@ -81,7 +81,7 @@ export function computeAttachmentEvidenceSummary(
   const nonDemo = matched.filter((record) => !record.is_demo)
   const hasDemoOnly = nonDemo.length === 0
 
-  let statusLabel = "근거 미등록"
+  let statusLabel = "안전 점검 미등록"
   let statusTone: AttachmentEvidenceSummary["statusTone"] = "empty"
 
   if (hasDemoOnly) {

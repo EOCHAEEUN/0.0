@@ -64,7 +64,7 @@ export function runEquipmentEvidenceUtilsTests() {
   assertEqual(attachmentSummary.statusLabel, "승인 완료", "attachment status")
 
   const emptySummary = computeAttachmentEvidenceSummary([], "att-2")
-  assertEqual(emptySummary.statusLabel, "근거 미등록", "empty attachment status")
+  assertEqual(emptySummary.statusLabel, "안전 점검 미등록", "empty attachment status")
 
   const demoSummary = computeAttachmentEvidenceSummary([demo], "att-1")
   assertEqual(demoSummary.statusTone, "demo", "demo attachment tone")

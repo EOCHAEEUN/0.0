@@ -10,7 +10,7 @@ export function ApplicationDraftSafetyEvidence({
     <section className="ff-card ff-draft-safety-card">
       <div className="ff-card-head ff-draft-safety-head">
         <div>
-          <span className="ff-mini-label">안전개선 근거</span>
+          <span className="ff-mini-label">안전 점검</span>
           <h3>현재 상태와 증빙 여부 판단</h3>
           <p>설비별 점검 증빙을 등록하고 신청서에 반영합니다.</p>
         </div>

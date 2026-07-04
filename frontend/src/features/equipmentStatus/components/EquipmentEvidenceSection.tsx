@@ -111,11 +111,11 @@ export default function EquipmentEvidenceSection({
         <header className="ff-equipment-evidence-head">
           <div className="ff-equipment-evidence-title">
             <ClipboardCheck aria-hidden="true" size={18} />
-            <strong>안전·정비 근거 관리</strong>
+            <strong>안전·정비 점검 관리</strong>
           </div>
         </header>
         <p className="ff-equipment-attachments-hint">
-          설비를 저장한 뒤 안전·정비 근거를 등록할 수 있습니다.
+          설비를 저장한 뒤 안전·정비 점검을 등록할 수 있습니다.
         </p>
       </section>
     )
@@ -135,7 +135,7 @@ export default function EquipmentEvidenceSection({
 
       <EquipmentCollapsibleSection
         sectionClassName="ff-equipment-evidence-section"
-        title="안전·정비 근거 관리"
+        title="안전·정비 점검 관리"
         description="업로드한 증빙자료를 바탕으로 신청서에 반영할 핵심 내용을 직접 정리하고 승인하세요."
         icon={<ClipboardCheck aria-hidden="true" size={18} />}
         badge={
@@ -149,7 +149,7 @@ export default function EquipmentEvidenceSection({
               onClick={() => openCreateDrawer(attachments[0] || null)}
             >
               <Plus aria-hidden="true" size={14} />
-              근거 등록
+              안전 점검 등록
             </button>
             <button
               type="button"
@@ -184,11 +184,11 @@ export default function EquipmentEvidenceSection({
         ) : null}
 
         {loading ? (
-          <p className="ff-equipment-attachments-hint">근거 목록을 불러오는 중...</p>
+          <p className="ff-equipment-attachments-hint">안전 점검 목록을 불러오는 중...</p>
         ) : records.length === 0 ? (
           <div className="ff-equipment-evidence-empty">
             <p>
-              아직 등록된 안전·정비 근거가 없습니다.
+              아직 등록된 안전·정비 점검이 없습니다.
               <br />
               첨부된 점검서나 정비기록을 기준으로 핵심 내용을 직접 정리해보세요.
             </p>

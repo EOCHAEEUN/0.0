@@ -1,4 +1,5 @@
 import { useEffect } from "react"
+import { createPortal } from "react-dom"
 
 type SafetyCheckConfirmDialogProps = {
   open: boolean
@@ -30,7 +31,7 @@ export default function SafetyCheckConfirmDialog({
 
   if (!open) return null
 
-  return (
+  return createPortal(
     <div
       className="safety-check-modal"
       role="presentation"
@@ -72,6 +73,7 @@ export default function SafetyCheckConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

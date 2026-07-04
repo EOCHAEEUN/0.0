@@ -255,7 +255,7 @@ export default function EquipmentAttachmentsPanel({
                 {evidenceSummary ? (
                   <span className="ff-equipment-attachment-evidence-summary">
                     {evidenceSummary.totalCount > 0
-                      ? `근거 ${evidenceSummary.totalCount}건 · 승인 ${evidenceSummary.approvedCount}건 · ${evidenceSummary.statusLabel}`
+                      ? `안전 점검 ${evidenceSummary.totalCount}건 · 승인 ${evidenceSummary.approvedCount}건 · ${evidenceSummary.statusLabel}`
                       : evidenceSummary.statusLabel}
                   </span>
                 ) : null}
@@ -271,7 +271,7 @@ export default function EquipmentAttachmentsPanel({
                     className="ff-equipment-secondary-btn"
                     onClick={() => onManageEvidence(item)}
                   >
-                    근거 관리
+                    안전 점검 관리
                   </button>
                 ) : null}
                 {item.attachment_type === "equipment_photo" && !item.is_primary_photo ? (

@@ -62,7 +62,7 @@ export default function EquipmentEvidenceCard({
       <div className="ff-evidence-card-body">
         <strong>{record.title || "제목 없음"}</strong>
         <p className="ff-evidence-card-meta">
-          근거 일자 {formatEvidenceDate(record.evidence_date)}
+          안전 점검 일자 {formatEvidenceDate(record.evidence_date)}
           {record.attachment_filename ? ` · ${record.attachment_filename}` : ""}
           {record.structured_items.length > 0
             ? ` · 세부 항목 ${record.structured_items.length}건`

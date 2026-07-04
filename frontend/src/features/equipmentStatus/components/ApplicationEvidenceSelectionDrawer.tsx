@@ -124,7 +124,7 @@ export default function ApplicationEvidenceSelectionDrawer({
   return (
     <EquipmentDrawerShell
       open={open}
-      title="신청서 반영 근거 선택"
+      title="신청서 반영 안전 점검 선택"
       subtitle={
         equipmentName
           ? `${equipmentName}${policyName ? ` · ${policyName}` : ""}`
@@ -135,11 +135,11 @@ export default function ApplicationEvidenceSelectionDrawer({
       footer={
         <div className="ff-evidence-selection-footer">
           <div className="ff-evidence-selection-footer-summary">
-            <strong>선택된 근거 {selectedDrafts.length}건</strong>
+            <strong>선택된 안전 점검 {selectedDrafts.length}건</strong>
             {previewText ? (
               <p>{previewText.slice(0, 180)}{previewText.length > 180 ? "..." : ""}</p>
             ) : (
-              <p>선택한 근거의 반영 문장이 여기에 미리보기됩니다.</p>
+              <p>선택한 안전 점검의 반영 문장이 여기에 미리보기됩니다.</p>
             )}
           </div>
           <div className="ff-evidence-drawer-footer-primary">
@@ -165,8 +165,8 @@ export default function ApplicationEvidenceSelectionDrawer({
     >
       <div className="ff-evidence-selection">
         <p className="ff-evidence-form-note">
-          승인된 근거만 신청서에 반영할 수 있습니다. 선택한 문장은 신청서 초안 생성 시 참고
-          근거로 사용됩니다.
+          승인된 안전 점검만 신청서에 반영할 수 있습니다. 선택한 문장은 신청서 초안 생성 시 참고
+          안전 점검으로 사용됩니다.
         </p>
 
         {missingContext ? (
@@ -206,7 +206,7 @@ export default function ApplicationEvidenceSelectionDrawer({
         <div className="ff-evidence-selection-list">
           {filteredRecords.length === 0 ? (
             <p className="ff-equipment-attachments-hint">
-              표시할 근거가 없습니다. 승인된 근거를 먼저 등록해 주세요.
+              표시할 안전 점검이 없습니다. 승인된 안전 점검을 먼저 등록해 주세요.
             </p>
           ) : (
             filteredRecords.map((record) => {

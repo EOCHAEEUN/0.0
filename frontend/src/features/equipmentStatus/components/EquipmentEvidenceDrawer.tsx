@@ -100,7 +100,7 @@ export default function EquipmentEvidenceDrawer({
     selectedAttachment?.download_url ||
     selectedAttachment?.signed_url
 
-  const drawerTitle = isEdit ? "근거 수정" : "근거 등록"
+  const drawerTitle = isEdit ? "안전 점검 수정" : "안전 점검 등록"
 
   const canSubmit = useMemo(() => {
     return Boolean(form.title.trim() && form.attachment_id)
@@ -123,7 +123,7 @@ export default function EquipmentEvidenceDrawer({
   const handleSubmit = async (reviewStatus: EvidenceReviewStatus) => {
     setLocalError("")
     if (!form.title.trim()) {
-      setLocalError("근거 제목을 입력해 주세요.")
+      setLocalError("안전 점검 제목을 입력해 주세요.")
       return
     }
     if (!form.attachment_id) {
@@ -151,7 +151,7 @@ export default function EquipmentEvidenceDrawer({
 
   const handleDelete = async () => {
     if (!record?.evidence_id || !onDelete) return
-    const confirmed = window.confirm("이 근거를 삭제할까요?")
+    const confirmed = window.confirm("이 안전 점검을 삭제할까요?")
     if (!confirmed) return
     await onDelete(record.evidence_id)
     onClose()
@@ -161,7 +161,7 @@ export default function EquipmentEvidenceDrawer({
     <EquipmentDrawerShell
       open={open}
       title={drawerTitle}
-      subtitle={equipmentName ? `${equipmentName} · 직접 입력 근거` : "직접 입력 근거"}
+      subtitle={equipmentName ? `${equipmentName} · 직접 입력 안전 점검` : "직접 입력 안전 점검"}
       onClose={onClose}
       footer={
         <div className="ff-evidence-drawer-footer-actions">
@@ -245,20 +245,20 @@ export default function EquipmentEvidenceDrawer({
         </div>
 
         <p className="ff-evidence-form-note">
-          자동 추출이 아닌 직접 입력 근거입니다. 신청서 문장은 사용자가 직접 작성·검토해야
+          자동 추출이 아닌 직접 입력 안전 점검입니다. 신청서 문장은 사용자가 직접 작성·검토해야
           합니다.
         </p>
 
         {isDemo ? (
           <div className="ff-evidence-form-demo-alert">
-            더미 자료는 화면 테스트용이며 실제 신청서 근거로 사용할 수 없습니다.
+            더미 자료는 화면 테스트용이며 실제 신청서 안전 점검으로 사용할 수 없습니다.
           </div>
         ) : null}
 
         {localError ? <div className="ff-equipment-attachments-error">{localError}</div> : null}
 
         <label className="ff-evidence-form-field">
-          <span>근거 유형</span>
+          <span>안전 점검 유형</span>
           <select
             value={form.evidence_type}
             disabled={saving || isDemo}
@@ -278,7 +278,7 @@ export default function EquipmentEvidenceDrawer({
         </label>
 
         <label className="ff-evidence-form-field">
-          <span>근거 일자</span>
+          <span>안전 점검 일자</span>
           <input
             type="date"
             value={form.evidence_date}
@@ -290,7 +290,7 @@ export default function EquipmentEvidenceDrawer({
         </label>
 
         <label className="ff-evidence-form-field">
-          <span>근거 제목</span>
+          <span>안전 점검 제목</span>
           <input
             type="text"
             value={form.title}
@@ -340,7 +340,7 @@ export default function EquipmentEvidenceDrawer({
 
         {confirmApprove ? (
           <div className="ff-evidence-confirm-box">
-            <p>승인하면 이 근거가 신청서 반영 후보가 됩니다. 승인하시겠습니까?</p>
+            <p>승인하면 이 안전 점검이 신청서 반영 후보가 됩니다. 승인하시겠습니까?</p>
             <div className="ff-evidence-confirm-actions">
               <button
                 type="button"

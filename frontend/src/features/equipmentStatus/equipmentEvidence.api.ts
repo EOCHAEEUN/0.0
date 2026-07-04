@@ -46,7 +46,7 @@ async function parseJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
     if (response.status === 404) {
       throw new Error(
-        "근거 API가 아직 연결되지 않았습니다. Backend API 준비 전에는 frontend/.env.local에 VITE_EQUIPMENT_EVIDENCE_USE_MOCK=true 를 설정해 주세요.",
+        "안전 점검 API가 아직 연결되지 않았습니다. Backend API 준비 전에는 frontend/.env.local에 VITE_EQUIPMENT_EVIDENCE_USE_MOCK=true 를 설정해 주세요.",
       )
     }
     const detailValue = payload?.detail

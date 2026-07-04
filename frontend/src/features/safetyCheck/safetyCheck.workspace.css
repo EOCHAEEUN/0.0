@@ -60,6 +60,8 @@
   gap: 12px;
   margin-bottom: 24px;
   border-bottom: 1px solid var(--sc-line);
+  position: relative;
+  z-index: 2;
 }
 
 .safety-check-page .tab-button {
@@ -328,7 +330,10 @@
   --sc-red-soft: #fcebeb;
 
   position: fixed;
-  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: var(--ff-dashboard-sidebar-width, 248px);
   z-index: 1200;
   display: flex;
   align-items: center;

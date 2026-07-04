@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
+import { createPortal } from "react-dom"
 import type { EquipmentInfo } from "../../mypage/myPage.parts"
 import { getErrorMessage } from "../../mypage/myPage.parts"
 import {
@@ -97,7 +98,7 @@ export default function SafetyCheckCreateModal({
     }
   }
 
-  return (
+  return createPortal(
     <div
       className="safety-check-modal"
       role="presentation"
@@ -219,6 +220,7 @@ export default function SafetyCheckCreateModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

@@ -16,8 +16,12 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
+    CondPageBreak,
     Flowable,
+    KeepTogether,
+    LongTable,
     Paragraph,
+    PageBreak,
     SimpleDocTemplate,
     Spacer,
     Table,
@@ -68,12 +72,12 @@ DEFAULT_BOLD_FONT_PATHS = (
 # PDF Design Tokens
 # ==============================
 COLOR_NAVY = colors.HexColor("#0B1F3A")
-COLOR_BLUE = colors.HexColor("#1F4E79")
-COLOR_BLUE_LIGHT = colors.HexColor("#EDF3F8")
+COLOR_BLUE = colors.HexColor("#28527A")
+COLOR_BLUE_LIGHT = colors.HexColor("#E8EEF4")
 COLOR_BORDER = colors.HexColor("#D7DEE8")
 COLOR_TEXT = colors.HexColor("#27364A")
 COLOR_MUTED = colors.HexColor("#5E6F82")
-COLOR_BG = colors.HexColor("#F7FAFC")
+COLOR_BG = colors.HexColor("#FFFFFF")
 COLOR_CARD_BG = colors.HexColor("#FFFFFF")
 COLOR_ORANGE = colors.HexColor("#A85C35")
 COLOR_GRAY_BAR = colors.HexColor("#E8EDF1")
@@ -602,6 +606,57 @@ class StackedBudgetFlowable(Flowable):
 
 
 
+class ConsumerBudgetBarsFlowable(Flowable):
+    """표 중심 PDF의 사업비 구성을 (1) PDF처럼 2줄 막대 구조로 표현합니다."""
+
+    def __init__(
+        self,
+        subsidy: float,
+        self_funding: float,
+        *,
+        regular_font: str,
+        bold_font: str,
+        width: float = 170 * mm,
+        height: float = 35 * mm,
+    ):
+        super().__init__()
+        self.subsidy = max(0, float(subsidy or 0))
+        self.self_funding = max(0, float(self_funding or 0))
+        self.regular_font = regular_font
+        self.bold_font = bold_font
+        self.width = width
+        self.height = height
+
+    def draw(self):
+        label_w = 30 * mm
+        value_w = 32 * mm
+        bar_w = self.width - label_w - value_w - 8 * mm
+        max_value = max(self.subsidy, self.self_funding, 1)
+
+        rows = [
+            ("정부 지원금", self.subsidy, _manwon(self.subsidy), COLOR_BLUE),
+            ("자기부담금", self.self_funding, _manwon(self.self_funding), colors.white),
+        ]
+        y_positions = [22 * mm, 9 * mm]
+
+        for (label, value, display, color), y in zip(rows, y_positions):
+            self.canv.setFillColor(COLOR_NAVY)
+            self.canv.setFont(self.bold_font, 8.3)
+            self.canv.drawString(0, y + 1 * mm, label)
+
+            self.canv.setFillColor(COLOR_GRAY_BAR)
+            self.canv.roundRect(label_w, y, bar_w, 5.2 * mm, 2.3 * mm, fill=True, stroke=False)
+
+            if value > 0:
+                actual_w = max(1.5 * mm, bar_w * value / max_value)
+                self.canv.setFillColor(color)
+                self.canv.roundRect(label_w, y, actual_w, 5.2 * mm, 2.3 * mm, fill=True, stroke=False)
+
+            self.canv.setFillColor(COLOR_NAVY)
+            self.canv.setFont(self.bold_font, 8.5)
+            self.canv.drawRightString(self.width, y + 1 * mm, display)
+
+
 
 class RevenueLineChartFlowable(Flowable):
     """최근 3개년 매출 추이를 PDF 내부 벡터 라인 그래프로 표현합니다."""
@@ -774,6 +829,526 @@ def _normalize_safety_improvement_for_report(value: Any) -> dict:
         "items": items,
     }
 
+
+_SAFETY_MAINTENANCE_EMPTY_ACTIONS = {
+    "",
+    "-",
+    "없음",
+    "미입력",
+    "선택입력",
+    "선택 입력",
+    "[선택입력]",
+    "[선택 입력]",
+    "입력 필요",
+    "작성 필요",
+    "null",
+    "none",
+}
+
+# 안전점검 화면의 실제 저장 테이블입니다.
+# 현재 운영 기준은 safety_check_improvement이며, 과거 오탈자 테이블(saftey_check_improvement)도
+# 호환 후보로만 남겨 둡니다.
+SAFETY_CHECK_IMPROVEMENT_TABLE_CANDIDATES = (
+    "safety_check_improvement",
+    # 과거/환경별 오탈자 테이블명 호환
+    "safetey_check_improvement",
+    "saftey_check_improvement",
+)
+
+
+def _first_text_from_keys(row: dict[str, Any], *keys: str) -> str:
+    for key in keys:
+        value = row.get(key)
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return ""
+
+
+def _safety_maintenance_source_items(value: Any) -> tuple[str, list[dict[str, Any]]]:
+    """
+    안전·정비 근거 관리 화면의 row 구조를 PDF용 단일 리스트로 변환하기 위한 입력 추출기입니다.
+
+    프론트/DB 버전에 따라 items, rows, records, safety_maintenance_items 등으로
+    저장될 수 있어 후보 키를 넓게 허용합니다. 설비별 그룹 구조도 함께 처리합니다.
+    """
+    if isinstance(value, list):
+        raw_items = value
+        source = "list"
+    elif isinstance(value, dict):
+        source = str(value.get("source") or "draft_result")
+        raw_items = []
+        for key in (
+            "items",
+            "rows",
+            "records",
+            "safety_maintenance_items",
+            "safety_maintenance_records",
+            "safety_management_items",
+            "safety_management_records",
+            "safety_evidence_items",
+            "safety_evidence_records",
+            "maintenance_items",
+            "maintenance_records",
+            "inspection_items",
+            "inspection_records",
+            "evidence_rows",
+        ):
+            candidate = value.get(key)
+            if isinstance(candidate, list):
+                raw_items = candidate
+                source = str(value.get("source") or key)
+                break
+        if not raw_items and any(
+            key in value
+            for key in (
+                "inspection_item",
+                "check_item",
+                "점검항목",
+                "inspection_content",
+                "check_content",
+                "점검내용",
+                "improvement_plan",
+                "개선대책",
+            )
+        ):
+            raw_items = [value]
+    else:
+        return "none", []
+
+    flattened: list[dict[str, Any]] = []
+    for raw_item in raw_items:
+        if not isinstance(raw_item, dict):
+            continue
+        group_equipment_name = _first_text_from_keys(
+            raw_item,
+            "equipment_name",
+            "equipment_label",
+            "equipment",
+            "equipmentName",
+            "name",
+            "설비",
+            "설비명",
+        )
+        nested = None
+        for key in ("items", "rows", "records", "checks", "children"):
+            if isinstance(raw_item.get(key), list):
+                nested = raw_item.get(key)
+                break
+        if nested:
+            for child in nested:
+                if not isinstance(child, dict):
+                    continue
+                merged = {**child}
+                if group_equipment_name and not _first_text_from_keys(
+                    merged,
+                    "equipment_name",
+                    "equipment_label",
+                    "equipment",
+                    "equipmentName",
+                    "설비",
+                    "설비명",
+                ):
+                    merged["equipment_name"] = group_equipment_name
+                flattened.append(merged)
+        else:
+            flattened.append(raw_item)
+    return source, flattened
+
+
+def _normalize_safety_maintenance_evidence_for_report(
+    value: Any,
+    *,
+    default_equipment_name: str = "설비명 미입력",
+    source_table: str | None = None,
+) -> dict[str, Any]:
+    """
+    safety_check_improvement 계열 DB row를 PDF 공통 구조로 정규화합니다.
+
+    - 표 중심 PDF: 프론트엔드에 보이는 컬럼 값을 그대로 표시합니다.
+    - 신청서 초안_그래프 PDF: 개선대책이 실제 입력된 row만 문장으로 가공합니다.
+
+    DB/프론트 버전에 따라 컬럼명이 조금씩 다를 수 있어 여러 후보 키를 허용합니다.
+    실제 row 원본은 raw에 보존합니다.
+    """
+    source, raw_items = _safety_maintenance_source_items(value)
+    if source_table:
+        source = source_table
+
+    items: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str, str, str]] = set()
+
+    for index, raw in enumerate(raw_items, start=1):
+        # 프론트 화면 컬럼: 설비
+        equipment_name = _first_text_from_keys(
+            raw,
+            "equipment_name",
+            "equipment_label",
+            "equipment_display_name",
+            "equipment_title",
+            "equipment",
+            "equipmentName",
+            "name",
+            "설비",
+            "설비명",
+        ) or default_equipment_name
+
+        # 프론트 화면 컬럼: 점검 목적 라벨/신청서 제목
+        # 신청서 초안 PDF의 안전점검 소제목은 inspection_item이 아니라
+        # safety_check_improvement.inspection_purpose_label 값을 우선 사용합니다.
+        inspection_purpose_label = _first_text_from_keys(
+            raw,
+            "inspection_purpose_label",
+            "inspectionPurposeLabel",
+            "purpose_label",
+            "purposeLabel",
+            "inspection_purpose",
+            "inspectionPurpose",
+            "purpose",
+            "purpose_name",
+            "purposeName",
+            "점검목적라벨",
+            "점검 목적 라벨",
+            "점검목적",
+            "점검 목적",
+            "점검분류",
+            "점검 분류",
+        )
+
+        # 프론트 화면 컬럼: 점검 항목
+        inspection_item = _first_text_from_keys(
+            raw,
+            "inspection_item",
+            "check_item",
+            "check_category",
+            "maintenance_item",
+            "safety_item",
+            "item",
+            "category",
+            "viewpoint_title",
+            "viewpoint_key",
+            "title",
+            "점검항목",
+            "점검 항목",
+        )
+
+        # 프론트 화면 컬럼: 점검 내용
+        inspection_content = _first_text_from_keys(
+            raw,
+            "inspection_content",
+            "check_content",
+            "check_detail",
+            "maintenance_content",
+            "safety_content",
+            "content",
+            "detail",
+            "description",
+            "reason",
+            "점검내용",
+            "점검 내용",
+        )
+
+        # 프론트 화면 컬럼: 현재 상태
+        current_status = _first_text_from_keys(
+            raw,
+            "current_status",
+            "current_state",
+            "evidence_status",
+            "evidence_state",
+            "status",
+            "current_judgement",
+            "proof_status",
+            "evidence_label",
+            "file_status",
+            "현재상태",
+            "현재 상태",
+            "증빙여부",
+            "증빙 여부",
+        )
+
+        # 프론트 화면 컬럼: 개선대책
+        improvement_plan = _first_text_from_keys(
+            raw,
+            "future_management_plan",
+            "future_management",
+            "management_plan",
+            "aftercare_plan",
+            "follow_up_plan",
+            "followup_plan",
+            "future_plan",
+            "improvement_plan",
+            "improvement_action",
+            "improvement_measure",
+            "improvement_countermeasure",
+            "countermeasure",
+            "action_plan",
+            "plan",
+            "improvement",
+            "향후관리계획",
+            "향후 관리 계획",
+            "향후관리 계획",
+            "향후 관리계획",
+            "개선대책",
+            "개선 대책",
+        )
+
+        # 프론트 표시값을 따로 보존합니다. 표 중심 PDF는 이 display 값을 사용합니다.
+        display_equipment = equipment_name
+        display_inspection_purpose_label = inspection_purpose_label
+        display_inspection_item = inspection_item
+        display_inspection_content = inspection_content
+        display_current_status = current_status
+        display_improvement_plan = improvement_plan
+
+        if not any((display_equipment, display_inspection_purpose_label, display_inspection_item, display_inspection_content, display_current_status, display_improvement_plan)):
+            continue
+        if not display_inspection_purpose_label and not display_inspection_item and not display_inspection_content and not display_improvement_plan:
+            continue
+
+        key = (
+            display_equipment,
+            display_inspection_purpose_label,
+            display_inspection_item,
+            display_inspection_content,
+            display_current_status,
+            display_improvement_plan,
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+
+        items.append(
+            {
+                "no": raw.get("no") or raw.get("sort_order") or raw.get("order") or index,
+                "id": raw.get("id"),
+                "company_id": raw.get("company_id") or raw.get("companyId"),
+                "policy_id": raw.get("policy_id") or raw.get("policyId"),
+                "analysis_id": raw.get("analysis_id") or raw.get("analysisId"),
+                "equipment_id": raw.get("equipment_id") or raw.get("equipmentId"),
+                "equipment_name": display_equipment or default_equipment_name,
+                "inspection_purpose_label": display_inspection_purpose_label or display_inspection_item or "안전점검",
+                "inspection_item": display_inspection_item or "안전·정비 점검",
+                "inspection_content": display_inspection_content or "점검 내용 확인 필요",
+                "current_status": display_current_status or "증빙 확인 필요",
+                "improvement_plan": display_improvement_plan,
+                "display": {
+                    "equipment_name": display_equipment or default_equipment_name,
+                    "inspection_purpose_label": display_inspection_purpose_label or display_inspection_item or "안전점검",
+                    "inspection_item": display_inspection_item or "안전·정비 점검",
+                    "inspection_content": display_inspection_content or "점검 내용 확인 필요",
+                    "current_status": display_current_status or "증빙 확인 필요",
+                    "improvement_plan": display_improvement_plan,
+                },
+                "raw": raw,
+            }
+        )
+
+    return {"source": source, "items": items}
+
+def _has_safety_maintenance_improvement_plan(item: dict[str, Any]) -> bool:
+    value = str(item.get("improvement_plan") or "").strip()
+    normalized = re.sub(r"\s+", " ", value).lower()
+    return normalized not in _SAFETY_MAINTENANCE_EMPTY_ACTIONS
+
+
+def _format_safety_maintenance_plan_for_table(item: dict[str, Any]) -> str:
+    plan = str(item.get("improvement_plan") or "").strip()
+    return plan if _has_safety_maintenance_improvement_plan(item) else "X"
+
+
+def _safety_maintenance_items_for_report(data: dict[str, Any]) -> list[dict[str, Any]]:
+    evidence = data.get("safety_maintenance_evidence") or {}
+    items = evidence.get("items") if isinstance(evidence, dict) else []
+    return [item for item in items or [] if isinstance(item, dict)]
+
+
+def _safety_maintenance_items_with_plan(data: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        item
+        for item in _safety_maintenance_items_for_report(data)
+        if _has_safety_maintenance_improvement_plan(item)
+    ]
+
+
+def _safety_maintenance_from_safety_improvement(
+    safety_improvement: dict[str, Any],
+    *,
+    default_equipment_name: str,
+) -> dict[str, Any]:
+    """기존 safety_improvement만 있는 경우 표 중심 PDF에 보여줄 수 있는 최소 row로 변환합니다."""
+    rows: list[dict[str, Any]] = []
+    for item in safety_improvement.get("items") or []:
+        if not isinstance(item, dict):
+            continue
+        rows.append(
+            {
+                "equipment_name": default_equipment_name,
+                "inspection_item": item.get("viewpoint_title") or item.get("viewpoint_key") or "안전개선 관리",
+                "inspection_content": item.get("description") or item.get("reason") or "안전관리 상태 확인",
+                "current_status": item.get("current_judgement") or item.get("status") or "확인 필요",
+                "improvement_plan": item.get("improvement_plan") or item.get("action_plan") or "",
+            }
+        )
+    return _normalize_safety_maintenance_evidence_for_report(
+        {"source": "safety_improvement_derived", "items": rows},
+        default_equipment_name=default_equipment_name,
+    )
+
+
+def _load_safety_maintenance_evidence_fallback(
+    db: Any,
+    *,
+    company_id: str,
+    equipment_id: str,
+    policy_id: str,
+    analysis_id: str | None = None,
+    default_equipment_name: str = "설비명 미입력",
+) -> dict[str, Any]:
+    """
+    Supabase safety_check_improvement 테이블에서 안전·정비 근거 관리 row를 조회합니다.
+
+    현재 프론트 화면의 입력값은 이 테이블을 기준으로 저장됩니다.
+    표 중심 PDF는 조회된 row의 화면 컬럼 값을 그대로 표시하고,
+    신청서 초안_그래프 PDF는 같은 row 중 개선대책이 입력된 항목만 문장으로 가공합니다.
+    """
+    table_names = (
+        *SAFETY_CHECK_IMPROVEMENT_TABLE_CANDIDATES,
+        # 기존 개발/임시 테이블명 호환
+        "safety_maintenance_evidence",
+        "safety_maintenance_records",
+        "safety_management_evidence",
+        "safety_management_records",
+        "equipment_safety_records",
+        "equipment_maintenance_records",
+    )
+
+    filter_sets: list[list[tuple[str, str | None]]] = [
+        [("analysis_id", analysis_id)] if analysis_id else [],
+        [("company_id", company_id), ("equipment_id", equipment_id), ("policy_id", policy_id)],
+        [("company_id", company_id), ("equipment_id", equipment_id)],
+        [("equipment_id", equipment_id), ("policy_id", policy_id)],
+        [("equipment_id", equipment_id)],
+        [("company_id", company_id)],
+    ]
+
+    for table_name in table_names:
+        for filters in filter_sets:
+            if not filters:
+                continue
+            try:
+                query = db.table(table_name).select("*")
+                for key, value in filters:
+                    if value:
+                        query = query.eq(key, value)
+                rows = query.limit(500).execute().data or []
+            except Exception:
+                # 테이블명/컬럼명이 환경별로 다를 수 있으므로 다음 후보로 넘어갑니다.
+                continue
+            normalized = _normalize_safety_maintenance_evidence_for_report(
+                {"source": table_name, "items": rows},
+                default_equipment_name=default_equipment_name,
+                source_table=table_name,
+            )
+            if normalized.get("items"):
+                return normalized
+
+    # 과거 저장 구조 호환: safety_viewer_policy 내부에 같은 화면용 rows가 같이 저장된 경우
+    try:
+        query = (
+            db.table("safety_viewer_policy")
+            .select("*")
+            .eq("policy_id", policy_id)
+            .eq("equipment_id", equipment_id)
+        )
+        if analysis_id:
+            query = query.eq("analysis_id", analysis_id)
+        preview = _first(query.order("updated_at", desc=True).limit(1).execute().data)
+    except Exception as exc:
+        print(f"safety maintenance evidence lookup failed: {exc}")
+        preview = {}
+
+    if preview:
+        for key in (
+            "safety_maintenance_items",
+            "safety_maintenance_records",
+            "safety_management_items",
+            "safety_management_records",
+            "maintenance_items",
+            "maintenance_records",
+            "inspection_records",
+            "evidence_rows",
+        ):
+            normalized = _normalize_safety_maintenance_evidence_for_report(
+                {"source": f"safety_viewer_policy.{key}", "items": preview.get(key) or []},
+                default_equipment_name=default_equipment_name,
+            )
+            if normalized.get("items"):
+                return normalized
+
+    return {"source": "none", "items": []}
+
+def _clean_sentence_fragment(value: Any) -> str:
+    """신청서 문장 조립용으로 따옴표·불필요한 마침표를 정리합니다."""
+    text = str(value or "").strip()
+    text = text.strip("'\"“”‘’ ")
+    text = re.sub(r"\s+", " ", text)
+    return text.rstrip(".。")
+
+
+def _as_future_sentence(plan: str) -> str:
+    """향후 관리 계획을 자연스러운 한 문장으로 정리합니다."""
+    cleaned = _clean_sentence_fragment(plan)
+    if not cleaned:
+        return "향후 관리 계획을 제출 전 보완하겠습니다."
+    if not cleaned.startswith("향후"):
+        cleaned = f"향후 {cleaned}"
+    if not re.search(r"(겠습니다|합니다|합니다|예정입니다|관리합니다|진행합니다|보관합니다)$", cleaned):
+        cleaned = f"{cleaned}하겠습니다"
+    return cleaned.rstrip(".") + "."
+
+
+def _evidence_phrase_for_status(status: Any) -> str:
+    """현재 상태 값에 따라 신청서 문장 속 증빙 보유 표현을 결정합니다."""
+    status_text = str(status or "").strip()
+    if any(token in status_text for token in ("파일보유", "자료보유", "보유", "완료", "있음")):
+        return "파일로 보유하고 있으며"
+    if any(token in status_text for token in ("미보유", "없음", "미등록", "X", "x")):
+        return "제출 전 파일로 보완할 예정이며"
+    return "증빙자료로 관리하고 있으며"
+
+
+def _safety_maintenance_narrative(item: dict[str, Any], *, variant: int = 1) -> str:
+    """신청서 초안_그래프 PDF에 넣을 안전점검 향후 관리 문장을 생성합니다.
+
+    각 항목이 같은 문장 구조로 반복되지 않도록 3가지 문장 패턴을 순환 적용합니다.
+    """
+    equipment_name = _clean_sentence_fragment(item.get("equipment_name") or "해당 설비")
+    inspection_item = _clean_sentence_fragment(item.get("inspection_item") or "안전점검")
+    inspection_content = _clean_sentence_fragment(
+        item.get("inspection_content") or item.get("inspection_item") or "점검 내용 확인 필요"
+    )
+    current_status = item.get("current_status") or ""
+    future_plan = str(item.get("improvement_plan") or "").strip()
+
+    evidence_phrase = _evidence_phrase_for_status(current_status)
+    future_sentence = _as_future_sentence(future_plan)
+
+    pattern = (variant - 1) % 3
+    if pattern == 0:
+        return f"{inspection_content} 자료를 {evidence_phrase}, {future_sentence}"
+    if pattern == 1:
+        return (
+            f"{inspection_item} 항목은 {inspection_content}을(를) 중심으로 증빙 상태를 관리합니다. "
+            f"현재 확인된 자료는 {evidence_phrase.replace(' 있으며', ' 있는 상태로 정리합니다')}. "
+            f"{future_sentence} 해당 내용은 제출 전 보완 근거로 활용하겠습니다."
+        )
+    return (
+        f"{equipment_name} 관련 {inspection_content} 결과는 신청서의 안전점검 보완 근거로 관리합니다. "
+        f"보유 자료는 제출 증빙으로 정리합니다. {future_sentence} "
+        "점검 이력과 조치 내용을 지속적으로 남기겠습니다."
+    )
 
 def _load_safety_improvement_fallback(
     db: Any,
@@ -1064,6 +1639,35 @@ def load_application_report_data(
 
     company_name = company.get("company_name") or "기업명 미입력"
     equipment_name = equipment.get("name") or "설비명 미입력"
+
+    # 안전점검 화면 데이터
+    # 1순위: Supabase safety_check_improvement 테이블
+    #   - 표 중심 PDF: 프론트엔드 화면 컬럼(점검항목/점검내용/현재상태/향후관리계획)을 그대로 표시
+    #   - 신청서 초안_그래프 PDF: 점검항목/점검내용/향후관리계획을 문장형으로 정리
+    safety_maintenance_evidence = _load_safety_maintenance_evidence_fallback(
+        db,
+        company_id=company_id,
+        equipment_id=equipment_id,
+        policy_id=policy_id,
+        analysis_id=effective_analysis_id or None,
+        default_equipment_name=equipment_name,
+    )
+
+    # 2순위: 과거 draft_result 내부 저장 구조 호환
+    if not safety_maintenance_evidence.get("items"):
+        safety_maintenance_evidence = _normalize_safety_maintenance_evidence_for_report(
+            (
+                draft_sections.get("safety_maintenance_evidence")
+                or draft_sections.get("safety_maintenance_records")
+                or draft_sections.get("safety_management_evidence")
+                or draft_sections.get("safety_management_records")
+                or draft_sections.get("maintenance_records")
+                or draft_sections.get("inspection_records")
+            ),
+            default_equipment_name=equipment_name,
+        )
+
+
     scenario_label = (
         matched_policy.get("scenario_label")
         or scenario.get("label")
@@ -1537,6 +2141,7 @@ def load_application_report_data(
         "benchmark": benchmark,
         "draft": draft,
         "safety_improvement": safety_improvement,
+        "safety_maintenance_evidence": safety_maintenance_evidence,
         "summary": {
             "company_name": company_name,
             "equipment_name": equipment_name,
@@ -1794,10 +2399,13 @@ def make_report_table(
             flow_row.append(_paragraph(cell, style))
         flow_rows.append(flow_row)
 
-    table = Table(
+    # 긴 표는 행 단위로 자연스럽게 다음 페이지로 넘어가야 하므로 LongTable을 사용합니다.
+    # 짧은 표는 뒤의 _paginate_story()에서 한 덩어리로 묶고, 긴 표는 splitByRow로 분할합니다.
+    table = LongTable(
         flow_rows,
         colWidths=[width * mm for width in col_widths],
         repeatRows=(1 if header else 0) if repeat_rows is None else repeat_rows,
+        splitByRow=1,
     )
     style = [
         ("BOX", (0, 0), (-1, -1), 0.45, COLOR_BORDER),
@@ -1835,6 +2443,21 @@ def make_card(content: list[Any], width: float, *, padding: float = 7) -> Table:
     return card
 
 
+def make_application_callout(text: Any, style: ParagraphStyle, *, width_mm: float = 170) -> Table:
+    """신청서 초안 PDF의 읽는 순서/진단 의견용 왼쪽 라인 콜아웃."""
+    box = Table([[_paragraph(text, style)]], colWidths=[width_mm * mm])
+    box.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+        ("LINEBEFORE", (0, 0), (0, -1), 2.2, COLOR_BLUE),
+        ("LEFTPADDING", (0, 0), (-1, -1), 11),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+        ("TOPPADDING", (0, 0), (-1, -1), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+    return box
+
+
 def make_kpi_strip(
     items: list[tuple[str, str]],
     *,
@@ -1842,35 +2465,223 @@ def make_kpi_strip(
     value_style: ParagraphStyle,
     total_width_mm: float = 170,
 ) -> Table:
-    """상단 KPI 요약 카드 스트립."""
+    """상단 KPI 요약 카드 스트립.
+
+    기존에는 각 KPI를 개별 nested Table로 감싸서 값이 두 줄로 내려가는 셀만
+    높이가 커지고, 나머지 셀의 하단 선이 맞지 않는 문제가 있었습니다.
+    하나의 외부 Table에 직접 셀을 배치하면 가장 높은 셀 기준으로 전체 행 높이가
+    통일되어 적용 시나리오 칸과 나머지 칸의 표 선이 정확히 맞습니다.
+    """
     if not items:
         return Table([[]])
+
     card_w = total_width_mm / len(items)
     cells = []
     for label, value in items:
-        inner = Table(
-            [[_paragraph(label, label_style)], [_paragraph(value, value_style)]],
-            colWidths=[card_w * mm],
-        )
-        inner.setStyle(TableStyle([
-            ("BOX", (0, 0), (-1, -1), 0.45, COLOR_BORDER),
-            ("BACKGROUND", (0, 0), (-1, -1), colors.white),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("TOPPADDING", (0, 0), (-1, -1), 7),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
-            ("LEFTPADDING", (0, 0), (-1, -1), 8),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-        ]))
-        cells.append(inner)
+        cells.append([
+            _paragraph(label, label_style),
+            Spacer(1, 2.2 * mm),
+            _paragraph(value, value_style),
+        ])
+
     strip = Table([cells], colWidths=[card_w * mm] * len(items))
     strip.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ("BOX", (0, 0), (-1, -1), 0.45, COLOR_BORDER),
+        ("INNERGRID", (0, 0), (-1, -1), 0.45, COLOR_BORDER),
+        ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
     ]))
     return strip
+
+
+# ==============================
+# Pagination Helpers
+# ==============================
+def _flowable_estimated_height(flowable: Any, *, width_mm: float = 170) -> float:
+    """ReportLab flowable의 예상 높이를 계산합니다. 실패 시 0을 반환합니다."""
+    if flowable is None:
+        return 0
+    if isinstance(flowable, Spacer):
+        return float(getattr(flowable, "height", 0) or 0)
+    try:
+        _, height = flowable.wrap(width_mm * mm, A4[1])
+        return float(height or 0)
+    except Exception:
+        return 0
+
+
+def _block_estimated_height(flowables: list[Any], *, width_mm: float = 170) -> float:
+    return sum(_flowable_estimated_height(item, width_mm=width_mm) for item in flowables if item is not None)
+
+
+def _is_heading_flowable(flowable: Any) -> bool:
+    """섹션 제목/소제목으로 볼 수 있는 Paragraph인지 확인합니다."""
+    if not isinstance(flowable, Paragraph):
+        return False
+    style_name = str(getattr(getattr(flowable, "style", None), "name", ""))
+    try:
+        plain = flowable.getPlainText().strip()
+    except Exception:
+        plain = ""
+    if re.match(r"^\d+\.\s*", plain):
+        return True
+    return "Heading" in style_name or "Subheading" in style_name
+
+
+def _keep_block_if_reasonable(
+    flowables: list[Any],
+    *,
+    width_mm: float = 170,
+    page_height_mm: float = 260,
+    min_required_mm: float = 36,
+    keep_all_max_mm: float = 155,
+) -> list[Any]:
+    """
+    표/그래프/카드/제목 묶음을 가능한 한 같은 페이지에 두는 helper입니다.
+
+    - 블록이 짧으면 CondPageBreak + KeepTogether로 한 페이지 안에 배치합니다.
+    - 블록이 너무 길면 무리하게 KeepTogether하지 않고 행/문단 단위 분할을 허용합니다.
+    """
+    clean = [item for item in flowables if item is not None]
+    if not clean:
+        return []
+
+    height = _block_estimated_height(clean, width_mm=width_mm)
+    page_height = page_height_mm * mm
+    min_required = min(max(height + 2 * mm, min_required_mm * mm), page_height * 0.92)
+
+    result: list[Any] = [CondPageBreak(min_required)]
+    if 0 < height <= keep_all_max_mm * mm:
+        result.append(KeepTogether(clean))
+    else:
+        result.extend(clean)
+    return result
+
+
+def _section_block(
+    title_text: str | None,
+    heading_style: ParagraphStyle | None,
+    body_flowables: list[Any],
+    *,
+    width_mm: float = 170,
+    page_height_mm: float = 260,
+    keep_all_max_mm: float = 160,
+    first_keep_max_mm: float = 105,
+    after_mm: float = 3,
+) -> list[Any]:
+    """섹션 제목과 첫 번째 본문/표가 분리되지 않도록 묶어 반환합니다."""
+    heading_flowable = _paragraph(title_text, heading_style) if title_text and heading_style else None
+    body = [item for item in body_flowables if item is not None]
+    block = ([heading_flowable] if heading_flowable else []) + body
+    if not block:
+        return []
+
+    block_height = _block_estimated_height(block, width_mm=width_mm)
+    if 0 < block_height <= keep_all_max_mm * mm:
+        result = _keep_block_if_reasonable(
+            block,
+            width_mm=width_mm,
+            page_height_mm=page_height_mm,
+            keep_all_max_mm=keep_all_max_mm,
+        )
+    else:
+        # 전체 섹션이 길면 제목 + 첫 번째 표/본문만 먼저 묶고 나머지는 자연 분할합니다.
+        first_part = ([heading_flowable] if heading_flowable else [])
+        remaining = list(body)
+        if remaining:
+            first_part.append(remaining.pop(0))
+        first_height = _block_estimated_height(first_part, width_mm=width_mm)
+        result = []
+        if first_part:
+            if 0 < first_height <= first_keep_max_mm * mm:
+                result.extend(_keep_block_if_reasonable(
+                    first_part,
+                    width_mm=width_mm,
+                    page_height_mm=page_height_mm,
+                    min_required_mm=38,
+                    keep_all_max_mm=first_keep_max_mm,
+                ))
+            else:
+                # 첫 번째 표 자체가 길면 KeepTogether로 묶지 않고 제목이 하단에 혼자 남지 않을 만큼만 확보합니다.
+                result.append(CondPageBreak(42 * mm))
+                result.extend(first_part)
+        result.extend(remaining)
+
+    if after_mm:
+        result.append(Spacer(1, after_mm * mm))
+    return result
+
+
+def _paginate_story(
+    story: list[Any],
+    *,
+    width_mm: float = 170,
+    page_height_mm: float = 260,
+) -> list[Any]:
+    """
+    기존 story를 페이지 나눔에 강한 구조로 재정렬합니다.
+
+    제목만 페이지 하단에 남는 현상을 막고, 표/그래프/카드는 현재 페이지에 들어갈 수 있으면
+    한 덩어리로 유지합니다. 긴 표는 LongTable/splitByRow로 자연스럽게 분할합니다.
+    """
+    packed: list[Any] = []
+    i = 0
+    while i < len(story):
+        item = story[i]
+        if item is None:
+            i += 1
+            continue
+
+        # 명시 PageBreak는 대부분 과도한 공백의 원인이므로 호출부에서 제거하지만,
+        # 남아 있는 경우에는 그대로 존중합니다.
+        if isinstance(item, (PageBreak, CondPageBreak, KeepTogether)):
+            packed.append(item)
+            i += 1
+            continue
+
+        if _is_heading_flowable(item):
+            group = [item]
+            i += 1
+            # 제목 뒤 Spacer와 첫 본문/표/그래프까지만 묶어서 제목 고립을 방지합니다.
+            while i < len(story) and isinstance(story[i], Spacer):
+                group.append(story[i])
+                i += 1
+            if i < len(story) and not isinstance(story[i], PageBreak):
+                group.append(story[i])
+                i += 1
+            packed.extend(_keep_block_if_reasonable(
+                group,
+                width_mm=width_mm,
+                page_height_mm=page_height_mm,
+                min_required_mm=42,
+                keep_all_max_mm=115,
+            ))
+            continue
+
+        # 카드/그래프/짧은 표는 가능한 한 한 페이지 안에 유지합니다.
+        if isinstance(item, (Table, LongTable, Flowable)) and not isinstance(item, Paragraph):
+            height = _flowable_estimated_height(item, width_mm=width_mm)
+            if 0 < height <= 150 * mm:
+                packed.extend(_keep_block_if_reasonable(
+                    [item],
+                    width_mm=width_mm,
+                    page_height_mm=page_height_mm,
+                    min_required_mm=30,
+                    keep_all_max_mm=150,
+                ))
+            else:
+                packed.append(item)
+            i += 1
+            continue
+
+        packed.append(item)
+        i += 1
+
+    return packed
 
 
 def make_two_column(left: Any, right: Any, *, left_width: float = 82, right_width: float = 82, gap: float = 6) -> Table:
@@ -1900,7 +2711,13 @@ def _consumer_judgement(summary: dict[str, Any], safety_items: list[dict[str, An
     match_score = _number(summary.get("match_score"))
     payback_months = summary.get("payback_months")
     self_funding = _number(summary.get("self_funding_manwon"))
-    required_count = sum(len(item.get("required_evidences") or []) for item in safety_items)
+    required_count = 0
+    for item in safety_items:
+        evidences = item.get("required_evidences") or []
+        if evidences:
+            required_count += len(evidences)
+        elif item.get("inspection_item") or item.get("inspection_content") or item.get("improvement_plan"):
+            required_count += 1
 
     if match_score and match_score < 55:
         return "신청 전 조건 재확인 필요"
@@ -1985,7 +2802,11 @@ def _annual_net_benefit(scenario: dict[str, Any], breakdown: dict[str, Any]) -> 
 
 
 def _consumer_safety_evidence_count(data: dict[str, Any]) -> int:
-    """표 중심 리포트에서 안전개선 준비자료 건수를 요약하기 위한 카운터."""
+    """표 중심 리포트에서 안전·정비 근거 관리 row 수를 요약하기 위한 카운터."""
+    maintenance_items = _safety_maintenance_items_for_report(data)
+    if maintenance_items:
+        return len(maintenance_items)
+
     safety_improvement = data.get("safety_improvement") or {}
     total = 0
     for item in safety_improvement.get("items") or []:
@@ -2046,35 +2867,39 @@ def _consumer_safety_rows(
     user_safety_files: list[dict[str, Any]] | None = None,
 ) -> list[list[str]]:
     """
-    표 중심 리포트용 안전관리 요약 표.
+    표 중심 PDF용 safety_check_improvement 화면 표.
 
-    준비자료를 길게 나열하지 않고, 사용자가 요청한 목업처럼
-    현재 상태와 증빙 보유 여부를 빠르게 판단할 수 있게 구성합니다.
+    프론트 화면과 동일하게 점검항목/점검내용/현재상태/향후관리계획 4개 컬럼으로 표시합니다.
+    단, 점검 항목 컬럼은 safety_check_improvement.inspection_purpose_label 값을 우선 사용합니다.
+    향후 관리 계획이 비어 있으면 X로 표시합니다.
     """
-    rows: list[list[str]] = [["번호", "관점", "현재 상태", "증빙 여부", "설명·근거"]]
-    safety_improvement = data.get("safety_improvement") or {}
-    safety_items = safety_improvement.get("items") or []
-
-    for index, item in enumerate(safety_items[:3], start=1):
-        has_evidence = _safety_item_has_uploaded_evidence(item, user_safety_files)
+    rows: list[list[str]] = [["점검 항목", "점검 내용", "현재 상태", "향후 관리 계획"]]
+    maintenance_items = _safety_maintenance_items_for_report(data)
+    for item in maintenance_items:
+        display = item.get("display") if isinstance(item.get("display"), dict) else {}
+        inspection_label = (
+            display.get("inspection_purpose_label")
+            or item.get("inspection_purpose_label")
+            or display.get("inspection_item")
+            or item.get("inspection_item")
+            or "안전점검 항목"
+        )
         rows.append(
             [
-                str(index),
-                item.get("viewpoint_title") or item.get("viewpoint_key") or "안전개선 관리",
-                item.get("current_judgement") or item.get("status") or "개선 필요",
-                "보유" if has_evidence else "미보유",
-                item.get("description") or item.get("reason") or "안전관리 상태 확인이 필요합니다.",
+                inspection_label,
+                display.get("inspection_content") or item.get("inspection_content") or "점검 내용 확인 필요",
+                display.get("current_status") or item.get("current_status") or "증빙 확인 필요",
+                display.get("improvement_plan") or _format_safety_maintenance_plan_for_table(item),
             ]
         )
 
     if len(rows) == 1:
         rows.append(
             [
-                "1",
-                "안전개선 항목",
+                "안전점검 근거",
+                "safety_check_improvement 등록 데이터 없음",
                 "확인 필요",
-                "미보유",
-                "안전개선 preview가 없거나 생성되지 않아 제출 전 안전관리 자료 확인이 필요합니다.",
+                "X",
             ]
         )
     return rows
@@ -2098,9 +2923,9 @@ def _consumer_evidence_rows(
         rows.append(
             [
                 "보완",
-                f"안전개선 증빙자료 {safety_count}건",
-                "안전개선 근거",
-                "7. 안전개선 근거 참조",
+                f"안전·정비 근거자료 {safety_count}건",
+                "안전·정비 근거 관리",
+                "7. 안전·정비 근거 관리 참조",
             ]
         )
         return rows
@@ -2129,6 +2954,13 @@ def _consumer_evidence_rows(
     return rows
 
 def generate_consumer_summary_report_pdf(ctx: ReportContext) -> bytes:
+    """표 중심 신청 판단 요약서.
+
+    (1) PDF의 디자인을 기준으로 섹션을 넓게 배치합니다.
+    - 1쪽: 제목, KPI, 읽는 순서, 핵심 요약
+    - 2쪽: 신청기업/설비 현황, 설비 상태 핵심 지표, 비용 발생 현황, 사업 목적
+    - 이후: 정책 적합성, 예산·ROI, 기대효과를 각각 넓은 표 중심으로 구성
+    """
     data = ctx.data
     regular_font, bold_font = _register_fonts()
     buffer = io.BytesIO()
@@ -2137,19 +2969,81 @@ def generate_consumer_summary_report_pdf(ctx: ReportContext) -> bytes:
         pagesize=A4,
         leftMargin=14 * mm,
         rightMargin=14 * mm,
-        topMargin=14 * mm,
+        topMargin=13 * mm,
         bottomMargin=13 * mm,
         title="consumer_summary_report",
         author="FactoFit",
     )
 
     base = getSampleStyleSheet()
-    title = ParagraphStyle("ConsumerTitle", parent=base["Title"], fontName=bold_font, fontSize=18, leading=24)
-    heading = ParagraphStyle("ConsumerHeading", fontName=bold_font, fontSize=12, leading=17, spaceBefore=5 * mm, spaceAfter=2 * mm)
-    body = ParagraphStyle("ConsumerBody", fontName=regular_font, fontSize=8.8, leading=13)
-    small = ParagraphStyle("ConsumerSmall", fontName=regular_font, fontSize=7.8, leading=11, textColor=colors.HexColor("#516070"))
-    cell = ParagraphStyle("ConsumerCell", fontName=regular_font, fontSize=8.2, leading=11)
-    cell_bold = ParagraphStyle("ConsumerCellBold", fontName=bold_font, fontSize=8.4, leading=11)
+    title = ParagraphStyle(
+        "ConsumerTitle",
+        parent=base["Title"],
+        fontName=bold_font,
+        fontSize=20,
+        leading=26,
+        alignment=TA_CENTER,
+        textColor=COLOR_NAVY,
+        spaceAfter=7 * mm,
+    )
+    heading = ParagraphStyle(
+        "ConsumerHeading",
+        fontName=bold_font,
+        fontSize=14,
+        leading=19,
+        textColor=COLOR_NAVY,
+        spaceBefore=5 * mm,
+        spaceAfter=3 * mm,
+    )
+    subheading = ParagraphStyle(
+        "ConsumerSubHeading",
+        fontName=bold_font,
+        fontSize=10.5,
+        leading=14,
+        textColor=COLOR_NAVY,
+        spaceBefore=4 * mm,
+        spaceAfter=2 * mm,
+    )
+    body = ParagraphStyle(
+        "ConsumerBody",
+        fontName=regular_font,
+        fontSize=8.8,
+        leading=13.2,
+        textColor=COLOR_TEXT,
+        wordWrap="CJK",
+    )
+    small = ParagraphStyle(
+        "ConsumerSmall",
+        fontName=regular_font,
+        fontSize=7.8,
+        leading=11,
+        textColor=COLOR_MUTED,
+        wordWrap="CJK",
+    )
+    cell = ParagraphStyle(
+        "ConsumerCell",
+        fontName=regular_font,
+        fontSize=8.3,
+        leading=11.8,
+        textColor=COLOR_TEXT,
+        wordWrap="CJK",
+    )
+    cell_bold = ParagraphStyle(
+        "ConsumerCellBold",
+        fontName=bold_font,
+        fontSize=8.6,
+        leading=12,
+        textColor=COLOR_NAVY,
+        wordWrap="CJK",
+    )
+    metric = ParagraphStyle(
+        "ConsumerMetric",
+        fontName=bold_font,
+        fontSize=14.2,
+        leading=17.2,
+        textColor=COLOR_NAVY,
+        alignment=TA_CENTER,
+    )
 
     summary = data.get("summary") or {}
     company = data.get("company") or {}
@@ -2157,7 +3051,8 @@ def generate_consumer_summary_report_pdf(ctx: ReportContext) -> bytes:
     policy = data.get("policy") or {}
     scenario = data.get("scenario") or {}
     breakdown = data.get("breakdown") or {}
-    safety_items = (data.get("safety_improvement") or {}).get("items") or []
+    benchmark = data.get("benchmark") or {}
+    safety_items = _safety_maintenance_items_for_report(data) or (data.get("safety_improvement") or {}).get("items") or []
 
     judgement = _consumer_judgement(summary, safety_items)
     annual_net = _annual_net_benefit(scenario, breakdown)
@@ -2165,38 +3060,72 @@ def generate_consumer_summary_report_pdf(ctx: ReportContext) -> bytes:
     safety_rows = _consumer_safety_rows(data, ctx.user_safety_files)
     safety_evidence_count = _consumer_safety_evidence_count(data)
 
-    def table(rows: list[list[Any]], widths: list[float], header: bool = True) -> Table:
+    company_name = summary.get("company_name") or company.get("company_name") or "-"
+    equipment_name = summary.get("equipment_name") or equipment.get("name") or "-"
+    region = company.get("region") or summary.get("region") or "-"
+    industry_display = summary.get("industry_display") or ", ".join(_as_list(company.get("industry_name")) or _as_list(company.get("industry_code"))) or "-"
+    company_size = company.get("company_type") or company.get("company_size") or "중소기업"
+    age_years = _number(equipment.get("age_years"))
+    avg_cycle = _first_number(benchmark.get("avg_replacement_cycle_yr"), benchmark.get("replacement_cycle_years"), default=10)
+    defect_rate = _number(equipment.get("defect_rate"))
+    avg_defect = _first_number(benchmark.get("avg_defect_rate_pct"), benchmark.get("defect_rate_pct"), default=1.8)
+
+    energy_saving = _energy_saving_value(breakdown)
+    maintenance_saving = _maintenance_saving_value(breakdown)
+    defect_saving = _defect_saving_value(breakdown)
+    productivity_gain = _productivity_gain_value(breakdown)
+
+    def table(
+        rows: list[list[Any]],
+        widths: list[float],
+        header: bool = True,
+        left_label_columns: tuple[int, ...] = (),
+    ) -> Table:
         return make_report_table(
             rows,
             widths,
             body_style=cell,
             header_style=cell_bold,
             header=header,
+            left_label_columns=left_label_columns,
         )
 
-    metric_rows = [
-        ["신청 판단", "정책 적합도", "예상 지원금", "내 부담금", "회수기간"],
-        [
-            judgement,
-            format_score(summary.get("match_score")),
-            format_manwon(summary.get("subsidy_manwon")),
-            format_manwon(summary.get("self_funding_manwon")),
-            format_months(summary.get("payback_months")),
-        ],
-    ]
+    def callout_text(text: Any, *, width_mm: float = 170) -> Table:
+        return make_application_callout(text, body, width_mm=width_mm)
+
+    def footer(canvas, document):
+        canvas.saveState()
+        canvas.setStrokeColor(COLOR_BORDER)
+        canvas.setLineWidth(0.4)
+        canvas.line(14 * mm, 10 * mm, A4[0] - 14 * mm, 10 * mm)
+        canvas.setFont(regular_font, 7)
+        canvas.setFillColor(COLOR_MUTED)
+        canvas.drawRightString(A4[0] - 14 * mm, 6.5 * mm, str(document.page))
+        canvas.restoreState()
+
     boss_rows = [
         ["사장님 질문", "현재 답변", "판단"],
-        ["우리 회사가 받을 수 있나?", summary.get("policy_analysis") or summary.get("industry_display") or "-", judgement],
-        ["내 돈은 얼마 들어가나?", format_manwon(summary.get("self_funding_manwon")), "지원금 차감 후 자기부담금 기준"],
-        ["왜 지금 해야 하나?", summary.get("business_necessity") or "-", "설비 노후·비용·품질 지표 기준"],
         [
-            "무엇이 부족한가?",
+            "우리 회사가 받을\n수 있나?",
+            summary.get("policy_analysis")
+            or (
+                f"정책 추천 적합도는 {format_score(summary.get('match_score'))}입니다.\n"
+                f"기업의 지역({region}), 업종({industry_display}), 규모({company_size})에 대한 매칭 결과를 기준으로 검토합니다.\n"
+                "세부 지원한도와 제출서류, 마감일, 자격조건은 공고 원문 확인이 필요합니다."
+            ),
+            judgement,
+        ],
+        ["내 돈은 얼마\n들어가나?", format_manwon(summary.get("self_funding_manwon")), "지원금 차감 후\n자기부담금 기준"],
+        ["왜 지금 해야\n하나?", summary.get("business_necessity") or "-", "설비 노후·비용·품질\n지표 기준"],
+        [
+            "무엇이\n부족한가?",
             f"일반 준비자료 {len(evidence_rows)}건"
-            + (f" + 안전개선 증빙 {safety_evidence_count}건 확인 필요" if safety_evidence_count else " 확인 필요"),
+            + (f" + 안전·정비 근거 {safety_evidence_count}건 확인 필요" if safety_evidence_count else " 확인 필요"),
             "제출 전 증빙 보완",
         ],
     ]
-    subsidy_basis = _policy_max_amount_type_reason(policy) or "정책 지원한도 및 시나리오"
+
+    subsidy_basis = _policy_max_amount_type_reason(policy) or _policy_max_amount_type(policy) or "정책 지원한도 유형 미확인"
     budget_rows = [
         ["항목", "금액/기간", "근거"],
         ["총 사업비", format_manwon(summary.get("investment_manwon")), "ROI 계산 시나리오"],
@@ -2205,17 +3134,6 @@ def generate_consumer_summary_report_pdf(ctx: ReportContext) -> bytes:
         ["연간 순편익", format_manwon(annual_net), "ROI breakdown"],
         ["예상 회수기간", format_months(summary.get("payback_months")), "ROI 계산값"],
     ]
-    energy_saving = _energy_saving_value(breakdown)
-    maintenance_saving = _maintenance_saving_value(breakdown)
-    defect_saving = _defect_saving_value(breakdown)
-    productivity_gain = _productivity_gain_value(breakdown)
-    benefit_chart_items = [
-        ("에너지비", energy_saving, format_manwon(energy_saving)),
-        ("유지보수비", maintenance_saving, format_manwon(maintenance_saving)),
-        ("불량비용", defect_saving, format_manwon(defect_saving)),
-    ]
-    if productivity_gain:
-        benefit_chart_items.append(("생산성", productivity_gain, format_manwon(productivity_gain)))
 
     savings_rows = [
         ["절감/개선 항목", "금액", "비고"],
@@ -2223,12 +3141,34 @@ def generate_consumer_summary_report_pdf(ctx: ReportContext) -> bytes:
         ["유지보수비 절감", format_manwon(maintenance_saving), "정비비 기준"],
         ["불량비용 절감", format_manwon(defect_saving), "불량률 기준"],
         ["생산성 개선 효과", _format_optional_manwon(productivity_gain), "생산성 개선값"],
+        ["연간 순편익", format_manwon(annual_net), "절감·개선 효과 합산"],
     ]
-    evidence_table_rows = [["상태", "항목", "왜 필요한가", "다음 조치"], *evidence_rows[:18]]
+
+    max_amount_text = format_manwon(policy.get("max_amount")) if policy.get("max_amount") else "한도 미확인"
+    policy_excerpt = (
+        policy.get("summary")
+        or policy.get("eligibility_text")
+        or summary.get("policy_analysis")
+        or "공고 원문 확인이 필요합니다."
+    )
+    policy_rows = [
+        ["검토 관점", "내용"],
+        ["추천 적합도", f"정책 추천 적합도는 {format_score(summary.get('match_score'))}입니다."],
+        ["기업 조건", f"지역({region}), 업종({industry_display}), 규모({company_size}) 기준으로 검토합니다."],
+        [
+            "활용 방향",
+            f"정책 지원 한도는 {max_amount_text} 이며, 현재 시나리오의 예상 지원금은 {format_manwon(summary.get('subsidy_manwon'))}입니다. "
+            "지원금은 설비 구매비만이 아니라 공정 데이터 수집, 시스템 연계, AI 기능 적용, 시운전 및 성과 검증 비용과 연결하여 구성합니다.",
+        ],
+        ["확인 필요", "지원한도, 제출서류, 마감일, 자격조건은 공고 원문으로 재확인합니다."],
+        ["연계 판단", "현재 매칭 결과 기준으로 지원사업 연계 가능성을 판단합니다."],
+        ["원문 발췌 해석", to_bullets(policy_excerpt, max_items=2)],
+        ["점수 해석", "추천 점수는 신청 자격 확정값이 아닌 참고 지표입니다."],
+        ["최종 확인", "업종, 기업 규모, 지역, 중복수혜 제한 및 자부담 조건을 최종 확인합니다."],
+    ]
 
     story: list[Any] = [
         _paragraph("FactoFit 표 중심 신청 판단 요약서", title),
-        Spacer(1, 4 * mm),
         make_kpi_strip(
             [
                 ("신청 판단", judgement),
@@ -2240,17 +3180,47 @@ def generate_consumer_summary_report_pdf(ctx: ReportContext) -> bytes:
             label_style=small,
             value_style=metric,
         ),
+        Spacer(1, 3 * mm),
+        callout_text(
+            "읽는 순서 - 먼저 상단 KPI로 신청 판단을 확인하고, 아래 4개 질문에서 사장님 관점의 핵심 답변을 확인합니다. 상세 근거는 2~5페이지에서 같은 순서로 이어집니다."
+        ),
         _paragraph("1. 핵심 요약", heading),
-        table([[boss_rows[0][0], boss_rows[0][1], boss_rows[0][2]]] + [[row[0], to_bullets(row[1]), row[2]] for row in boss_rows[1:]], [42, 91, 37]),
+        table([[boss_rows[0][0], boss_rows[0][1], boss_rows[0][2]]] + [[row[0], to_bullets(row[1]), row[2]] for row in boss_rows[1:]], [26, 108, 36], left_label_columns=(0,)),
+        Spacer(1, 0),  # removed unconditional PageBreak to avoid excessive blank space
+
         _paragraph("2. 신청기업 및 설비 현황", heading),
         table(
             [
                 ["구분", "내용", "구분", "내용"],
-                ["기업명", summary.get("company_name") or company.get("company_name") or "-", "지역", company.get("region") or "-"],
-                ["업종", summary.get("industry_display") or "-", "직원 수", f"{company.get('employee_count') or 0:,}명"],
-                ["설비명", summary.get("equipment_name") or equipment.get("name") or "-", "사용연수", f"{equipment.get('age_years') or 0}년"],
+                ["기업명", company_name, "지역", region],
+                ["업종", industry_display, "직원 수", f"{company.get('employee_count') or 0:,}명"],
+                ["설비명", equipment_name, "사용연수", f"{age_years:g}년"],
             ],
-            [25, 60, 25, 60],
+            [42, 42, 42, 44],
+            left_label_columns=(0, 2),
+        ),
+        Spacer(1, 3 * mm),
+        _paragraph("설비 상태 핵심 지표", subheading),
+        ComparisonChartFlowable(
+            [
+                ("설비 사용연수", age_years, avg_cycle, f"보유 설비 {age_years:g}년", f"업종 평균 {avg_cycle:g}년"),
+                ("설비 불량률", defect_rate, avg_defect, f"보유 설비 {_percent(defect_rate)}", f"업종 평균 {_percent(avg_defect)}"),
+            ],
+            regular_font=regular_font,
+            bold_font=bold_font,
+            width=170 * mm,
+        ),
+        Spacer(1, 3 * mm),
+        _paragraph("비용 발생 현황", subheading),
+        table(
+            [
+                ["항목", "금액"],
+                ["연간 에너지비", format_manwon(equipment.get("energy_cost_annual"))],
+                ["연간 유지보수비", format_manwon(equipment.get("maintenance_cost_annual"))],
+                ["연간 비용 합계", format_manwon(_number(equipment.get("energy_cost_annual")) + _number(equipment.get("maintenance_cost_annual")))],
+            ],
+            [85, 85],
+            left_label_columns=(0,),
         ),
         _paragraph("3. 사업 목적 및 추진내용", heading),
         table(
@@ -2260,85 +3230,60 @@ def generate_consumer_summary_report_pdf(ctx: ReportContext) -> bytes:
                 ["지원사업", summary.get("policy_title") or policy.get("title") or "-"],
             ],
             [35, 135],
+            left_label_columns=(0,),
         ),
+        Spacer(1, 0),  # removed unconditional PageBreak to avoid excessive blank space
+
         _paragraph("4. 정책 적합성", heading),
-        table(
-            [
-                ["검토 관점", "내용"],
-                ["추천 적합도", f"정책 추천 적합도는 {format_score(summary.get('match_score'))}입니다."],
-                ["정책 판단", summary.get("policy_analysis") or "-"],
-                ["최종 확인", "공고 원문, 지원 가능 비목, 지원한도, 자부담 조건, 제출서류 확인 이후 신청 가능 여부를 확정합니다."],
-            ],
-            [35, 135],
-        ),
-        _paragraph("5. 예산·ROI 판단 - 내 돈 기준", heading),
-        make_two_column(
-            table(budget_rows, [28, 28, 26]),
-            make_card(
-                [
-                    _paragraph("사업비 구성", cell_bold),
-                    StackedBudgetFlowable(
-                        _number(summary.get("subsidy_manwon")),
-                        _number(summary.get("self_funding_manwon")),
-                        regular_font=regular_font,
-                        bold_font=bold_font,
-                        width=76 * mm,
-                    ),
-                    _paragraph(_budget_note_by_max_amount_type(policy, summary), body),
-                ],
-                82,
-            ),
-            left_width=82,
-            right_width=82,
-        ),
         Spacer(1, 2 * mm),
-        _paragraph("6. 절감/개선 항목 및 기대효과", heading),
-        make_two_column(
-            table(savings_rows, [31, 23, 28]),
-            make_card(
-                [
-                    _paragraph("연간 순편익 구성", cell_bold),
-                    HorizontalBarChartFlowable(
-                        benefit_chart_items,
-                        regular_font=regular_font,
-                        bold_font=bold_font,
-                        width=76 * mm,
-                    ),
-                ],
-                82,
-            ),
-            left_width=82,
-            right_width=82,
+        table(policy_rows, [35, 135], left_label_columns=(0,)),
+        Spacer(1, 3 * mm),
+        table(
+            [["탈락위험 관점", "정책 적합성은 가능성 판단이며, 실제 지원 가능 여부는 공고 원문, 지원 가능 비목, 지원한도, 자부담 조건, 제출서류 확인 이후 확정됩니다."]],
+            [35, 135],
+            header=False,
+            left_label_columns=(0,),
         ),
-        _paragraph("기대효과 및 성과관리", cell_bold),
+        Spacer(1, 0),  # removed unconditional PageBreak to avoid excessive blank space
+
+        _paragraph("5. 예산·ROI 판단 - 내 돈 기준", heading),
+        table(budget_rows, [40, 40, 90], left_label_columns=(0,)),
+        _paragraph("사업비 구성", subheading),
+        ConsumerBudgetBarsFlowable(
+            _number(summary.get("subsidy_manwon")),
+            _number(summary.get("self_funding_manwon")),
+            regular_font=regular_font,
+            bold_font=bold_font,
+            width=170 * mm,
+        ),
+        callout_text(_budget_note_by_max_amount_type(policy, summary)),
+        Spacer(1, 0),  # removed unconditional PageBreak to avoid excessive blank space
+
+        _paragraph("6. 절감/개선 항목 및 기대효과", heading),
+        table(savings_rows, [55, 40, 75], left_label_columns=(0,)),
+        _paragraph("기대효과", subheading),
         table(
             [
                 ["구분", "내용"],
                 ["기대효과", summary.get("expected_effects") or "-"],
                 ["성과관리", summary.get("performance_plan") or "-"],
             ],
-            [35, 135],
-        ),
-        _paragraph("7. 안전개선 근거", heading),
-        _paragraph("현재 상태와 증빙 여부 판단", cell_bold),
-        _paragraph(
-            "각 관점별 현재 상태와 증빙 보유 여부를 가시성 높게 확인할 수 있도록 구성했습니다.",
-            body,
-        ),
-        table(safety_rows, [12, 43, 26, 26, 63]),
-        _paragraph("8. 증빙자료·탈락위험 체크", heading),
-        table(evidence_table_rows, [21, 52, 58, 39]),
-        _paragraph("9. 데이터 보안·신뢰 안내 및 제출 전 확인", heading),
-        _paragraph(
-            "본 리포트는 저장된 기업·설비·ROI·정책·안전개선 데이터를 기준으로 생성되었습니다. "
-            "최종 제출 전 공고 원문, 실제 견적, 지원비율, 제출서류를 반드시 재확인해야 합니다.",
-            body,
+            [32, 138],
+            left_label_columns=(0,),
         ),
     ]
-    doc.build(story)
+
+    # 안전점검 입력값이 있는 경우에는 기존 기능을 유지하되, (1) PDF와 같은 표 스타일로 맨 뒤에만 추가합니다.
+    if safety_rows and len(safety_rows) > 1:
+        story.extend([
+            Spacer(1, 0),  # removed unconditional PageBreak to avoid excessive blank space
+            _paragraph("7. 안전점검 및 향후 관리 계획", heading),
+            table(safety_rows, [35, 55, 28, 52], left_label_columns=(0,)),
+        ])
+
+    doc.build(_paginate_story(story, width_mm=170, page_height_mm=269), onFirstPage=footer, onLaterPages=footer)
     buffer.seek(0)
     return buffer.getvalue()
-
 
 def generate_application_evidence_report_pdf(ctx: ReportContext) -> bytes:
     return build_application_report_pdf(ctx.data)
@@ -2446,7 +3391,24 @@ def build_application_report_pdf(data: dict) -> bytes:
 
     story: list[Any] = [
         _paragraph(summary["policy_title"], title),
-        Spacer(1, 5 * mm),
+        make_kpi_strip(
+            [
+                ("적용 시나리오", str(summary.get("scenario_label") or "-")),
+                ("총 투자금", _manwon(summary.get("investment_manwon"))),
+                ("예상 지원금", _manwon(summary.get("subsidy_manwon"))),
+                ("정책 적합도", format_score(summary.get("match_score"))),
+                ("회수기간", format_months(summary.get("payback_months"))),
+            ],
+            label_style=small,
+            value_style=metric,
+            total_width_mm=170,
+        ),
+        Spacer(1, 2.5 * mm),
+        make_application_callout(
+            "읽는 순서 - 먼저 종합 검토 의견과 신청기업 개요를 확인하고, 2~4페이지에서 설비·사업목적·정책 적합성을 확인합니다. 5페이지 이후는 기대효과와 예산계획 중심으로 이어집니다.",
+            body,
+        ),
+        Spacer(1, 2.5 * mm),
     ]
 
     review_box = Table(
@@ -2466,7 +3428,7 @@ def build_application_report_pdf(data: dict) -> bytes:
         ("TOPPADDING", (0, 0), (-1, -1), 10),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
     ]))
-    story += [review_box, Spacer(1, 4 * mm)]
+    story += [review_box, Spacer(1, 3 * mm)]
 
     overview = [
         ["기업명", summary["company_name"], "기업 규모", company.get("company_type") or company.get("company_size") or "-"],
@@ -2479,7 +3441,7 @@ def build_application_report_pdf(data: dict) -> bytes:
         colWidths=[28 * mm, 57 * mm, 28 * mm, 57 * mm],
     )
     overview_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F6F7F3")),
+        ("BACKGROUND", (0, 0), (-1, -1), colors.white),
         ("FONTNAME", (0, 0), (-1, -1), regular_font),
         ("FONTNAME", (0, 0), (0, -1), bold_font),
         ("FONTNAME", (2, 0), (2, -1), bold_font),
@@ -2513,27 +3475,36 @@ def build_application_report_pdf(data: dict) -> bytes:
         revenue_cards = make_kpi_strip(
             [(label, display) for label, _, display in revenue_items],
             label_style=small,
-            value_style=body,
-            total_width_mm=82,
+            value_style=metric,
+            total_width_mm=170,
         )
-        story += [
-            Spacer(1, 3 * mm),
-            make_card(
-                [
-                    _paragraph("최근 매출 추이", subheading),
-                    revenue_cards,
-                    Spacer(1, 2 * mm),
-                    _paragraph("연매출 추이 라인 그래프", small),
-                    RevenueLineChartFlowable(
-                        revenue_items,
-                        regular_font=regular_font,
-                        bold_font=bold_font,
-                        width=82 * mm,
-                    ),
-                ],
-                170,
-            ),
-        ]
+        revenue_chart_card = make_card(
+            [
+                _paragraph("연매출 추이 라인 그래프", subheading),
+                RevenueLineChartFlowable(
+                    revenue_items,
+                    regular_font=regular_font,
+                    bold_font=bold_font,
+                    width=158 * mm,
+                    height=72 * mm,
+                ),
+                _paragraph("최근 3개년 연매출이 완만한 상승 흐름을 보이고 있음을 한눈에 확인할 수 있도록 추가한 시각화입니다.", small),
+            ],
+            170,
+            padding=6,
+        )
+        story += _keep_block_if_reasonable(
+            [
+                _paragraph("최근 매출 추이", subheading),
+                revenue_cards,
+                Spacer(1, 2 * mm),
+                revenue_chart_card,
+            ],
+            width_mm=170,
+            page_height_mm=265,
+            min_required_mm=92,
+            keep_all_max_mm=165,
+        )
 
     equipment_rows = [
         ["설비명 / 공정", f"{summary['equipment_name']} / {summary['process']}"],
@@ -2550,7 +3521,7 @@ def build_application_report_pdf(data: dict) -> bytes:
     )
     equipment_table.setStyle(TableStyle([
         ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#E2E7EC")),
-        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#F6F7F3")),
+        ("BACKGROUND", (0, 0), (0, -1), colors.white),
         ("FONTNAME", (0, 0), (0, -1), bold_font),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("PADDING", (0, 0), (-1, -1), 7),
@@ -2595,7 +3566,7 @@ def build_application_report_pdf(data: dict) -> bytes:
     purpose_table.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 0.7, colors.HexColor("#CBD5DF")),
         ("INNERGRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#E2E7EC")),
-        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#F6F7F3")),
+        ("BACKGROUND", (0, 0), (0, -1), colors.white),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 8),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
@@ -2686,7 +3657,7 @@ def build_application_report_pdf(data: dict) -> bytes:
     )
     policy_evidence_table.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8EEF4")),
-        ("BACKGROUND", (0, 1), (0, -1), colors.HexColor("#F6F7F3")),
+        ("BACKGROUND", (0, 1), (0, -1), colors.white),
         ("FONTNAME", (0, 0), (-1, 0), bold_font),
         ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#D5DDE5")),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
@@ -2697,55 +3668,55 @@ def build_application_report_pdf(data: dict) -> bytes:
     ]))
 
     story += [
-        _paragraph("4. 지원내용 및 원문 추출 근거", heading),
+        _paragraph("4. 지원내용 및 원문 발췌", heading),
         policy_evidence_table,
     ]
 
-    metrics = [
-        ["연간 에너지 절감", _manwon(breakdown.get("energy_saving_manwon"))],
-        ["연간 유지보수 절감", _manwon(breakdown.get("maintenance_saving_manwon"))],
-        ["연간 불량비용 절감", _manwon(breakdown.get("defect_saving_manwon"))],
-        ["연간 순편익", _manwon(scenario.get("annual_net_benefit_manwon"))],
-    ]
-    metric_table = Table(
+    effects_table = make_report_table(
         [
-            [
-                [_paragraph(label, small), Spacer(1, 2 * mm), _paragraph(value, metric)]
-                for label, value in metrics
-            ]
+            ["항목", "내용", "항목", "내용"],
+            ["에너지비 절감", _manwon(breakdown.get("energy_saving_manwon")), "유지보수비 절감", _manwon(breakdown.get("maintenance_saving_manwon"))],
+            ["불량비용 절감", _manwon(breakdown.get("defect_saving_manwon")), "연간 순편익", _manwon(scenario.get("annual_net_benefit_manwon"))],
         ],
-        colWidths=[42.5 * mm] * 4,
+        [38, 47, 38, 47],
+        body_style=body,
+        header_style=small,
+        header=True,
+        left_label_columns=(0, 2),
     )
-    metric_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F6F7F3")),
-        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E7EC")),
-        ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E7EC")),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 9),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
-    ]))
+    effects_chart_card = make_card(
+        [
+            _paragraph("기대효과 시각화", subheading),
+            HorizontalBarChartFlowable(
+                [
+                    ("에너지비 절감", _number(breakdown.get("energy_saving_manwon")), _manwon(breakdown.get("energy_saving_manwon"))),
+                    ("유지보수비 절감", _number(breakdown.get("maintenance_saving_manwon")), _manwon(breakdown.get("maintenance_saving_manwon"))),
+                    ("불량비용 절감", _number(breakdown.get("defect_saving_manwon")), _manwon(breakdown.get("defect_saving_manwon"))),
+                ],
+                regular_font=regular_font,
+                bold_font=bold_font,
+                width=150 * mm,
+                height=55 * mm,
+                bar_color=COLOR_BLUE,
+            ),
+        ],
+        170,
+    )
+    story += _section_block(
+        "5. 기대효과",
+        heading,
+        [
+            effects_table,
+            Spacer(1, 2 * mm),
+            effects_chart_card,
+        ],
+        width_mm=170,
+        page_height_mm=265,
+        keep_all_max_mm=160,
+        first_keep_max_mm=115,
+        after_mm=2,
+    )
     story += [
-        _paragraph("5. 기대효과", heading),
-        metric_table,
-        Spacer(1, 3 * mm),
-        make_card(
-            [
-                _paragraph("기대효과 시각화", subheading),
-                HorizontalBarChartFlowable(
-                    [
-                        ("에너지비 절감", _number(breakdown.get("energy_saving_manwon")), _manwon(breakdown.get("energy_saving_manwon"))),
-                        ("유지보수비 절감", _number(breakdown.get("maintenance_saving_manwon")), _manwon(breakdown.get("maintenance_saving_manwon"))),
-                        ("불량비용 절감", _number(breakdown.get("defect_saving_manwon")), _manwon(breakdown.get("defect_saving_manwon"))),
-                    ],
-                    regular_font=regular_font,
-                    bold_font=bold_font,
-                    width=82 * mm,
-                    bar_color=COLOR_BLUE,
-                ),
-            ],
-            170,
-        ),
-        Spacer(1, 2 * mm),
         *_paragraph_blocks(summary["expected_effects"], body),
         _paragraph("성과 측정 및 사후관리", subheading),
         *_paragraph_blocks(summary["performance_plan"], body),
@@ -2756,95 +3727,99 @@ def build_application_report_pdf(data: dict) -> bytes:
             *_paragraph_blocks(summary["performance_governance"], body),
         ]
 
-    safety_improvement = data.get("safety_improvement") or {}
-    safety_items = safety_improvement.get("items") or []
-    if safety_items:
-        safety_rows = [
-            [
-                _paragraph("안전개선 관점", small),
-                _paragraph("현재 판단", small),
-                _paragraph("준비할 자료", small),
-                _paragraph("설명/근거", small),
-            ]
-        ]
-        for item in safety_items[:6]:
-            evidences = item.get("required_evidences") or []
-            evidence_labels = [get_evidence_label(evidence) for evidence in evidences if evidence]
-            safety_rows.append(
-                [
-                    _paragraph(item.get("viewpoint_title") or item.get("viewpoint_key") or "-", body),
-                    _paragraph(item.get("current_judgement") or "-", body),
-                    _paragraph(", ".join([label for label in evidence_labels if label][:4]) or "-", body),
-                    _paragraph(item.get("description") or "-", body),
-                ]
-            )
-        safety_table = Table(
-            safety_rows,
-            colWidths=[36 * mm, 27 * mm, 43 * mm, 64 * mm],
-            repeatRows=1,
+    safety_maintenance_items = _safety_maintenance_items_for_report(data)
+    if safety_maintenance_items:
+        safety_item_heading = ParagraphStyle(
+            "SafetyItemHeadingKo",
+            fontName=bold_font,
+            fontSize=12,
+            leading=18,
+            textColor=colors.HexColor("#0B1F3A"),
+            spaceBefore=2.5 * mm,
+            spaceAfter=1.5 * mm,
         )
-        safety_table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F3F7FA")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#0B1F3A")),
-            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#D9E2EA")),
-            ("INNERGRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#D9E2EA")),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("TOPPADDING", (0, 0), (-1, -1), 7),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
-        ]))
         story += [
-            _paragraph("6. 안전점검 및 안전개선 기대효과", heading),
-            *_paragraph_blocks(
-                "선택 설비와 투자안 기준으로 생성된 안전점검·안전개선 항목입니다. 작업자 위험 노출 감소, 설비 운용 안정성 개선, 교체 후 안전관리 체계 구축 관점에서 기대효과와 준비자료를 함께 정리합니다.",
-                body,
-            ),
-            safety_table,
-            Spacer(1, 3 * mm),
+            _paragraph("6. 안전점검 및 향후 관리 계획", heading),
         ]
+        for index, item in enumerate(safety_maintenance_items, start=1):
+            display = item.get("display") if isinstance(item.get("display"), dict) else {}
+            inspection_title = _clean_sentence_fragment(
+                item.get("inspection_purpose_label")
+                or display.get("inspection_purpose_label")
+                or item.get("inspection_item")
+                or f"안전점검 {index}"
+            )
+            story += [
+                _paragraph(f"{index}. {inspection_title}", safety_item_heading),
+                *_paragraph_blocks(_safety_maintenance_narrative(item, variant=index), body, max_chars=320),
+                Spacer(1, 2.5 * mm),
+            ]
 
+
+
+    budget_section_no = 7 if safety_maintenance_items else 6
+    budget_summary = Table(
+        [
+            [_paragraph("정부 지원금", body), _paragraph(_manwon(summary.get("subsidy_manwon")), right)],
+            [_paragraph("자기부담금", body), _paragraph(_manwon(summary.get("self_funding_manwon")), right)],
+        ],
+        colWidths=[85 * mm, 85 * mm],
+    )
+    budget_summary.setStyle(TableStyle([
+        ("LINEBELOW", (0, 0), (-1, -1), 0.35, colors.HexColor("#E2E7EC")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+    ]))
 
     budget_table = Table(
         [
-            [_paragraph("항목", small), _paragraph("내용", small)],
-            [_paragraph("총 사업비", body), _paragraph(_manwon(summary.get("investment_manwon")), body)],
-            [_paragraph("정부 지원금", body), _paragraph(_manwon(summary.get("subsidy_manwon")), body)],
-            [_paragraph("자기부담금", body), _paragraph(_manwon(summary.get("self_funding_manwon")), body)],
-            [_paragraph("예상 회수기간", body), _paragraph(format_months(summary.get("payback_months")), body)],
-            [
-                _paragraph("정책 지원 한도", body),
-                _paragraph(_manwon(policy.get("max_amount")) if policy.get("max_amount") else "-", body),
-            ],
+            [_paragraph("항목", small), _paragraph("값", small)],
+            [_paragraph("총 사업비", body), _paragraph(_manwon(summary.get("investment_manwon")), right)],
+            [_paragraph("정부 지원금", body), _paragraph(_manwon(summary.get("subsidy_manwon")), right)],
+            [_paragraph("자기부담금", body), _paragraph(_manwon(summary.get("self_funding_manwon")), right)],
+            [_paragraph("예상 회수기간", body), _paragraph(format_months(summary.get("payback_months")), right)],
+            [_paragraph("정책 지원 한도", body), _paragraph(_manwon(policy.get("max_amount")) if policy.get("max_amount") else "-", right)],
         ],
-        colWidths=[48 * mm, 122 * mm],
+        colWidths=[85 * mm, 85 * mm],
     )
     budget_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8EEF4")),
-        ("BACKGROUND", (0, 1), (0, -1), colors.HexColor("#F6F7F3")),
+        ("BACKGROUND", (0, 0), (-1, 0), COLOR_BLUE_LIGHT),
         ("FONTNAME", (0, 0), (-1, 0), bold_font),
-        ("FONTNAME", (0, 1), (0, -1), bold_font),
-        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#D5DDE5")),
+        ("FONTNAME", (1, 1), (1, -1), bold_font),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.35, colors.HexColor("#E2E7EC")),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 7),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 7),
-        ("TOPPADDING", (0, 0), (-1, -1), 6),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
     ]))
+
     story += [
-        _paragraph("7. 예산계획", heading),
-        StackedBudgetFlowable(
-            _number(summary.get("subsidy_manwon")),
-            _number(summary.get("self_funding_manwon")),
-            regular_font=regular_font,
-            bold_font=bold_font,
-        ),
+        _paragraph(f"{budget_section_no}. 예산계획", heading),
+        _paragraph("사업비 구성", subheading),
+        budget_summary,
         Spacer(1, 2 * mm),
         budget_table,
-        *_paragraph_blocks(summary.get("financial_assessment") or _budget_note_by_max_amount_type(policy, summary), body),
+        Spacer(1, 3 * mm),
+        make_card(
+            _paragraph_blocks(summary.get("financial_assessment") or _budget_note_by_max_amount_type(policy, summary), body),
+            170,
+            padding=7,
+        ),
     ]
     if summary.get("risk_review"):
         story += [
-            _paragraph("주요 위험요인 및 확인사항", subheading),
-            *_paragraph_blocks(summary["risk_review"], body),
+            make_card(
+                [
+                    _paragraph("주요 위험요인 및 확인사항", subheading),
+                    *_paragraph_blocks(summary["risk_review"], body),
+                ],
+                170,
+                padding=7,
+            ),
         ]
 
     if summary.get("final_recommendation"):
@@ -2853,7 +3828,7 @@ def build_application_report_pdf(data: dict) -> bytes:
             colWidths=[170 * mm],
         )
         conclusion_box.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#EEF4EE")),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.white),
             ("BOX", (0, 0), (-1, -1), 0.7, colors.HexColor("#9FB7A5")),
             ("LEFTPADDING", (0, 0), (-1, -1), 11),
             ("RIGHTPADDING", (0, 0), (-1, -1), 11),
@@ -2861,7 +3836,7 @@ def build_application_report_pdf(data: dict) -> bytes:
             ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
         ]))
         story += [
-            _paragraph("8. 종합 결론", heading),
+            _paragraph("종합 결론", heading),
             conclusion_box,
         ]
 
@@ -2874,7 +3849,7 @@ def build_application_report_pdf(data: dict) -> bytes:
         canvas.drawRightString(A4[0] - 17 * mm, 9 * mm, str(document.page))
         canvas.restoreState()
 
-    doc.build(story, onFirstPage=footer, onLaterPages=footer)
+    doc.build(_paginate_story(story, width_mm=170, page_height_mm=265), onFirstPage=footer, onLaterPages=footer)
     return buffer.getvalue()
 
 

@@ -319,7 +319,7 @@ def roi_snapshot_node(state: FactofitState) -> FactofitState:
     action = _as_text(state.get("action")).lower()
 
     if action == "roi_compare" or _contains_any(query, ["비교", "a안", "b안"]):
-        text = "저장된 분석 기준 A/B 비교입니다.\n\n" + compare_scenarios(roi_data)
+        text = compare_scenarios(roi_data)
         cards = [{"type": "roi_compare", "data": {"scenario_a": scenario_a, "scenario_b": scenario_b, "recommended": recommended}}]
     elif action == "roi_detail":
         label = "전체 교체" if recommended == "A" else "부분 교체"
@@ -438,14 +438,18 @@ def draft_status_node(state: FactofitState) -> FactofitState:
 
     if draft_row:
         content = draft_row.get("draft_content")
+        additional_info = _as_text(draft_row.get("additional_info"))
         preview = ""
         if isinstance(content, dict):
             preview = _as_text(content.get("business_necessity") or json.dumps(content, ensure_ascii=False))
         else:
             preview = _as_text(content)
+        text = f"신청서 초안이 준비되어 있습니다.\n{preview[:360]}"
+        if additional_info:
+            text += f"\n\n최근 반영 요청: {additional_info}"
         _response_payload(
             state,
-            text=f"신청서 초안이 준비되어 있습니다.\n{preview[:360]}",
+            text=text,
             cards=[{
                 "type": "application_draft_status",
                 "data": {
@@ -454,6 +458,7 @@ def draft_status_node(state: FactofitState) -> FactofitState:
                     "policy_id": selected_policy_id,
                     "policies": policy_cards,
                     "preview": preview[:240],
+                    "additional_info": additional_info,
                 },
             }],
             intent="draft",

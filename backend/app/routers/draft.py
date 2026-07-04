@@ -523,15 +523,6 @@ def _enrich_draft_content(
         f"{scenario_label} 기준 설비투자를 통해 에너지 효율 개선, 유지보수 부담 완화, 품질 안정화 효과를 기대할 수 있습니다.",
     )
 
-    must_include_text = _safe_text(body.must_include_text)
-    if must_include_text:
-        if must_include_text not in application_purpose:
-            application_purpose = f"{application_purpose}\n\n[추가 반영 요청]\n{must_include_text}"
-        if must_include_text not in business_necessity:
-            business_necessity = f"{business_necessity}\n\n[추가 반영 요청]\n{must_include_text}"
-        if must_include_text not in expected_effects:
-            expected_effects = f"{expected_effects}\n\n[추가 반영 요청]\n{must_include_text}"
-
     ai_reasons = content.get("ai_reasons")
     if not isinstance(ai_reasons, list) or not ai_reasons:
         ai_reasons = [
@@ -564,7 +555,6 @@ def _enrich_draft_content(
         "business_necessity": business_necessity,
         "expected_effects": expected_effects,
         "required_documents": _build_required_documents(content),
-        "must_include_text": must_include_text,
         "scenario_used": scenario_used,
         "scenario_label": scenario_label,
         "created_at": datetime.now().isoformat(),
@@ -818,22 +808,24 @@ async def generate_draft(
     draft_payload = {
         "company_id": body.company_id,
         "equipment_id": body.equipment_id,
+        "analysis_id": body.analysis_id,
         "policy_id": effective_policy_id,
+        "additional_info": _safe_text(body.must_include_text) or None,
         "draft_content": draft_content,
         "created_at": datetime.now().isoformat(),
     }
 
-    # Keep only one latest draft for the same company/equipment/policy.
-    db.table("draft_result").delete().eq(
-        "company_id",
-        body.company_id,
-    ).eq(
-        "equipment_id",
-        body.equipment_id,
-    ).eq(
-        "policy_id",
-        effective_policy_id,
-    ).execute()
+    # Keep only one latest draft for the same company/equipment/policy/(analysis if available).
+    delete_query = (
+        db.table("draft_result")
+        .delete()
+        .eq("company_id", body.company_id)
+        .eq("equipment_id", body.equipment_id)
+        .eq("policy_id", effective_policy_id)
+    )
+    if body.analysis_id:
+        delete_query = delete_query.eq("analysis_id", body.analysis_id)
+    delete_query.execute()
 
     saved_draft = db.table("draft_result").insert(draft_payload).execute()
 
@@ -849,6 +841,7 @@ async def generate_draft(
             "policy_id": effective_policy_id,
             "company_id": body.company_id,
             "equipment_id": body.equipment_id,
+            "additional_info": _safe_text(body.must_include_text) or None,
             "scenario_used": scenario_used,
             "scenario_label": scenario_label,
             "draft_result": draft_content,

@@ -7,6 +7,7 @@ import DashboardWorkspacePageLayout from "../components/layout/DashboardWorkspac
 import AdvisorQuickActions from "../features/aiAdvisor/AdvisorQuickActions"
 import AdvisorResponseCards from "../features/aiAdvisor/AdvisorResponseCards"
 import InvestmentSimulationDialog from "../features/aiAdvisor/InvestmentSimulationDialog"
+import AnalysisPickerDialog from "../features/aiAdvisor/AnalysisPickerDialog"
 import { ANALYSIS_QUICK_ACTIONS, type AdvisorActionDefinition } from "../features/aiAdvisor/advisorActions"
 import "../features/aiAdvisor/aiAdvisor.css"
 import {
@@ -54,7 +55,9 @@ type AnalysisContext = {
   analysisId: string
   companyId: string
   equipmentId: string
+  analysisTitle: string
   equipmentName: string
+  equipmentCategory: string
   createdAt: string
   roiPct: number | null
   scenarioAInvestment: number | null
@@ -199,21 +202,47 @@ function buildActiveSessionStorageKey(companyId: string, userId: string, tokenMa
 function mapContexts(onboarding: DashboardOnboardingMeResponse | null) {
   const company = asRecord(onboarding?.company)
   const companyId = readText(company.company_id)
+  const equipmentRows = Array.isArray(onboarding?.equipments)
+    ? onboarding.equipments.map((item) => asRecord(item))
+    : []
+  const equipmentById = new Map(
+    equipmentRows.map((equipment) => [
+      readText(equipment.equipment_id, equipment.id),
+      {
+        name: readText(equipment.name),
+        category: readText(equipment.category),
+      },
+    ]),
+  )
   return (onboarding?.roi_outputs ?? [])
     .map((row) => {
       const roiOutput = asRecord(row)
       const analysisId = readText(roiOutput.analysis_id, roiOutput.analysisId, roiOutput.id)
       const equipmentId = readText(roiOutput.equipment_id)
+      const equipmentMeta = equipmentById.get(equipmentId)
       const roiData = asRecord(roiOutput.roi_data)
       const scenarioA = asRecord(roiData.scenario_a)
       const scenarioB = asRecord(roiData.scenario_b)
       const snapshot = asRecord(roiOutput.policy_snapshot)
+      const createdAt = readText(roiOutput.created_at)
+      const equipmentName =
+        readText(
+          roiOutput.equipment_name,
+          equipmentMeta?.name,
+          roiData.equipment_name,
+        ) || "검토 설비"
+      const createdLabel = formatDateTime(createdAt)
       return {
         analysisId,
         companyId,
         equipmentId,
-        equipmentName: readText(roiOutput.equipment_name) || "검토 설비",
-        createdAt: readText(roiOutput.created_at),
+        analysisTitle:
+          createdLabel !== "-"
+            ? `${equipmentName} · ${createdLabel}`
+            : `${equipmentName} · ${analysisId.slice(0, 8)}`,
+        equipmentName,
+        equipmentCategory: readText(equipmentMeta?.category, roiData.category),
+        createdAt,
         roiPct: readNumber(scenarioA.roi_pct),
         scenarioAInvestment: readNumber(scenarioA.investment_manwon),
         scenarioBInvestment: readNumber(scenarioB.investment_manwon),
@@ -256,6 +285,11 @@ function toMessageListFromSession(data: unknown): ChatMessage[] {
     messages.push({ id: crypto.randomUUID(), role, content })
   }
   return messages
+}
+
+function shouldHideAssistantText(message: ChatMessage) {
+  if (message.role !== "assistant" || !Array.isArray(message.cards)) return false
+  return message.cards.some((card) => asRecord(card).type === "policy_snapshot_cards")
 }
 
 export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boolean }) {
@@ -315,8 +349,16 @@ export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boole
     const keyword = analysisSearch.trim().toLowerCase()
     if (!keyword) return contexts
     return contexts.filter((item) => {
-      const haystack = `${item.equipmentName} ${item.analysisId}`.toLowerCase()
-      return haystack.includes(keyword)
+      const searchable = [
+        item.analysisTitle,
+        item.equipmentName,
+        item.equipmentCategory,
+        item.analysisId,
+        item.equipmentId,
+      ]
+        .join(" ")
+        .toLowerCase()
+      return searchable.includes(keyword)
     })
   }, [analysisSearch, contexts])
 
@@ -524,7 +566,7 @@ export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boole
     simulationInput?: Record<string, number>,
   ) => {
     if (loadingActionId || sending) return
-    if (actionDef.responseType === "dialog") {
+    if (actionDef.responseType === "dialog" && !simulationInput) {
       setSimulationOpen(true)
       return
     }
@@ -834,7 +876,9 @@ export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boole
                       <span>AI Engi</span>
                     </div>
                     <div className="ff-advisor-message-stack">
-                      <div className="ff-advisor-message assistant">{message.content}</div>
+                      {!shouldHideAssistantText(message) ? (
+                        <div className="ff-advisor-message assistant">{message.content}</div>
+                      ) : null}
                       {message.cards && message.cards.length > 0 ? (
                         <AdvisorResponseCards
                           cards={message.cards}
@@ -1020,59 +1064,19 @@ export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boole
           onSubmit={(input) => void handleSimulationSubmit(input)}
         />
 
-        {analysisPickerOpen && (
-        <section className="ff-advisor-agent-shell" aria-label="분석 선택">
-          <div className="ff-advisor-agent-stage" style={{ maxWidth: 720 }}>
-            <header className="ff-advisor-agent-header">
-              <div className="ff-advisor-brand-block">
-                <div>
-                  <span>ANALYSIS PICKER</span>
-                  <h2>분석 변경</h2>
-                </div>
-              </div>
-              <button type="button" onClick={() => setAnalysisPickerOpen(false)} aria-label="닫기">
-                ×
-              </button>
-            </header>
-            <main className="ff-advisor-agent-main">
-              <input
-                value={analysisSearch}
-                onChange={(event) => setAnalysisSearch(event.target.value)}
-                placeholder="설비명/analysis_id 검색"
-                style={{
-                  width: "100%",
-                  height: 46,
-                  borderRadius: 10,
-                  border: "1px solid #d0d5dd",
-                  padding: "0 12px",
-                  marginBottom: 10,
-                }}
-              />
-              <div style={{ display: "grid", gap: 8, maxHeight: "55vh", overflow: "auto" }}>
-                {filteredContexts.map((analysis) => (
-                  <button
-                    key={analysis.analysisId}
-                    type="button"
-                    className="ff-support-btn ghost"
-                    style={{ justifyContent: "space-between" }}
-                    onClick={() => {
-                      setSelectedAnalysisId(analysis.analysisId)
-                      setSelectedEquipmentId(analysis.equipmentId)
-                      setAnalysisPickerOpen(false)
-                    }}
-                  >
-                    <span>
-                      {analysis.equipmentName} · ROI {formatPercent(analysis.roiPct)}
-                    </span>
-                    <span>{formatDateTime(analysis.createdAt)}</span>
-                  </button>
-                ))}
-                {!filteredContexts.length && <p>검색 결과가 없습니다.</p>}
-              </div>
-            </main>
-          </div>
-        </section>
-      )}
+        <AnalysisPickerDialog
+          open={analysisPickerOpen}
+          items={filteredContexts}
+          selectedAnalysisId={selectedAnalysisId}
+          search={analysisSearch}
+          onSearchChange={setAnalysisSearch}
+          onSelect={(analysis) => {
+            setSelectedAnalysisId(analysis.analysisId)
+            setSelectedEquipmentId(analysis.equipmentId)
+            setAnalysisPickerOpen(false)
+          }}
+          onClose={() => setAnalysisPickerOpen(false)}
+        />
     </div>
   )
 

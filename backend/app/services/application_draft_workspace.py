@@ -841,6 +841,7 @@ def load_application_draft_workspace(
         "draft": {
             "exists": bool(draft_row),
             "draft_result_id": (draft_row or {}).get("draft_result_id"),
+            "additional_info": _safe_text((draft_row or {}).get("additional_info")) or None,
             "content": draft_content if draft_row else {},
             "summary_paragraphs": _build_summary_paragraphs(draft_content)
             if draft_row

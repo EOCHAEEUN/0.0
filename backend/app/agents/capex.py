@@ -156,23 +156,55 @@ def show_roi_detail(roi_data: dict, user_query: str) -> str:
 
 
 def compare_scenarios(roi_data: dict) -> str:
-    """A/B 시나리오 비교 텍스트를 생성합니다."""
+    """A/B 시나리오 비교 설명 문장을 생성합니다. 수치 상세는 UI 카드에 위임합니다."""
     scenario_a = _scenario_values(roi_data, "scenario_a")
     scenario_b = _scenario_values(roi_data, "scenario_b")
     recommended = str(roi_data.get("recommended") or "A").upper()
-    return "\n".join(
-        [
-            "- 시나리오 A vs B 비교",
-            "",
-            "                 A (전체교체)           B (부분개선)",
-            f"투자금:          {_fmt_int(scenario_a['investment_manwon'])}만원         {_fmt_int(scenario_b['investment_manwon'])}만원",
-            f"연간 순편익:     {_fmt_int(scenario_a['annual_net_benefit_manwon'])}만원         {_fmt_int(scenario_b['annual_net_benefit_manwon'])}만원",
-            f"회수기간:        {_fmt_float(scenario_a['payback_years'])}년            {_fmt_float(scenario_b['payback_years'])}년",
-            f"ROI:            {_fmt_float(scenario_a['roi_pct'])}%            {_fmt_float(scenario_b['roi_pct'])}%",
-            "",
-            f"- 추천: 시나리오 {recommended}",
-        ]
+    ai_recommendation = roi_data.get("ai_recommendation", {})
+    ai_recommendation = ai_recommendation if isinstance(ai_recommendation, dict) else {}
+    summary = str(ai_recommendation.get("summary") or "").strip()
+    reason_bullets = ai_recommendation.get("reason_bullets")
+    reason_bullets = (
+        [str(reason).strip() for reason in reason_bullets if str(reason).strip()]
+        if isinstance(reason_bullets, list)
+        else []
     )
+
+    rec_name = "A안(전체 교체)" if recommended == "A" else "B안(부분 개선)"
+    tradeoff_parts: list[str] = []
+    if scenario_a["investment_manwon"] > scenario_b["investment_manwon"]:
+        tradeoff_parts.append("A안은 B안보다 초기 투자 규모가 큽니다")
+    elif scenario_b["investment_manwon"] > scenario_a["investment_manwon"]:
+        tradeoff_parts.append("B안은 A안보다 초기 투자 규모가 큽니다")
+
+    if scenario_b["roi_pct"] > scenario_a["roi_pct"]:
+        tradeoff_parts.append("B안이 ROI와 회수 측면에서 더 효율적일 수 있습니다")
+    elif scenario_a["roi_pct"] > scenario_b["roi_pct"]:
+        tradeoff_parts.append("A안이 ROI와 회수 측면에서 더 효율적일 수 있습니다")
+
+    if scenario_a["annual_net_benefit_manwon"] > scenario_b["annual_net_benefit_manwon"]:
+        tradeoff_parts.append("연간 절감 효과는 A안이 더 큽니다")
+    elif scenario_b["annual_net_benefit_manwon"] > scenario_a["annual_net_benefit_manwon"]:
+        tradeoff_parts.append("연간 절감 효과는 B안이 더 큽니다")
+
+    intro = "저장된 분석 기준으로 A/B 투자안을 비교했습니다."
+    if tradeoff_parts:
+        intro += " " + ", ".join(tradeoff_parts) + "."
+
+    paragraphs = [intro]
+    if summary:
+        paragraphs.append(summary)
+    elif reason_bullets:
+        paragraphs.append(" ".join(reason_bullets[:2]))
+    else:
+        paragraphs.append(
+            f"투자 부담, 회수 기간, 연간 순편익, 설비 상태를 종합하면 {rec_name}이 우선 검토 대상입니다."
+        )
+
+    paragraphs.append(
+        f"추천 안은 {rec_name}입니다. 투자금·ROI·회수기간 등 상세 수치는 아래 비교 카드에서 확인해 주세요."
+    )
+    return "\n\n".join(paragraphs)
 
 
 def compare_roi_results(original_roi: dict, new_roi: dict) -> str:

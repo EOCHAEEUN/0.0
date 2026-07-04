@@ -13,6 +13,7 @@ export type DraftResult = {
   company_name?: string | null
   equipment_name?: string | null
   selected_policy?: string | null
+  additional_info?: string | null
   application_purpose?: string | null
   investment_manwon?: number | null
   subsidy_manwon?: number | null
@@ -265,6 +266,7 @@ export type ApplicationDraftWorkspaceData = {
   draft: {
     exists: boolean
     draft_result_id?: string | null
+    additional_info?: string | null
     content: DraftResult & Record<string, unknown>
     summary_paragraphs: string[]
   }

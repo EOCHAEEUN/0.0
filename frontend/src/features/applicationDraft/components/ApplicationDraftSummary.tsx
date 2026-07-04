@@ -1,4 +1,4 @@
-import { ArrowRight, Clock3, Pencil, Sparkles } from "lucide-react"
+import { Clock3, Pencil, Sparkles } from "lucide-react"
 
 import {
   formatCurrencyWonFromManwon,
@@ -232,20 +232,6 @@ export function ApplicationDraftSummary({
             </span>
             <span className="ff-draft-payback-label">예상 회수기간</span>
             <strong>{paybackCompact !== "-" ? paybackCompact : paybackFallback}</strong>
-          </div>
-
-          <div className="ff-draft-scenario-actions">
-            <button
-              type="button"
-              className="ff-draft-primary-action"
-              disabled={
-                model.isGeneratingDraft || !model.data?.policy_id || policyLegacy
-              }
-              onClick={() => void model.handleGenerateDraft()}
-            >
-              {model.isGeneratingDraft ? "신청서 생성 중..." : "시나리오 확정 및 신청서 생성"}
-              <ArrowRight size={16} strokeWidth={2.4} aria-hidden="true" />
-            </button>
           </div>
         </article>
 

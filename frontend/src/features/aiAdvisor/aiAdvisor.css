@@ -452,6 +452,8 @@
   background: #fff;
   border: 1px solid #e3e6ef;
   color: #343a4a;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .ff-advisor-message.user {
@@ -929,6 +931,121 @@
   gap: 8px;
   justify-content: flex-end;
   padding: 12px 16px;
+}
+
+.ff-advisor-analysis-picker-shell {
+  align-items: center;
+  background: rgba(5, 9, 20, 0.48);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  position: fixed;
+  z-index: 95;
+}
+
+.ff-advisor-analysis-picker-panel {
+  background: #fff;
+  border: 1px solid #e4e7ec;
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(9, 16, 32, 0.24);
+  max-width: 420px;
+  width: 100%;
+  overflow: hidden;
+}
+
+.ff-advisor-analysis-picker-header {
+  align-items: center;
+  border-bottom: 1px solid #e4e7ec;
+  display: flex;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+.ff-advisor-analysis-picker-header h3 {
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 900;
+  margin: 0;
+}
+
+.ff-advisor-analysis-picker-header button {
+  background: transparent;
+  border: 0;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.ff-advisor-analysis-picker-body {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px 16px;
+}
+
+.ff-advisor-analysis-picker-body input {
+  border: 1px solid #d0d5dd;
+  border-radius: 10px;
+  color: #0f172a;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  height: 42px;
+  padding: 0 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.ff-advisor-analysis-picker-body input:focus {
+  border-color: #344ba0;
+  box-shadow: 0 0 0 3px rgba(52, 75, 160, 0.12);
+  outline: none;
+}
+
+.ff-advisor-analysis-picker-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(360px, 50vh);
+  overflow-y: auto;
+}
+
+.ff-advisor-analysis-picker-item {
+  width: 100%;
+  min-height: 46px;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  color: #0f172a;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.ff-advisor-analysis-picker-item:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.ff-advisor-analysis-picker-item.is-active {
+  border-color: #344ba0;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.ff-advisor-analysis-picker-empty {
+  margin: 0;
+  padding: 16px 4px;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
 }
 
 @media (max-width: 1200px) {
@@ -1465,6 +1582,8 @@
   background: #f8fafc;
   border: 1px solid #e8edf5;
   color: #334155;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .ff-advisor-message.user {

@@ -379,7 +379,39 @@ function PolicyByTypePanel({
     ? recommendedPolicies
     : recommendedPolicies.slice(0, RECOMMENDED_VISIBLE_COUNT)
   const hiddenRecommendedCount = Math.max(0, recommendedPolicies.length - RECOMMENDED_VISIBLE_COUNT)
-  const hiddenUrgentCount = Math.max(0, reviewNowPolicies.length - URGENT_CAROUSEL_HINT_COUNT)
+
+  const renderUrgentCard = (policy: SupportProjectsPolicyCard) => (
+    <article key={policy.policy_id} className="ff-mobile-policy-urgent-card">
+      <div className="ff-mobile-policy-urgent-card-top">
+        <span
+          className={`ff-mobile-policy-urgent-badge is-${resolveDdayTone(policy) === "urgent" ? "deadline" : "progress"}`}
+        >
+          {formatUrgentStatusLabel(policy)}
+        </span>
+        <button type="button" className="ff-mobile-policy-card-menu" aria-label="메뉴">
+          <MoreVertical size={16} strokeWidth={2.1} />
+        </button>
+      </div>
+      <h3>{policy.title}</h3>
+      <p>{formatPolicySummaryLine(policy)}</p>
+      {policy.tags.length > 0 ? (
+        <div className="ff-mobile-policy-tag-row">
+          {policy.tags.slice(0, 2).map((tag) => (
+            <span key={tag} className="ff-mobile-policy-tag-chip">
+              {tag.replace(/^#/, "")}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      <button
+        type="button"
+        className="ff-mobile-policy-urgent-cta"
+        onClick={() => onOpenPolicy(policy.policy_id)}
+      >
+        상세 검토
+      </button>
+    </article>
+  )
 
   return (
     <div className="ff-mobile-policies-by-type">
@@ -416,47 +448,16 @@ function PolicyByTypePanel({
               <span className="ff-mobile-policy-urgent-label">URGENT</span>
               <h2>지금 검토할 지원사업</h2>
             </div>
-            {hiddenUrgentCount > 0 ? (
-              <button type="button" className="ff-mobile-policy-more-link" onClick={onOpenDiscovery}>
-                +{hiddenUrgentCount}건 더보기
+            {reviewNowPolicies.length > URGENT_CAROUSEL_HINT_COUNT ? (
+              <span className="ff-mobile-policy-more-link" aria-hidden="true">
+                옆으로 스크롤을 넘기세요
                 <ChevronRight size={14} aria-hidden="true" />
-              </button>
+              </span>
             ) : null}
           </div>
 
           <div className="ff-mobile-policy-urgent-scroll">
-            {reviewNowPolicies.map((policy) => (
-              <article key={policy.policy_id} className="ff-mobile-policy-urgent-card">
-                <div className="ff-mobile-policy-urgent-card-top">
-                  <span
-                    className={`ff-mobile-policy-urgent-badge is-${resolveDdayTone(policy) === "urgent" ? "deadline" : "progress"}`}
-                  >
-                    {formatUrgentStatusLabel(policy)}
-                  </span>
-                  <button type="button" className="ff-mobile-policy-card-menu" aria-label="메뉴">
-                    <MoreVertical size={16} strokeWidth={2.1} />
-                  </button>
-                </div>
-                <h3>{policy.title}</h3>
-                <p>{formatPolicySummaryLine(policy)}</p>
-                {policy.tags.length > 0 ? (
-                  <div className="ff-mobile-policy-tag-row">
-                    {policy.tags.slice(0, 2).map((tag) => (
-                      <span key={tag} className="ff-mobile-policy-tag-chip">
-                        {tag.replace(/^#/, "")}
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-                <button
-                  type="button"
-                  className="ff-mobile-policy-urgent-cta"
-                  onClick={() => onOpenPolicy(policy.policy_id)}
-                >
-                  상세 검토
-                </button>
-              </article>
-            ))}
+            {reviewNowPolicies.map((policy) => renderUrgentCard(policy))}
           </div>
         </section>
       ) : null}

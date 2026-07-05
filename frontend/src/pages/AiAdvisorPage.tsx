@@ -6,6 +6,7 @@ import engiBot from "../assets/advisor/engi-bot-transparent.png"
 import botIcon from "../assets/advisor/factofit-ai-bot.png"
 import DashboardWorkspacePageLayout from "../components/layout/DashboardWorkspacePageLayout"
 import AdvisorQuickActions from "../features/aiAdvisor/AdvisorQuickActions"
+import AnalysisPickerDialog from "../features/aiAdvisor/AnalysisPickerDialog"
 import AdvisorResponseCards from "../features/aiAdvisor/AdvisorResponseCards"
 import InvestmentSimulationDialog from "../features/aiAdvisor/InvestmentSimulationDialog"
 import { ANALYSIS_QUICK_ACTIONS, type AdvisorActionDefinition } from "../features/aiAdvisor/advisorActions"
@@ -86,9 +87,6 @@ function readNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-function formatPercent(value: number | null) {
-  return value === null ? "-" : `${Math.round(value)}%`
-}
 
 function formatMessageTime(value?: string) {
   if (!value) return ""
@@ -105,16 +103,6 @@ function nowIso() {
   return new Date().toISOString()
 }
 
-function formatDateTime(value: string) {
-  const parsed = Date.parse(value)
-  if (!Number.isFinite(parsed)) return "-"
-  const date = new Date(parsed)
-  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(
-    date.getDate(),
-  ).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(
-    date.getMinutes(),
-  ).padStart(2, "0")}`
-}
 
 function formatHistoryDate(value: string) {
   const parsed = Date.parse(value)
@@ -231,6 +219,37 @@ function mapContexts(onboarding: DashboardOnboardingMeResponse | null) {
     )
 }
 
+function mapEquipmentPickerItems(
+  onboarding: DashboardOnboardingMeResponse | null,
+  contexts: AnalysisContext[],
+) {
+  const latestContextByEquipment = new Map<string, AnalysisContext>()
+  for (const context of contexts) {
+    if (!context.equipmentId) continue
+    const existing = latestContextByEquipment.get(context.equipmentId)
+    if (!existing || Date.parse(context.createdAt || "") > Date.parse(existing.createdAt || "")) {
+      latestContextByEquipment.set(context.equipmentId, context)
+    }
+  }
+
+  return (onboarding?.equipments ?? [])
+    .map((equipment, index) => {
+      const equipmentId = readText(equipment.equipment_id, equipment.id) || `equipment-${index}`
+      const equipmentName = readText(equipment.name) || "이름 미입력 설비"
+      const subtitle = readText(equipment.process, equipment.category) || "분류 없음"
+      const latestContext = latestContextByEquipment.get(equipmentId)
+      return {
+        equipmentId,
+        equipmentName,
+        subtitle,
+        analysisId: latestContext?.analysisId || "",
+        roiPct: latestContext?.roiPct ?? null,
+        createdAt: latestContext?.createdAt || "",
+      }
+    })
+    .filter((item) => Boolean(item.equipmentId))
+}
+
 function extractEquipmentSelection(cards: unknown[]) {
   const card = cards.find((item) => asRecord(item).type === "equipment_selection")
   const data = Array.isArray(asRecord(card).data) ? (asRecord(card).data as unknown[]) : []
@@ -282,6 +301,8 @@ export default function AiAdvisorPage({
   const [selectedEquipmentId, setSelectedEquipmentId] = useState("")
   const [analysisPickerOpen, setAnalysisPickerOpen] = useState(false)
   const [analysisSearch, setAnalysisSearch] = useState("")
+  const [pickerAnchorTop, setPickerAnchorTop] = useState(0)
+  const quickActionsAnchorRef = useRef<HTMLDivElement | null>(null)
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     createChatMessage(
@@ -325,14 +346,31 @@ export default function AiAdvisorPage({
     [companyId, tokenMarker, userId],
   )
 
-  const filteredContexts = useMemo(() => {
+  const equipmentPickerItems = useMemo(
+    () => mapEquipmentPickerItems(onboarding, contexts),
+    [contexts, onboarding],
+  )
+
+  const filteredEquipmentPickerItems = useMemo(() => {
     const keyword = analysisSearch.trim().toLowerCase()
-    if (!keyword) return contexts
-    return contexts.filter((item) => {
-      const haystack = `${item.equipmentName} ${item.analysisId}`.toLowerCase()
+    if (!keyword) return equipmentPickerItems
+    return equipmentPickerItems.filter((item) => {
+      const haystack = `${item.equipmentName} ${item.subtitle} ${item.analysisId}`.toLowerCase()
       return haystack.includes(keyword)
     })
-  }, [analysisSearch, contexts])
+  }, [analysisSearch, equipmentPickerItems])
+
+  const hasActiveContext = Boolean(selectedContext) || Boolean(selectedEquipmentId)
+
+  const openAnalysisPicker = () => {
+    const anchor = quickActionsAnchorRef.current
+    if (anchor) {
+      setPickerAnchorTop(anchor.getBoundingClientRect().bottom + 10)
+    } else {
+      setPickerAnchorTop(Math.round(window.innerHeight * 0.34))
+    }
+    setAnalysisPickerOpen(true)
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -356,8 +394,11 @@ export default function AiAdvisorPage({
           mapped.find((item) => item.analysisId === preferredId) ||
           mapped[0] ||
           null
+        const pickerItems = mapEquipmentPickerItems(response, mapped)
         setSelectedAnalysisId(selected?.analysisId || "")
-        setSelectedEquipmentId(selected?.equipmentId || "")
+        setSelectedEquipmentId(
+          selected?.equipmentId || pickerItems[0]?.equipmentId || "",
+        )
       })
       .catch((error) => {
         if (cancelled) return
@@ -1068,26 +1109,28 @@ export default function AiAdvisorPage({
 
             {!loading && !loadError && (
               <>
-                <AdvisorQuickActions
-                  variant={isWorkspaceAdvisor ? "workspace" : "compact"}
-                  hasAnalysis={Boolean(selectedContext)}
-                  loadingActionId={loadingActionId}
-                  onChangeAnalysis={() => setAnalysisPickerOpen(true)}
-                  collapsible={mobileMode}
-                  onAction={(action) => void executeAdvisorAction(action)}
-                  trailingAction={
-                    mobileMode ? (
-                      <button
-                        type="button"
-                        className="ff-mobile-advisor-history-action-btn"
-                        onClick={() => setHistoryOpen(true)}
-                      >
-                        <History size={14} strokeWidth={2.1} aria-hidden="true" />
-                        <span>채팅 히스토리</span>
-                      </button>
-                    ) : undefined
-                  }
-                />
+                <div ref={quickActionsAnchorRef} className="ff-advisor-quick-actions-anchor">
+                  <AdvisorQuickActions
+                    variant={isWorkspaceAdvisor ? "workspace" : "compact"}
+                    hasAnalysis={hasActiveContext}
+                    loadingActionId={loadingActionId}
+                    onChangeAnalysis={openAnalysisPicker}
+                    collapsible={mobileMode}
+                    onAction={(action) => void executeAdvisorAction(action)}
+                    trailingAction={
+                      mobileMode ? (
+                        <button
+                          type="button"
+                          className="ff-mobile-advisor-history-action-btn"
+                          onClick={() => setHistoryOpen(true)}
+                        >
+                          <History size={14} strokeWidth={2.1} aria-hidden="true" />
+                          <span>채팅 히스토리</span>
+                        </button>
+                      ) : undefined
+                    }
+                  />
+                </div>
                 {!isWorkspaceAdvisor && (
                   <div className="ff-advisor-chip-row">
                     {SUGGESTION_CHIPS.map((question) => (
@@ -1152,72 +1195,22 @@ export default function AiAdvisorPage({
           onSubmit={(input) => void handleSimulationSubmit(input)}
         />
 
-        {analysisPickerOpen && (
-        <section
-          className={`ff-advisor-agent-shell${mobileMode ? " ff-mobile-advisor-analysis-picker" : ""}`}
-          aria-label="분석 선택"
-        >
-          <div className="ff-advisor-agent-stage" style={{ maxWidth: 720 }}>
-            <header className="ff-advisor-agent-header">
-              <div className="ff-advisor-brand-block">
-                <div>
-                  <span>ANALYSIS PICKER</span>
-                  <h2>분석 변경</h2>
-                </div>
-              </div>
-              <button type="button" onClick={() => setAnalysisPickerOpen(false)} aria-label="닫기">
-                ×
-              </button>
-            </header>
-            <main className="ff-advisor-agent-main">
-              <input
-                value={analysisSearch}
-                onChange={(event) => setAnalysisSearch(event.target.value)}
-                placeholder="설비명/analysis_id 검색"
-                style={
-                  mobileMode
-                    ? undefined
-                    : {
-                        width: "100%",
-                        height: 46,
-                        borderRadius: 10,
-                        border: "1px solid #d0d5dd",
-                        padding: "0 12px",
-                        marginBottom: 10,
-                      }
-                }
-              />
-              <div
-                style={
-                  mobileMode
-                    ? undefined
-                    : { display: "grid", gap: 8, maxHeight: "55vh", overflow: "auto" }
-                }
-              >
-                {filteredContexts.map((analysis) => (
-                  <button
-                    key={analysis.analysisId}
-                    type="button"
-                    className="ff-support-btn ghost"
-                    style={mobileMode ? undefined : { justifyContent: "space-between" }}
-                    onClick={() => {
-                      setSelectedAnalysisId(analysis.analysisId)
-                      setSelectedEquipmentId(analysis.equipmentId)
-                      setAnalysisPickerOpen(false)
-                    }}
-                  >
-                    <span>
-                      {analysis.equipmentName} · ROI {formatPercent(analysis.roiPct)}
-                    </span>
-                    <span>{formatDateTime(analysis.createdAt)}</span>
-                  </button>
-                ))}
-                {!filteredContexts.length && <p>검색 결과가 없습니다.</p>}
-              </div>
-            </main>
-          </div>
-        </section>
-      )}
+        {!mobileMode ? (
+          <AnalysisPickerDialog
+            open={analysisPickerOpen}
+            search={analysisSearch}
+            items={filteredEquipmentPickerItems}
+            selectedEquipmentId={selectedEquipmentId}
+            selectedAnalysisId={selectedAnalysisId}
+            onSearchChange={setAnalysisSearch}
+            onClose={() => setAnalysisPickerOpen(false)}
+            onSelect={(item) => {
+              setSelectedEquipmentId(item.equipmentId)
+              setSelectedAnalysisId(item.analysisId)
+              setAnalysisPickerOpen(false)
+            }}
+          />
+        ) : null}
     </div>
   )
 
@@ -1234,6 +1227,34 @@ export default function AiAdvisorPage({
           showSubtitle
         />
         {advisorPageContent}
+        {analysisPickerOpen
+          ? createPortal(
+              <>
+                <div
+                  className="ff-advisor-analysis-picker-mobile-backdrop"
+                  role="presentation"
+                  onClick={() => setAnalysisPickerOpen(false)}
+                />
+                <AnalysisPickerDialog
+                  open
+                  search={analysisSearch}
+                  items={filteredEquipmentPickerItems}
+                  selectedEquipmentId={selectedEquipmentId}
+                  selectedAnalysisId={selectedAnalysisId}
+                  onSearchChange={setAnalysisSearch}
+                  onClose={() => setAnalysisPickerOpen(false)}
+                  onSelect={(item) => {
+                    setSelectedEquipmentId(item.equipmentId)
+                    setSelectedAnalysisId(item.analysisId)
+                    setAnalysisPickerOpen(false)
+                  }}
+                  variant="mobile-card"
+                  anchorTop={pickerAnchorTop}
+                />
+              </>,
+              document.body,
+            )
+          : null}
         {historyOpen
           ? createPortal(
               <div

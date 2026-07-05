@@ -3815,6 +3815,22 @@
   color: #3b55c8;
 }
 
+.ff-draft-workspace-page .ff-draft-safety-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  background: #eef4ff;
+  color: #3b55c8;
+}
+
+.ff-draft-workspace-page .ff-draft-safety-badge svg {
+  flex-shrink: 0;
+}
+
 .ff-draft-safety-table-shell {
   border: 1px solid #e8edf5;
   border-radius: 12px;

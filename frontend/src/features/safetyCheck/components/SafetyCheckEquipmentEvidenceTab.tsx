@@ -1,7 +1,8 @@
+import { FolderOpen, Wrench } from "lucide-react"
 import type { EquipmentInfo } from "../../mypage/myPage.parts"
 import type { SafetyCheckItem } from "../safetyCheck.contract"
 import { getCheckContent } from "../safetyCheck.constants"
-import { formatEquipmentRegisteredAt, getEquipmentEmoji } from "../safetyCheck.utils"
+import { formatEquipmentRegisteredAt } from "../safetyCheck.utils"
 import SafetyCheckPurposeBadge from "./SafetyCheckPurposeBadge"
 
 type SafetyCheckEquipmentEvidenceTabProps = {
@@ -33,15 +34,17 @@ export default function SafetyCheckEquipmentEvidenceTab({
           : []
 
         return (
-          <div key={equipment.id} className="card card-compact">
+          <article key={equipment.id} className="card card-compact equipment-card">
             <div className="equipment-head">
-              <div className="equipment-head__info">
-                <div className="card-title">
-                  <span aria-hidden="true">{getEquipmentEmoji(equipment.category)}</span>
-                  {equipment.name || "설비"}
-                </div>
-                <div className="card-subtitle">
-                  등록일: {formatEquipmentRegisteredAt(equipment.createdAt)}
+              <div className="equipment-head__left">
+                <span className="equipment-icon-badge" aria-hidden="true">
+                  <Wrench size={18} strokeWidth={2.2} />
+                </span>
+                <div className="equipment-head__info">
+                  <div className="card-title">{equipment.name || "설비"}</div>
+                  <div className="card-subtitle">
+                    등록일: {formatEquipmentRegisteredAt(equipment.createdAt)}
+                  </div>
                 </div>
               </div>
               <button
@@ -55,14 +58,12 @@ export default function SafetyCheckEquipmentEvidenceTab({
             </div>
 
             {items.length === 0 ? (
-              <div className="empty-state empty-state--compact">
+              <div className="empty-state empty-state--equipment">
                 <span className="empty-state-icon" aria-hidden="true">
-                  📂
+                  <FolderOpen size={34} strokeWidth={1.8} />
                 </span>
-                <div>
-                  <p>등록된 안전 점검이 없습니다</p>
-                  <p className="subtle">+ 점검 내용 버튼으로 첫 증빙을 등록하세요.</p>
-                </div>
+                <p>등록된 안전 점검이 없습니다</p>
+                <p className="subtle">+ 점검 내용 버튼으로 첫 증빙을 등록하세요.</p>
               </div>
             ) : (
               <div className="table-container">
@@ -112,7 +113,7 @@ export default function SafetyCheckEquipmentEvidenceTab({
                 </table>
               </div>
             )}
-          </div>
+          </article>
         )
       })}
     </div>

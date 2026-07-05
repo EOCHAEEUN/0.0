@@ -4,7 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.core.auth import get_current_user
 from app.models.auth import CurrentUser
-from app.services.support_projects_overview import load_support_projects_overview
+from app.services.support_projects_overview import (
+    load_policy_detail_view,
+    load_support_projects_overview,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -38,6 +41,29 @@ async def get_support_projects_overview(
         raise HTTPException(
             status_code=500,
             detail="지원사업 정보를 불러오지 못했습니다.",
+        ) from exc
+
+    return {"success": True, "data": data}
+
+
+@router.get("/support-projects/policies/{policy_id}")
+async def get_support_policy_detail(
+    policy_id: str,
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    del current_user
+    try:
+        data = load_policy_detail_view(policy_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception(
+            "support policy detail failed policy_id=%s",
+            policy_id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="지원사업 상세 정보를 불러오지 못했습니다.",
         ) from exc
 
     return {"success": True, "data": data}

@@ -1166,3 +1166,64 @@ def _load_live_discovery_overview(
         legacy_state=None,
         empty_state="no_matches" if not live_items else None,
     )
+
+
+def load_policy_detail_view(policy_id: str) -> dict[str, Any]:
+    normalized_id = _normalize_policy_id(policy_id)
+    if not normalized_id:
+        raise LookupError("policy_id가 필요합니다.")
+
+    db = get_db()
+    details = _fetch_policy_details(db, [normalized_id])
+    detail = details.get(normalized_id)
+    if not detail:
+        raise LookupError("정책을 찾을 수 없습니다.")
+
+    support_items_summary = _format_support_items_summary(
+        detail.get("support_items"),
+        max_len=500,
+    )
+    support_content = _safe_text(
+        detail.get("summary"),
+        detail.get("support_content"),
+        detail.get("content"),
+        support_items_summary,
+    )
+    raw_text = _safe_text(detail.get("raw_text"))
+    if not support_content and raw_text:
+        support_content = _summarize_reason(raw_text, max_len=1200)
+
+    deadline_info = _deadline_info(detail)
+    docs_count = _safe_number(detail.get("required_documents_count"))
+
+    return {
+        "policy_id": normalized_id,
+        "title": _safe_text(detail.get("title"), default="공고명 미확인"),
+        "organization": _safe_text(
+            detail.get("organization"),
+            detail.get("agency"),
+            default="-",
+        ),
+        "summary": _safe_text(detail.get("summary")) or None,
+        "support_content": support_content or None,
+        "eligibility_text": _safe_text(detail.get("eligibility_text")) or None,
+        "support_items_summary": support_items_summary or None,
+        "deadline": deadline_info["deadline"],
+        "deadline_display": _format_deadline_label(detail),
+        "d_day": deadline_info["d_day"],
+        "max_amount_actual": _safe_text(detail.get("max_amount_actual")) or None,
+        "policy_category": _safe_text(
+            detail.get("policy_category"),
+            detail.get("category"),
+        )
+        or None,
+        "policy_subcategory": _safe_text(detail.get("policy_subcategory")) or None,
+        "url": _safe_text(detail.get("url")) or None,
+        "required_documents_count": docs_count,
+        "posted_date": _safe_text(
+            detail.get("posted_date"),
+            detail.get("created_at"),
+            detail.get("posted_at"),
+        )
+        or None,
+    }

@@ -343,3 +343,49 @@ export async function generateSafetyPreview({
 
   return json.data ?? null
 }
+
+export type SupportPolicyDetailResponse = {
+  policy_id: string
+  title: string
+  organization: string
+  summary?: string | null
+  support_content?: string | null
+  eligibility_text?: string | null
+  support_items_summary?: string | null
+  deadline?: string | null
+  deadline_display?: string | null
+  d_day?: string | null
+  max_amount_actual?: string | null
+  policy_category?: string | null
+  policy_subcategory?: string | null
+  url?: string | null
+  required_documents_count?: number | null
+  posted_date?: string | null
+}
+
+export async function fetchSupportPolicyDetail(
+  policyId: string,
+): Promise<SupportPolicyDetailResponse | null> {
+  if (!policyId) return null
+
+  const response = await fetch(
+    buildApiUrl(`/support-projects/policies/${encodeURIComponent(policyId)}`),
+    {
+      method: "GET",
+      headers: getJsonHeaders(),
+    },
+  )
+  const json = (await response.json().catch(() => ({}))) as {
+    success?: boolean
+    data?: SupportPolicyDetailResponse | null
+    message?: string
+    detail?: string
+  }
+
+  if (response.status === 404) return null
+  if (!response.ok || json.success === false) {
+    throw new Error(json.message || json.detail || `Policy detail API failed: ${response.status}`)
+  }
+
+  return json.data ?? null
+}

@@ -1,3 +1,4 @@
+import { FileText, Wrench } from "lucide-react"
 import { useState } from "react"
 import type { EquipmentInfo } from "../mypage/myPage.parts"
 import SafetyCheckApplicationTab from "./components/SafetyCheckApplicationTab"
@@ -76,7 +77,8 @@ export default function SafetyCheckEmbeddedPanel() {
           className={`tab-button ${activeTab === "equipment" ? "active" : ""}`}
           onClick={() => switchTab("equipment")}
         >
-          📋 설비관리 탭
+          <Wrench aria-hidden="true" size={15} strokeWidth={2.2} />
+          설비관리 탭
         </button>
         <button
           type="button"
@@ -85,7 +87,8 @@ export default function SafetyCheckEmbeddedPanel() {
           className={`tab-button ${activeTab === "application" ? "active" : ""}`}
           onClick={() => switchTab("application")}
         >
-          📝 신청서 탭
+          <FileText aria-hidden="true" size={15} strokeWidth={2.2} />
+          신청서 탭
         </button>
       </div>
 

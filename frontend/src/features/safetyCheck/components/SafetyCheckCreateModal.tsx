@@ -1,3 +1,4 @@
+import { FolderOpen } from "lucide-react"
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import { createPortal } from "react-dom"
 import type { EquipmentInfo } from "../../mypage/myPage.parts"
@@ -189,7 +190,10 @@ export default function SafetyCheckCreateModal({
                 disabled={submitting}
                 onChange={(event) => handleFile(event.target.files?.[0] || null)}
               />
-              <div className="file-upload-text">📁 클릭하여 파일 선택</div>
+              <div className="file-upload-icon" aria-hidden="true">
+                <FolderOpen size={30} strokeWidth={1.8} />
+              </div>
+              <div className="file-upload-text">클릭하여 파일 선택</div>
               <div className="file-upload-size">
                 또는 파일을 드래그하세요 (최대 {INSPECTION_PDF_MAX_BYTES / (1024 * 1024)}MB)
               </div>

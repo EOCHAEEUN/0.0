@@ -25,6 +25,10 @@ export type SupportProject = {
   scenarioLabel: "전체교체" | "부분교체"
   sourceUrl: string
   can_run_safety_logic?: boolean
+  eligibilityText?: string
+  whyCheckNow?: string[]
+  preflightChecks?: { label: string; value: string }[]
+  detailLoading?: boolean
 }
 
 export type SafetyPreviewItem = {

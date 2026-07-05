@@ -60,6 +60,11 @@ export function PolicyDetailDialog({
     .map((item) => item.trim())
     .filter(Boolean)
 
+  const whyCheckItems = (project.whyCheckNow || []).filter(
+    (line) => !line.startsWith("지원 내용:"),
+  )
+  const preflightChecks = project.preflightChecks || []
+
   return (
     <div
       role="dialog"
@@ -203,7 +208,18 @@ export function PolicyDetailDialog({
               지원내용
             </h4>
 
-            {supportLines.length > 1 ? (
+            {project.detailLoading ? (
+              <p
+                style={{
+                  color: "#667085",
+                  fontSize: "15px",
+                  lineHeight: 1.8,
+                  fontWeight: 800,
+                }}
+              >
+                공고 상세 내용을 불러오는 중입니다...
+              </p>
+            ) : supportLines.length > 1 ? (
               <ul
                 style={{
                   display: "grid",
@@ -234,6 +250,125 @@ export function PolicyDetailDialog({
               </p>
             )}
           </div>
+
+          {project.eligibilityText ? (
+            <div
+              style={{
+                borderRadius: "26px",
+                border: "1px solid rgba(52,75,160,.12)",
+                background: "#FFFFFF",
+                padding: "26px",
+                marginBottom: "22px",
+              }}
+            >
+              <h4
+                style={{
+                  color: "#061B34",
+                  fontSize: "18px",
+                  fontWeight: 900,
+                  marginBottom: "12px",
+                }}
+              >
+                지원 대상 · 자격 요건
+              </h4>
+              <p
+                style={{
+                  color: "#222222",
+                  fontSize: "15px",
+                  lineHeight: 1.8,
+                  fontWeight: 800,
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                <DialogHighlightedText text={project.eligibilityText} />
+              </p>
+            </div>
+          ) : null}
+
+          {whyCheckItems.length > 0 ? (
+            <div
+              style={{
+                borderRadius: "26px",
+                border: "1px solid rgba(52,75,160,.12)",
+                background: "#FFFFFF",
+                padding: "26px",
+                marginBottom: "22px",
+              }}
+            >
+              <h4
+                style={{
+                  color: "#061B34",
+                  fontSize: "18px",
+                  fontWeight: 900,
+                  marginBottom: "12px",
+                }}
+              >
+                이 사업을 먼저 확인하는 이유
+              </h4>
+              <ul
+                style={{
+                  display: "grid",
+                  gap: "8px",
+                  paddingLeft: "20px",
+                  color: "#222222",
+                  fontSize: "15px",
+                  lineHeight: 1.75,
+                  fontWeight: 800,
+                }}
+              >
+                {whyCheckItems.map((line) => (
+                  <li key={line}>
+                    <DialogHighlightedText text={line} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {preflightChecks.length > 0 ? (
+            <div
+              style={{
+                borderRadius: "26px",
+                border: "1px solid rgba(52,75,160,.12)",
+                background: "#FFFFFF",
+                padding: "26px",
+                marginBottom: "22px",
+              }}
+            >
+              <h4
+                style={{
+                  color: "#061B34",
+                  fontSize: "18px",
+                  fontWeight: 900,
+                  marginBottom: "12px",
+                }}
+              >
+                신청 전 확인할 항목
+              </h4>
+              <div
+                style={{
+                  display: "grid",
+                  gap: "10px",
+                }}
+              >
+                {preflightChecks.map((item) => (
+                  <div
+                    key={item.label}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: "12px",
+                      fontSize: "14px",
+                      fontWeight: 800,
+                    }}
+                  >
+                    <span style={{ color: "#667085" }}>{item.label}</span>
+                    <strong style={{ color: "#061B34", textAlign: "right" }}>{item.value}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           <div
             style={{

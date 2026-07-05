@@ -83,20 +83,29 @@ def build_safety_snapshot(
         or []
     )
 
-    legal_rule_rows = (
-        db.table("safety_rule_legal")
-        .select("rule_id,inspection_type,purpose")
-        .execute()
-        .data
-        or []
-    )
-    voluntary_rule_rows = (
-        db.table("safety_rule_voluntary")
-        .select("rule_id,inspection_type,purpose")
-        .execute()
-        .data
-        or []
-    )
+    # safety_rule_* 컬럼은 스키마 시점에 따라
+    # purpose(legacy) 또는 inspection_purpose(normalized)를 사용합니다.
+    # 둘 중 하나만 있어도 안전 스냅샷 생성이 깨지지 않도록 fallback합니다.
+    def _load_rule_rows(table_name: str) -> list[dict[str, Any]]:
+        try:
+            return (
+                db.table(table_name)
+                .select("rule_id,inspection_type,inspection_purpose")
+                .execute()
+                .data
+                or []
+            )
+        except Exception:
+            return (
+                db.table(table_name)
+                .select("rule_id,inspection_type,purpose")
+                .execute()
+                .data
+                or []
+            )
+
+    legal_rule_rows = _load_rule_rows("safety_rule_legal")
+    voluntary_rule_rows = _load_rule_rows("safety_rule_voluntary")
 
     preview_items = [
         item

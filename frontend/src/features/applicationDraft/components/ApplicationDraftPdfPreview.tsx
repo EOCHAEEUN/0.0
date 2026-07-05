@@ -1,5 +1,6 @@
 import { ChevronDown } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 
 import type { ApplicationDraftReportParams } from "../applicationDraft.contract"
 import type { ApplicationDraftWorkspaceModel } from "../hooks/useApplicationDraftWorkspace"
@@ -285,6 +286,7 @@ export function ApplicationDraftPdfPreview({
   }, [controlledPreviewOpen])
 
   const selectedDownloadCount = Object.values(downloadSelection).filter(Boolean).length
+  const canUseDom = typeof document !== "undefined"
 
   const downloadSelectedPdfs = async () => {
     if (downloading || selectedDownloadCount === 0 || !reportParams) return
@@ -400,7 +402,9 @@ export function ApplicationDraftPdfPreview({
         <div className="ff-draft-alert warning">{unavailableReason}</div>
       )}
 
-      {previewOpen && (
+      {previewOpen &&
+        canUseDom &&
+        createPortal(
         <div
           className="ff-pdf-modal-backdrop"
           role="dialog"
@@ -455,7 +459,8 @@ export function ApplicationDraftPdfPreview({
                 )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       {downloadDialogOpen && (

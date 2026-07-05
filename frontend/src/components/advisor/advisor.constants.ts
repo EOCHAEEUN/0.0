@@ -12,6 +12,7 @@ import type {
   AdvisorDashboardDeadline,
   AdvisorRecentAnalysis,
   GuestChatAction,
+  GuestSuggestionChip,
 } from "./advisor.types"
 
 export const GUEST_COMPANY_NAME = "강승우 제조"
@@ -55,12 +56,35 @@ export const GUEST_CHAT_ACTIONS: GuestChatAction[] = [
   { id: "dashboard", label: "종합현황", icon: "▦", screen: "dashboard" },
 ]
 
-export const GUEST_SUGGESTION_CHIPS = [
-  "현재 분석 요약해줘",
-  "추천 시나리오 근거 알려줘",
-  "A안/B안 차이 쉽게 설명해줘",
-  "지금 바로 해야 할 일 정리해줘",
-] as const
+export const GUEST_SUGGESTION_CHIPS: GuestSuggestionChip[] = [
+  {
+    id: "analysis-summary",
+    label: "현재 분석 요약해줘",
+    message: "현재 분석 요약해줘",
+  },
+  {
+    id: "scenario-rationale",
+    label: "추천 시나리오 근거 알려줘",
+    message: "추천 시나리오 근거 알려줘",
+  },
+  {
+    id: "ab-diff",
+    label: "A안/B안 차이 쉽게 설명해줘",
+    message: "A안/B안 차이 쉽게 설명해줘",
+  },
+  {
+    id: "safety-check-summary",
+    label: "안전점검 현황 알려줘",
+    message: "안전점검 현황 알려줘",
+    action: "safety_check_summary",
+    requiresEquipment: true,
+  },
+  {
+    id: "next-todo",
+    label: "지금 바로 해야 할 일 정리해줘",
+    message: "지금 바로 해야 할 일 정리해줘",
+  },
+]
 
 export const GUEST_ENGI_GREETING =
   "안녕하세요. 작업형 AI 어드바이저 Engi입니다. 어떤 점을 도와드릴까요?"

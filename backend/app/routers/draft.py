@@ -815,6 +815,30 @@ async def generate_draft(
         "created_at": datetime.now().isoformat(),
     }
 
+    # 일부 분석 스냅샷은 policy_snapshot에만 존재하고 policy 테이블에는 아직 승격되지 않아
+    # draft_result.policy_id FK 제약(23503)로 저장이 실패할 수 있습니다.
+    # 이 경우 초안 생성은 계속 진행하고, policy_id 저장만 null로 완화합니다.
+    policy_id_for_insert = effective_policy_id
+    if effective_policy_id:
+        policy_exists = False
+        try:
+            exists_rows = (
+                db.table("policy")
+                .select("policy_id")
+                .eq("policy_id", effective_policy_id)
+                .limit(1)
+                .execute()
+                .data
+                or []
+            )
+            policy_exists = bool(exists_rows)
+        except Exception:
+            policy_exists = False
+
+        if not policy_exists:
+            policy_id_for_insert = None
+    draft_payload["policy_id"] = policy_id_for_insert
+
     # Keep only one latest draft for the same company/equipment/policy/(analysis if available).
     delete_query = (
         db.table("draft_result")

@@ -751,6 +751,31 @@ def load_application_draft_workspace(
         if draft_result.data:
             draft_row = draft_result.data[0]
 
+    # policy FK 완화로 policy_id가 null로 저장된 최신 초안도 조회 가능해야 한다.
+    # (정책 스냅샷 id는 있으나 policy 테이블 row가 아직 없는 경우)
+    if not draft_row:
+        fallback_query = (
+            db.table("draft_result")
+            .select("*")
+            .eq("company_id", company_id)
+            .eq("analysis_id", analysis_id)
+            .order("created_at", desc=True)
+            .limit(1)
+        )
+        fallback_result = fallback_query.execute()
+        if not fallback_result.data and equipment_id:
+            fallback_result = (
+                db.table("draft_result")
+                .select("*")
+                .eq("company_id", company_id)
+                .eq("equipment_id", equipment_id)
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+        if fallback_result.data:
+            draft_row = fallback_result.data[0]
+
     roi_data = _as_dict(roi_output.get("roi_data"))
     selected_scenario = _resolve_selected_scenario(
         draft_row=draft_row,

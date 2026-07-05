@@ -34,6 +34,7 @@ const SUGGESTION_CHIPS = [
   "현재 분석 요약해줘",
   "추천 시나리오 근거 알려줘",
   "A안/B안 차이 쉽게 설명해줘",
+  "안전점검 현황 알려줘",
   "지금 바로 해야 할 일 정리해줘",
 ] as const
 
@@ -273,6 +274,14 @@ function extractEquipmentSelection(cards: unknown[]) {
     .filter((item) => Boolean(item.equipment_id))
 }
 
+function extractSafetyCheckTotal(cards: unknown[]) {
+  const target = cards.find((item) => asRecord(item).type === "safety_check_summary")
+  const data = asRecord(asRecord(target).data)
+  const total = readNumber(data.total)
+  if (total === null) return null
+  return Math.max(0, Math.trunc(total))
+}
+
 function toMessageListFromSession(data: unknown): ChatMessage[] {
   const record = asRecord(data)
   const items = Array.isArray(record.messages) ? (record.messages as unknown[]) : []
@@ -333,6 +342,15 @@ export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boole
     () => contexts.find((item) => item.analysisId === selectedAnalysisId) ?? null,
     [contexts, selectedAnalysisId],
   )
+  const latestSafetyCheckTotal = useMemo(() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index]
+      if (message.role !== "assistant" || !Array.isArray(message.cards)) continue
+      const total = extractSafetyCheckTotal(message.cards)
+      if (total !== null) return total
+    }
+    return null
+  }, [messages])
 
   const companyId = useMemo(
     () => readText(selectedContext?.companyId, asRecord(onboarding?.company).company_id),
@@ -568,6 +586,14 @@ export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boole
     if (loadingActionId || sending) return
     if (actionDef.responseType === "dialog" && !simulationInput) {
       setSimulationOpen(true)
+      return
+    }
+    if (
+      actionDef.id === "safety_check_summary" &&
+      !readText(selectedContext?.equipmentId, selectedEquipmentId)
+    ) {
+      setActionError("설비를 먼저 선택해주세요.")
+      setMessages((prev) => [...prev, createChatMessage("assistant", "설비를 먼저 선택해주세요.")])
       return
     }
 
@@ -856,6 +882,9 @@ export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boole
                       </button>
                     ))}
                   </div>
+                )}
+                {latestSafetyCheckTotal !== null && (
+                  <p className="ff-advisor-quick-hint">등록된 점검 항목 {latestSafetyCheckTotal}건</p>
                 )}
               </>
             )}

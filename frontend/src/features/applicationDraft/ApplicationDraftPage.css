@@ -2341,9 +2341,8 @@
   position: fixed;
   inset: 0;
   z-index: 1100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
   padding: 20px;
   background: rgba(15, 23, 42, .4);
 }
@@ -2351,10 +2350,16 @@
 .ff-pdf-modal,
 .ff-pdf-download-dialog {
   width: min(980px, 95vw);
+  max-height: calc(100dvh - 40px);
   border-radius: 16px;
   background: #fff;
   border: 1px solid #e4e7ec;
   box-shadow: 0 30px 64px rgba(15, 23, 42, .24);
+}
+
+.ff-pdf-modal {
+  display: flex;
+  flex-direction: column;
 }
 
 .ff-pdf-modal-head {
@@ -2397,14 +2402,21 @@
 
 .ff-pdf-preview-body {
   padding: 12px 18px 18px;
-  min-height: 580px;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .ff-pdf-preview-iframe {
-  width: 100%;
-  height: 560px;
+  width: min(100%, 920px);
+  height: min(70dvh, 760px);
   border: 1px solid #e4e7ec;
   border-radius: 10px;
+  display: block;
+  margin: 0 auto;
 }
 
 .ff-pdf-download-dialog {

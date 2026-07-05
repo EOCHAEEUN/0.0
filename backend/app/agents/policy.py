@@ -15,7 +15,7 @@ from app.agents.capex import (
     show_roi_detail,
 )
 from app.core.database import get_db
-from app.core.llm import llm
+from app.core.llm import llm_fast
 from app.prompts.policy import POLICY_SYSTEM_PROMPT
 from app.state import FactofitState
 from app.tools.query_builder import _get_impact_keywords
@@ -206,7 +206,7 @@ def policy_matching_node(state: FactofitState) -> FactofitState:
     )
 
     try:
-        response = llm.invoke(
+        response = llm_fast.invoke(
             [
                 SystemMessage(content=prompt),
                 HumanMessage(content=state.get("user_query", "")),
@@ -563,7 +563,10 @@ def _support_matches_scenario(policy: dict, scenario: str) -> bool:
 
 
 def _support_policy_score(policy: dict) -> float:
-    for key in ("hybrid_score", "final_score", "match_score"):
+    # Deterministic 정책 점수만 사용한다.
+    # LLM 하이브리드 점수(hybrid_score)는 표시 순위/사유 용도로만 쓰고
+    # ROI/지원금 산정 입력에는 영향을 주지 않는다.
+    for key in ("final_score", "match_score"):
         try:
             return float(_support_value(policy, key))
         except (TypeError, ValueError):
@@ -778,7 +781,7 @@ def evaluate_and_rerank_with_llm(
     )
 
     try:
-        response = llm.invoke([SystemMessage(content=prompt)])
+        response = llm_fast.invoke([SystemMessage(content=prompt)])
         content = response.content.strip()
         if content.startswith("```"):
             content = content.split("```", 2)[1]
@@ -828,11 +831,14 @@ def evaluate_and_rerank_with_llm(
             }
         )
 
-    return sorted(
+    sorted_for_display = sorted(
         hybrid_ranked,
         key=lambda policy: policy.get("hybrid_score", 0),
         reverse=True,
     )
+    for index, policy in enumerate(sorted_for_display, start=1):
+        policy["display_rank"] = index
+    return sorted_for_display
 
 
 # ============================================================================
@@ -1038,7 +1044,7 @@ def analyze_followup_query(user_query: str, matched_policies: list) -> dict:
 의도와 정책 번호를 JSON으로 반환하세요.
 {{"intent": "sort/more/filter/compare/detail/general", "policy_index": 0}}
 """
-    response = llm.invoke([SystemMessage(content=prompt)])
+    response = llm_fast.invoke([SystemMessage(content=prompt)])
     return json.loads(response.content)
 
 

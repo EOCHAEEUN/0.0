@@ -778,8 +778,9 @@ async def analyze(
         print(f"정책 오케스트레이션 실패[{policy_stage}]: {exc}")
 
     # 5. A/B별 단 하나의 정책만 실제 지원금으로 반영
-    # LLM 실패 시에도 deterministic ranked 후보를 사용해 계산 가능하게 한다.
-    policy_pool_for_support = matched_policies or ranked
+    # ROI/지원금 계산 입력 정책 집합은 deterministic ranked 후보로 고정한다.
+    # LLM 재정렬 결과(matched_policies)는 표시 순위/추천 사유 용도로만 사용한다.
+    policy_pool_for_support = ranked
     policy_applications = {
         "scenario_a": resolve_scenario_policy_support(
             scenario="a",

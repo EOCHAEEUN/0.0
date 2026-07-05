@@ -1,7 +1,7 @@
 from langchain_core.messages import SystemMessage, HumanMessage
 from app.state import FactofitState
 from app.prompts.draft import APPLICATION_DRAFT_SYSTEM_PROMPT
-from app.core.llm import llm
+from app.core.llm import llm_fast
 import json
 
 
@@ -37,7 +37,7 @@ def application_draft_node(state: FactofitState) -> FactofitState:
         ),
     )
 
-    response = llm.invoke([
+    response = llm_fast.invoke([
         SystemMessage(content=prompt),
         HumanMessage(content=state["user_query"])
     ])

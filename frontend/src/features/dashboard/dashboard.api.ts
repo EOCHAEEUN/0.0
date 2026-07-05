@@ -3,11 +3,9 @@ import type {
   DashboardOnboardingMeResponse,
   DashboardOverviewResponse,
 } from "./dashboard.contract"
-import { getCurrentUserId } from "../../services/auth"
+import { getAccessToken, getCurrentUserId } from "../../services/auth"
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000"
-const ACCESS_TOKEN_STORAGE_KEY = "factofit_access_token"
-const AUTH_SESSION_STORAGE_KEY = "factofit_auth_session"
 const ANALYSIS_RESULT_STORAGE_KEY = "factofit_analysis_result"
 const DASHBOARD_ACTIVE_ANALYSIS_KEY = "factofit_dashboard_active_analysis_id"
 const COMPANY_ID_STORAGE_KEY = "factofit_company_id"
@@ -32,24 +30,8 @@ export function safeJsonParse<T = unknown>(value: string | null): T | null {
   }
 }
 
-function getStoredAuthSession() {
-  if (typeof window === "undefined") return null
-
-  return safeJsonParse<Record<string, unknown>>(
-    window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY),
-  )
-}
-
 export function getDashboardAccessToken() {
-  if (typeof window === "undefined") return null
-
-  const directToken = window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY)
-  if (directToken?.trim()) return directToken.trim()
-
-  const session = getStoredAuthSession()
-  const token = session?.access_token
-
-  return typeof token === "string" && token.trim() ? token.trim() : null
+  return getAccessToken()
 }
 
 export function getStoredDashboardAnalysisResult() {
@@ -97,6 +79,13 @@ export async function fetchDashboardOnboarding() {
       hasToken: Boolean(accessToken),
       response: responseText.slice(0, 300),
     })
+    if (response.status === 401) {
+      throw new Error(
+        accessToken
+          ? "세션이 만료되었습니다. 다시 로그인해주세요."
+          : "로그인이 필요합니다.",
+      )
+    }
     throw new Error(`마이페이지 온보딩 조회에 실패했습니다. (${response.status})`)
   }
 

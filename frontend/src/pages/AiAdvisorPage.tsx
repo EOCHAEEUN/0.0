@@ -1,6 +1,6 @@
 import { Send } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
-import { useLocation, useSearchParams } from "react-router-dom"
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom"
 import engiBot from "../assets/advisor/engi-bot-transparent.png"
 import botIcon from "../assets/advisor/factofit-ai-bot.png"
 import DashboardWorkspacePageLayout from "../components/layout/DashboardWorkspacePageLayout"
@@ -23,6 +23,7 @@ import {
 import { requestApplicationDraftGeneration } from "../features/applicationDraft/applicationDraft.api"
 import { fetchDashboardOnboarding } from "../features/dashboard/dashboard.api"
 import type { DashboardOnboardingMeResponse } from "../features/dashboard/dashboard.contract"
+import { clearAuthSession } from "../services/auth"
 
 type ChatMessage = {
   id: string
@@ -262,6 +263,10 @@ function mapEquipmentPickerItems(
     .filter((item) => Boolean(item.equipmentId))
 }
 
+function hasPolicySnapshotCards(cards?: unknown[]) {
+  return Array.isArray(cards) && cards.some((item) => asRecord(item).type === "policy_snapshot_cards")
+}
+
 function extractEquipmentSelection(cards: unknown[]) {
   const card = cards.find((item) => asRecord(item).type === "equipment_selection")
   const data = Array.isArray(asRecord(card).data) ? (asRecord(card).data as unknown[]) : []
@@ -302,6 +307,7 @@ function toMessageListFromSession(data: unknown): ChatMessage[] {
 
 export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boolean }) {
   const location = useLocation()
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const messageEndRef = useRef<HTMLDivElement | null>(null)
   const hydratedSessionRef = useRef("")
@@ -409,7 +415,14 @@ export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boole
       })
       .catch((error) => {
         if (cancelled) return
-        setLoadError(error instanceof Error ? error.message : "컨텍스트 조회 실패")
+        const message = error instanceof Error ? error.message : "컨텍스트 조회 실패"
+        if (message.includes("세션이 만료") || message.includes("로그인이 필요")) {
+          clearAuthSession()
+          const redirect = encodeURIComponent(location.pathname + location.search)
+          navigate(`/login?redirect=${redirect}`, { replace: true })
+          return
+        }
+        setLoadError(message)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -586,7 +599,7 @@ export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boole
     simulationInput?: Record<string, number>,
   ) => {
     if (loadingActionId || sending) return
-    if (actionDef.responseType === "dialog") {
+    if (actionDef.responseType === "dialog" && !simulationInput) {
       setSimulationOpen(true)
       return
     }
@@ -912,7 +925,9 @@ export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boole
                       <span>AI Engi</span>
                     </div>
                     <div className="ff-advisor-message-stack">
-                      <div className="ff-advisor-message assistant">{message.content}</div>
+                      {!hasPolicySnapshotCards(message.cards) && message.content ? (
+                        <div className="ff-advisor-message assistant">{message.content}</div>
+                      ) : null}
                       {message.cards && message.cards.length > 0 ? (
                         <AdvisorResponseCards
                           cards={message.cards}

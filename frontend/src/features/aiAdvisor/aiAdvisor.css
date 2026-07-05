@@ -454,6 +454,8 @@
   background: #fff;
   border: 1px solid #e3e6ef;
   color: #343a4a;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .ff-advisor-message.user {
@@ -812,6 +814,48 @@
 .ff-advisor-policy-list li span {
   color: #667085;
   font-size: 11px;
+}
+
+.ff-advisor-safety-metrics {
+  margin-top: 8px;
+}
+
+.ff-advisor-safety-list {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.ff-advisor-safety-list li {
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px 10px;
+}
+
+.ff-advisor-safety-list li.is-attention {
+  border-color: #fecdca;
+  background: #fff8f7;
+}
+
+.ff-advisor-safety-list li strong {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+.ff-advisor-safety-list li span {
+  color: #667085;
+  font-size: 11px;
+}
+
+.ff-advisor-safety-list li p {
+  color: #475467;
+  font-size: 11px;
+  line-height: 1.45;
+  margin: 4px 0 0;
 }
 
 .ff-advisor-card-actions {
@@ -1617,6 +1661,8 @@
   background: #f8fafc;
   border: 1px solid #e8edf5;
   color: #334155;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .ff-advisor-message.user {

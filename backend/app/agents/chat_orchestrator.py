@@ -320,7 +320,7 @@ def roi_snapshot_node(state: FactofitState) -> FactofitState:
     action = _as_text(state.get("action")).lower()
 
     if action == "roi_compare" or _contains_any(query, ["비교", "a안", "b안"]):
-        text = "저장된 분석 기준 A/B 비교입니다.\n\n" + compare_scenarios(roi_data)
+        text = compare_scenarios(roi_data)
         cards = [{"type": "roi_compare", "data": {"scenario_a": scenario_a, "scenario_b": scenario_b, "recommended": recommended}}]
     elif action == "roi_detail":
         label = "전체 교체" if recommended == "A" else "부분 교체"

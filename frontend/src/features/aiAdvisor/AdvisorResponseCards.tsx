@@ -342,6 +342,94 @@ export default function AdvisorResponseCards({
           )
         }
 
+        if (type === "safety_status") {
+          const summary = asRecord(data.summary)
+          const rows = Array.isArray(data.rows) ? data.rows : []
+          const total = readNumber(summary.total) ?? rows.length
+          const needImprovement = readNumber(summary.need_improvement) ?? 0
+          const missingEvidence = readNumber(summary.missing_evidence) ?? 0
+
+          if (total <= 0) {
+            return (
+              <article key={`${type}-${index}`} className="ff-advisor-result-card is-warning">
+                <strong>안전점검 현황</strong>
+                <p>
+                  현재 분석 기준 안전점검 항목이 아직 생성되지 않았습니다. 안전 프리뷰를
+                  먼저 생성하거나 점검 항목을 등록해 주세요.
+                </p>
+              </article>
+            )
+          }
+
+          return (
+            <article key={`${type}-${index}`} className="ff-advisor-result-card">
+              <strong>안전점검 현황</strong>
+              <div className="ff-advisor-safety-metrics">
+                <MetricRow label="총 점검 항목" value={`${total}건`} />
+                <MetricRow label="개선 필요" value={`${needImprovement}건`} />
+                <MetricRow label="증빙 미보유" value={`${missingEvidence}건`} />
+              </div>
+              <ul className="ff-advisor-safety-list">
+                {rows.slice(0, 8).map((row, rowIndex) => {
+                  const item = asRecord(row)
+                  const label = readText(item.viewpoint_label) || `점검 항목 ${rowIndex + 1}`
+                  const currentStatus = readText(item.current_status) || "상태 미기재"
+                  const evidenceStatus = readText(item.evidence_status) || "증빙 상태 미기재"
+                  const description = readText(item.description)
+                  const needsAttention =
+                    currentStatus.includes("개선") || evidenceStatus === "미보유"
+                  return (
+                    <li
+                      key={`${label}-${rowIndex}`}
+                      className={needsAttention ? "is-attention" : undefined}
+                    >
+                      <strong>{label}</strong>
+                      <span>
+                        {currentStatus} · {evidenceStatus}
+                      </span>
+                      {description ? <p>{description}</p> : null}
+                    </li>
+                  )
+                })}
+              </ul>
+              {rows.length > 8 ? (
+                <p className="ff-advisor-card-footnote">
+                  외 {rows.length - 8}건은 안전점검 메뉴에서 확인할 수 있습니다.
+                </p>
+              ) : null}
+            </article>
+          )
+        }
+
+        if (type === "safety_check_summary") {
+          const hasSafetyStatusCard = cards.some(
+            (item) => String(asRecord(item).type || "") === "safety_status",
+          )
+          if (hasSafetyStatusCard) return null
+
+          const total = readNumber(data.total)
+          const needImprovement = readNumber(data.need_improvement)
+          const missingEvidence = readNumber(data.missing_evidence)
+          if (total === null) return null
+
+          return (
+            <article key={`${type}-${index}`} className="ff-advisor-result-card">
+              <strong>안전점검 요약</strong>
+              <div className="ff-advisor-safety-metrics">
+                <MetricRow label="총 점검 항목" value={`${total}건`} />
+                <MetricRow
+                  label="개선 필요"
+                  value={needImprovement === null ? "-" : `${needImprovement}건`}
+                />
+                <MetricRow
+                  label="증빙 미보유"
+                  value={missingEvidence === null ? "-" : `${missingEvidence}건`}
+                />
+              </div>
+            </article>
+          )
+        }
+
         return null
       })}
     </div>

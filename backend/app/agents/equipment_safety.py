@@ -50,29 +50,33 @@ def build_safety_snapshot(
             "has_viewer_policy": False,
         }
 
-    viewer_rows = (
+    resolved_policy_id = policy_id
+    viewer_query = (
         db.table("safety_viewer_policy")
         .select("*")
         .eq("analysis_id", analysis_id)
         .eq("equipment_id", equipment_id)
-        .eq("policy_id", policy_id)
-        .limit(1)
-        .execute()
-        .data
-        or []
     )
+    if resolved_policy_id:
+        viewer_rows = (
+            viewer_query.eq("policy_id", resolved_policy_id).limit(1).execute().data or []
+        )
+    else:
+        viewer_rows = viewer_query.limit(1).execute().data or []
     viewer_policy = _as_dict(viewer_rows[0]) if viewer_rows else {}
+    if not resolved_policy_id:
+        resolved_policy_id = _as_text(viewer_policy.get("policy_id"))
 
-    file_rows = (
+    file_query = (
         db.table("user_safety_files")
         .select("*")
         .eq("analysis_id", analysis_id)
         .eq("equipment_id", equipment_id)
-        .eq("policy_id", policy_id)
-        .execute()
-        .data
-        or []
     )
+    if resolved_policy_id:
+        file_rows = file_query.eq("policy_id", resolved_policy_id).execute().data or []
+    else:
+        file_rows = file_query.execute().data or []
     check_rows = (
         db.table("safety_check_status")
         .select("*")
@@ -125,6 +129,27 @@ def build_safety_snapshot(
             }
         )
 
+    if not rows and check_rows:
+        for index, check in enumerate(check_rows, start=1):
+            row = _as_dict(check)
+            has_evidence = bool(
+                _as_text(row.get("pdf_file_url") or row.get("inspection_pdf_file"))
+            )
+            rows.append(
+                {
+                    "no": index,
+                    "viewpoint_key": _as_text(row.get("inspection_rule_id")),
+                    "viewpoint_label": _as_text(row.get("check_item"))
+                    or _as_text(row.get("inspection_purpose_label"))
+                    or "안전점검 항목",
+                    "current_status": _as_text(row.get("status")) or "상태 미기재",
+                    "evidence_status": "보유" if has_evidence else "미보유",
+                    "description": _as_text(row.get("check_content"))
+                    or _as_text(row.get("current_safety_measures"))
+                    or "점검 내용 확인이 필요합니다.",
+                }
+            )
+
     summary = {
         "total": len(rows),
         "need_improvement": sum(1 for row in rows if "개선" in _as_text(row.get("current_status"))),
@@ -134,7 +159,7 @@ def build_safety_snapshot(
     return {
         "analysis_id": analysis_id,
         "equipment_id": equipment_id,
-        "policy_id": policy_id,
+        "policy_id": resolved_policy_id or policy_id,
         "rows": rows,
         "summary": summary,
         "rule_sources": {

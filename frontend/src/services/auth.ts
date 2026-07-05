@@ -53,20 +53,24 @@ export function getAccessToken() {
 
   try {
     const raw = localStorage.getItem("factofit_auth_session")
-    if (!raw) return null
+    if (raw) {
+      const session = JSON.parse(raw) as Record<string, unknown>
+      const sessionData = session.data as Record<string, unknown> | undefined
+      const nestedSession = session.session as Record<string, unknown> | undefined
+      const token =
+        session.access_token ??
+        sessionData?.access_token ??
+        nestedSession?.access_token
 
-    const session = JSON.parse(raw) as Record<string, unknown>
-    const sessionData = session.data as Record<string, unknown> | undefined
-    const nestedSession = session.session as Record<string, unknown> | undefined
-    const token =
-      session.access_token ??
-      sessionData?.access_token ??
-      nestedSession?.access_token
-
-    return typeof token === "string" && token.trim() ? token.trim() : null
+      if (typeof token === "string" && token.trim()) return token.trim()
+    }
   } catch {
-    return null
+    // ignore malformed session payload
   }
+
+  const legacy =
+    localStorage.getItem("access_token") ?? localStorage.getItem("token")
+  return legacy?.trim() ? legacy.trim() : null
 }
 
 async function postAuth<T>(

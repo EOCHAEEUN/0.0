@@ -85,14 +85,14 @@ def build_safety_snapshot(
 
     legal_rule_rows = (
         db.table("safety_rule_legal")
-        .select("rule_id,inspection_type,purpose")
+        .select("rule_id,inspection_type,inspection_purpose")
         .execute()
         .data
         or []
     )
     voluntary_rule_rows = (
         db.table("safety_rule_voluntary")
-        .select("rule_id,inspection_type,purpose")
+        .select("rule_id,inspection_type,inspection_purpose")
         .execute()
         .data
         or []

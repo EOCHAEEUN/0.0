@@ -546,7 +546,7 @@ export default function AiAdvisorPage({
       setLastFailedAction(null)
       return
     }
-    if (actionDef.responseType === "dialog") {
+    if (actionDef.responseType === "dialog" && !simulationInput) {
       setSimulationOpen(true)
       return
     }

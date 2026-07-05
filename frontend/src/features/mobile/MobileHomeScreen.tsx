@@ -7,13 +7,17 @@ import {
   Sparkles,
   UserRound,
 } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { useApplicationDraftWorkspace } from "../applicationDraft/hooks/useApplicationDraftWorkspace"
 import { getStoredCompanyId } from "../dashboard/dashboard.api"
 import { useDashboardData } from "../dashboard/hooks/useDashboardData"
 import { MobileScreenFeedback } from "./components/MobileScreenFeedback"
+import { MobileCompanyMenuSheet } from "./components/MobileCompanyMenuSheet"
+import { MobileSettingsOverlayPanel } from "./components/MobileSettingsOverlayPanel"
 import { MobileTopBar } from "./components/MobileTopBar"
+import MyPageFeature from "../mypage/MyPageFeature"
+import EquipmentStatusFeature from "../equipmentStatus/EquipmentStatusFeature"
 import { buildMobilePath, resolveMobileFlowContext } from "./mobileFlowContext"
 import { mapMobileHomeViewModel } from "./mobileApp.mapper"
 import type { MobileTaskItem } from "./mobileApp.types"
@@ -45,6 +49,12 @@ export default function MobileHomeScreen() {
   const preferredAnalysisId = searchParams.get("analysisId") || searchParams.get("analysis_id") || undefined
   const { dashboard, loading, error, refetch } = useDashboardData({ preferredAnalysisId })
   const [policyImageError, setPolicyImageError] = useState(false)
+  const [companyMenuOpen, setCompanyMenuOpen] = useState(false)
+  const [companyMenuAnchor, setCompanyMenuAnchor] = useState<{ top: number; right: number } | null>(
+    null,
+  )
+  const companyMenuButtonRef = useRef<HTMLButtonElement>(null)
+  const [settingsPanel, setSettingsPanel] = useState<"none" | "profile" | "equipment">("none")
   const workspace = dashboard.workspace
   const flowContext = useMemo(
     () => resolveMobileFlowContext(searchParams, workspace),
@@ -64,6 +74,20 @@ export default function MobileHomeScreen() {
       }),
     [dashboard, draftWorkspace.data],
   )
+
+  const openCompanyMenu = () => {
+    const anchor = companyMenuButtonRef.current
+    if (anchor) {
+      const rect = anchor.getBoundingClientRect()
+      setCompanyMenuAnchor({
+        top: rect.bottom + 8,
+        right: Math.max(12, window.innerWidth - rect.right),
+      })
+    } else {
+      setCompanyMenuAnchor({ top: 120, right: 12 })
+    }
+    setCompanyMenuOpen(true)
+  }
 
   return (
     <section className="ff-mobile-screen ff-mobile-screen-home">
@@ -100,7 +124,14 @@ export default function MobileHomeScreen() {
                 <strong>{model.companyCard.companyName}</strong>
                 <span>{model.companyCard.locationLine}</span>
               </div>
-              <button type="button" className="ff-mobile-company-menu" aria-label="기업 메뉴">
+              <button
+                ref={companyMenuButtonRef}
+                type="button"
+                className="ff-mobile-company-menu"
+                aria-label="기업 메뉴"
+                aria-expanded={companyMenuOpen}
+                onClick={openCompanyMenu}
+              >
                 <MoreVertical size={18} strokeWidth={2.1} />
               </button>
             </div>
@@ -262,6 +293,39 @@ export default function MobileHomeScreen() {
           </article>
         </>
       ) : null}
+
+      <MobileCompanyMenuSheet
+        open={companyMenuOpen}
+        anchorTop={companyMenuAnchor?.top}
+        anchorRight={companyMenuAnchor?.right}
+        onClose={() => setCompanyMenuOpen(false)}
+        onSelectProfile={() => setSettingsPanel("profile")}
+        onSelectEquipment={() => setSettingsPanel("equipment")}
+      />
+
+      <MobileSettingsOverlayPanel
+        open={settingsPanel === "profile"}
+        title="내 정보관리"
+        onClose={() => setSettingsPanel("none")}
+      >
+        <div className="ff-mobile-settings-embed ff-mobile-settings-embed--mypage">
+          <MyPageFeature
+            mobileOverlay
+            onClose={() => setSettingsPanel("none")}
+            onOpenEquipment={() => setSettingsPanel("equipment")}
+          />
+        </div>
+      </MobileSettingsOverlayPanel>
+
+      <MobileSettingsOverlayPanel
+        open={settingsPanel === "equipment"}
+        title="내 설비현황"
+        onClose={() => setSettingsPanel("none")}
+      >
+        <div className="ff-mobile-settings-embed ff-mobile-settings-embed--equipment">
+          <EquipmentStatusFeature mobileOverlay />
+        </div>
+      </MobileSettingsOverlayPanel>
     </section>
   )
 }

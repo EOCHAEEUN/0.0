@@ -304,11 +304,35 @@ function mapRemoteEquipment(item: unknown, index: number): EquipmentInfo {
 }
 
 
-export default function MyPage() {
+export default function MyPage({
+  mobileOverlay = false,
+  onClose,
+  onOpenEquipment,
+}: {
+  mobileOverlay?: boolean
+  onClose?: () => void
+  onOpenEquipment?: () => void
+} = {}) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const returnToDashboard = searchParams.get("return_to") === "dashboard";
   const focusRepresentative = searchParams.get("focus") === "representative";
+
+  const goDashboard = () => {
+    if (mobileOverlay) {
+      onClose?.()
+      return
+    }
+    navigate("/dashboard")
+  }
+
+  const goEquipment = () => {
+    if (mobileOverlay) {
+      onOpenEquipment?.()
+      return
+    }
+    navigate("/equipment")
+  }
 
   const storedData = useMemo(() => {
     if (typeof window === "undefined") return null;
@@ -900,7 +924,7 @@ export default function MyPage() {
       setRepresentativeEquipmentId(equipmentId);
       setRepresentativeFeedback(`대표 설비를 ${equipmentLabel}로 변경했습니다.`);
       if (returnToDashboard) {
-        navigate("/dashboard");
+        goDashboard();
       }
     } catch (error) {
       window.alert(
@@ -925,7 +949,7 @@ export default function MyPage() {
       setRepresentativeEquipmentId("");
       setRepresentativeFeedback("대표 설비를 해제했습니다.");
       if (returnToDashboard) {
-        navigate("/dashboard");
+        goDashboard();
       }
     } catch (error) {
       window.alert(
@@ -1352,6 +1376,13 @@ export default function MyPage() {
     }
 
     if (selectedEquipment.equipmentId) {
+      if (mobileOverlay) {
+        onClose?.();
+        navigate(
+          `/mobile/roi?equipmentId=${encodeURIComponent(selectedEquipment.equipmentId)}`,
+        );
+        return;
+      }
       window.location.assign(
         `/analysis/new?mode=existing&equipmentId=${encodeURIComponent(selectedEquipment.equipmentId)}`,
       );
@@ -1402,6 +1433,12 @@ export default function MyPage() {
         }),
       );
 
+      if (mobileOverlay) {
+        onClose?.();
+        navigate("/mobile/roi");
+        return;
+      }
+
       window.location.assign("/dashboard");
     } catch (error) {
       window.alert(getErrorMessage(error));
@@ -1410,45 +1447,14 @@ export default function MyPage() {
     }
   };
 
-  return (
-    <>
-      <style>{`
-        details > summary::-webkit-details-marker { display: none !important; }
-        details > summary::marker { content: "" !important; }
-        details > summary { list-style: none !important; }
-        @media (max-width: 960px) {
-          .ff-mypage-service-flow,
-          .ff-mypage-three-col,
-          .ff-mypage-four-col,
-          .ff-mypage-analysis-bar {
-            grid-template-columns: 1fr !important;
-          }
-          .ff-mypage-analysis-actions {
-            justify-content: stretch !important;
-          }
-          .ff-mypage-analysis-actions > button {
-            width: 100% !important;
-          }
-        }
-      `}</style>
-
-      <FloatingModalNotice
-        open={analysisBlockNoticeOpen}
-        title="필수 정보를 먼저 입력해주세요."
-        description={"기본정보, 기업정보, 설비현황의 필수 항목이\n모두 입력되어야 분석을 시작할 수 있습니다."}
-        description2="필수값을 입력하고 저장한 뒤 다시 분석하기를 눌러주세요."
-        onClose={() => setAnalysisBlockNoticeOpen(false)}
-      />
-
-      <DashboardWorkspacePageLayout
-        pageClassName="ff-mypage-workspace-page"
-        contentClassName="ff-mypage-workspace-content"
-      >
-        <div className="ff-mypage-page-shell">
+  const pageShell = (
+        <div className={`ff-mypage-page-shell${mobileOverlay ? " ff-mypage-page-shell--mobile-overlay" : ""}`}>
+          {!mobileOverlay ? (
           <header className="ff-mypage-page-header">
             <h1>프로필 및 기업 설정</h1>
             <p>산업 분석 플랫폼의 개인 정보와 기업 데이터를 관리하세요.</p>
           </header>
+          ) : null}
 
           <div className="ff-mypage-profile-grid">
             <div className="ff-mypage-profile-main">
@@ -2026,7 +2032,7 @@ export default function MyPage() {
               <button
                 type="button"
                 className="ff-mypage-btn ghost"
-                onClick={() => navigate("/dashboard")}
+                onClick={goDashboard}
               >
                 취소
               </button>
@@ -2046,7 +2052,7 @@ export default function MyPage() {
               basicInfoDone={basicInfoDone}
               companyInfoDone={companyInfoDone}
               equipmentInfoDone={equipmentInfoDone}
-              onGoEquipment={() => navigate("/equipment")}
+              onGoEquipment={goEquipment}
             />
           </div>
 
@@ -2119,7 +2125,48 @@ export default function MyPage() {
             </div>
           )}
         </div>
-      </DashboardWorkspacePageLayout>
+  );
+
+  return (
+    <>
+      <style>{`
+        details > summary::-webkit-details-marker { display: none !important; }
+        details > summary::marker { content: "" !important; }
+        details > summary { list-style: none !important; }
+        @media (max-width: 960px) {
+          .ff-mypage-service-flow,
+          .ff-mypage-three-col,
+          .ff-mypage-four-col,
+          .ff-mypage-analysis-bar {
+            grid-template-columns: 1fr !important;
+          }
+          .ff-mypage-analysis-actions {
+            justify-content: stretch !important;
+          }
+          .ff-mypage-analysis-actions > button {
+            width: 100% !important;
+          }
+        }
+      `}</style>
+
+      <FloatingModalNotice
+        open={analysisBlockNoticeOpen}
+        title="필수 정보를 먼저 입력해주세요."
+        description={"기본정보, 기업정보, 설비현황의 필수 항목이\n모두 입력되어야 분석을 시작할 수 있습니다."}
+        description2="필수값을 입력하고 저장한 뒤 다시 분석하기를 눌러주세요."
+        onClose={() => setAnalysisBlockNoticeOpen(false)}
+      />
+
+      {mobileOverlay ? (
+        pageShell
+      ) : (
+        <DashboardWorkspacePageLayout
+          pageClassName="ff-mypage-workspace-page"
+          contentClassName="ff-mypage-workspace-content"
+        >
+          {pageShell}
+        </DashboardWorkspacePageLayout>
+      )}
     </>
   );
 }

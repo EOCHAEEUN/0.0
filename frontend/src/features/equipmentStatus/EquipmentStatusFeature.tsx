@@ -1,4 +1,4 @@
-import { Bot, CircleHelp, Info, Plus } from "lucide-react"
+import { Bot, CircleHelp, ExternalLink, Info, Plus, Star } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import DashboardWorkspaceSidebar from "../../components/layout/DashboardWorkspaceSidebar"
 import {
@@ -40,7 +40,25 @@ function getObject(value: unknown): Record<string, unknown> | null {
     : null
 }
 
-export default function EquipmentStatusFeature() {
+function formatRegisteredDate(value?: string) {
+  if (!value) return "등록일: -"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return "등록일: -"
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `등록일: ${year}.${month}.${day}`
+}
+
+function openEquipmentOnWeb() {
+  window.location.assign("/equipment")
+}
+
+export default function EquipmentStatusFeature({
+  mobileOverlay = false,
+}: {
+  mobileOverlay?: boolean
+} = {}) {
   const { dashboard, loading: dashboardLoading } = useDashboardData()
   const workspace = dashboard.workspace
 
@@ -225,22 +243,8 @@ export default function EquipmentStatusFeature() {
     }
   }
 
-  return (
-    <main className="page ff-dashboard-workspace-page">
-      <div className="ff-dashboard-layout">
-        <DashboardWorkspaceSidebar
-          paths={{
-            newRoiPath: workspace.newRoiPath,
-            policyPath: workspace.policyPath,
-            draftPath: workspace.draftPath,
-            advisorPath: workspace.advisorPath,
-            analysisId: workspace.analysisId,
-            priorityPolicyId: workspace.priorityPolicyId,
-          }}
-        />
-
-        <div className="ff-dashboard-main-content ff-equipment-workspace-content">
-          <div className="ff-equipment-workspace-inner">
+  const workspaceBody = (
+          <div className={`ff-equipment-workspace-inner${mobileOverlay ? " ff-equipment-workspace-inner--mobile-overlay" : ""}`}>
             <section className="ff-equipment-hero-card">
             <div>
               <p className="ff-equipment-eyebrow">EQUIPMENT STATUS</p>
@@ -427,6 +431,89 @@ export default function EquipmentStatusFeature() {
             </>
           )}
           </div>
+  );
+
+  if (mobileOverlay) {
+    return (
+      <div className="ff-equipment-workspace-inner ff-equipment-workspace-inner--mobile-overlay">
+        {loading || dashboardLoading ? (
+          <div className="ff-equipment-mobile-overlay-loading">설비 정보를 불러오는 중...</div>
+        ) : equipmentList.length === 0 ? (
+          <div className="ff-equipment-mobile-overlay-empty">
+            <div className="ff-equipment-mobile-overlay-empty-icon" aria-hidden="true">
+              <Bot size={28} strokeWidth={1.8} />
+            </div>
+            <strong>등록된 설비가 없습니다.</strong>
+            <p>웹에서 설비를 등록하고 상세 정보를 관리할 수 있습니다.</p>
+            <button
+              type="button"
+              className="ff-mobile-primary-btn ff-equipment-mobile-overlay-web-btn"
+              onClick={openEquipmentOnWeb}
+            >
+              <ExternalLink aria-hidden="true" size={16} />
+              웹에서 설비 등록
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="ff-equipment-mobile-overlay-list">
+              {equipmentList.map((equipment) => {
+                const isRepresentative = equipment.equipmentId === representativeEquipmentId
+                return (
+                  <article key={equipment.id} className="ff-equipment-mobile-summary-card">
+                    <span className="ff-equipment-mobile-summary-icon" aria-hidden="true">
+                      <Bot size={20} strokeWidth={1.8} />
+                    </span>
+                    <div className="ff-equipment-mobile-summary-copy">
+                      <strong>{equipment.name || `설비 ${equipment.id}`}</strong>
+                      <span>{formatRegisteredDate(equipment.createdAt)}</span>
+                      <span>{getCategoryLabel(equipment.category)}</span>
+                    </div>
+                    {isRepresentative ? (
+                      <span className="ff-equipment-badge representative">
+                        <Star aria-hidden="true" size={13} />
+                        대표
+                      </span>
+                    ) : null}
+                  </article>
+                )
+              })}
+            </div>
+            {representativeEquipment ? (
+              <p className="ff-equipment-mobile-overlay-rep">
+                ROI 대표 설비: {representativeEquipment.name}
+              </p>
+            ) : null}
+            <button
+              type="button"
+              className="ff-mobile-primary-btn ff-equipment-mobile-overlay-web-btn"
+              onClick={openEquipmentOnWeb}
+            >
+              <ExternalLink aria-hidden="true" size={16} />
+              웹에서 상세 관리
+            </button>
+          </>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <main className="page ff-dashboard-workspace-page">
+      <div className="ff-dashboard-layout">
+        <DashboardWorkspaceSidebar
+          paths={{
+            newRoiPath: workspace.newRoiPath,
+            policyPath: workspace.policyPath,
+            draftPath: workspace.draftPath,
+            advisorPath: workspace.advisorPath,
+            analysisId: workspace.analysisId,
+            priorityPolicyId: workspace.priorityPolicyId,
+          }}
+        />
+
+        <div className="ff-dashboard-main-content ff-equipment-workspace-content">
+          {workspaceBody}
         </div>
       </div>
       <EquipmentGuideChatLauncher />

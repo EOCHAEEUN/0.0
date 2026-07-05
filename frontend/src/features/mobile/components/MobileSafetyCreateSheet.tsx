@@ -91,14 +91,14 @@ export function MobileSafetyCreateSheet({
 
   return createPortal(
     <div
-      className="ff-mobile-safety-sheet-backdrop"
+      className="ff-mobile-safety-sheet-backdrop ff-mobile-safety-create-backdrop"
       role="presentation"
       onClick={() => {
         if (!submitting) onClose()
       }}
     >
       <div
-        className="ff-mobile-safety-sheet"
+        className="ff-mobile-safety-sheet ff-mobile-safety-create-sheet"
         role="dialog"
         aria-modal="true"
         aria-label="근거 등록"

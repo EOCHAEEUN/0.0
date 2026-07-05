@@ -314,6 +314,10 @@ export default function AiAdvisorPage({
     () => readText(selectedContext?.companyId, asRecord(onboarding?.company).company_id),
     [onboarding, selectedContext?.companyId],
   )
+  const routePolicyId = useMemo(
+    () => readText(searchParams.get("policyId"), searchParams.get("policy_id")),
+    [searchParams],
+  )
   const userId = useMemo(() => readAuthUserId(), [])
   const tokenMarker = useMemo(() => readLoginTokenMarker(), [])
   const activeSessionStorageKey = useMemo(
@@ -500,6 +504,7 @@ export default function AiAdvisorPage({
             options?.selectedEquipmentOverride ||
             selectedContext?.equipmentId ||
             selectedEquipmentId,
+          policyId: routePolicyId || undefined,
           analysisId: selectedContext?.analysisId,
           action: options?.action,
           simulationInput: options?.simulationInput,
@@ -534,6 +539,13 @@ export default function AiAdvisorPage({
     simulationInput?: Record<string, number>,
   ) => {
     if (loadingActionId || sending) return
+    const targetEquipmentId = selectedContext?.equipmentId || selectedEquipmentId
+    if (actionDef.id === "safety_check_summary" && !targetEquipmentId) {
+      setActionError("설비를 먼저 선택해주세요.")
+      setChatError("")
+      setLastFailedAction(null)
+      return
+    }
     if (actionDef.responseType === "dialog") {
       setSimulationOpen(true)
       return
@@ -558,6 +570,21 @@ export default function AiAdvisorPage({
     } finally {
       setLoadingActionId(null)
     }
+  }
+
+  const resetCurrentChat = () => {
+    hydratedSessionRef.current = ""
+    setActiveChatId("")
+    setMessages([])
+    setInput("")
+    setChatError("")
+    setActionError("")
+    setLastFailedQuestion("")
+    setLastFailedAction(null)
+    setEquipmentSelectionCards([])
+    setLoadingActionId(null)
+    setSimulationOpen(false)
+    setHistoryOpen(false)
   }
 
   const handleSimulationSubmit = async (simulationInput: Record<string, number>) => {
@@ -1013,7 +1040,17 @@ export default function AiAdvisorPage({
               }`}
             >
               {mobileMode ? (
+                <>
                 <h3>버튼을 누르면 AI Engi가 빠른 대답을 드려요</h3>
+                <button
+                  type="button"
+                  className="ff-mobile-advisor-new-chat-btn"
+                  disabled={sending || Boolean(loadingActionId)}
+                  onClick={resetCurrentChat}
+                >
+                  + 새 채팅
+                </button>
+                </>
               ) : isWorkspaceAdvisor ? (
                 <h3>지금 필요한 작업을 선택하면 AI Engi가 순서대로 이어갑니다.</h3>
               ) : (

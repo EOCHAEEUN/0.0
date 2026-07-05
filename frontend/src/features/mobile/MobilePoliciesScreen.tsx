@@ -1,13 +1,16 @@
 import {
+  Building2,
   CalendarDays,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  FileText,
   Info,
   Lightbulb,
   MoreVertical,
   Search,
   Settings,
+  X,
 } from "lucide-react"
 import { useMemo, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
@@ -80,6 +83,179 @@ function resolveDdayTone(policy: SupportProjectsPolicyCard) {
 
 function isAttentionValue(value: string) {
   return /확인 필요|미확인|공고문/.test(value)
+}
+
+function hasPolicyDetailValue(value?: string | number | null) {
+  if (value == null) return false
+  const text = String(value).trim()
+  if (!text) return false
+  if (text === "-" || text === "0" || text === "None") return false
+  if (/^[-\s]+$/.test(text)) return false
+  return true
+}
+
+function resolvePolicyDeadlineText(policy: SupportProjectsPolicyCard) {
+  if (hasPolicyDetailValue(policy.deadline_display)) return policy.deadline_display || ""
+  if (hasPolicyDetailValue(policy.deadline)) return policy.deadline || ""
+  return ""
+}
+
+function MobilePolicyDetailSheet({
+  policy,
+  analysisId,
+  equipmentId,
+  onClose,
+  onOpenApplication,
+}: {
+  policy: SupportProjectsPolicyCard
+  analysisId?: string
+  equipmentId?: string
+  onClose: () => void
+  onOpenApplication: () => void
+}) {
+  const deadlineText = resolvePolicyDeadlineText(policy)
+  const hasDday = hasPolicyDetailValue(policy.d_day) && policy.d_day !== "-"
+  const hasSupportAmount = hasPolicyDetailValue(policy.support_amount_text)
+  const hasSupportType = hasPolicyDetailValue(policy.support_type_label)
+  const hasMatchScore = typeof policy.match_score === "number" && Number.isFinite(policy.match_score)
+  const reason = policy.recommendation_summary || policy.match_reason || ""
+  const hasRequiredDocuments = hasPolicyDetailValue(policy.required_documents_label)
+  const hasApplicationContext = Boolean(analysisId && policy.policy_id && equipmentId)
+  const preflightItems = policy.preflight_checks.filter(
+    (item) => hasPolicyDetailValue(item.label) || hasPolicyDetailValue(item.value),
+  )
+  const conditionItems = policy.condition_links.filter(
+    (item) => hasPolicyDetailValue(item.label) || hasPolicyDetailValue(item.value),
+  )
+
+  return (
+    <div className="ff-mobile-policy-detail-backdrop" role="presentation" onClick={onClose}>
+      <section
+        className="ff-mobile-policy-detail-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-label="지원사업 상세"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="ff-mobile-policy-detail-hero">
+          <button type="button" className="ff-mobile-policy-detail-close" aria-label="닫기" onClick={onClose}>
+            <X size={18} aria-hidden="true" />
+          </button>
+          <div className="ff-mobile-policy-detail-badges">
+            {hasSupportType ? <span>{policy.support_type_label}</span> : null}
+            {hasPolicyDetailValue(policy.application_status) ? <span>{policy.application_status}</span> : null}
+          </div>
+          <h2>{policy.title}</h2>
+          {hasPolicyDetailValue(policy.organization) ? (
+            <p>
+              <Building2 size={15} aria-hidden="true" />
+              {policy.organization}
+            </p>
+          ) : null}
+        </header>
+
+        <div className="ff-mobile-policy-detail-body">
+          <section className="ff-mobile-policy-detail-summary" aria-label="핵심 요약">
+            {deadlineText ? (
+              <article>
+                <span>마감일</span>
+                <strong>{deadlineText}</strong>
+                {hasDday ? <em className={`is-${resolveDdayTone(policy)}`}>{policy.d_day}</em> : null}
+              </article>
+            ) : null}
+            <article>
+              <span>지원 한도</span>
+              <strong>
+                {hasSupportAmount ? policy.support_amount_text : "공고문에서 지원 한도를 확인해주세요"}
+              </strong>
+            </article>
+            {hasSupportType ? (
+              <article>
+                <span>지원 유형</span>
+                <strong>{policy.support_type_label}</strong>
+              </article>
+            ) : null}
+            {hasMatchScore ? (
+              <article>
+                <span>AI 매칭</span>
+                <strong>{Math.round(policy.match_score ?? 0)}점</strong>
+              </article>
+            ) : null}
+          </section>
+
+          <section className="ff-mobile-policy-detail-section">
+            <h3>추천 사유</h3>
+            {hasPolicyDetailValue(reason) ? (
+              <p>{reason}</p>
+            ) : (
+              <p className="ff-mobile-policy-detail-empty">분석 기반 추천 사유 데이터가 없습니다.</p>
+            )}
+          </section>
+
+          {policy.why_check_now.length > 0 ? (
+            <section className="ff-mobile-policy-detail-section">
+              <h3>Why check now?</h3>
+              <ul className="ff-mobile-policy-detail-list">
+                {policy.why_check_now.map((line) => (
+                  <li key={line}>
+                    <CheckCircle2 size={15} aria-hidden="true" />
+                    <span>{line}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          <section className="ff-mobile-policy-detail-section">
+            <h3>신청 전 확인할 항목</h3>
+            <div className="ff-mobile-policy-detail-checks">
+              {preflightItems.map((item) => (
+                <article key={`${item.label}-${item.value}`}>
+                  <span>{item.label}</span>
+                  <strong>{item.value}</strong>
+                </article>
+              ))}
+              {conditionItems.map((item) => (
+                <article key={`${item.label}-${item.value}`}>
+                  <span>{item.label}</span>
+                  <strong>{item.value}</strong>
+                </article>
+              ))}
+              <article>
+                <span>제출서류</span>
+                <strong>
+                  {hasRequiredDocuments
+                    ? policy.required_documents_label
+                    : "공고문에서 제출서류를 확인해주세요"}
+                </strong>
+              </article>
+              {!deadlineText ? (
+                <article>
+                  <span>마감일</span>
+                  <strong>공고문에서 마감일을 확인해주세요</strong>
+                </article>
+              ) : null}
+            </div>
+          </section>
+        </div>
+
+        <footer className="ff-mobile-policy-detail-footer">
+          {!hasApplicationContext ? (
+            <p>분석, 정책, 설비 문맥이 있어야 신청서로 이동할 수 있습니다.</p>
+          ) : null}
+          <button
+            type="button"
+            className="ff-mobile-primary-btn"
+            disabled={!hasApplicationContext}
+            onClick={onOpenApplication}
+          >
+            <FileText size={16} aria-hidden="true" />
+            신청 준비도 보기
+          </button>
+        </footer>
+      </section>
+    </div>
+  )
 }
 
 function PriorityPolicyPanel({
@@ -354,6 +530,8 @@ export default function MobilePoliciesScreen() {
   const [activeTab, setActiveTab] = useState<PoliciesTab>("priority")
   const [query, setQuery] = useState("")
   const [typeFilter, setTypeFilter] = useState<SupportTypeFilter>("all")
+  const [selectedPolicyId, setSelectedPolicyId] = useState("")
+  const [policyDetailNotice, setPolicyDetailNotice] = useState("")
   const preferredAnalysisId = searchParams.get("analysisId") || searchParams.get("analysis_id") || undefined
   const { dashboard } = useDashboardData({ preferredAnalysisId })
   const workspace = dashboard.workspace
@@ -401,20 +579,41 @@ export default function MobilePoliciesScreen() {
     ],
   )
 
+  const selectedPolicy = useMemo(
+    () => allPolicies.find((policy) => policy.policy_id === selectedPolicyId) || null,
+    [allPolicies, selectedPolicyId],
+  )
+  const detailAnalysisId = flowContext.analysisId || overviewModel?.analysisId
+  const detailEquipmentId = flowContext.equipmentId || overviewModel?.analysisContext?.equipment_id
+
   const openPolicyDetail = (policyId?: string) => {
-    navigate(
-      buildWebSupportProjectsPath({
-        analysisId: flowContext.analysisId,
-        equipmentId: flowContext.equipmentId,
-        policyId: policyId || model.priorityPolicy?.policy_id,
-      }),
-    )
+    const targetPolicyId = policyId || model.priorityPolicy?.policy_id
+    if (!targetPolicyId) {
+      setPolicyDetailNotice("상세를 볼 정책을 먼저 선택해주세요.")
+      return
+    }
+    if (!allPolicies.some((policy) => policy.policy_id === targetPolicyId)) {
+      setPolicyDetailNotice("선택한 정책 상세 데이터를 찾지 못했습니다.")
+      return
+    }
+    setPolicyDetailNotice("")
+    setSelectedPolicyId(targetPolicyId)
   }
 
-  const openPriorityPolicyDocuments = (policyId?: string) => {
+  const openPriorityPolicyDocuments = () => {
+    openPolicyDetail(model.priorityPolicy?.policy_id)
+  }
+
+  const openSelectedPolicyApplication = () => {
+    if (!selectedPolicy?.policy_id || !detailAnalysisId || !detailEquipmentId) {
+      setPolicyDetailNotice("신청서 이동에 필요한 분석, 정책, 설비 문맥이 부족합니다.")
+      return
+    }
     navigate(
-      buildMobilePath("/mobile/application", flowContext, {
-        policyId: policyId || model.priorityPolicy?.policy_id,
+      buildMobilePath("/mobile/application", {
+        analysisId: detailAnalysisId,
+        policyId: selectedPolicy.policy_id,
+        equipmentId: detailEquipmentId,
       }),
     )
   }
@@ -455,6 +654,10 @@ export default function MobilePoliciesScreen() {
         </button>
       </div>
 
+      {policyDetailNotice ? (
+        <p className="ff-mobile-policy-detail-notice">{policyDetailNotice}</p>
+      ) : null}
+
       {state.kind === "loading" ? (
         <article className="ff-mobile-card">
           <p>정책 정보를 불러오는 중...</p>
@@ -476,7 +679,7 @@ export default function MobilePoliciesScreen() {
           {model.priorityDetail ? (
             <PriorityPolicyPanel
               detail={model.priorityDetail}
-              onOpenDetail={() => openPriorityPolicyDocuments(model.priorityPolicy?.policy_id)}
+              onOpenDetail={openPriorityPolicyDocuments}
             />
           ) : (
             <article className="ff-mobile-card">
@@ -509,6 +712,16 @@ export default function MobilePoliciesScreen() {
             }
           />
         </div>
+      ) : null}
+
+      {selectedPolicy ? (
+        <MobilePolicyDetailSheet
+          policy={selectedPolicy}
+          analysisId={detailAnalysisId}
+          equipmentId={detailEquipmentId}
+          onClose={() => setSelectedPolicyId("")}
+          onOpenApplication={openSelectedPolicyApplication}
+        />
       ) : null}
     </section>
   )

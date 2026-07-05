@@ -28,6 +28,11 @@ import {
 } from "./equipmentStatus.mapper"
 import EquipmentGuideChatLauncher from "./EquipmentGuideChatLauncher"
 import EquipmentRegisteredList from "./EquipmentRegisteredList"
+<<<<<<< Updated upstream
+=======
+import EquipmentGuideChatLauncher from "./EquipmentGuideChatLauncher"
+import { isEquipmentRegisterIntent } from "./equipmentStatusPaths"
+>>>>>>> Stashed changes
 
 function getStringValue(value: unknown) {
   if (value === null || value === undefined) return ""

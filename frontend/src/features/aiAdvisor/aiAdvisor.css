@@ -1,13 +1,15 @@
 .ff-advisor-floating-button {
+  --ff-advisor-fab-size: 64px;
+  --ff-advisor-fab-icon-size: 56px;
   background: transparent;
   border: 0;
-  bottom: 32px;
+  bottom: 24px;
   cursor: pointer;
-  height: 92px;
+  height: var(--ff-advisor-fab-size);
   padding: 0;
   position: fixed;
-  right: 32px;
-  width: 92px;
+  right: 24px;
+  width: var(--ff-advisor-fab-size);
   z-index: 80;
 }
 
@@ -19,14 +21,14 @@
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 999px;
   box-shadow:
-    0 18px 42px rgba(9, 16, 32, 0.28),
+    0 12px 28px rgba(9, 16, 32, 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.18);
   display: flex;
-  height: 92px;
+  height: var(--ff-advisor-fab-size);
   justify-content: center;
   overflow: hidden;
   transition: transform 0.18s ease, box-shadow 0.18s ease;
-  width: 92px;
+  width: var(--ff-advisor-fab-size);
 }
 
 .ff-advisor-floating-button img {
@@ -34,12 +36,12 @@
   height: auto;
   object-fit: contain;
   transform: translateY(1px);
-  width: 82px;
+  width: var(--ff-advisor-fab-icon-size);
 }
 
 .ff-advisor-floating-button:hover .ff-advisor-floating-ring {
-  box-shadow: 0 22px 52px rgba(9, 16, 32, 0.32);
-  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 16px 36px rgba(9, 16, 32, 0.28);
+  transform: translateY(-2px) scale(1.02);
 }
 
 .ff-advisor-floating-button.is-open .ff-advisor-floating-ring {
@@ -560,20 +562,27 @@
   }
 
   .ff-advisor-floating-button {
-    bottom: 22px;
-    right: 22px;
+    --ff-advisor-fab-size: 58px;
+    --ff-advisor-fab-icon-size: 50px;
+    bottom: 18px;
+    right: 18px;
   }
 }
 
 @media (max-width: 560px) {
+  .ff-advisor-floating-button {
+    --ff-advisor-fab-size: 58px;
+    --ff-advisor-fab-icon-size: 50px;
+  }
+
   .ff-advisor-floating-button,
   .ff-advisor-floating-ring {
-    height: 76px;
-    width: 76px;
+    height: var(--ff-advisor-fab-size);
+    width: var(--ff-advisor-fab-size);
   }
 
   .ff-advisor-floating-button img {
-    width: 68px;
+    width: var(--ff-advisor-fab-icon-size);
   }
 
   .ff-advisor-agent-stage {

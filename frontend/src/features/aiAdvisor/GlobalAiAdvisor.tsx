@@ -44,6 +44,13 @@ export function GlobalAiAdvisor() {
     location.pathname === "/ai-advisor" ||
     location.pathname === "/ai"
 
+  const usesGuestIntroAdvisor =
+    location.pathname === "/" ||
+    location.pathname === "/main" ||
+    location.pathname === "/login"
+
+  const showLoggedInAdvisorPopup = isLoggedIn && !usesGuestIntroAdvisor
+
   useEffect(() => {
     if (activeAdvisorRoute) {
       setOpen(false)
@@ -69,7 +76,7 @@ export function GlobalAiAdvisor() {
     return null
   }
 
-  if (isLoggedIn) {
+  if (showLoggedInAdvisorPopup) {
     return (
       <>
         <AdvisorFloatingButton

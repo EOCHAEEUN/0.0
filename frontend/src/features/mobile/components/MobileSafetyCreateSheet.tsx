@@ -101,12 +101,12 @@ export function MobileSafetyCreateSheet({
         className="ff-mobile-safety-sheet ff-mobile-safety-create-sheet"
         role="dialog"
         aria-modal="true"
-        aria-label="근거 등록"
+        aria-label="점검 내용 등록"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="ff-mobile-safety-sheet-handle" aria-hidden="true" />
         <div className="ff-mobile-safety-sheet-head">
-          <h2>근거 등록</h2>
+          <h2>점검 내용 등록</h2>
           <p>{equipment.name || "설비"}</p>
         </div>
 

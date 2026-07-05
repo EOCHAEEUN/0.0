@@ -155,11 +155,11 @@ export default function MobileSafetyScreen() {
                     onClick={() => openCreate(equipment)}
                   >
                     <Plus size={16} strokeWidth={2.4} aria-hidden="true" />
-                    근거 등록
+                    점검 내용 등록
                   </button>
 
                   {items.length === 0 ? (
-                    <div className="ff-mobile-safety-empty-box">등록된 근거가 없습니다.</div>
+                    <div className="ff-mobile-safety-empty-box">등록된 점검 내용이 없습니다.</div>
                   ) : (
                     <div className="ff-mobile-safety-evidence-list">
                       {items.map((item) => (

@@ -207,6 +207,7 @@ export function mapSupportProjectsOverview(
     heroTitle: `지금 신청을 검토할 지원사업 ${priorityCount}건을 정리했어요`,
     heroSubtitle:
       "현재 설비와 투자안을 기준으로 우선 검토 정책을 정리하고, 기업 기본 조건에 맞는 추가 정책도 함께 확인할 수 있습니다.",
+    analysisCreatedAt: pickString(data.analysis?.created_at) || null,
     counts,
     priorityPolicy,
     priorityPolicies,

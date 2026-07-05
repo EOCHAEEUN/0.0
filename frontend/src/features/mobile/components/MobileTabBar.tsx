@@ -35,7 +35,7 @@ export function MobileTabBar() {
               to={buildMobilePath(tab.path, context)}
               className={`ff-mobile-tab${isActive ? " is-active" : ""}`}
             >
-              <Icon size={18} strokeWidth={isActive ? 2.4 : 2} />
+              <Icon size={17} strokeWidth={isActive ? 2.4 : 2} />
               <span>{tab.label}</span>
             </NavLink>
           )

@@ -25,6 +25,8 @@ export type MobilePolicySummary = {
   deadlineLabel: string
   reason: string
   supportAmountText: string
+  metaLine: string
+  preflightNote: string
   path: string
 }
 
@@ -43,27 +45,56 @@ export type MobileCompanySummaryRow = {
   value: string
 }
 
-export type MobileEquipmentBanner = {
-  headline: string
-  equipmentName: string
-  statusLabel: string
-  metricText: string
+export type MobileEquipmentAlert = {
+  title: string
+  message: string
+  ctaLabel: string
+  ctaPath: string
+  showCta: boolean
+}
+
+export type MobileCompanyCard = {
+  companyName: string
+  locationLine: string
+  equipmentStatusLine: string
+  registeredEquipmentCount: number
+  closingSoonCount: number
+  matchedPolicyLabel: string
+}
+
+export type MobileFeaturedPolicy = MobilePolicySummary & {
+  organizationLabel: string
+  tags: string[]
+  matchBadge: string
+  supportAmountLabel: string
+  ctaLabel: string
+}
+
+export type MobileAiCard = {
+  message: string
+  highlightText: string
+  ctaLabel: string
 }
 
 export type MobileHomeViewModel = {
   greeting: string
   companyName: string
   statusHeadline: string
-  equipmentBanner: MobileEquipmentBanner
+  equipmentAlert: MobileEquipmentAlert
+  companyCard: MobileCompanyCard
   companyRows: MobileCompanySummaryRow[]
   matchedPolicyCount: string
   summaryStatusText: string
+  todayTaskCount: number
   priorityCards: MobilePriorityCard[]
   tasks: MobileTaskItem[]
-  featuredPolicy: MobilePolicySummary | null
+  featuredPolicy: MobileFeaturedPolicy | null
   recommendedPolicies: MobilePolicySummary[]
+  policiesViewAllPath: string
   readiness: MobileReadinessSummary
+  aiCard: MobileAiCard
   aiChips: MobileAiChip[]
+  aiHeadline: string
   aiPrompt: string
 }
 
@@ -93,6 +124,31 @@ export type MobileRoadmapStep = {
   body: string
 }
 
+export type MobileStrategyComparison = {
+  label: string
+  detail: string
+  hasData: boolean
+}
+
+export type MobileStrategyPhase = {
+  id: string
+  phase: string
+  duration: string
+  title: string
+  items: string[]
+}
+
+export type MobileStrategyRoadmap = {
+  eyebrow: string
+  title: string
+  subtitle: string
+  roiComparison: MobileStrategyComparison
+  paybackComparison: MobileStrategyComparison
+  phases: MobileStrategyPhase[]
+  summaryTitle: string
+  summary: string
+}
+
 export type MobileRoiViewModel = {
   hasAnalysis: boolean
   equipmentName: string
@@ -110,18 +166,45 @@ export type MobileRoiViewModel = {
   chartRoiB: number | null
   recommendationSummary: string
   roadmapSteps: MobileRoadmapStep[]
+  strategyRoadmap: MobileStrategyRoadmap
   aiSummary: string
   webDetailPath: string
   emptyMessage: string
   emptyCtaPath: string
 }
 
+export type MobilePriorityPolicyDetail = {
+  rankStatusLabel: string
+  supportTypeLabel: string
+  displayTitle: string
+  equipmentLabel: string
+  deadlineLabel: string
+  ddayLabel: string
+  ddayTone: "urgent" | "soon" | "normal" | "past"
+  recommendationReason: string
+  whyCheckNow: string[]
+  preflightChecks: Array<{ label: string; value: string }>
+  documentsLabel: string
+  actionLabel: string
+}
+
+export type MobilePolicyTypeGroup = {
+  typeLabel: string
+  policies: SupportProjectsPolicyCard[]
+}
+
 export type MobilePoliciesViewModel = {
   hasData: boolean
+  eyebrow: string
+  pageTitle: string
+  pageSubtitle: string
+  updatedAtLabel: string
   title: string
   subtitle: string
   priorityPolicy: SupportProjectsPolicyCard | null
+  priorityDetail: MobilePriorityPolicyDetail | null
   policies: SupportProjectsPolicyCard[]
+  policiesByType: MobilePolicyTypeGroup[]
   urgentPolicies: SupportProjectsPolicyCard[]
   webSearchPath: string
 }

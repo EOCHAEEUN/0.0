@@ -121,6 +121,7 @@ export type SupportProjectsOverviewViewModel = {
   heroTrustLabel: string
   heroTitle: string
   heroSubtitle: string
+  analysisCreatedAt?: string | null
   counts: SupportProjectsCounts
   priorityPolicy: SupportProjectsPolicyCard | null
   priorityPolicies: SupportProjectsPolicyCard[]

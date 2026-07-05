@@ -9,6 +9,7 @@ import type {
   SafetyEvidenceSummary,
   ScenarioKey,
 } from "./applicationDraft.contract"
+import { markAuthExpired } from "../../services/auth"
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") || "http://127.0.0.1:8000/api"
@@ -26,6 +27,12 @@ function buildApiUrl(path: string) {
 
 function normalizeDraftScenario(scenario: ScenarioKey) {
   return scenario.toLowerCase() as "a" | "b"
+}
+
+function markAuthExpiredIfNeeded(status: number) {
+  if (status === 401 || status === 403) {
+    markAuthExpired("로그인이 만료되었습니다. 다시 로그인해주세요.")
+  }
 }
 
 function getCompanyId(analysisData?: AnalysisData) {
@@ -85,6 +92,7 @@ export async function fetchApplicationDraftWorkspace(params: {
   const payload = text ? JSON.parse(text) : null
 
   if (!response.ok) {
+    markAuthExpiredIfNeeded(response.status)
     const message =
       payload?.message ||
       payload?.detail ||
@@ -137,6 +145,7 @@ export async function requestApplicationDraftGeneration(params: {
   const data = text ? JSON.parse(text) : null
 
   if (!response.ok) {
+    markAuthExpiredIfNeeded(response.status)
     throw new Error(data?.message || data?.detail || "신청서 초안 생성에 실패했습니다.")
   }
 
@@ -167,6 +176,7 @@ export async function fetchSafetyEvidenceSummary(params: {
   const text = await response.text()
   const payload = text ? JSON.parse(text) : null
   if (!response.ok) {
+    markAuthExpiredIfNeeded(response.status)
     throw new Error(
       payload?.detail || payload?.message || "증빙 현황을 불러오지 못했습니다.",
     )
@@ -208,6 +218,7 @@ export async function uploadSafetyEvidencePdf(params: {
   const text = await response.text()
   const payload = text ? JSON.parse(text) : null
   if (!response.ok) {
+    markAuthExpiredIfNeeded(response.status)
     throw new Error(
       payload?.detail || payload?.message || "증빙 파일 업로드에 실패했습니다.",
     )
@@ -230,6 +241,7 @@ export async function requestSafetyEvidenceDownload(fileId: string) {
   const text = await response.text()
   const payload = text ? JSON.parse(text) : null
   if (!response.ok) {
+    markAuthExpiredIfNeeded(response.status)
     throw new Error(
       payload?.detail || payload?.message || "다운로드 URL을 생성하지 못했습니다.",
     )
@@ -252,6 +264,7 @@ export async function deleteSafetyEvidenceFile(fileId: string) {
   const text = await response.text()
   const payload = text ? JSON.parse(text) : null
   if (!response.ok) {
+    markAuthExpiredIfNeeded(response.status)
     throw new Error(payload?.detail || payload?.message || "파일 삭제에 실패했습니다.")
   }
   return payload?.data || payload
@@ -285,6 +298,7 @@ export async function generateSafetyPreviewBaseline(params: {
   const text = await response.text()
   const payload = text ? JSON.parse(text) : null
   if (!response.ok) {
+    markAuthExpiredIfNeeded(response.status)
     throw new Error(
       payload?.detail || payload?.message || "안전 증빙 기준 생성에 실패했습니다.",
     )
@@ -317,6 +331,7 @@ export async function requestApplicationDraft(
   const data = text ? JSON.parse(text) : null
 
   if (!response.ok) {
+    markAuthExpiredIfNeeded(response.status)
     throw new Error(data?.message || data?.detail || "신청서 초안 생성에 실패했습니다.")
   }
 

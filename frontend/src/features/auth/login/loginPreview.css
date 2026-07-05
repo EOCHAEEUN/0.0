@@ -140,7 +140,8 @@
   line-height: 1;
   font-weight: 900;
   letter-spacing: -0.03em;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: keep-all;
 }
 
 .ff-login-preview-metric-card strong.is-muted {
@@ -317,16 +318,66 @@
 
 @media (max-width: 640px) {
   .ff-login-preview-overlay {
-    padding: 12px;
+    align-items: flex-end;
+    padding: 0;
   }
 
   .ff-login-preview-modal {
-    max-height: calc(100vh - 24px);
-    border-radius: 20px;
+    width: 100%;
+    max-width: 430px;
+    margin: 0 auto;
+    max-height: 88dvh;
+    border-radius: 20px 20px 0 0;
+  }
+
+  .ff-login-preview-header {
+    padding: 14px 16px 12px;
+  }
+
+  .ff-login-preview-brand-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 12px;
+  }
+
+  .ff-login-preview-brand-copy strong {
+    font-size: 16px;
+  }
+
+  .ff-login-preview-brand-copy span {
+    font-size: 11px;
+  }
+
+  .ff-login-preview-close {
+    width: 30px;
+    height: 30px;
+    font-size: 22px;
   }
 
   .ff-login-preview-body {
-    padding: 20px 18px 16px;
+    padding: 16px 16px 12px;
+  }
+
+  .ff-login-preview-hero {
+    margin-bottom: 16px;
+  }
+
+  .ff-login-preview-hero h2 {
+    font-size: 20px;
+  }
+
+  .ff-login-preview-hero p {
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .ff-login-preview-metric-card {
+    min-height: auto;
+    padding: 14px 16px;
+  }
+
+  .ff-login-preview-metric-card span {
+    font-size: 12px;
   }
 
   .ff-login-preview-columns,
@@ -335,6 +386,24 @@
   }
 
   .ff-login-preview-metric-card strong {
-    font-size: 28px;
+    font-size: 22px;
+  }
+
+  .ff-login-preview-metric-grid .ff-login-preview-metric-card strong {
+    font-size: 20px;
+  }
+
+  .ff-login-preview-section h3 {
+    font-size: 14px;
+  }
+
+  .ff-login-preview-footer {
+    padding: 0 16px 16px;
+  }
+
+  .ff-login-preview-cta {
+    min-height: 48px;
+    font-size: 14px;
+    border-radius: 12px;
   }
 }

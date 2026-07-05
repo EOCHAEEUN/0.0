@@ -349,6 +349,19 @@ export default function AdvisorResponseCards({
           )
         }
 
+        if (type === "safety_check_summary" || type === "safety_status") {
+          const summary = asRecord(data.summary)
+          const total = readNumber(data.total) ?? readNumber(summary.total)
+          return total !== null ? (
+            <article key={`${type}-${index}`} className="ff-advisor-result-card">
+              <strong>안전점검</strong>
+              <p className="ff-advisor-card-footnote">
+                등록된 안전점검 항목 {total.toLocaleString("ko-KR")}건
+              </p>
+            </article>
+          ) : null
+        }
+
         return null
       })}
     </div>

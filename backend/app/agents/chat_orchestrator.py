@@ -18,6 +18,7 @@ EXPLICIT_ACTION_TO_ROUTE = {
     "policy_calendar": "calendar_snapshot",
     "application_draft_status": "draft_status",
     "safety_status": "safety_snapshot",
+    "safety_check_summary": "safety_snapshot",
     "investment_simulation": "investment_simulation",
     "current_analysis_summary": "current_analysis_summary",
 }

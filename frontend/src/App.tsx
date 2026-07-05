@@ -20,6 +20,13 @@ import SetupCompletePage from "./features/onboarding/pages/SetupCompletePage"
 import AnalysisNewPage from "./features/onboarding/pages/AnalysisNewPage"
 import AnalysisReviewPage from "./features/onboarding/pages/AnalysisReviewPage"
 import AnalysisResultPage from "./features/onboarding/pages/AnalysisResultPage"
+import MobileAppFeature from "./features/mobile/MobileAppFeature"
+import MobileHomeScreen from "./features/mobile/MobileHomeScreen"
+import MobileRoiScreen from "./features/mobile/MobileRoiScreen"
+import MobilePoliciesScreen from "./features/mobile/MobilePoliciesScreen"
+import MobileApplicationScreen from "./features/mobile/MobileApplicationScreen"
+import MobileAiScreen from "./features/mobile/MobileAiScreen"
+import MobileSafetyScreen from "./features/mobile/MobileSafetyScreen"
 
 // 공통 레이아웃 (GlobalHeader + 인증 가드 포함)
 import AuthenticatedLayout from "./components/layout/AuthenticatedLayout"
@@ -133,6 +140,16 @@ function App() {
           <Route path="/safety-check" element={<Navigate to="/application-draft" replace />} />
           <Route path="/mypage" element={<MyPage />} />
           <Route path="/company" element={<MyPage />} />
+
+          {/* 모바일 우선 앱 화면 */}
+          <Route path="/mobile" element={<MobileAppFeature />}>
+            <Route index element={<MobileHomeScreen />} />
+            <Route path="roi" element={<MobileRoiScreen />} />
+            <Route path="policies" element={<MobilePoliciesScreen />} />
+            <Route path="application" element={<MobileApplicationScreen />} />
+            <Route path="ai" element={<MobileAiScreen />} />
+            <Route path="safety" element={<MobileSafetyScreen />} />
+          </Route>
         </Route>
       </Routes>
 

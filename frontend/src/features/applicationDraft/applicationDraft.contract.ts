@@ -267,6 +267,13 @@ export type ApplicationDraftWorkspaceData = {
       title?: string | null
       deadline?: string | null
     }>
+    available_policies?: Array<{
+      policy_id: string
+      title?: string | null
+      organization?: string | null
+      deadline?: string | null
+      is_selected?: boolean
+    }>
   }
   draft: {
     exists: boolean

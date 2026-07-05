@@ -1,5 +1,6 @@
 import { Check, Lightbulb, Settings, Zap } from "lucide-react"
 import { useNavigate } from "react-router-dom"
+import { ROI_ROADMAP_PHASES } from "../roiRoadmap.constants"
 import type { RoiEvidenceMetricsView, RoiKpiView, RoiScenarioView, RoiStrategyCardView } from "./RoiAnalysisResultView"
 
 export type RoiWorkspaceViewProps = {
@@ -320,37 +321,6 @@ function RoiCumulativeChart({
     </section>
   )
 }
-
-const ROADMAP_PHASES = [
-  {
-    phase: "PHASE 1",
-    duration: "3개월",
-    title: "데이터 통합 및 기반 구축",
-    items: [
-      "설비 가동·에너지 소비 데이터 실시간 수집 체계 구축",
-      "병목 공정 식별 및 데이터 정밀도 검증",
-    ],
-  },
-  {
-    phase: "PHASE 2",
-    duration: "6개월",
-    title: "AI 모델 최적화 및 시뮬레이션",
-    items: [
-      "과거 생산 데이터 기반 예지보전 AI 모델 도입",
-      "가상 시나리오를 통한 공정 효율 시뮬레이션 및 ROI 검증",
-    ],
-  },
-  {
-    phase: "PHASE 3",
-    duration: "12개월",
-    title: "지능형 자율 공정 확산",
-    items: [
-      "ERP·MES 연동 자동화",
-      "AI 기반 실시간 의사결정 지원 시스템 현장 적용",
-    ],
-  },
-]
-
 export function RoiWorkspaceViews(props: RoiWorkspaceViewProps) {
   const {
     view,
@@ -546,7 +516,7 @@ export function RoiWorkspaceViews(props: RoiWorkspaceViewProps) {
       <section className="ff-roi-roadmap-section" aria-label="단계별 AI 추천 로드맵">
         <h2>단계별 AI 추천 로드맵</h2>
         <div className="ff-roi-roadmap-grid">
-          {ROADMAP_PHASES.map((phase) => (
+          {ROI_ROADMAP_PHASES.map((phase) => (
             <article key={phase.phase} className="ff-roi-roadmap-card">
               <div className="ff-roi-roadmap-card-head">
                 <span className="ff-roi-roadmap-phase">{phase.phase}</span>

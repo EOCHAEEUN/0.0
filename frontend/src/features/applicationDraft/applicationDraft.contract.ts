@@ -261,6 +261,13 @@ export type ApplicationDraftWorkspaceData = {
     deadline?: string | null
     source: "policy_snapshot" | "legacy_missing"
     legacy_missing?: boolean
+    available_policies?: Array<{
+      policy_id: string
+      title?: string | null
+      organization?: string | null
+      deadline?: string | null
+      is_selected?: boolean
+    }>
   }
   draft: {
     exists: boolean

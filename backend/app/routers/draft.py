@@ -320,6 +320,90 @@ def _fetch_policy_detail_by_id(db: Any, policy_id: str) -> dict:
     return {}
 
 
+def _resolve_policy_id_for_fk(db: Any, policy_id: str, selected_policy: dict[str, Any]) -> str:
+    """
+    draft_result.policy_id FK를 만족하는 policy_id를 찾는다.
+    스냅샷 전용 suffix(:1, :A 등)가 붙은 경우 canonical id로 보정하고,
+    그래도 매칭되는 policy 행이 없으면 최소 정보로 policy 행을 생성한다.
+    """
+    requested = _safe_text(policy_id)
+    if not requested:
+        return ""
+
+    candidates = [requested]
+    candidates.append(re.sub(r":[AB](?:\d+)?$", "", requested, flags=re.IGNORECASE))
+    candidates.append(re.sub(r":\d+$", "", requested))
+    candidates.append(re.sub(r":[AB]$", "", requested, flags=re.IGNORECASE))
+    policy_meta = _as_dict((selected_policy or {}).get("metadata"))
+    candidates.extend(
+        [
+            _safe_text((selected_policy or {}).get("policy_id")),
+            _safe_text((selected_policy or {}).get("id")),
+            _safe_text(policy_meta.get("policy_id")),
+            _safe_text(policy_meta.get("source_policy_id")),
+            _safe_text(policy_meta.get("canonical_policy_id")),
+        ]
+    )
+
+    seen: set[str] = set()
+    for candidate in candidates:
+        normalized = _safe_text(candidate)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        if _fetch_policy_detail_by_id(db, normalized):
+            return normalized
+
+    # SMARTFACTORY:...:1 같은 스냅샷 suffix 케이스는
+    # 동일 prefix를 가진 실제 policy_id를 1건 찾아 FK를 맞춘다.
+    prefix = _safe_text(re.sub(r":\d+$", "", requested))
+    if prefix:
+        try:
+            prefix_rows = (
+                db.table("policy")
+                .select("policy_id")
+                .like("policy_id", f"{prefix}%")
+                .limit(1)
+                .execute()
+            )
+            if prefix_rows.data:
+                resolved = _safe_text(prefix_rows.data[0].get("policy_id"))
+                if resolved:
+                    return resolved
+        except Exception:
+            pass
+
+    # policy 테이블 어디에도 없으면, draft_result FK를 만족시키기 위해
+    # 스냅샷 정보를 기반으로 최소 policy 행을 생성한다.
+    fallback_policy = selected_policy or {}
+    fallback_payload = {
+        "policy_id": requested,
+        "title": _safe_text(fallback_policy.get("title"), "지원사업명 미확인"),
+        "organization": _safe_text(fallback_policy.get("organization"), "주관기관 정보 없음"),
+        "summary": _safe_text(
+            fallback_policy.get("summary"),
+            "분석 시점 스냅샷 기반 정책 정보입니다.",
+        ),
+        "url": _safe_text(
+            fallback_policy.get("url"),
+            fallback_policy.get("source_url"),
+            fallback_policy.get("policy_url"),
+        ),
+        "deadline": _safe_text(
+            fallback_policy.get("deadline"),
+            fallback_policy.get("deadline_display"),
+        ),
+        "industry_codes": [],
+    }
+    try:
+        db.table("policy").upsert(fallback_payload, on_conflict="policy_id").execute()
+        return requested
+    except Exception as exc:
+        print(f"policy fallback 행 생성 실패: {exc}")
+
+    return requested
+
+
 def _merge_policy(matched_policy: dict, policy_detail: dict) -> dict:
     """
     matched_policy: recommendation result.
@@ -815,10 +899,13 @@ async def generate_draft(
                 "message": "현재 분석에 연결된 안전 증빙 기준이 아직 준비되지 않았습니다.",
             }
 
+    fk_policy_id = _resolve_policy_id_for_fk(db, effective_policy_id, selected_policy)
+
     draft_payload = {
         "company_id": body.company_id,
         "equipment_id": body.equipment_id,
-        "policy_id": effective_policy_id,
+        "policy_id": fk_policy_id,
+        "analysis_id": body.analysis_id,
         "draft_content": draft_content,
         "created_at": datetime.now().isoformat(),
     }
@@ -832,7 +919,7 @@ async def generate_draft(
         body.equipment_id,
     ).eq(
         "policy_id",
-        effective_policy_id,
+        fk_policy_id,
     ).execute()
 
     saved_draft = db.table("draft_result").insert(draft_payload).execute()

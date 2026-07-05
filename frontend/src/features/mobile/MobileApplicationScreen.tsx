@@ -179,6 +179,7 @@ export default function MobileApplicationScreen() {
     consumer_summary: true,
     application_evidence: true,
   })
+  const [policyPickerOpen, setPolicyPickerOpen] = useState(false)
   const preferredAnalysisId = searchParams.get("analysisId") || searchParams.get("analysis_id") || undefined
   const { dashboard } = useDashboardData({ preferredAnalysisId })
   const workspace = dashboard.workspace
@@ -250,12 +251,19 @@ export default function MobileApplicationScreen() {
     }
   }, [previewUrl])
 
-  const openWebDraft = () => {
-    const query = new URLSearchParams()
-    if (flowContext.analysisId) query.set("analysisId", flowContext.analysisId)
-    if (flowContext.policyId) query.set("policyId", flowContext.policyId)
-    const queryText = query.toString()
-    navigate(queryText ? `/application-draft?${queryText}` : "/application-draft")
+  const availablePolicies = draft.data?.policy?.available_policies ?? []
+  const generatedAtLabel = draft.lastGeneratedAt
+    ? new Date(draft.lastGeneratedAt).toLocaleTimeString("ko-KR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      })
+    : ""
+
+  const handleSelectPolicy = (policyId: string) => {
+    setPolicyPickerOpen(false)
+    if (!policyId || policyId === flowContext.policyId) return
+    navigate(buildMobilePath("/mobile/application", flowContext, { policyId }))
   }
 
   const selectedReportType: MobileReportType =
@@ -381,7 +389,11 @@ export default function MobileApplicationScreen() {
               <h2>
                 핵심 요약 <span>(Summary)</span>
               </h2>
-              <button type="button" className="ff-mobile-application-edit-btn" onClick={openWebDraft}>
+              <button
+                type="button"
+                className="ff-mobile-application-edit-btn"
+                onClick={() => setPolicyPickerOpen(true)}
+              >
                 <Pencil size={13} strokeWidth={2.1} aria-hidden="true" />
                 수정
               </button>
@@ -478,6 +490,11 @@ export default function MobileApplicationScreen() {
             </div>
 
             {draft.generateError ? <p className="ff-mobile-application-error">{draft.generateError}</p> : null}
+            {!draft.generateError && generatedAtLabel ? (
+              <p style={{ margin: 0, color: "#0B7A53", fontSize: 12, fontWeight: 800 }}>
+                신청서 초안을 갱신했습니다 ({generatedAtLabel})
+              </p>
+            ) : null}
 
             <button
               type="button"
@@ -706,6 +723,89 @@ export default function MobileApplicationScreen() {
                     {downloading ? "준비 중..." : "다운로드"}
                   </button>
                 </div>
+              </div>
+            </div>
+          ) : null}
+
+          {policyPickerOpen ? (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="추천 지원사업 변경"
+              onClick={() => setPolicyPickerOpen(false)}
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 1600,
+                background: "rgba(15, 23, 42, 0.52)",
+                display: "flex",
+                alignItems: "flex-end",
+                justifyContent: "center",
+                padding: 0,
+              }}
+            >
+              <div
+                onClick={(event) => event.stopPropagation()}
+                style={{
+                  width: "min(100%, 430px)",
+                  background: "#fff",
+                  borderRadius: "20px",
+                  marginBottom: 120,
+                  padding: 14,
+                  display: "grid",
+                  gap: 10,
+                  maxHeight: "70vh",
+                  overflowY: "auto",
+                }}
+              >
+                <strong style={{ fontSize: 14 }}>추천 지원사업 변경</strong>
+                {availablePolicies.length === 0 ? (
+                  <p style={{ fontSize: 12, color: "#667085" }}>
+                    선택 가능한 추천 지원사업이 없습니다.
+                  </p>
+                ) : (
+                  availablePolicies.map((policy) => {
+                    const isActive = policy.policy_id === flowContext.policyId
+                    return (
+                      <button
+                        key={policy.policy_id}
+                        type="button"
+                        onClick={() => handleSelectPolicy(policy.policy_id)}
+                        style={{
+                          textAlign: "left",
+                          border: isActive ? "1px solid #061B34" : "1px solid #E2E8F0",
+                          borderRadius: 12,
+                          padding: "10px 12px",
+                          background: isActive ? "#EEF3FF" : "#fff",
+                        }}
+                      >
+                        <div style={{ fontSize: 13, fontWeight: 900, color: "#0B1F3A" }}>
+                          {policy.title}
+                        </div>
+                        {policy.organization ? (
+                          <div style={{ fontSize: 11, color: "#667085", marginTop: 2 }}>
+                            {policy.organization}
+                          </div>
+                        ) : null}
+                      </button>
+                    )
+                  })
+                )}
+                <button
+                  type="button"
+                  onClick={() => setPolicyPickerOpen(false)}
+                  style={{
+                    border: 0,
+                    background: "transparent",
+                    color: "#344ba0",
+                    fontWeight: 900,
+                    fontSize: 13,
+                    justifySelf: "center",
+                    padding: "8px 0",
+                  }}
+                >
+                  닫기
+                </button>
               </div>
             </div>
           ) : null}

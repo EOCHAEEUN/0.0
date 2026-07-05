@@ -19,20 +19,26 @@ export function resolveMobileFlowContext(
   searchParams: URLSearchParams,
   workspace: DashboardWorkspace,
 ): MobileFlowContext {
-  const analysisId = pickText(
+  const queryAnalysisId = pickText(
     searchParams.get("analysisId"),
     searchParams.get("analysis_id"),
+  )
+  const analysisId = pickText(
     workspace.analysisId || undefined,
+    queryAnalysisId,
   )
   const policyId = pickText(
+    workspace.priorityPolicyId || undefined,
     searchParams.get("policyId"),
     searchParams.get("policy_id"),
-    workspace.priorityPolicyId || undefined,
   )
-  const equipmentId = pickText(
-    searchParams.get("equipmentId"),
-    searchParams.get("equipment_id"),
-  )
+  const shouldIgnoreQueryEquipment =
+    Boolean(workspace.analysisId) &&
+    Boolean(queryAnalysisId) &&
+    workspace.analysisId !== queryAnalysisId
+  const equipmentId = shouldIgnoreQueryEquipment
+    ? ""
+    : pickText(searchParams.get("equipmentId"), searchParams.get("equipment_id"))
 
   return {
     analysisId: analysisId || undefined,

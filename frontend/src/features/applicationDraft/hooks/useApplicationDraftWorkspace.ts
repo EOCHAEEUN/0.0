@@ -72,6 +72,7 @@ export function useApplicationDraftWorkspace(route: RouteContext) {
   const [manualScenarioKey, setManualScenarioKey] = useState<ScenarioKey>("A")
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false)
   const [generateError, setGenerateError] = useState("")
+  const [lastGeneratedAt, setLastGeneratedAt] = useState("")
 
   const companyId = resolveCompanyId(route)
   const analysisId = route.analysisId
@@ -161,6 +162,7 @@ export function useApplicationDraftWorkspace(route: RouteContext) {
         analysisId: data.analysis_id || analysisId,
       })
       await reload()
+      setLastGeneratedAt(new Date().toISOString())
     } catch (error) {
       setGenerateError(
         error instanceof Error ? error.message : "신청서 초안 생성에 실패했습니다.",
@@ -222,6 +224,7 @@ export function useApplicationDraftWorkspace(route: RouteContext) {
     draftExists: Boolean(data?.draft.exists),
     isGeneratingDraft,
     generateError,
+    lastGeneratedAt,
     handleGenerateDraft,
     reload,
     reportParams,

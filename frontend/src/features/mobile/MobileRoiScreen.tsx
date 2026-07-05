@@ -200,7 +200,7 @@ export default function MobileRoiScreen() {
                 <p>{model.recommendationSummary}</p>
               </article>
 
-              <article className="ff-mobile-card">
+              <article className="ff-mobile-card ff-mobile-roi-kpi-card">
                 <h2>핵심 ROI 수치</h2>
                 <p className="ff-mobile-kpi">{model.roiMetricValue}</p>
                 <p className="ff-mobile-meta">{model.roiMetricLabel}</p>

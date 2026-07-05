@@ -7,8 +7,9 @@ import {
   Pencil,
   Sparkles,
 } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
+import type { ApplicationDraftReportParams } from "../applicationDraft/applicationDraft.contract"
 import { useApplicationDraftWorkspace } from "../applicationDraft/hooks/useApplicationDraftWorkspace"
 import {
   formatCurrencyWonFromManwon,
@@ -33,6 +34,123 @@ const STEPPER = [
   { key: "application", label: "신청서" },
 ] as const
 
+type MobileReportType = "consumer_summary" | "application_evidence"
+
+const MOBILE_REPORT_OPTIONS: Array<{ key: MobileReportType; label: string }> = [
+  { key: "consumer_summary", label: "한눈에 보는 분석 PDF" },
+  { key: "application_evidence", label: "신청서 작성 초안 PDF" },
+]
+
+const API_BASE_URL = (
+  (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
+  "http://127.0.0.1:8000/api"
+).replace(/\/$/, "")
+
+const MOBILE_FALLBACK_FILENAMES: Record<MobileReportType, string> = {
+  consumer_summary: "FactoFit_분석결과_표중심.pdf",
+  application_evidence: "FactoFit_신청서초안_그래프.pdf",
+}
+
+function buildApiUrl(path: string) {
+  if (API_BASE_URL.endsWith("/api")) {
+    return `${API_BASE_URL}${path.replace(/^\/api/, "")}`
+  }
+  return `${API_BASE_URL}${path}`
+}
+
+function getToken() {
+  try {
+    return (
+      window.localStorage.getItem("factofit_access_token")?.trim() ||
+      window.localStorage.getItem("access_token")?.trim() ||
+      window.localStorage.getItem("token")?.trim() ||
+      ""
+    )
+  } catch {
+    return ""
+  }
+}
+
+function parseContentDispositionFilename(header: string | null): string {
+  if (!header) return ""
+  const encoded = header.match(/filename\*=UTF-8''([^;]+)/i)?.[1]
+  if (encoded) {
+    try {
+      return decodeURIComponent(encoded)
+    } catch {
+      return encoded
+    }
+  }
+  return header.match(/filename="?([^";]+)"?/i)?.[1] ?? ""
+}
+
+async function readErrorMessage(response: Response): Promise<string> {
+  try {
+    const payload = await response.json()
+    const detail = payload?.detail
+    if (typeof detail === "string" && detail.trim()) return detail
+    if (typeof payload?.message === "string" && payload.message.trim()) return payload.message
+  } catch {
+    const text = await response.text().catch(() => "")
+    if (text.trim()) return text
+  }
+  return "PDF 생성 중 오류가 발생했습니다."
+}
+
+async function requestMobilePdf(
+  params: ApplicationDraftReportParams,
+  reportType: MobileReportType,
+) {
+  const token = getToken()
+  const headers: Record<string, string> = { "Content-Type": "application/json" }
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  const endpoint =
+    reportType === "consumer_summary"
+      ? "/api/reports/consumer-summary.pdf"
+      : "/api/reports/application-evidence.pdf"
+
+  const response = await fetch(buildApiUrl(endpoint), {
+    method: "POST",
+    cache: "no-store",
+    headers,
+    body: JSON.stringify({
+      company_id: params.companyId,
+      equipment_id: params.equipmentId,
+      policy_id: params.policyId,
+      analysis_id: params.analysisId,
+      draft_result_id: params.draftResultId,
+      report_type: reportType,
+      tone: "submission",
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response))
+  }
+
+  const blob = await response.blob()
+  const serverFilename = parseContentDispositionFilename(response.headers.get("Content-Disposition"))
+  return {
+    blob,
+    filename:
+      serverFilename || MOBILE_FALLBACK_FILENAMES[reportType] || "factofit_application_report.pdf",
+  }
+}
+
+async function triggerBrowserDownload(blob: Blob, filename: string) {
+  const objectUrl = window.URL.createObjectURL(blob)
+  const anchor = document.createElement("a")
+  anchor.href = objectUrl
+  anchor.download = filename
+  anchor.style.display = "none"
+  document.body.appendChild(anchor)
+  anchor.click()
+  await new Promise((resolve) => window.setTimeout(resolve, 300))
+  document.body.removeChild(anchor)
+  window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), 1200)
+}
+
 function policySupportLabel(supportText?: string) {
   const text = supportText?.trim()
   if (text && text !== "-" && text !== "공고문 확인 필요") return text
@@ -49,6 +167,18 @@ export default function MobileApplicationScreen() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [selectedPdfSection, setSelectedPdfSection] = useState(MOBILE_PDF_SECTIONS[0].id)
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [previewType, setPreviewType] = useState<MobileReportType>("consumer_summary")
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [previewError, setPreviewError] = useState("")
+  const [previewUrl, setPreviewUrl] = useState("")
+  const [downloadOpen, setDownloadOpen] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+  const [downloadMessage, setDownloadMessage] = useState("")
+  const [downloadSelection, setDownloadSelection] = useState<Record<MobileReportType, boolean>>({
+    consumer_summary: true,
+    application_evidence: true,
+  })
   const preferredAnalysisId = searchParams.get("analysisId") || searchParams.get("analysis_id") || undefined
   const { dashboard } = useDashboardData({ preferredAnalysisId })
   const workspace = dashboard.workspace
@@ -105,12 +235,76 @@ export default function MobileApplicationScreen() {
     ]
   }, [draft.data?.policy?.title, draft.data?.policy_id, draft.subsidyLabel])
 
+  const unavailablePdfReason = useMemo(() => {
+    if (draft.isLoading) return "신청서 화면 데이터를 불러오는 중입니다."
+    if (!draft.reportParams) return "분석·정책 정보가 준비되면 PDF를 생성할 수 있습니다."
+    if (draft.data?.policy?.legacy_missing) return "정책 스냅샷 이력이 없어 PDF를 생성할 수 없습니다."
+    return ""
+  }, [draft.isLoading, draft.reportParams, draft.data?.policy?.legacy_missing])
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        window.URL.revokeObjectURL(previewUrl)
+      }
+    }
+  }, [previewUrl])
+
   const openWebDraft = () => {
     const query = new URLSearchParams()
     if (flowContext.analysisId) query.set("analysisId", flowContext.analysisId)
     if (flowContext.policyId) query.set("policyId", flowContext.policyId)
     const queryText = query.toString()
     navigate(queryText ? `/application-draft?${queryText}` : "/application-draft")
+  }
+
+  const selectedReportType: MobileReportType =
+    selectedPdfSection === "01" ? "consumer_summary" : "application_evidence"
+
+  const openMobilePreview = async () => {
+    if (!draft.reportParams || unavailablePdfReason) {
+      setPreviewError(unavailablePdfReason || "PDF 생성 정보가 부족합니다.")
+      setPreviewOpen(true)
+      return
+    }
+
+    setPreviewType(selectedReportType)
+    setPreviewOpen(true)
+    setPreviewLoading(true)
+    setPreviewError("")
+
+    try {
+      const { blob } = await requestMobilePdf(draft.reportParams, selectedReportType)
+      if (previewUrl) window.URL.revokeObjectURL(previewUrl)
+      const nextUrl = window.URL.createObjectURL(blob)
+      setPreviewUrl(nextUrl)
+    } catch (error) {
+      setPreviewError(error instanceof Error ? error.message : "PDF 바로보기를 준비하지 못했습니다.")
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
+  const handleDownloadSelected = async () => {
+    if (downloading || !draft.reportParams) return
+    const targets = MOBILE_REPORT_OPTIONS.filter((option) => downloadSelection[option.key])
+    if (!targets.length) return
+
+    setDownloading(true)
+    setDownloadMessage("")
+
+    try {
+      for (const option of targets) {
+        const { blob, filename } = await requestMobilePdf(draft.reportParams, option.key)
+        await triggerBrowserDownload(blob, filename)
+      }
+      setDownloadMessage(`PDF ${targets.length}개 다운로드를 시작했습니다.`)
+    } catch (error) {
+      setDownloadMessage(error instanceof Error ? error.message : "PDF 다운로드 중 오류가 발생했습니다.")
+    } finally {
+      setDownloading(false)
+      setDownloadOpen(false)
+    }
   }
 
   const stepComplete = (key: string) => {
@@ -366,21 +560,154 @@ export default function MobileApplicationScreen() {
               <button
                 type="button"
                 className="ff-mobile-application-report-preview"
-                disabled={!draft.canUsePdf}
-                onClick={openWebDraft}
+                disabled={!draft.canUsePdf || Boolean(unavailablePdfReason)}
+                onClick={() => void openMobilePreview()}
               >
                 미리보기
               </button>
               <button
                 type="button"
                 className="ff-mobile-application-report-download"
-                disabled={!draft.canUsePdf}
-                onClick={openWebDraft}
+                disabled={!draft.canUsePdf || Boolean(unavailablePdfReason)}
+                onClick={() => setDownloadOpen(true)}
               >
                 다운로드
               </button>
             </div>
+            {downloadMessage ? <p className="ff-mobile-application-error">{downloadMessage}</p> : null}
+            {unavailablePdfReason ? <p className="ff-mobile-application-error">{unavailablePdfReason}</p> : null}
           </article>
+
+          {previewOpen ? (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="PDF 미리보기"
+              onClick={() => setPreviewOpen(false)}
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 1600,
+                background: "rgba(15, 23, 42, 0.52)",
+                display: "flex",
+                alignItems: "flex-end",
+                justifyContent: "center",
+                padding: 0,
+              }}
+            >
+              <div
+                onClick={(event) => event.stopPropagation()}
+                style={{
+                  width: "min(100%, 430px)",
+                  height: "78vh",
+                  background: "#fff",
+                  borderRadius: "20px 20px 0 0",
+                  display: "grid",
+                  gridTemplateRows: "auto minmax(0, 1fr)",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "12px 14px",
+                    borderBottom: "1px solid #e2e8f0",
+                  }}
+                >
+                  <strong style={{ fontSize: 14 }}>PDF 미리보기</strong>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewOpen(false)}
+                    style={{
+                      border: 0,
+                      background: "transparent",
+                      color: "#344ba0",
+                      fontWeight: 900,
+                      fontSize: 13,
+                    }}
+                  >
+                    닫기
+                  </button>
+                </div>
+                <div style={{ minHeight: 0, padding: 10 }}>
+                  {previewLoading ? <p>PDF 준비 중...</p> : null}
+                  {!previewLoading && previewError ? (
+                    <p className="ff-mobile-application-error">{previewError}</p>
+                  ) : null}
+                  {!previewLoading && !previewError && previewUrl ? (
+                    <iframe
+                      title={`${previewType}-preview`}
+                      src={previewUrl}
+                      style={{ width: "100%", height: "100%", border: 0, borderRadius: 10 }}
+                    />
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {downloadOpen ? (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="PDF 다운로드"
+              onClick={() => setDownloadOpen(false)}
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 1600,
+                background: "rgba(15, 23, 42, 0.52)",
+                display: "flex",
+                alignItems: "flex-end",
+                justifyContent: "center",
+                padding: 0,
+              }}
+            >
+              <div
+                onClick={(event) => event.stopPropagation()}
+                style={{
+                  width: "min(100%, 430px)",
+                  background: "#fff",
+                  borderRadius: "20px 20px 0 0",
+                  padding: 14,
+                  display: "grid",
+                  gap: 10,
+                }}
+              >
+                <strong style={{ fontSize: 14 }}>PDF 다운로드</strong>
+                {MOBILE_REPORT_OPTIONS.map((option) => (
+                  <label key={option.key} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input
+                      type="checkbox"
+                      checked={downloadSelection[option.key]}
+                      onChange={(event) =>
+                        setDownloadSelection((prev) => ({
+                          ...prev,
+                          [option.key]: event.target.checked,
+                        }))
+                      }
+                    />
+                    <span style={{ fontSize: 12 }}>{option.label}</span>
+                  </label>
+                ))}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <button type="button" className="ff-mobile-application-report-preview" onClick={() => setDownloadOpen(false)}>
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    className="ff-mobile-application-report-download"
+                    onClick={() => void handleDownloadSelected()}
+                    disabled={downloading || !Object.values(downloadSelection).some(Boolean)}
+                  >
+                    {downloading ? "준비 중..." : "다운로드"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </>
       ) : null}
     </section>

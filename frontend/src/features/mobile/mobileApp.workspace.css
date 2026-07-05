@@ -764,6 +764,34 @@
   font-weight: 500;
 }
 
+/* ROI trend card tone alignment */
+.ff-mobile-roi-kpi-card .ff-mobile-kpi {
+  font-family: "Noto Sans KR", "Pretendard", system-ui, sans-serif;
+  font-size: 38px;
+  line-height: 1.12;
+  letter-spacing: -0.015em;
+  font-weight: 800;
+}
+
+.ff-mobile-roi-kpi-card .ff-mobile-meta {
+  font-size: 13px;
+  font-weight: 800;
+  color: #475467;
+}
+
+.ff-mobile-roi-kpi-card .ff-mobile-kpi-cell span {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.ff-mobile-roi-kpi-card .ff-mobile-kpi-cell strong {
+  font-family: "Noto Sans KR", "Pretendard", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  font-weight: 800;
+}
+
 .ff-mobile-meta {
   color: var(--muted);
   font-size: 12px;
@@ -962,6 +990,7 @@
   -webkit-line-clamp: 2;
   overflow: hidden;
   line-height: 1.45;
+  font-weight: 900;
 }
 
 .ff-mobile-policy-meta {

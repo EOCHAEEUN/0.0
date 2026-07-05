@@ -8,6 +8,32 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/* Mobile-only scrollbar hiding — scroll/touch/wheel behavior unchanged */
+.ff-mobile-app-page,
+.ff-mobile-app-page *,
+.ff-mobile-policy-detail-backdrop,
+.ff-mobile-policy-detail-backdrop *,
+.ff-mobile-safety-sheet-backdrop,
+.ff-mobile-safety-sheet-backdrop *,
+.ff-mobile-advisor-history-backdrop,
+.ff-mobile-advisor-history-backdrop * {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.ff-mobile-app-page::-webkit-scrollbar,
+.ff-mobile-app-page *::-webkit-scrollbar,
+.ff-mobile-policy-detail-backdrop::-webkit-scrollbar,
+.ff-mobile-policy-detail-backdrop *::-webkit-scrollbar,
+.ff-mobile-safety-sheet-backdrop::-webkit-scrollbar,
+.ff-mobile-safety-sheet-backdrop *::-webkit-scrollbar,
+.ff-mobile-advisor-history-backdrop::-webkit-scrollbar,
+.ff-mobile-advisor-history-backdrop *::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
 .ff-mobile-app-frame {
   width: 100%;
   max-width: 430px;
@@ -4582,6 +4608,113 @@
   font-size: 12px;
   background: var(--navy);
   border-radius: 10px;
+}
+
+.ff-mobile-advisor-screen .ff-advisor-simulation-shell {
+  z-index: 1500;
+  align-items: center;
+  padding: 18px;
+  background: rgba(15, 23, 42, 0.52);
+}
+
+.ff-mobile-advisor-screen .ff-advisor-simulation-panel {
+  width: min(100%, 390px);
+  max-height: min(78vh, 620px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.28);
+}
+
+.ff-mobile-advisor-screen .ff-advisor-simulation-header {
+  padding: 12px 14px;
+}
+
+.ff-mobile-advisor-screen .ff-advisor-simulation-header h3 {
+  font-size: 15px;
+  line-height: 1.35;
+  color: var(--navy);
+}
+
+.ff-mobile-advisor-screen .ff-advisor-simulation-header button {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  color: var(--navy);
+  font-size: 24px;
+}
+
+.ff-mobile-advisor-screen .ff-advisor-simulation-body {
+  min-height: 0;
+  overflow-y: auto;
+  gap: 12px;
+  padding: 12px 14px;
+}
+
+.ff-mobile-advisor-screen .ff-advisor-simulation-note {
+  background: #eef4ff;
+  color: #24407a;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 9px 10px;
+  border-radius: 10px;
+}
+
+.ff-mobile-advisor-screen .ff-advisor-simulation-field label {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--navy);
+}
+
+.ff-mobile-advisor-screen .ff-advisor-simulation-current {
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.ff-mobile-advisor-screen .ff-advisor-simulation-field input {
+  height: 38px;
+  border-radius: 9px;
+  padding: 0 10px;
+  color: var(--navy);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ff-mobile-advisor-screen .ff-advisor-simulation-footer {
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px 12px;
+}
+
+.ff-mobile-advisor-screen .ff-advisor-simulation-footer button {
+  min-height: 42px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.ff-mobile-advisor-screen .ff-advisor-simulation-footer .ff-support-btn.ghost {
+  flex: 0 0 80px;
+  color: var(--navy);
+  background: #fff;
+  border: 1px solid var(--line);
+}
+
+.ff-mobile-advisor-screen .ff-advisor-simulation-footer .btn.blue {
+  flex: 1;
+  background: var(--navy);
+  border-color: var(--navy);
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.18);
+}
+
+.ff-mobile-advisor-screen .ff-advisor-simulation-footer .btn.blue:disabled,
+.ff-mobile-advisor-screen .ff-advisor-simulation-footer .ff-support-btn.ghost:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
 }
 
 .ff-mobile-advisor-history-backdrop {

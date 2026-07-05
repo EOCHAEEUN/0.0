@@ -562,6 +562,44 @@ def _support_matches_scenario(policy: dict, scenario: str) -> bool:
     return not tags or scenario in tags or "c" in tags
 
 
+def normalize_roi_apply_method(raw_value: str | None) -> str:
+    """ROI 직접 투자비 차감 방식을 세 가지 canonical 값으로 정규화한다."""
+    normalized = str(raw_value or "").strip().lower()
+    if normalized in {"subtract", "direct_subtract", "직접 차감"}:
+        return "subtract"
+    if normalized in {"ratio_cap", "ratio_with_cap", "비율 계산", "비율+한도"}:
+        return "ratio_cap"
+    return "none"
+
+
+NON_DEDUCTIBLE_MAX_AMOUNT_TYPES = {
+    "loan",
+    "guarantee",
+    "interest_support",
+    "non_cash",
+    "consulting_fee",
+    "education_fee",
+    "equipment_usage_fee",
+    "fee",
+    "self_funding",
+    "total_budget",
+    "project_budget",
+    "total_project_cost",
+    "revenue_condition",
+}
+
+NOT_APPLICABLE_BASIS = (
+    "이 정책은 사업 경제성 ROI의 직접 투자비 차감 대상이 아닙니다."
+)
+
+
+def _selected_amount_candidate(policy: dict) -> Any:
+    candidate = _support_value(policy, "selected_amount_candidate")
+    if isinstance(candidate, dict):
+        return candidate.get("amount_manwon")
+    return None
+
+
 def _support_policy_score(policy: dict) -> float:
     # Deterministic 정책 점수만 사용한다.
     # LLM 하이브리드 점수(hybrid_score)는 표시 순위/사유 용도로만 쓰고
@@ -575,10 +613,13 @@ def _support_policy_score(policy: dict) -> float:
 
 
 def _estimate_policy_support(policy: dict, investment_manwon: float) -> dict:
-    """
-    해당 정책의 실제 적용 지원금 1건을 계산한다.
-    지원율이 없으면 max_amount를 실제 수혜액으로 사용하지 않는다.
-    """
+    """정책 성격과 명시된 ROI 적용 방식에 따라 실제 차감 지원금을 계산한다."""
+    roi_apply_method = normalize_roi_apply_method(
+        _support_value(policy, "roi_apply_method")
+    )
+    max_amount_type = str(
+        _support_value(policy, "max_amount_type") or ""
+    ).strip().lower()
     support_rate = _support_parse_rate(
         _support_value(
             policy,
@@ -590,58 +631,107 @@ def _estimate_policy_support(policy: dict, investment_manwon: float) -> dict:
         )
     )
     max_amount = _support_parse_number(
-        _support_value(
-            policy,
-            "max_amount_manwon",
-            "max_amount",
-            "support_limit",
-            "support_amount",
-            "subsidy_amount",
+        _selected_amount_candidate(policy)
+    )
+    if max_amount is None:
+        max_amount = _support_parse_number(
+            _support_value(
+                policy,
+                "max_amount_numeric_manwon",
+                "max_amount_manwon",
+                "max_amount",
+                "support_limit",
+                "support_amount",
+                "subsidy_amount",
+            )
         )
-    )
-    eligible_cost_ratio = _support_parse_rate(
-        _support_value(
-            policy,
-            "eligible_cost_ratio",
-            "eligible_investment_ratio",
-            "eligible_ratio",
-        )
-    )
 
-    eligible_investment = investment_manwon * (
-        eligible_cost_ratio if eligible_cost_ratio is not None else 1.0
-    )
-
-    if support_rate is None:
-        return {
-            "status": "terms_missing",
-            "support_rate": None,
-            "max_amount_manwon": max_amount,
-            "eligible_investment_manwon": round(eligible_investment, 1),
-            "applied_support_manwon": 0,
-            "message": (
-                "정책 지원율이 구조화되어 있지 않아 추천에는 포함하되 "
-                "ROI 지원금에는 반영하지 않았습니다."
-            ),
-        }
-
-    support_by_rate = eligible_investment * support_rate
-    caps = [investment_manwon, eligible_investment, support_by_rate]
-    if max_amount is not None:
-        caps.append(max_amount)
-
-    applied_support = max(0, min(caps))
-    return {
-        "status": "applied" if max_amount is not None else "estimated",
+    common = {
+        "roi_apply_method": roi_apply_method,
         "support_rate": support_rate,
         "max_amount_manwon": max_amount,
-        "eligible_investment_manwon": round(eligible_investment, 1),
+        "eligible_investment_manwon": round(max(0, investment_manwon), 1),
+    }
+
+    if max_amount_type in NON_DEDUCTIBLE_MAX_AMOUNT_TYPES:
+        reason = f"정책 지원한도 유형 '{max_amount_type}'은 직접 차감 대상이 아닙니다."
+        return {
+            **common,
+            "status": "not_applicable",
+            "roi_apply_method": "none",
+            "applied_support_manwon": 0,
+            "calculation_basis": NOT_APPLICABLE_BASIS,
+            "reason": reason,
+            "message": NOT_APPLICABLE_BASIS,
+        }
+
+    if roi_apply_method == "none":
+        return {
+            **common,
+            "status": "not_applicable",
+            "applied_support_manwon": 0,
+            "calculation_basis": NOT_APPLICABLE_BASIS,
+            "reason": NOT_APPLICABLE_BASIS,
+            "message": NOT_APPLICABLE_BASIS,
+        }
+
+    if roi_apply_method == "subtract":
+        if investment_manwon <= 0 or max_amount is None or max_amount <= 0:
+            missing = (
+                "투자금이 0보다 커야 합니다."
+                if investment_manwon <= 0
+                else "직접 지원금 한도가 없거나 0 이하입니다."
+            )
+            return {
+                **common,
+                "status": "terms_missing",
+                "applied_support_manwon": 0,
+                "calculation_basis": missing,
+                "reason": missing,
+                "message": missing,
+            }
+        applied_support = min(investment_manwon, max_amount)
+        basis = "직접 지원금 한도와 투자금 중 작은 금액을 반영했습니다."
+        return {
+            **common,
+            "status": "applied",
+            "applied_support_manwon": int(round(applied_support)),
+            "calculation_basis": basis,
+            "reason": basis,
+            "message": basis,
+        }
+
+    missing_terms: list[str] = []
+    if investment_manwon <= 0:
+        missing_terms.append("투자금이 0보다 크지 않습니다")
+    if support_rate is None or not 0 < support_rate <= 1:
+        missing_terms.append("유효한 지원율이 없습니다")
+    if max_amount is None or max_amount <= 0:
+        missing_terms.append("유효한 정책 상한이 없습니다")
+    if missing_terms:
+        reason = "비율+한도 계산 조건 부족: " + ", ".join(missing_terms) + "."
+        return {
+            **common,
+            "status": "terms_missing",
+            "applied_support_manwon": 0,
+            "calculation_basis": reason,
+            "reason": reason,
+            "message": reason,
+        }
+
+    applied_support = min(
+        investment_manwon,
+        investment_manwon * support_rate,
+        max_amount,
+    )
+    basis = "투자금, 투자금 × 지원율, 정책 상한 중 작은 금액을 반영했습니다."
+    return {
+        **common,
+        "status": "applied",
         "applied_support_manwon": int(round(applied_support)),
-        "message": (
-            "투자금 × 지원율, 정책 상한, 인정 투자비 한도를 반영했습니다."
-            if max_amount is not None
-            else "지원율 기준 추정치입니다. 정책 최대 지원금은 공고 원문 확인이 필요합니다."
-        ),
+        "calculation_basis": basis,
+        "reason": basis,
+        "message": basis,
     }
 
 
@@ -661,16 +751,26 @@ def resolve_scenario_policy_support(
 
     if scenario not in {"a", "b"}:
         return {
-            "status": "invalid_scenario",
+            "status": "not_applicable",
+            "roi_apply_method": "none",
             "applied_support_manwon": 0,
+            "support_rate": None,
+            "max_amount_manwon": None,
+            "calculation_basis": NOT_APPLICABLE_BASIS,
+            "reason": "지원금 산정 시나리오가 올바르지 않습니다.",
             "message": "지원금 산정 시나리오가 올바르지 않습니다.",
         }
 
     if investment <= 0:
         return {
             "scenario": scenario,
-            "status": "invalid_investment",
+            "status": "terms_missing",
+            "roi_apply_method": "none",
             "applied_support_manwon": 0,
+            "support_rate": None,
+            "max_amount_manwon": None,
+            "calculation_basis": "투자금이 0보다 커야 합니다.",
+            "reason": "투자금이 없어 정책 지원금을 산정할 수 없습니다.",
             "message": "투자금이 없어 정책 지원금을 산정할 수 없습니다.",
         }
 
@@ -683,8 +783,13 @@ def resolve_scenario_policy_support(
     if not candidates:
         return {
             "scenario": scenario,
-            "status": "no_policy",
+            "status": "not_applicable",
+            "roi_apply_method": "none",
             "applied_support_manwon": 0,
+            "support_rate": None,
+            "max_amount_manwon": None,
+            "calculation_basis": NOT_APPLICABLE_BASIS,
+            "reason": "해당 시나리오에 재무 반영 가능한 정책 후보가 없습니다.",
             "message": "해당 시나리오에 재무 반영 가능한 정책 후보가 없습니다.",
         }
 
@@ -728,11 +833,13 @@ def resolve_scenario_policy_support(
         "policy_id": _support_value(policy, "policy_id", "id", "matched_policy_id"),
         "policy_title": str(_support_value(policy, "title", "policy_title", "name") or ""),
         "policy_match_score": selected["score"],
+        "roi_apply_method": finance.get("roi_apply_method", "none"),
         "support_rate": finance.get("support_rate"),
         "max_amount_manwon": finance.get("max_amount_manwon"),
         "eligible_investment_manwon": finance.get("eligible_investment_manwon"),
         "applied_support_manwon": finance.get("applied_support_manwon", 0),
-        "calculation_basis": finance.get("message", ""),
+        "calculation_basis": finance.get("calculation_basis", ""),
+        "reason": finance.get("reason", ""),
         "message": finance.get("message", ""),
     }
 

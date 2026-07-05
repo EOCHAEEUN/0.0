@@ -1,6 +1,6 @@
 from langchain_core.messages import SystemMessage
 
-from app.core.llm import llm
+from app.core.llm import llm_fast
 from app.prompts.router import ROUTER_SYSTEM_PROMPT
 from app.state import FactofitState
 
@@ -64,7 +64,7 @@ def router_node(state: FactofitState) -> FactofitState:
         user_message=state["user_query"],
     )
 
-    response = llm.invoke([SystemMessage(content=prompt)])
+    response = llm_fast.invoke([SystemMessage(content=prompt)])
     intent = response.content.strip().lower()
     query = (state.get("user_query") or "").lower()
 

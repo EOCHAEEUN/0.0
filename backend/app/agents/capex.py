@@ -3,7 +3,7 @@ from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage
 from app.state import FactofitState
 from app.prompts.capex import CAPEX_SYSTEM_PROMPT
 from app.tools.roi_calc_tool import calculate_equipment_roi
-from app.core.llm import llm
+from app.core.llm import llm_fast
 
 import json
 import re
@@ -300,7 +300,7 @@ def analyze_roi_followup(user_query: str, roi_result: dict) -> dict:
 {{"intent":"detail|compare|simulate|other","new_investment":null_or_number}}
 """
     try:
-        response = llm.invoke([SystemMessage(content=prompt)])
+        response = llm_fast.invoke([SystemMessage(content=prompt)])
         parsed = _extract_json_object(response.content)
         intent = str(parsed.get("intent") or "other").lower()
         amount = parsed.get("new_investment")

@@ -411,6 +411,14 @@ export default function MobilePoliciesScreen() {
     )
   }
 
+  const openPriorityPolicyDocuments = (policyId?: string) => {
+    navigate(
+      buildMobilePath("/mobile/application", flowContext, {
+        policyId: policyId || model.priorityPolicy?.policy_id,
+      }),
+    )
+  }
+
   return (
     <section className="ff-mobile-screen ff-mobile-policies-screen">
       <MobileTopBar companyName={workspace.companyName} subtitle="지원사업" showSubtitle />
@@ -468,7 +476,7 @@ export default function MobilePoliciesScreen() {
           {model.priorityDetail ? (
             <PriorityPolicyPanel
               detail={model.priorityDetail}
-              onOpenDetail={() => openPolicyDetail(model.priorityPolicy?.policy_id)}
+              onOpenDetail={() => openPriorityPolicyDocuments(model.priorityPolicy?.policy_id)}
             />
           ) : (
             <article className="ff-mobile-card">

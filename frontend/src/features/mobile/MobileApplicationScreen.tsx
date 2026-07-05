@@ -670,7 +670,8 @@ export default function MobileApplicationScreen() {
                 style={{
                   width: "min(100%, 430px)",
                   background: "#fff",
-                  borderRadius: "20px 20px 0 0",
+                  borderRadius: "20px",
+                  marginBottom: 120,
                   padding: 14,
                   display: "grid",
                   gap: 10,

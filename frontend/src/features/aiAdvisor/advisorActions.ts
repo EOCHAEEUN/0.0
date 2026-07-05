@@ -5,6 +5,7 @@ import {
   GitCompare,
   Landmark,
   PlayCircle,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react"
 
@@ -13,6 +14,7 @@ export type AdvisorActionId =
   | "roi_compare"
   | "investment_simulation"
   | "matched_policies"
+  | "safety_check_summary"
   | "application_draft_status"
   | "start_analysis"
   | "roi_analyze"
@@ -64,6 +66,15 @@ export const ANALYSIS_QUICK_ACTIONS: AdvisorActionDefinition[] = [
     icon: Landmark,
     requiresAnalysis: true,
     loadingLabel: "정책 조회 중…",
+    responseType: "database",
+  },
+  {
+    id: "safety_check_summary",
+    label: "안전점검",
+    userMessage: "안전점검 현황 알려줘",
+    icon: ShieldCheck,
+    requiresAnalysis: true,
+    loadingLabel: "안전점검 조회 중…",
     responseType: "database",
   },
   {

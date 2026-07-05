@@ -1,14 +1,30 @@
-.ff-equipment-guide-chat-launcher .ff-advisor-floating-button {
-  z-index: 10060;
-}
-
-.ff-equipment-guide-popup-shell {
-  z-index: 10055;
+.ff-equipment-guide-chat-launcher {
   pointer-events: none;
 }
 
-.ff-equipment-guide-popup-shell .ff-advisor-popup-stage {
+.ff-equipment-guide-chat-launcher .ff-advisor-floating-button {
   pointer-events: auto;
+  z-index: 90;
+}
+
+.ff-advisor-popup-shell.ff-equipment-guide-popup-shell {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: var(--ff-dashboard-sidebar-width, 248px);
+  z-index: 85;
+  pointer-events: none !important;
+}
+
+.ff-advisor-popup-shell.ff-equipment-guide-popup-shell .ff-advisor-popup-stage {
+  pointer-events: auto;
+}
+
+@media (max-width: 860px) {
+  .ff-advisor-popup-shell.ff-equipment-guide-popup-shell {
+    left: 0;
+  }
 }
 
 .ff-equipment-guide-chat-card {

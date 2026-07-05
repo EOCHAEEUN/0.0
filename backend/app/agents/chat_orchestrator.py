@@ -16,9 +16,10 @@ EXPLICIT_ACTION_TO_ROUTE = {
     "roi_compare": "roi_snapshot",
     "matched_policies": "policy_snapshot",
     "policy_calendar": "calendar_snapshot",
-    "application_draft_status": "draft_status",
-    "safety_status": "safety_snapshot",
-    "investment_simulation": "investment_simulation",
+  "application_draft_status": "draft_status",
+  "safety_status": "safety_snapshot",
+  "safety_check_summary": "safety_snapshot",
+  "investment_simulation": "investment_simulation",
     "current_analysis_summary": "current_analysis_summary",
 }
 
@@ -486,10 +487,55 @@ def safety_snapshot_node(state: FactofitState) -> FactofitState:
         equipment_id=_as_text(state.get("equipment_id")),
         policy_id=_as_text(state.get("policy_id")),
     )
+    summary = _as_dict(snapshot.get("summary"))
+    rows = snapshot.get("rows") if isinstance(snapshot.get("rows"), list) else []
+    total = _safe_int(summary.get("total"))
+    need_improvement = _safe_int(summary.get("need_improvement"))
+    missing_evidence = _safe_int(summary.get("missing_evidence"))
+
+    if total <= 0:
+        text = (
+            "현재 분석 기준 안전점검 항목이 아직 생성되지 않았습니다. "
+            "안전 프리뷰를 먼저 생성하거나 점검 항목을 등록해 주세요."
+        )
+    else:
+        text_lines = [
+            f"안전점검 요약: 총 {total}건",
+            f"- 개선 필요: {need_improvement}건",
+            f"- 증빙 미보유: {missing_evidence}건",
+        ]
+        highlight_rows = []
+        for row in rows:
+            item = _as_dict(row)
+            if _as_text(item.get("current_status")).find("개선") >= 0 or _as_text(item.get("evidence_status")) == "미보유":
+                highlight_rows.append(item)
+            if len(highlight_rows) >= 3:
+                break
+        if highlight_rows:
+            text_lines.append("")
+            text_lines.append("우선 확인 항목:")
+            for item in highlight_rows:
+                text_lines.append(
+                    f"- {_as_text(item.get('viewpoint_label')) or '안전점검 항목'}"
+                    f" ({_as_text(item.get('current_status')) or '상태 미기재'} / "
+                    f"{_as_text(item.get('evidence_status')) or '증빙 상태 미기재'})"
+                )
+        text = "\n".join(text_lines)
+
     _response_payload(
         state,
-        text="현재 분석 기준 안전 현황입니다.",
-        cards=[{"type": "safety_status", "data": snapshot}],
+        text=text,
+        cards=[
+            {"type": "safety_status", "data": snapshot},
+            {
+                "type": "safety_check_summary",
+                "data": {
+                    "total": total,
+                    "need_improvement": need_improvement,
+                    "missing_evidence": missing_evidence,
+                },
+            },
+        ],
         intent="safety",
         answer_source="database",
     )

@@ -1288,6 +1288,76 @@ async def get_support_projects(
             key=lambda item: _snapshot_int(item.get("match_score"), 0),
             reverse=True,
         )
+
+        if len(policies_raw) < limit:
+            seen_ids = {
+                str(item.get("policy_id")).strip()
+                for item in policies_raw
+                if item.get("policy_id")
+            }
+            try:
+                matched_query = (
+                    db.table("matched_policy")
+                    .select("*")
+                    .eq("company_id", company_id)
+                    .eq("analysis_id", analysis_id)
+                    .order("match_score", desc=True)
+                    .limit(limit)
+                    .execute()
+                )
+                matched_rows = getattr(matched_query, "data", []) or []
+                if matched_rows:
+                    detail_map = fetch_policy_details_by_ids(
+                        db,
+                        [row.get("policy_id") for row in matched_rows if isinstance(row, dict)],
+                    )
+                    for row in matched_rows:
+                        if not isinstance(row, dict):
+                            continue
+                        policy_id = str(row.get("policy_id") or "").strip()
+                        if not policy_id or policy_id in seen_ids:
+                            continue
+                        seen_ids.add(policy_id)
+                        detail = detail_map.get(normalize_policy_id(policy_id)) or {}
+                        policies_raw.append(
+                            {
+                                "policy_id": policy_id,
+                                "title": _first_text(
+                                    row.get("title"),
+                                    detail.get("title"),
+                                ),
+                                "organization": _first_text(
+                                    row.get("organization"),
+                                    detail.get("organization"),
+                                    detail.get("agency"),
+                                ),
+                                "match_score": row.get("match_score")
+                                or detail.get("match_score"),
+                                "deadline": _first_text(
+                                    row.get("deadline"),
+                                    detail.get("deadline"),
+                                ),
+                                "deadline_display": _first_text(
+                                    detail.get("deadline_display"),
+                                    row.get("deadline"),
+                                    detail.get("deadline"),
+                                ),
+                                "eligible": row.get("eligible", True),
+                                "reason": row.get("reason"),
+                                "llm_score": row.get("llm_score"),
+                                "scenario_match": row.get("scenario_match"),
+                                "scenario_label": row.get("scenario_label"),
+                            }
+                        )
+                        if len(policies_raw) >= limit:
+                            break
+                    policies_raw.sort(
+                        key=lambda item: _snapshot_int(item.get("match_score"), 0),
+                        reverse=True,
+                    )
+            except Exception as exc:
+                print(f"policy_snapshot matched_policy 보강 실패: {exc}")
+
         policies = [
             _snapshot_policy_item_to_response(item)
             for item in policies_raw[:limit]

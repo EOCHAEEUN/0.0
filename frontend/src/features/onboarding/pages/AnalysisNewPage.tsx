@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import {
+  EquipmentRegistrationFormCard,
+  type EquipmentRegistrationFormValues,
+} from "../../equipmentStatus/components/EquipmentRegistrationFormCard"
+import "../../equipmentStatus/equipmentStatus.workspace.css"
+import {
   fetchAnalysisEntryContext,
   runExistingEquipmentAnalysis,
   runOnboardingAnalysis,
@@ -24,6 +29,50 @@ const categoryOptions = [
   { label: "기타 설비", value: "other" },
 ]
 const purposeOptions = ["노후 설비 교체", "생산량 확대", "인력 절감", "에너지 절감", "안전성 개선"]
+
+function conditionToFormValues(
+  condition: AnalysisConditionDraft,
+): EquipmentRegistrationFormValues {
+  return {
+    category: condition.equipmentCategory || "선택 필요",
+    name: condition.equipmentName,
+    years: condition.ageYears,
+    annualEnergyCost: condition.energyCostAnnual,
+    process: condition.process || "",
+    defectRate: condition.defectRate || "",
+    maintenanceCostMonthly: condition.monthlyMaintenanceCost || "",
+    scenarioAInvestment: condition.investmentAmount || "",
+    scenarioBInvestment: condition.scenarioBInvestmentManwon || "",
+  }
+}
+
+function formValuesToCondition(
+  patch: Partial<EquipmentRegistrationFormValues>,
+): Partial<AnalysisConditionDraft> {
+  return {
+    equipmentCategory: patch.category,
+    equipmentName: patch.name,
+    ageYears: patch.years,
+    energyCostAnnual: patch.annualEnergyCost,
+    process: patch.process,
+    defectRate: patch.defectRate,
+    monthlyMaintenanceCost: patch.maintenanceCostMonthly,
+    investmentAmount: patch.scenarioAInvestment,
+    scenarioBInvestmentManwon: patch.scenarioBInvestment,
+  }
+}
+
+function isNewEquipmentFormReady(condition: AnalysisConditionDraft) {
+  const categoryReady =
+    Boolean(condition.equipmentCategory) && condition.equipmentCategory !== "선택 필요"
+  return Boolean(
+    categoryReady &&
+      condition.equipmentName.trim() &&
+      condition.ageYears.trim() &&
+      condition.energyCostAnnual.trim() &&
+      condition.investmentAmount?.trim(),
+  )
+}
 
 function createAnalysisId() {
   return `analysis-${Date.now()}`
@@ -90,7 +139,10 @@ export default function AnalysisNewPage() {
       setIsLoadingEquipment(false)
       setEquipments([])
       setCompanyId("")
-      setCondition({ ...emptyAnalysisConditionDraft })
+      setCondition({
+        ...emptyAnalysisConditionDraft,
+        equipmentCategory: mode === "new_equipment" ? "선택 필요" : "",
+      })
       return
     }
 
@@ -167,8 +219,17 @@ export default function AnalysisNewPage() {
     setCondition((current) => ({ ...current, ...patch }))
 
   const handleAnalyze = async () => {
-    if (!condition.equipmentCategory || !condition.equipmentName || !condition.investmentAmount) {
-      setError("설비 종류, 검토 설비명, A안 투자금을 입력해주세요.")
+    const validationMessage =
+      mode === "new_equipment"
+        ? isNewEquipmentFormReady(condition)
+          ? ""
+          : "설비 종류, 설비명, 사용연수, 연간 에너지 비용, 전체교체 투자금(A안)을 입력해주세요."
+        : !condition.equipmentCategory || !condition.equipmentName || !condition.investmentAmount
+          ? "설비 종류, 검토 설비명, A안 투자금을 입력해주세요."
+          : ""
+
+    if (validationMessage) {
+      setError(validationMessage)
       return
     }
     setIsAnalyzing(true)
@@ -280,6 +341,26 @@ export default function AnalysisNewPage() {
             </div>
           )}
           {error && <p className="ff-field-error">{error}</p>}
+        </section>
+      </main>
+    )
+  }
+
+  if (mode === "new_equipment") {
+    const cancelPath = searchParams.get("source") === "dashboard" ? "/dashboard" : "/analysis/new"
+
+    return (
+      <main className="ff-onboarding-page ff-analysis-equipment-register-page">
+        <section className="ff-analysis-equipment-register-shell">
+          <EquipmentRegistrationFormCard
+            values={conditionToFormValues(condition)}
+            onChange={(patch) => update(formValuesToCondition(patch))}
+            onCancel={() => navigate(cancelPath)}
+            onSubmit={() => void handleAnalyze()}
+            submitLabel="ROI 분석 실행"
+            submitting={isAnalyzing}
+            error={error}
+          />
         </section>
       </main>
     )

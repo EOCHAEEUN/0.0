@@ -1205,3 +1205,25 @@
   padding-top: 20px;
   border-top: 1px solid rgba(52, 75, 160, 0.1);
 }
+
+.ff-analysis-equipment-register-page {
+  min-height: 100vh;
+  background: #f4f7fb;
+}
+
+.ff-analysis-equipment-register-shell {
+  width: min(980px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 32px 0 48px;
+}
+
+.ff-analysis-equipment-register-shell .ff-equipment-form-card {
+  margin-bottom: 0;
+}
+
+.ff-analysis-equipment-register-shell .ff-field-error {
+  margin: 0 0 12px;
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 800;
+}

@@ -71,13 +71,19 @@ export function useApplicationDraftWorkspace(route: RouteContext) {
   })
   const [manualScenarioKey, setManualScenarioKey] = useState<ScenarioKey>("A")
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false)
+  const [isApplyingPolicy, setIsApplyingPolicy] = useState(false)
   const [generateError, setGenerateError] = useState("")
+  const [activePolicyId, setActivePolicyId] = useState<string | undefined>(route.policyId)
 
   const companyId = resolveCompanyId(route)
   const analysisId = route.analysisId
   const policyId = route.policyId
 
-  const reload = useCallback(async () => {
+  useEffect(() => {
+    setActivePolicyId(route.policyId)
+  }, [route.policyId])
+
+  const reload = useCallback(async (overridePolicyId?: string) => {
     if (!companyId) {
       setWorkspaceState({
         kind: "error",
@@ -94,13 +100,15 @@ export function useApplicationDraftWorkspace(route: RouteContext) {
       return
     }
 
+    const effectivePolicyId = overridePolicyId ?? activePolicyId ?? policyId
+
     setWorkspaceState({ kind: "loading" })
 
     try {
       const data = await fetchApplicationDraftWorkspace({
         companyId,
         analysisId,
-        policyId,
+        policyId: effectivePolicyId,
       })
 
       if (data.state === "analysis_required") {
@@ -113,6 +121,9 @@ export function useApplicationDraftWorkspace(route: RouteContext) {
 
       setWorkspaceState({ kind: "ready", data })
       setManualScenarioKey(scenarioKeyFromSelected(data.scenarios?.selected))
+      if (data.policy_id) {
+        setActivePolicyId(data.policy_id)
+      }
     } catch (error) {
       setWorkspaceState({
         kind: "error",
@@ -122,7 +133,7 @@ export function useApplicationDraftWorkspace(route: RouteContext) {
             : "신청서 초안 화면 데이터를 불러오지 못했습니다.",
       })
     }
-  }, [analysisId, companyId, policyId])
+  }, [activePolicyId, analysisId, companyId, policyId])
 
   useEffect(() => {
     void reload()
@@ -160,13 +171,39 @@ export function useApplicationDraftWorkspace(route: RouteContext) {
         policyId: data.policy_id,
         analysisId: data.analysis_id || analysisId,
       })
-      await reload()
+      await reload(data.policy_id)
     } catch (error) {
       setGenerateError(
         error instanceof Error ? error.message : "신청서 초안 생성에 실패했습니다.",
       )
     } finally {
       setIsGeneratingDraft(false)
+    }
+  }
+
+  const applyPolicyAndRegenerate = async (nextPolicyId: string) => {
+    const normalizedPolicyId = nextPolicyId.trim()
+    if (!data?.company_id || !data.equipment_id || !normalizedPolicyId) return
+    if (normalizedPolicyId === data.policy_id) return
+
+    setIsApplyingPolicy(true)
+    setGenerateError("")
+    setActivePolicyId(normalizedPolicyId)
+
+    try {
+      await requestApplicationDraftGeneration({
+        companyId: data.company_id,
+        equipmentId: data.equipment_id,
+        policyId: normalizedPolicyId,
+        analysisId: data.analysis_id || analysisId,
+      })
+      await reload(normalizedPolicyId)
+    } catch (error) {
+      setGenerateError(
+        error instanceof Error ? error.message : "지원사업 변경 후 초안 재생성에 실패했습니다.",
+      )
+    } finally {
+      setIsApplyingPolicy(false)
     }
   }
 
@@ -221,8 +258,10 @@ export function useApplicationDraftWorkspace(route: RouteContext) {
     summaryText,
     draftExists: Boolean(data?.draft.exists),
     isGeneratingDraft,
+    isApplyingPolicy,
     generateError,
     handleGenerateDraft,
+    applyPolicyAndRegenerate,
     reload,
     reportParams,
     pdfPreview,

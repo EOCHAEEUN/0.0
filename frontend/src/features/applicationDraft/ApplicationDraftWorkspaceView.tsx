@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react"
 import {
   useLocation,
-  useNavigate,
   useParams,
   useSearchParams,
 } from "react-router-dom"
@@ -12,7 +11,6 @@ import { ApplicationDraftPdfPreview } from "./components/ApplicationDraftPdfPrev
 import { ApplicationDraftWorkspace } from "./components/ApplicationDraftWorkspace"
 import { ApplicationDraftWorkspaceLayout } from "./components/ApplicationDraftWorkspaceLayout"
 import { useApplicationDraftWorkspace } from "./hooks/useApplicationDraftWorkspace"
-import { buildRoiPath } from "../roi/roiPaths"
 
 type RoutePolicyContext = {
   analysisId?: string
@@ -31,7 +29,6 @@ export function ApplicationDraftWorkspaceView({
   routeAnalysisId?: string
   resolvedPolicyId?: string
 }) {
-  const navigate = useNavigate()
   const location = useLocation()
 
   const companyId = useMemo(() => {
@@ -45,10 +42,6 @@ export function ApplicationDraftWorkspaceView({
     policyId: resolvedPolicyId || routeState.policyId,
     companyId,
   })
-
-  const roiPath = routeAnalysisId
-    ? buildRoiPath("strategy", { analysisId: routeAnalysisId })
-    : buildRoiPath("strategy")
 
   const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false)
 
@@ -86,7 +79,7 @@ export function ApplicationDraftWorkspaceView({
       <div className="ff-draft-page-container">
         <ApplicationDraftHero model={workspace} />
 
-        <ApplicationDraftWorkspace model={workspace} onGoRoi={() => navigate(roiPath)} />
+        <ApplicationDraftWorkspace model={workspace} />
 
         <ApplicationDraftPdfPreview
           model={workspace}

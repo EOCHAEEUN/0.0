@@ -1,5 +1,6 @@
 import { Bot, CircleHelp, Info, Plus } from "lucide-react"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import DashboardWorkspaceSidebar from "../../components/layout/DashboardWorkspaceSidebar"
 import {
   fetchDashboardOnboarding,
@@ -8,10 +9,10 @@ import {
   patchRepresentativeEquipment,
 } from "../dashboard/dashboard.api"
 import { useDashboardData } from "../dashboard/hooks/useDashboardData"
+import { runSetupRoiAnalysis } from "../onboarding/onboardingAnalysisApi"
+import { saveAnalysisResult } from "../onboarding/onboardingState"
+import { buildRoiPath } from "../roi/roiPaths"
 import {
-  EQUIPMENT_CATEGORY_OPTIONS,
-  Field,
-  SelectField,
   createEmptyEquipment,
   deleteEquipmentPayload,
   findCompanyId,
@@ -26,8 +27,10 @@ import {
   getCategoryLabel,
   mapRemoteEquipment,
 } from "./equipmentStatus.mapper"
+import { EquipmentRegistrationFormCard, type EquipmentRegistrationFormValues } from "./components/EquipmentRegistrationFormCard"
 import EquipmentGuideChatLauncher from "./EquipmentGuideChatLauncher"
 import EquipmentRegisteredList from "./EquipmentRegisteredList"
+import { isEquipmentRegisterIntent } from "./equipmentStatusPaths"
 
 function getStringValue(value: unknown) {
   if (value === null || value === undefined) return ""
@@ -40,9 +43,45 @@ function getObject(value: unknown): Record<string, unknown> | null {
     : null
 }
 
+function equipmentToFormValues(equipment: EquipmentInfo): EquipmentRegistrationFormValues {
+  return {
+    category: equipment.category,
+    name: equipment.name,
+    years: equipment.years,
+    annualEnergyCost: equipment.annualEnergyCost,
+    process: equipment.process,
+    defectRate: equipment.defectRate,
+    maintenanceCostMonthly: equipment.maintenanceCostAnnual,
+    scenarioAInvestment: equipment.scenarioAInvestment,
+    scenarioBInvestment: equipment.scenarioBInvestment,
+  }
+}
+
+function applyFormValuesToEquipment(
+  equipment: EquipmentInfo,
+  patch: Partial<EquipmentRegistrationFormValues>,
+): EquipmentInfo {
+  return {
+    ...equipment,
+    category: patch.category ?? equipment.category,
+    name: patch.name ?? equipment.name,
+    years: patch.years ?? equipment.years,
+    annualEnergyCost: patch.annualEnergyCost ?? equipment.annualEnergyCost,
+    process: patch.process ?? equipment.process,
+    defectRate: patch.defectRate ?? equipment.defectRate,
+    maintenanceCostAnnual:
+      patch.maintenanceCostMonthly ?? equipment.maintenanceCostAnnual,
+    scenarioAInvestment: patch.scenarioAInvestment ?? equipment.scenarioAInvestment,
+    scenarioBInvestment: patch.scenarioBInvestment ?? equipment.scenarioBInvestment,
+  }
+}
+
 export default function EquipmentStatusFeature() {
   const { dashboard, loading: dashboardLoading } = useDashboardData()
   const workspace = dashboard.workspace
+  const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const autoRegisterHandledRef = useRef(false)
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -109,6 +148,28 @@ export default function EquipmentStatusFeature() {
     setFeedback("")
   }
 
+  useEffect(() => {
+    if (autoRegisterHandledRef.current) return
+    if (!isEquipmentRegisterIntent(searchParams)) return
+    if (loading || dashboardLoading || editingId !== null) return
+
+    autoRegisterHandledRef.current = true
+    const next = createEmptyEquipment(nextLocalId)
+    setDraftEquipment(next)
+    setEditingId(next.id)
+    setFeedback("")
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete("register")
+    setSearchParams(nextParams, { replace: true })
+  }, [
+    dashboardLoading,
+    editingId,
+    loading,
+    nextLocalId,
+    searchParams,
+    setSearchParams,
+  ])
+
   const startEdit = (equipment: EquipmentInfo) => {
     setDraftEquipment({ ...equipment })
     setEditingId(equipment.id)
@@ -118,10 +179,6 @@ export default function EquipmentStatusFeature() {
   const cancelEdit = () => {
     setDraftEquipment(null)
     setEditingId(null)
-  }
-
-  const updateDraft = (field: keyof EquipmentInfo, value: string) => {
-    setDraftEquipment((prev) => (prev ? { ...prev, [field]: value } : prev))
   }
 
   const handleSave = async () => {
@@ -163,6 +220,26 @@ export default function EquipmentStatusFeature() {
       setDraftEquipment(null)
       setEditingId(null)
       notifyDashboardRefresh()
+
+      const shouldAutoStartAnalysis = searchParams.get("source") === "analysis"
+      if (shouldAutoStartAnalysis) {
+        const savedEquipmentId = equipmentId || draftEquipment.equipmentId
+        if (!savedEquipmentId) {
+          window.alert(
+            "설비 저장은 완료됐지만 설비 ID를 찾지 못해 자동 분석을 시작할 수 없습니다.",
+          )
+          return
+        }
+
+        const result = await runSetupRoiAnalysis(
+          companyId,
+          savedEquipmentId,
+          savedEquipment.name || "검토 설비",
+        )
+        saveAnalysisResult(result)
+        navigate(buildRoiPath("strategy", { analysisId: result.id }), { replace: true })
+        return
+      }
     } catch (error) {
       window.alert(getErrorMessage(error))
     } finally {
@@ -257,7 +334,7 @@ export default function EquipmentStatusFeature() {
               </p>
             </div>
             {!editingId ? (
-              <button type="button" className="ff-equipment-primary-btn" onClick={startCreate}>
+              <button type="button" className="ff-equipment-secondary-btn" onClick={startCreate}>
                 <Plus aria-hidden="true" size={18} />
                 내 설비 등록
               </button>
@@ -305,98 +382,19 @@ export default function EquipmentStatusFeature() {
           ) : (
             <>
               {editingId !== null && draftEquipment ? (
-                <section className="ff-equipment-form-card">
-                  <header>
-                    <strong>{draftEquipment.equipmentId ? "설비 수정" : "내 설비 등록"}</strong>
-                    <button type="button" className="ff-equipment-text-btn" onClick={cancelEdit}>
-                      취소
-                    </button>
-                  </header>
-
-                  <div className="ff-equipment-form-grid">
-                    <SelectField
-                      label="설비 종류"
-                      required
-                      value={draftEquipment.category}
-                      onChange={(value) => updateDraft("category", value)}
-                      options={EQUIPMENT_CATEGORY_OPTIONS}
-                    />
-                    <Field
-                      label="설비명"
-                      required
-                      value={draftEquipment.name}
-                      placeholder="예: 프레스 1호기"
-                      onChange={(value) => updateDraft("name", value)}
-                    />
-                    <Field
-                      label="사용연수"
-                      required
-                      value={draftEquipment.years}
-                      placeholder="예: 10"
-                      helperText="단위: 년"
-                      inputMode="numeric"
-                      onChange={(value) => updateDraft("years", value)}
-                    />
-                    <Field
-                      label="연간 에너지 비용"
-                      required
-                      value={draftEquipment.annualEnergyCost}
-                      placeholder="예: 5,000"
-                      helperText="단위: 만원"
-                      inputMode="numeric"
-                      onChange={(value) => updateDraft("annualEnergyCost", value)}
-                    />
-                    <Field
-                      label="공정"
-                      value={draftEquipment.process}
-                      placeholder="예: 프레스공정"
-                      onChange={(value) => updateDraft("process", value)}
-                    />
-                    <Field
-                      label="불량률"
-                      value={draftEquipment.defectRate}
-                      placeholder="예: 3.5"
-                      helperText="단위: %"
-                      inputMode="decimal"
-                      onChange={(value) => updateDraft("defectRate", value)}
-                    />
-                    <Field
-                      label="월 유지보수 비용"
-                      value={draftEquipment.maintenanceCostAnnual}
-                      placeholder="예: 80"
-                      helperText="단위: 만원"
-                      inputMode="numeric"
-                      onChange={(value) => updateDraft("maintenanceCostAnnual", value)}
-                    />
-                    <Field
-                      label="전체교체 투자금(A안)"
-                      value={draftEquipment.scenarioAInvestment}
-                      placeholder="예: 20,000"
-                      helperText="단위: 만원"
-                      inputMode="numeric"
-                      onChange={(value) => updateDraft("scenarioAInvestment", value)}
-                    />
-                    <Field
-                      label="부분교체 투자금(B안)"
-                      value={draftEquipment.scenarioBInvestment}
-                      placeholder="예: 4,000"
-                      helperText="단위: 만원"
-                      inputMode="numeric"
-                      onChange={(value) => updateDraft("scenarioBInvestment", value)}
-                    />
-                  </div>
-
-                  <div className="ff-equipment-form-actions">
-                    <button
-                      type="button"
-                      className="ff-equipment-primary-btn"
-                      disabled={saving}
-                      onClick={() => void handleSave()}
-                    >
-                      {saving ? "저장 중..." : "설비 저장"}
-                    </button>
-                  </div>
-                </section>
+                <EquipmentRegistrationFormCard
+                  title={draftEquipment.equipmentId ? "설비 수정" : "내 설비 등록"}
+                  values={equipmentToFormValues(draftEquipment)}
+                  onChange={(patch) =>
+                    setDraftEquipment((current) =>
+                      current ? applyFormValuesToEquipment(current, patch) : current,
+                    )
+                  }
+                  onCancel={cancelEdit}
+                  onSubmit={() => void handleSave()}
+                  submitLabel="설비 저장"
+                  submitting={saving}
+                />
               ) : null}
 
               <section className="ff-equipment-list-section">

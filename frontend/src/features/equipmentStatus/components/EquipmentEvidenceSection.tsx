@@ -153,7 +153,7 @@ export default function EquipmentEvidenceSection({
             </button>
             <button
               type="button"
-              className="ff-equipment-primary-btn"
+              className="ff-equipment-secondary-btn"
               onClick={() => setDrawerState({ mode: "selection" })}
             >
               <FileSearch aria-hidden="true" size={14} />

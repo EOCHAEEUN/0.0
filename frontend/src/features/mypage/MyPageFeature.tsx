@@ -1859,7 +1859,7 @@ export default function MyPage() {
                     <tr>
                       <td>
                         {PREVIOUS_YEAR}
-                        <span style={{ color: "#94a3b8", fontWeight: 700 }}> (추정)</span>
+                        <span style={{ color: "#94a3b8", fontWeight: 700 }}> (직전년도)</span>
                       </td>
                       <td>
                         <input

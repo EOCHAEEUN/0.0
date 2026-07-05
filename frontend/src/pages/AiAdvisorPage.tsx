@@ -4,6 +4,9 @@ import { useLocation, useSearchParams } from "react-router-dom"
 import engiBot from "../assets/advisor/engi-bot-transparent.png"
 import botIcon from "../assets/advisor/factofit-ai-bot.png"
 import DashboardWorkspacePageLayout from "../components/layout/DashboardWorkspacePageLayout"
+import AnalysisPickerDialog, {
+  type AnalysisPickerItem,
+} from "../features/aiAdvisor/AnalysisPickerDialog"
 import AdvisorQuickActions from "../features/aiAdvisor/AdvisorQuickActions"
 import AdvisorResponseCards from "../features/aiAdvisor/AdvisorResponseCards"
 import InvestmentSimulationDialog from "../features/aiAdvisor/InvestmentSimulationDialog"
@@ -33,6 +36,7 @@ const SUGGESTION_CHIPS = [
   "현재 분석 요약해줘",
   "추천 시나리오 근거 알려줘",
   "A안/B안 차이 쉽게 설명해줘",
+  "안전점검 현황 알려줘",
   "지금 바로 해야 할 일 정리해줘",
 ] as const
 
@@ -83,10 +87,6 @@ function readNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-function formatPercent(value: number | null) {
-  return value === null ? "-" : `${Math.round(value)}%`
-}
-
 function formatMessageTime(value?: string) {
   if (!value) return ""
   const date = new Date(value)
@@ -100,17 +100,6 @@ function formatMessageTime(value?: string) {
 
 function nowIso() {
   return new Date().toISOString()
-}
-
-function formatDateTime(value: string) {
-  const parsed = Date.parse(value)
-  if (!Number.isFinite(parsed)) return "-"
-  const date = new Date(parsed)
-  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(
-    date.getDate(),
-  ).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(
-    date.getMinutes(),
-  ).padStart(2, "0")}`
 }
 
 function formatHistoryDate(value: string) {
@@ -196,9 +185,20 @@ function buildActiveSessionStorageKey(companyId: string, userId: string, tokenMa
   return `advisor.activeSession.${companyId}.${userId || "unknown"}.${tokenMarker}`
 }
 
+function buildEquipmentNameLookup(onboarding: DashboardOnboardingMeResponse | null) {
+  const lookup = new Map<string, string>()
+  for (const equipment of onboarding?.equipments ?? []) {
+    const equipmentId = readText(equipment.equipment_id, equipment.id)
+    const equipmentName = readText(equipment.name)
+    if (equipmentId && equipmentName) lookup.set(equipmentId, equipmentName)
+  }
+  return lookup
+}
+
 function mapContexts(onboarding: DashboardOnboardingMeResponse | null) {
   const company = asRecord(onboarding?.company)
   const companyId = readText(company.company_id)
+  const equipmentNameById = buildEquipmentNameLookup(onboarding)
   return (onboarding?.roi_outputs ?? [])
     .map((row) => {
       const roiOutput = asRecord(row)
@@ -212,7 +212,10 @@ function mapContexts(onboarding: DashboardOnboardingMeResponse | null) {
         analysisId,
         companyId,
         equipmentId,
-        equipmentName: readText(roiOutput.equipment_name) || "검토 설비",
+        equipmentName:
+          readText(roiOutput.equipment_name) ||
+          equipmentNameById.get(equipmentId) ||
+          "검토 설비",
         createdAt: readText(roiOutput.created_at),
         roiPct: readNumber(scenarioA.roi_pct),
         scenarioAInvestment: readNumber(scenarioA.investment_manwon),
@@ -226,6 +229,37 @@ function mapContexts(onboarding: DashboardOnboardingMeResponse | null) {
     .sort(
       (left, right) => Date.parse(right.createdAt || "") - Date.parse(left.createdAt || ""),
     )
+}
+
+function mapEquipmentPickerItems(
+  onboarding: DashboardOnboardingMeResponse | null,
+  contexts: AnalysisContext[],
+): AnalysisPickerItem[] {
+  const latestContextByEquipment = new Map<string, AnalysisContext>()
+  for (const context of contexts) {
+    if (!context.equipmentId) continue
+    const existing = latestContextByEquipment.get(context.equipmentId)
+    if (!existing || Date.parse(context.createdAt || "") > Date.parse(existing.createdAt || "")) {
+      latestContextByEquipment.set(context.equipmentId, context)
+    }
+  }
+
+  return (onboarding?.equipments ?? [])
+    .map((equipment, index) => {
+      const equipmentId = readText(equipment.equipment_id, equipment.id) || `equipment-${index}`
+      const equipmentName = readText(equipment.name) || "이름 미입력 설비"
+      const subtitle = readText(equipment.process, equipment.category) || "분류 없음"
+      const latestContext = latestContextByEquipment.get(equipmentId)
+      return {
+        equipmentId,
+        equipmentName,
+        subtitle,
+        analysisId: latestContext?.analysisId || "",
+        roiPct: latestContext?.roiPct ?? null,
+        createdAt: latestContext?.createdAt || "",
+      } satisfies AnalysisPickerItem
+    })
+    .filter((item) => Boolean(item.equipmentId))
 }
 
 function extractEquipmentSelection(cards: unknown[]) {
@@ -242,6 +276,14 @@ function extractEquipmentSelection(cards: unknown[]) {
       } satisfies EquipmentOption
     })
     .filter((item) => Boolean(item.equipment_id))
+}
+
+function extractSafetyCheckTotal(cards: unknown[]) {
+  const target = cards.find((item) => asRecord(item).type === "safety_check_summary")
+  const data = asRecord(asRecord(target).data)
+  const total = readNumber(data.total)
+  if (total === null) return null
+  return Math.max(0, Math.trunc(total))
 }
 
 function toMessageListFromSession(data: unknown): ChatMessage[] {
@@ -300,6 +342,16 @@ export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boole
     [contexts, selectedAnalysisId],
   )
 
+  const latestSafetyCheckTotal = useMemo(() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index]
+      if (message.role !== "assistant" || !Array.isArray(message.cards)) continue
+      const total = extractSafetyCheckTotal(message.cards)
+      if (total !== null) return total
+    }
+    return null
+  }, [messages])
+
   const companyId = useMemo(
     () => readText(selectedContext?.companyId, asRecord(onboarding?.company).company_id),
     [onboarding, selectedContext?.companyId],
@@ -311,14 +363,21 @@ export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boole
     [companyId, tokenMarker, userId],
   )
 
-  const filteredContexts = useMemo(() => {
+  const equipmentPickerItems = useMemo(
+    () => mapEquipmentPickerItems(onboarding, contexts),
+    [contexts, onboarding],
+  )
+
+  const filteredEquipmentPickerItems = useMemo(() => {
     const keyword = analysisSearch.trim().toLowerCase()
-    if (!keyword) return contexts
-    return contexts.filter((item) => {
-      const haystack = `${item.equipmentName} ${item.analysisId}`.toLowerCase()
+    if (!keyword) return equipmentPickerItems
+    return equipmentPickerItems.filter((item) => {
+      const haystack = `${item.equipmentName} ${item.subtitle} ${item.analysisId}`.toLowerCase()
       return haystack.includes(keyword)
     })
-  }, [analysisSearch, contexts])
+  }, [analysisSearch, equipmentPickerItems])
+
+  const hasActiveContext = Boolean(selectedContext) || Boolean(selectedEquipmentId)
 
   useEffect(() => {
     let cancelled = false
@@ -342,8 +401,11 @@ export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boole
           mapped.find((item) => item.analysisId === preferredId) ||
           mapped[0] ||
           null
+        const pickerItems = mapEquipmentPickerItems(response, mapped)
         setSelectedAnalysisId(selected?.analysisId || "")
-        setSelectedEquipmentId(selected?.equipmentId || "")
+        setSelectedEquipmentId(
+          selected?.equipmentId || pickerItems[0]?.equipmentId || "",
+        )
       })
       .catch((error) => {
         if (cancelled) return
@@ -528,6 +590,14 @@ export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boole
       setSimulationOpen(true)
       return
     }
+    if (
+      actionDef.id === "safety_check_summary" &&
+      !readText(selectedContext?.equipmentId, selectedEquipmentId)
+    ) {
+      setActionError("설비를 먼저 선택해주세요.")
+      setMessages((prev) => [...prev, createChatMessage("assistant", "설비를 먼저 선택해주세요.")])
+      return
+    }
 
     setActionError("")
     setLoadingActionId(actionDef.id)
@@ -708,6 +778,11 @@ export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boole
 
   const sendSuggestionChip = async (question: string) => {
     if (!question.trim() || sending || loadingActionId) return
+    const matchedAction = ANALYSIS_QUICK_ACTIONS.find((item) => item.userMessage === question)
+    if (matchedAction) {
+      await executeAdvisorAction(matchedAction)
+      return
+    }
     const userMessage = createChatMessage("user", question)
     const nextMessages = [...messages, userMessage]
     setMessages(nextMessages)
@@ -795,11 +870,14 @@ export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boole
               <>
                 <AdvisorQuickActions
                   variant={isWorkspaceAdvisor ? "workspace" : "compact"}
-                  hasAnalysis={Boolean(selectedContext)}
+                  hasAnalysis={hasActiveContext}
                   loadingActionId={loadingActionId}
                   onChangeAnalysis={() => setAnalysisPickerOpen(true)}
                   onAction={(action) => void executeAdvisorAction(action)}
                 />
+                {latestSafetyCheckTotal !== null && (
+                  <p className="ff-advisor-quick-hint">등록된 점검 항목 {latestSafetyCheckTotal}건</p>
+                )}
                 {!isWorkspaceAdvisor && (
                   <div className="ff-advisor-chip-row">
                     {SUGGESTION_CHIPS.map((question) => (
@@ -1005,7 +1083,7 @@ export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boole
                 className="ff-advisor-start-task-btn"
                 onClick={() => void startNewChat()}
               >
-                새 작업 시작
+                새 채팅 시작
               </button>
             )}
           </article>
@@ -1020,59 +1098,20 @@ export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boole
           onSubmit={(input) => void handleSimulationSubmit(input)}
         />
 
-        {analysisPickerOpen && (
-        <section className="ff-advisor-agent-shell" aria-label="분석 선택">
-          <div className="ff-advisor-agent-stage" style={{ maxWidth: 720 }}>
-            <header className="ff-advisor-agent-header">
-              <div className="ff-advisor-brand-block">
-                <div>
-                  <span>ANALYSIS PICKER</span>
-                  <h2>분석 변경</h2>
-                </div>
-              </div>
-              <button type="button" onClick={() => setAnalysisPickerOpen(false)} aria-label="닫기">
-                ×
-              </button>
-            </header>
-            <main className="ff-advisor-agent-main">
-              <input
-                value={analysisSearch}
-                onChange={(event) => setAnalysisSearch(event.target.value)}
-                placeholder="설비명/analysis_id 검색"
-                style={{
-                  width: "100%",
-                  height: 46,
-                  borderRadius: 10,
-                  border: "1px solid #d0d5dd",
-                  padding: "0 12px",
-                  marginBottom: 10,
-                }}
-              />
-              <div style={{ display: "grid", gap: 8, maxHeight: "55vh", overflow: "auto" }}>
-                {filteredContexts.map((analysis) => (
-                  <button
-                    key={analysis.analysisId}
-                    type="button"
-                    className="ff-support-btn ghost"
-                    style={{ justifyContent: "space-between" }}
-                    onClick={() => {
-                      setSelectedAnalysisId(analysis.analysisId)
-                      setSelectedEquipmentId(analysis.equipmentId)
-                      setAnalysisPickerOpen(false)
-                    }}
-                  >
-                    <span>
-                      {analysis.equipmentName} · ROI {formatPercent(analysis.roiPct)}
-                    </span>
-                    <span>{formatDateTime(analysis.createdAt)}</span>
-                  </button>
-                ))}
-                {!filteredContexts.length && <p>검색 결과가 없습니다.</p>}
-              </div>
-            </main>
-          </div>
-        </section>
-      )}
+        <AnalysisPickerDialog
+          open={analysisPickerOpen}
+          search={analysisSearch}
+          items={filteredEquipmentPickerItems}
+          selectedEquipmentId={selectedEquipmentId}
+          selectedAnalysisId={selectedAnalysisId}
+          onSearchChange={setAnalysisSearch}
+          onClose={() => setAnalysisPickerOpen(false)}
+          onSelect={(item) => {
+            setSelectedEquipmentId(item.equipmentId)
+            setSelectedAnalysisId(item.analysisId)
+            setAnalysisPickerOpen(false)
+          }}
+        />
     </div>
   )
 

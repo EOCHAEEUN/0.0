@@ -69,6 +69,14 @@ export type GuestChatAction = {
   screen: AdvisorScreen
 }
 
+export type GuestSuggestionChip = {
+  id: string
+  label: string
+  message: string
+  action?: string
+  requiresEquipment?: boolean
+}
+
 export type AdvisorTopPick = {
   badge: string
   title: string

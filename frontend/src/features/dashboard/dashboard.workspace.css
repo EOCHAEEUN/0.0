@@ -11,6 +11,8 @@
 .ff-dashboard-layout {
   --ff-dashboard-sidebar-width: 248px;
   min-height: 100vh;
+  position: relative;
+  isolation: isolate;
 }
 
 .ff-dashboard-sidebar {
@@ -19,7 +21,8 @@
   position: fixed;
   top: 0;
   left: 0;
-  z-index: 20;
+  z-index: 2147483000;
+  pointer-events: auto !important;
   width: var(--ff-dashboard-sidebar-width);
   height: 100vh;
   padding: 28px 18px 24px;
@@ -187,6 +190,8 @@
   margin-left: var(--ff-dashboard-sidebar-width);
   padding: 24px 28px 40px;
   background: #f4f7f9;
+  position: relative;
+  z-index: 1;
 }
 
 .ff-dashboard-workspace-page .ff-dashboard-main-content,
@@ -1763,22 +1768,18 @@
     3 * var(--ff-analysis-row-height) + 2 * var(--ff-analysis-row-gap)
   );
   overflow-y: hidden;
-  padding-right: 4px;
-  scrollbar-gutter: stable;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 .ff-analysis-list-scroll.is-scrollable {
   overflow-y: auto;
-  padding-right: 6px;
 }
 
 .ff-analysis-list-scroll::-webkit-scrollbar {
-  width: 6px;
-}
-
-.ff-analysis-list-scroll::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: #cbd5e1;
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .ff-analysis-list-footer {

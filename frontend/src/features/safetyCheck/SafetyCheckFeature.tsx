@@ -1,3 +1,4 @@
+import { FileText, Wrench } from "lucide-react"
 import { useState } from "react"
 import DashboardWorkspaceSidebar from "../../components/layout/DashboardWorkspaceSidebar"
 import { useDashboardData } from "../dashboard/hooks/useDashboardData"
@@ -100,7 +101,8 @@ export default function SafetyCheckFeature() {
                   className={`tab-button ${activeTab === "equipment" ? "active" : ""}`}
                   onClick={() => switchTab("equipment")}
                 >
-                  📋 설비관리 탭
+                  <Wrench aria-hidden="true" size={16} />
+                  설비관리 탭
                 </button>
                 <button
                   type="button"
@@ -109,7 +111,8 @@ export default function SafetyCheckFeature() {
                   className={`tab-button ${activeTab === "application" ? "active" : ""}`}
                   onClick={() => switchTab("application")}
                 >
-                  📝 신청서 탭
+                  <FileText aria-hidden="true" size={16} />
+                  신청서 탭
                 </button>
               </div>
 

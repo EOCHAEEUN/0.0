@@ -1,5 +1,6 @@
 import { ChevronDown } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 
 import type { ApplicationDraftReportParams } from "../applicationDraft.contract"
 import type { ApplicationDraftWorkspaceModel } from "../hooks/useApplicationDraftWorkspace"
@@ -285,6 +286,7 @@ export function ApplicationDraftPdfPreview({
   }, [controlledPreviewOpen])
 
   const selectedDownloadCount = Object.values(downloadSelection).filter(Boolean).length
+  const canUseDom = typeof document !== "undefined"
 
   const downloadSelectedPdfs = async () => {
     if (downloading || selectedDownloadCount === 0 || !reportParams) return
@@ -400,7 +402,9 @@ export function ApplicationDraftPdfPreview({
         <div className="ff-draft-alert warning">{unavailableReason}</div>
       )}
 
-      {previewOpen && (
+      {previewOpen &&
+        canUseDom &&
+        createPortal(
         <div
           className="ff-pdf-modal-backdrop"
           role="dialog"
@@ -455,7 +459,8 @@ export function ApplicationDraftPdfPreview({
                 )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       {downloadDialogOpen && (
@@ -488,7 +493,7 @@ export function ApplicationDraftPdfPreview({
             <div className="ff-pdf-download-actions">
               <button
                 type="button"
-                className="ff-support-btn ghost"
+                className="ff-pdf-action-button outline"
                 onClick={() => setDownloadDialogOpen(false)}
                 disabled={downloading}
               >
@@ -496,7 +501,7 @@ export function ApplicationDraftPdfPreview({
               </button>
               <button
                 type="button"
-                className="btn blue"
+                className="ff-pdf-action-button primary"
                 disabled={selectedDownloadCount === 0 || downloading}
                 onClick={() => void downloadSelectedPdfs()}
               >

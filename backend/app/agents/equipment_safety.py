@@ -83,20 +83,26 @@ def build_safety_snapshot(
         or []
     )
 
-    legal_rule_rows = (
-        db.table("safety_rule_legal")
-        .select("rule_id,inspection_type,purpose")
-        .execute()
-        .data
-        or []
-    )
-    voluntary_rule_rows = (
-        db.table("safety_rule_voluntary")
-        .select("rule_id,inspection_type,purpose")
-        .execute()
-        .data
-        or []
-    )
+    def _load_rule_rows(table_name: str) -> list[dict[str, Any]]:
+        try:
+            return (
+                db.table(table_name)
+                .select("rule_id,inspection_type,inspection_purpose")
+                .execute()
+                .data
+                or []
+            )
+        except Exception:
+            return (
+                db.table(table_name)
+                .select("rule_id,inspection_type,purpose")
+                .execute()
+                .data
+                or []
+            )
+
+    legal_rule_rows = _load_rule_rows("safety_rule_legal")
+    voluntary_rule_rows = _load_rule_rows("safety_rule_voluntary")
 
     preview_items = [
         item

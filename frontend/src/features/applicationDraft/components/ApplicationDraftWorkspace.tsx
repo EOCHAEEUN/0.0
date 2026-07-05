@@ -4,14 +4,12 @@ import { ApplicationDraftSummary } from "./ApplicationDraftSummary"
 
 export function ApplicationDraftWorkspace({
   model,
-  onGoRoi,
 }: {
   model: ApplicationDraftWorkspaceModel
-  onGoRoi: () => void
 }) {
   return (
     <section className="ff-draft-workspace ff-draft-workspace-v2">
-      <ApplicationDraftSummary model={model} onGoRoi={onGoRoi} />
+      <ApplicationDraftSummary model={model} />
       <ApplicationDraftSafetyEvidence model={model} />
     </section>
   )

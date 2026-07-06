@@ -24,6 +24,7 @@ from app.models.auth import CurrentUser
 from app.models.company import CompanyContext
 from app.models.equipment import EquipmentInput
 from app.state import FactofitState
+from app.services.policy_support_summary import load_policy_support_summary
 from app.tools.query_builder import build_policy_queries_from_roi
 from app.tools.roi_calc import calculate_roi
 
@@ -873,6 +874,7 @@ async def analyze(
         for policy in frontend_matched_policies
         if (policy_id := _policy_id(policy) or policy.get("policy_id") or policy.get("id"))
     ]
+    policy_support_summary = load_policy_support_summary(db, policy_ids)
     policy_details = _fetch_policy_details_for_snapshot(db, policy_ids)
     policy_snapshot = _build_policy_snapshot(
         analysis_id=analysis_id,
@@ -955,6 +957,7 @@ async def analyze(
             # 프론트가 사용하는 값은 항상 정책 반영 final ROI
             "roi_result": roi_result,
             "policy_applications": roi_result.get("policy_applications", {}),
+            "policy_support_summary": policy_support_summary,
             "matched_policies": frontend_matched_policies,
             "policies": frontend_matched_policies,
             "raw_candidates": frontend_raw_candidates,

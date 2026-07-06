@@ -23,19 +23,98 @@ SUPPORT_TYPES = {
 }
 
 CAPEX_KEYWORDS = (
-    "설비구매",
-    "설비 구매",
-    "설비도입",
-    "설비 도입",
-    "장비구매",
-    "장비 구매",
-    "장비도입",
-    "장비 도입",
-    "시설개선",
-    "시설 개선",
-    "기계구입",
-    "기계 구입",
+    "설비",
+    "장비",
+    "시설",
+    "자동화",
+    "제조로봇",
+    "로봇",
+    "금형",
+    "공정",
     "생산설비",
+    "안전장비",
+    "방호장치",
+    "보호구",
+    "작업환경 개선",
+    "환경개선 시설",
+    "인프라 구축",
+    "계측기",
+    "제어장치",
+    "에너지관리시스템",
+    "설치공사",
+    "스마트공장",
+    "dx retrofit",
+    "제조운영 시스템",
+)
+
+NON_CAPEX_KEYWORDS = (
+    "시험",
+    "분석",
+    "검사",
+    "인증",
+    "수수료",
+    "출원",
+    "특허",
+    "상표",
+    "지식재산",
+    "심판",
+    "소송",
+    "평가",
+    "실사",
+    "컨설팅",
+    "멘토링",
+    "교육",
+    "훈련",
+    "마케팅",
+    "홍보",
+    "전시",
+    "박람회",
+    "브랜드",
+    "디자인",
+    "콘텐츠",
+    "영상",
+    "인건비",
+    "고용",
+    "근로자",
+    "휴직",
+    "출산",
+    "육아",
+    "보험",
+    "관광",
+    "여행",
+    "인센티브",
+    "r&d",
+    "연구개발",
+    "기술개발",
+    "사업화",
+    "시제품",
+    "poc",
+    "실증",
+    "데이터 구매",
+    "saas",
+    "secaas",
+    "sw 임차",
+    "운영비",
+    "프로그램 운영",
+)
+
+R_AND_D_KEYWORDS = (
+    "r&d",
+    "연구개발",
+    "기술개발",
+    "사업화",
+    "시제품",
+    "poc",
+    "실증",
+)
+
+SERVICE_OR_OPERATING_KEYWORDS = (
+    "데이터 구매",
+    "saas",
+    "secaas",
+    "sw 임차",
+    "운영비",
+    "프로그램 운영",
 )
 
 
@@ -182,8 +261,6 @@ def _classify_support_type(source: dict[str, Any]) -> str:
         )
     ):
         return "interest_support"
-    if explicit in exact:
-        return exact[explicit]
     if any(word in detail for word in ("신용보증", "보증서", "보증지원")):
         return "guarantee"
     if any(word in detail for word in ("융자", "정책자금", "대출")):
@@ -196,6 +273,39 @@ def _classify_support_type(source: dict[str, Any]) -> str:
         return "education"
     if any(word in detail for word in ("시험", "인증", "성능평가", "검사", "분석")):
         return "testing_certification"
+    if any(
+        word in detail
+        for word in (
+            "특허",
+            "상표",
+            "출원",
+            "지식재산",
+            "심판",
+            "소송",
+            "실사",
+            "보험",
+            "인건비",
+            "고용",
+            "근로자",
+            "휴직",
+            "출산",
+            "육아",
+            "마케팅",
+            "홍보",
+            "전시",
+            "박람회",
+            "브랜드",
+            "디자인",
+            "콘텐츠",
+            "영상",
+            "관광",
+            "여행",
+            "인센티브",
+        )
+    ):
+        return "other"
+    if explicit in exact:
+        return exact[explicit]
     if any(word in detail for word in ("공동장비", "장비활용", "시설이용", "공간제공")):
         return "equipment_access"
     if explicit in {"현물서비스", "non_cash"} or any(
@@ -209,14 +319,42 @@ def _classify_support_type(source: dict[str, Any]) -> str:
     return "other"
 
 
-def _is_capex_candidate(source: dict[str, Any]) -> bool:
-    if source.get("roi_deductible") is True:
-        return True
-    context = " ".join(
+def _source_context(source: dict[str, Any]) -> str:
+    return " ".join(
         _text(source.get(key))
-        for key in ("name", "subtype", "evidence", "category", "amount_role")
-    )
-    return any(keyword in context for keyword in CAPEX_KEYWORDS)
+        for key in ("name", "subtype", "evidence")
+    ).lower()
+
+
+def _matching_keywords(context: str, keywords: tuple[str, ...]) -> list[str]:
+    return [keyword for keyword in keywords if keyword in context]
+
+
+def _capex_assessment(source: dict[str, Any]) -> dict[str, Any]:
+    context = _source_context(source)
+    positive = _matching_keywords(context, CAPEX_KEYWORDS)
+    excluded = _matching_keywords(context, NON_CAPEX_KEYWORDS)
+    r_and_d = _matching_keywords(context, R_AND_D_KEYWORDS)
+    non_r_and_d_excluded = [
+        keyword for keyword in excluded if keyword not in R_AND_D_KEYWORDS
+    ]
+    return {
+        "positive": positive,
+        "excluded": excluded,
+        "r_and_d": r_and_d,
+        "non_r_and_d_excluded": non_r_and_d_excluded,
+        "service_or_operating": _matching_keywords(
+            context, SERVICE_OR_OPERATING_KEYWORDS
+        ),
+        "roi_deductible": source.get("roi_deductible") is True,
+        "is_capex": bool(positive)
+        and not non_r_and_d_excluded
+        and (not excluded or bool(r_and_d)),
+    }
+
+
+def _is_capex_candidate(source: dict[str, Any]) -> bool:
+    return bool(_capex_assessment(source)["is_capex"])
 
 
 def _policy_reference(policy: dict[str, Any]) -> dict[str, Any]:
@@ -258,29 +396,61 @@ def _build_candidate(
     reasons: list[str] = []
     proposed_method = "none"
     cap_amount: float | None = None
+    assessment = _capex_assessment(source)
 
     if support_type in {"direct_grant", "voucher"}:
-        capex = _is_capex_candidate(source)
-        if capex and amount is not None:
+        has_package_terms = amount is not None or ratio is not None
+        capex = assessment["is_capex"] and has_package_terms
+        if capex:
             cap_amount = amount
-            if ratio is not None:
+            effect_layer = "capex_offset"
+            if ratio is not None and amount is not None:
                 effect_layer = "capex_offset"
                 calculation_method = "ratio_cap"
                 proposed_method = "ratio_cap"
-            else:
-                effect_layer = "capex_offset"
+            elif amount is not None:
                 calculation_method = "fixed_cap"
                 proposed_method = "subtract"
+            else:
+                calculation_method = "ratio_cap"
+                _append_once(flags, "missing_amount")
+                _append_once(
+                    reasons,
+                    "지원율은 있으나 package 자체의 지원 한도가 없어 ROI 방식을 제안하지 않았습니다.",
+                )
+            if assessment["r_and_d"]:
+                _append_once(flags, "manual_capex_review_required")
+                _append_once(
+                    reasons,
+                    "R&D·시제품·실증·사업화 항목에 명시적 CAPEX 지출 근거가 함께 있어 수동 검토가 필요합니다.",
+                )
         else:
             effect_layer = "reference_only"
-            calculation_method = "none"
-            if amount is None:
+            calculation_method = "qualitative"
+            if not has_package_terms:
                 _append_once(flags, "missing_amount")
-            if not capex:
+            if assessment["positive"] and assessment["excluded"]:
+                _append_once(flags, "capex_keyword_conflict")
+                _append_once(
+                    reasons,
+                    "CAPEX 긍정 키워드와 비CAPEX 제외 키워드가 함께 있어 자동 CAPEX 후보에서 제외했습니다.",
+                )
+            elif assessment["r_and_d"]:
                 _append_once(flags, "non_capex_expense_unknown")
                 _append_once(
                     reasons,
-                    "CAPEX 적격 비용 여부가 확인되지 않았습니다.",
+                    "R&D·시제품·실증·사업화 비용은 설비 투자비와 직접 연결되는지 별도 확인이 필요합니다.",
+                )
+            else:
+                _append_once(flags, "non_capex_support_scope")
+                _append_once(reasons, "명시적인 설비·장비·시설·공정 CAPEX 근거가 없습니다.")
+            if assessment["service_or_operating"]:
+                _append_once(flags, "service_or_operating_cost")
+            if assessment["roi_deductible"] and not assessment["positive"]:
+                _append_once(flags, "roi_deductible_not_sufficient")
+                _append_once(
+                    reasons,
+                    "roi_deductible=true만으로는 CAPEX 직접 차감 근거가 충분하지 않습니다.",
                 )
     elif support_type == "loan":
         effect_layer = "financing_effect"
@@ -315,9 +485,25 @@ def _build_candidate(
         )
     else:
         effect_layer = "reference_only"
-        calculation_method = "none"
+        calculation_method = "qualitative"
         _append_once(flags, "ambiguous_support_type")
         _append_once(reasons, "지원 유형이 원문상 모호합니다.")
+
+    if (
+        support_type not in {"direct_grant", "voucher"}
+        and assessment["positive"]
+        and assessment["excluded"]
+    ):
+        _append_once(flags, "capex_keyword_conflict")
+        _append_once(
+            reasons,
+            "CAPEX 긍정 키워드와 비CAPEX 제외 키워드가 함께 있어 자동 CAPEX 후보에서 제외했습니다.",
+        )
+    if (
+        support_type not in {"direct_grant", "voucher"}
+        and assessment["roi_deductible"]
+    ):
+        _append_once(flags, "roi_deductible_not_sufficient")
 
     if ratio is None and calculation_method == "ratio_cap":
         _append_once(flags, "missing_rate")
@@ -510,6 +696,49 @@ def build_dry_run_report(
         for item in resolved
         for flag in item.quality_flags
     )
+    scope_keywords = {
+        "testing_certification_ip": (
+            "시험",
+            "분석",
+            "검사",
+            "인증",
+            "특허",
+            "상표",
+            "출원",
+            "지식재산",
+            "심판",
+            "소송",
+        ),
+        "consulting_education_mentoring": ("컨설팅", "멘토링", "교육", "훈련"),
+        "employment_insurance_marketing": (
+            "인건비",
+            "고용",
+            "근로자",
+            "보험",
+            "마케팅",
+            "홍보",
+            "전시",
+            "박람회",
+            "브랜드",
+            "디자인",
+            "콘텐츠",
+        ),
+        "research_prototype_poc": R_AND_D_KEYWORDS,
+    }
+    scope_roi_candidate_counts = {
+        name: sum(
+            item.proposed_roi_apply_method != "none"
+            and any(
+                keyword
+                in _source_context(
+                    _mapping(item.source_component_json.get("component"))
+                )
+                for keyword in keywords
+            )
+            for item in resolved
+        )
+        for name, keywords in scope_keywords.items()
+    }
 
     return {
         "processed_policy_count": len(policies),
@@ -555,6 +784,7 @@ def build_dry_run_report(
         "duplicate_component_key_count": duplicate_key_count,
         "quality_flag_counts": dict(sorted(quality_flags.items())),
         "review_reason_counts": dict(sorted(review_reasons.items())),
+        "scope_roi_candidate_counts": scope_roi_candidate_counts,
         "candidates_per_policy_distribution": {
             str(count): policies_count
             for count, policies_count in sorted(distribution.items())

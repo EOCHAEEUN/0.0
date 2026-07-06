@@ -19,6 +19,12 @@ from app.services.policy_component_candidate import (  # noqa: E402
     build_dry_run_samples,
     extract_component_candidates,
 )
+from app.services.policy_component_review_queue import (  # noqa: E402
+    build_review_queue_payload,
+    build_review_queue_summary,
+    write_review_queue_csv,
+    write_review_queue_json,
+)
 
 
 def _load_policies(path: Path) -> list[dict[str, Any]]:
@@ -116,6 +122,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="지정한 경우에만 후보와 집계 JSON을 파일로 저장",
     )
     parser.add_argument("--output-csv", type=Path, help="지정한 경우에만 후보 CSV 저장")
+    parser.add_argument(
+        "--review-queue-csv",
+        type=Path,
+        help="지정한 경우에만 CAPEX 수동 검토 큐 CSV 저장",
+    )
+    parser.add_argument(
+        "--review-queue-json",
+        type=Path,
+        help="지정한 경우에만 CAPEX 수동 검토 큐 JSON 저장",
+    )
     parser.add_argument("--show-samples", type=int, default=5)
     return parser
 
@@ -151,9 +167,27 @@ def main() -> int:
     if args.output_csv:
         _write_csv(args.output_csv, candidates)
 
+    review_queue_summary = None
+    if args.review_queue_csv or args.review_queue_json:
+        review_payload = build_review_queue_payload(policies, candidates)
+        review_queue = review_payload["candidates"]
+        if args.review_queue_csv:
+            write_review_queue_csv(args.review_queue_csv, review_queue)
+        if args.review_queue_json:
+            write_review_queue_json(args.review_queue_json, review_payload)
+        review_queue_summary = build_review_queue_summary(
+            review_queue,
+            csv_path=args.review_queue_csv,
+            json_path=args.review_queue_json,
+        )
+
     print(
         json.dumps(
-            {"report": report, "samples": samples},
+            {
+                "report": report,
+                "samples": samples,
+                "review_queue_summary": review_queue_summary,
+            },
             ensure_ascii=False,
             indent=2,
         )

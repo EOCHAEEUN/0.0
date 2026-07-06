@@ -54,11 +54,44 @@ export type RoiApiData = {
 export type AnalyzeApiData = {
   roi_result?: RoiApiData | null
   roi_data?: RoiApiData | null
+  policy_support_summary?: PolicySupportSummary | null
   matched_policies?: unknown[]
   policies?: unknown[]
   raw_candidates?: unknown[]
   total_candidates?: number
   response?: string
+}
+
+export type PolicySupportItem = {
+  id?: string
+  policy_id?: string
+  component_key?: string
+  component_name?: string
+  support_type?: string
+  effect_layer?: string
+  calculation_method?: string
+  review_status?: string
+  roi_apply_method?: string
+  fixed_amount_manwon?: number | null
+  cap_amount_manwon?: number | null
+  support_ratio?: number | null
+  eligible_cost_ratio?: number | null
+  evidence_text?: string | null
+  applied_amount_manwon?: number
+  roi_effect_applied?: boolean
+}
+
+export type PolicySupportLayer = {
+  items?: PolicySupportItem[]
+  pending_count?: number
+  approved_count?: number
+  roi_effect_applied?: boolean
+}
+
+export type PolicySupportSummary = {
+  business_roi_support?: PolicySupportLayer
+  financing_support?: PolicySupportLayer
+  execution_support?: PolicySupportLayer
 }
 
 export type RoiApiResponse = {

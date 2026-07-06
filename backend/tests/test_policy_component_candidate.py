@@ -226,6 +226,12 @@ def test_dry_run_report_has_no_auto_approval():
     assert report["reference_non_none_roi_count"] == 0
     assert report["suspected_policy_amount_duplication_count"] == 0
     assert report["duplicate_component_key_count"] == 0
+    assert report["scope_roi_candidate_counts"] == {
+        "testing_certification_ip": 0,
+        "consulting_education_mentoring": 0,
+        "employment_insurance_marketing": 0,
+        "research_prototype_poc": 0,
+    }
     assert report["safety_checks_passed"] is True
 
 
@@ -243,6 +249,178 @@ def test_dry_run_samples_are_bounded():
 
     assert len(samples["type_samples"]["loan"]) == 1
     assert len(samples["quality_flag_samples"]["missing_rate"]) == 2
+
+
+def test_explicit_manufacturing_capex_packages_can_propose_roi_methods():
+    cases = [
+        (
+            _package(
+                "현금보조",
+                "제조로봇 도입 지원",
+                amount_numeric_manwon=5000,
+                support_ratio=50,
+            ),
+            "ratio_cap",
+        ),
+        (
+            _package(
+                "바우처",
+                "스마트공장 장비 구축 지원",
+                amount_numeric_manwon=3000,
+            ),
+            "subtract",
+        ),
+    ]
+
+    for package, expected_method in cases:
+        candidate = extract_policy_component_candidates(_policy([package]))[0]
+        assert candidate.effect_layer == "capex_offset"
+        assert candidate.proposed_roi_apply_method == expected_method
+        assert candidate.review_status == "pending"
+
+
+def test_testing_certification_and_ip_costs_are_never_roi_candidates():
+    cases = [
+        ("현금보조", "시험분석 수수료", "testing_certification"),
+        ("현금보조", "인증 수수료", "testing_certification"),
+        ("현금보조", "특허·상표 출원비", "other"),
+    ]
+
+    for raw_type, name, expected_type in cases:
+        candidate = extract_policy_component_candidates(
+            _policy(
+                [
+                    _package(
+                        raw_type,
+                        name,
+                        amount_numeric_manwon=1000,
+                        roi_deductible=True,
+                    )
+                ]
+            )
+        )[0]
+        assert candidate.support_type == expected_type
+        assert candidate.effect_layer == "reference_only"
+        assert candidate.proposed_roi_apply_method == "none"
+
+
+def test_consulting_marketing_employment_and_insurance_are_non_capex():
+    cases = [
+        ("M&A 실사 컨설팅", {"execution_support", "reference_only"}),
+        ("해외마케팅 디자인 콘텐츠 제작", {"reference_only"}),
+        ("인건비 고용지원", {"reference_only"}),
+        ("수출 보험료 지원", {"reference_only"}),
+    ]
+
+    for name, expected_layers in cases:
+        candidate = extract_policy_component_candidates(
+            _policy(
+                [
+                    _package(
+                        "현금보조",
+                        name,
+                        amount_numeric_manwon=1000,
+                        roi_deductible=True,
+                    )
+                ]
+            )
+        )[0]
+        assert candidate.effect_layer in expected_layers
+        assert candidate.proposed_roi_apply_method == "none"
+
+
+def test_research_and_prototype_default_to_reference_only():
+    for name in ("R&D 연구개발", "시제품 제작", "PoC 실증 사업화"):
+        candidate = extract_policy_component_candidates(
+            _policy(
+                [
+                    _package(
+                        "현금보조",
+                        name,
+                        amount_numeric_manwon=2000,
+                        roi_deductible=True,
+                    )
+                ]
+            )
+        )[0]
+        assert candidate.effect_layer == "reference_only"
+        assert candidate.proposed_roi_apply_method == "none"
+        assert "non_capex_expense_unknown" in candidate.quality_flags
+        assert any("별도 확인" in reason for reason in candidate.review_reasons)
+
+
+def test_capex_and_consulting_keyword_conflict_is_not_auto_capex():
+    candidate = extract_policy_component_candidates(
+        _policy(
+            [
+                _package(
+                    "현금보조",
+                    "설비 구축 및 컨설팅",
+                    amount_numeric_manwon=4000,
+                    roi_deductible=True,
+                )
+            ]
+        )
+    )[0]
+
+    assert candidate.effect_layer != "capex_offset"
+    assert candidate.proposed_roi_apply_method == "none"
+    assert "capex_keyword_conflict" in candidate.quality_flags
+
+
+def test_research_with_explicit_equipment_requires_manual_capex_review():
+    candidate = extract_policy_component_candidates(
+        _policy(
+            [
+                _package(
+                    "현금보조",
+                    "R&D 생산설비 도입",
+                    amount_numeric_manwon=4000,
+                )
+            ]
+        )
+    )[0]
+
+    assert candidate.effect_layer == "capex_offset"
+    assert candidate.proposed_roi_apply_method == "subtract"
+    assert "manual_capex_review_required" in candidate.quality_flags
+    assert candidate.review_status == "pending"
+
+
+def test_roi_deductible_alone_does_not_make_capex_candidate():
+    candidate = extract_policy_component_candidates(
+        _policy(
+            [
+                _package(
+                    "현금보조",
+                    "일반 운영지원",
+                    amount_numeric_manwon=1000,
+                    roi_deductible=True,
+                )
+            ]
+        )
+    )[0]
+
+    assert candidate.effect_layer == "reference_only"
+    assert candidate.proposed_roi_apply_method == "none"
+    assert "roi_deductible_not_sufficient" in candidate.quality_flags
+
+
+def test_financial_education_and_mentoring_classification_regression():
+    cases = [
+        ("융자", "시설자금 융자", "loan", "financing_effect"),
+        ("보증", "신용보증", "guarantee", "financing_effect"),
+        ("현물서비스", "재직자 교육", "education", "execution_support"),
+        ("현물서비스", "현장 멘토링", "mentoring", "execution_support"),
+    ]
+
+    for raw_type, name, support_type, effect_layer in cases:
+        candidate = extract_policy_component_candidates(
+            _policy([_package(raw_type, name, amount_numeric_manwon=1000)])
+        )[0]
+        assert candidate.support_type == support_type
+        assert candidate.effect_layer == effect_layer
+        assert candidate.proposed_roi_apply_method == "none"
 
 
 class _FakeResult:

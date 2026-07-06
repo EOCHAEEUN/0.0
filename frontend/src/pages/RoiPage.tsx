@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom"
 import { fetchAnalysisEntryContext, fetchAnalysisResultSnapshot } from "../features/onboarding/onboardingAnalysisApi"
 import { getAnalysisResult } from "../features/onboarding/onboardingState"
@@ -11,6 +11,11 @@ import {
 } from "../features/roi/components/RoiAnalysisResultView"
 import { RoiWorkspaceViews } from "../features/roi/components/RoiWorkspaceViews"
 import { buildRoiPath, type RoiView } from "../features/roi/roiPaths"
+import {
+  readPolicySupportSummaryFromAnalysisCache,
+  resolvePolicySupportSummary,
+} from "../features/roi/roi.utils"
+import type { PolicySupportSummary } from "../features/roi/roi.contract"
 import type { AnalysisResultSnapshot } from "../features/onboarding/onboardingState"
 import "../features/dashboard/dashboard.workspace.css"
 import "../features/roi/roi.workspace.css"
@@ -26,6 +31,16 @@ function getNum(rec: Record<string, unknown>, ...keys: string[]): number | null 
     if (typeof v === "number" && Number.isFinite(v) && v > 0) return v
   }
   return null
+}
+
+function getPolicySupportSummaryItemCount(summary: PolicySupportSummary | null | undefined) {
+  if (!summary) return 0
+
+  return (
+    (summary.business_roi_support?.items?.length ?? 0) +
+    (summary.financing_support?.items?.length ?? 0) +
+    (summary.execution_support?.items?.length ?? 0)
+  )
 }
 
 // 0도 유효한 숫자로 처리 (지원금 0원 = "지원 없음"을 명시적으로 구분)
@@ -250,6 +265,9 @@ export default function RoiPage({ view = "strategy" }: { view?: RoiView }) {
     Boolean(analysisId && !getAnalysisResult(analysisId)),
   )
   const [loadFailed, setLoadFailed] = useState(false)
+  const [policySupportSnapshotSummary, setPolicySupportSnapshotSummary] =
+    useState<PolicySupportSummary | null>(null)
+  const policySupportSnapshotFetchKeyRef = useRef("")
   const { dashboard } = useDashboardData({ preferredAnalysisId: analysisId })
   const workspace = dashboard.workspace
   const result = resolvedResult
@@ -304,6 +322,42 @@ export default function RoiPage({ view = "strategy" }: { view?: RoiView }) {
     }
   }, [analysisId])
 
+  useEffect(() => {
+    const currentId = analysisId || resolvedResult?.id
+    if (!currentId) return
+
+    const currentSummary = resolvePolicySupportSummary(
+      policySupportSnapshotSummary,
+      resolvedResult?.policy_support_summary,
+      resolvedResult,
+      resolvedResult?.roiResult,
+      readPolicySupportSummaryFromAnalysisCache(currentId),
+    )
+    if (getPolicySupportSummaryItemCount(currentSummary) > 0) return
+    const fetchKey = `${currentId}:${getPolicySupportSummaryItemCount(currentSummary)}`
+    if (policySupportSnapshotFetchKeyRef.current === fetchKey) return
+    policySupportSnapshotFetchKeyRef.current = fetchKey
+
+    let cancelled = false
+    void fetchAnalysisResultSnapshot(currentId)
+      .then((snapshot) => {
+        if (cancelled || !snapshot) return
+        const snapshotSummary = resolvePolicySupportSummary(
+          snapshot.policy_support_summary,
+          snapshot,
+          snapshot.roiResult,
+        )
+        setPolicySupportSnapshotSummary(snapshotSummary)
+      })
+      .catch((error) => {
+        console.warn("정책 지원 구성 표시 데이터를 불러오지 못했습니다.", error)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [analysisId, resolvedResult, policySupportSnapshotSummary])
+
   if (isLoadingResult) {
     return (
       <main className="page ff-dashboard-workspace-page">
@@ -325,6 +379,13 @@ export default function RoiPage({ view = "strategy" }: { view?: RoiView }) {
 
   const resultRecord = result as Record<string, unknown>
   const roiResult = asRecord(result.roiResult)
+  const policySupportSummary = resolvePolicySupportSummary(
+    policySupportSnapshotSummary,
+    result.policy_support_summary,
+    result,
+    result.roiResult,
+    readPolicySupportSummaryFromAnalysisCache(analysisId),
+  )
   const rec = normalizeRec(roiResult.recommended ?? resultRecord.recommendedScenario)
   const topLevelRoi = (result as Record<string, unknown>).roiPct as number ?? null
   const topLevelPayback = (result as Record<string, unknown>).paybackYears as number ?? null
@@ -633,6 +694,8 @@ export default function RoiPage({ view = "strategy" }: { view?: RoiView }) {
             evidenceTitle={evidenceHeadline}
             evidenceBullets={evidenceBullets}
             evidenceMetrics={evidenceMetrics}
+            policySupportSummary={policySupportSummary}
+            policySupportPolicies={canonicalPolicies}
             reanalysisError={reanalysisError}
             isResolvingReanalysis={isResolvingReanalysis}
             onSupportProjects={() => navigate(supportProjectsPath)}

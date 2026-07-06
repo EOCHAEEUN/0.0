@@ -23,6 +23,10 @@ from app.core.database import get_db
 from app.models.auth import CurrentUser
 from app.models.company import CompanyContext
 from app.models.equipment import EquipmentInput
+from app.services.policy_snapshot_hydration import (
+    hydrate_canonical_policies_from_public_policy,
+    hydrate_policy_snapshot_for_response,
+)
 from app.state import FactofitState
 from app.services.policy_support_summary import load_policy_support_summary
 from app.tools.query_builder import build_policy_queries_from_roi
@@ -402,6 +406,11 @@ def _format_raw_policy_candidate_for_frontend(policy: dict) -> dict:
 
 
 def _score_to_percent(policy: dict) -> int:
+    """raw 매칭 점수(0~약 1.3 유사도 스케일)를 화면 표시용 0~100 percent로 변환한다.
+
+    입력은 항상 매칭 파이프라인의 raw 점수다. 값 크기로 스케일을 추론하지 않고
+    일괄 *100 후 0~100으로 클램프한다(1.0 초과 보너스 구간은 100으로 표시).
+    """
     value = policy.get(
         "hybrid_score",
         policy.get(
@@ -413,9 +422,7 @@ def _score_to_percent(policy: dict) -> int:
         numeric = float(value)
     except (TypeError, ValueError):
         numeric = 0
-    if numeric <= 1:
-        numeric *= 100
-    return int(max(0, min(100, round(numeric))))
+    return int(max(0, min(100, round(numeric * 100))))
 
 
 def _snapshot_optional_text(value: Any) -> Optional[str]:
@@ -459,6 +466,7 @@ def _build_snapshot_policy_item(
 
     return {
         "policy_id": policy_id,
+        "id": policy_id,
         "title": _first_text(
             matched_policy.get("title"),
             policy_detail.get("title"),
@@ -494,10 +502,56 @@ def _build_snapshot_policy_item(
             default=len(required_documents_json),
         ),
         "support_items": support_items,
+        "support_method": _first_value(
+            matched_policy.get("support_method"),
+            policy_detail.get("support_method"),
+        ),
+        "support_primary_category": _snapshot_optional_text(
+            _first_value(
+                matched_policy.get("support_primary_category"),
+                policy_detail.get("support_primary_category"),
+            )
+        ),
+        "support_categories": _snapshot_json_list(
+            _first_value(
+                matched_policy.get("support_categories"),
+                policy_detail.get("support_categories"),
+            )
+        ),
+        "roi_support_type": _snapshot_optional_text(
+            _first_value(
+                matched_policy.get("roi_support_type"),
+                policy_detail.get("roi_support_type"),
+            )
+        ),
+        "policy_primary_nature": _snapshot_optional_text(
+            _first_value(
+                matched_policy.get("policy_primary_nature"),
+                policy_detail.get("policy_primary_nature"),
+            )
+        ),
+        "max_amount_type_ko": _snapshot_optional_text(
+            _first_value(
+                matched_policy.get("max_amount_type_ko"),
+                policy_detail.get("max_amount_type_ko"),
+            )
+        ),
         "max_amount_actual": _snapshot_optional_text(
             policy_detail.get("max_amount_actual")
         ),
+        "support_ratio": _first_value(
+            matched_policy.get("support_ratio"),
+            policy_detail.get("support_ratio"),
+        ),
         "max_amount_numeric_manwon": _snapshot_int(max_amount_numeric),
+        # 프론트 금액 표시 계약: POST 응답(스냅샷 아이템 원형)과
+        # GET 변환 응답(_snapshot_policy_item_to_response)이 같은 키를 갖도록 유지한다.
+        "max_amount": (
+            _snapshot_int(max_amount_numeric)
+            if max_amount_numeric is not None
+            else _snapshot_optional_text(policy_detail.get("max_amount_actual"))
+        ),
+        "max_amount_manwon": _snapshot_int(max_amount_numeric),
         "deadline": _snapshot_optional_text(
             _first_value(
                 matched_policy.get("deadline"),
@@ -591,11 +645,13 @@ def _fetch_policy_details_for_snapshot(
         result = (
             db.table("policy")
             .select(
-                "policy_id,title,organization,agency,provider,summary,"
+                "policy_id,title,organization,summary,"
                 "eligibility_text,required_documents_json,required_documents_count,"
                 "support_items,max_amount,max_amount_actual,deadline,deadline_display,"
-                "url,source_url,policy_category,policy_subcategory,source_name,"
-                "safety_justification_usable"
+                "url,policy_category,policy_subcategory,source_name,"
+                "safety_justification_usable,support_method,"
+                "support_primary_category,support_categories,roi_support_type,"
+                "policy_primary_nature,max_amount_type_ko,support_ratio"
             )
             .in_("policy_id", unique_ids)
             .execute()
@@ -883,6 +939,11 @@ async def analyze(
         matched_policies=frontend_matched_policies,
         policy_details=policy_details,
     )
+    hydrated_frontend_policies = policy_snapshot.get("policies") or (
+        hydrate_canonical_policies_from_public_policy(db, frontend_matched_policies)
+        if frontend_matched_policies
+        else frontend_matched_policies
+    )
 
     try:
         snapshot_update_result = (
@@ -958,8 +1019,8 @@ async def analyze(
             "roi_result": roi_result,
             "policy_applications": roi_result.get("policy_applications", {}),
             "policy_support_summary": policy_support_summary,
-            "matched_policies": frontend_matched_policies,
-            "policies": frontend_matched_policies,
+            "matched_policies": hydrated_frontend_policies,
+            "policies": hydrated_frontend_policies,
             "raw_candidates": frontend_raw_candidates,
             "total_candidates": len(raw_candidates),
             "policy_status": policy_status,
@@ -1168,7 +1229,11 @@ def _is_empty_policy_snapshot(snapshot: Any) -> bool:
 
 def _snapshot_policy_item_to_response(item: dict) -> dict:
     policy_id = normalize_policy_id(item.get("policy_id"))
-    max_amount = item.get("max_amount_numeric_manwon")
+    # 신규 스냅샷은 max_amount를 직접 저장하므로 그대로 사용해 POST 응답과 일치시키고,
+    # 과거 스냅샷은 기존 numeric/actual 폴백을 유지한다.
+    max_amount = item.get("max_amount")
+    if max_amount is None:
+        max_amount = item.get("max_amount_numeric_manwon")
     if max_amount is None:
         max_amount = item.get("max_amount_actual")
 
@@ -1190,6 +1255,13 @@ def _snapshot_policy_item_to_response(item: dict) -> dict:
         "policy_subcategory": item.get("policy_subcategory"),
         "safety_justification_usable": item.get("safety_justification_usable"),
         "support_items": _snapshot_json_list(item.get("support_items")),
+        "support_method": item.get("support_method"),
+        "support_primary_category": item.get("support_primary_category"),
+        "support_categories": _snapshot_json_list(item.get("support_categories")),
+        "roi_support_type": item.get("roi_support_type"),
+        "policy_primary_nature": item.get("policy_primary_nature"),
+        "max_amount_type_ko": item.get("max_amount_type_ko"),
+        "support_ratio": item.get("support_ratio"),
         "required_documents_json": _snapshot_json_list(
             item.get("required_documents_json")
         ),
@@ -1219,6 +1291,13 @@ def _snapshot_policy_item_to_response(item: dict) -> dict:
         "policy_subcategory": item.get("policy_subcategory"),
         "safety_justification_usable": item.get("safety_justification_usable"),
         "support_items": metadata["support_items"],
+        "support_method": item.get("support_method"),
+        "support_primary_category": item.get("support_primary_category"),
+        "support_categories": metadata["support_categories"],
+        "roi_support_type": item.get("roi_support_type"),
+        "policy_primary_nature": item.get("policy_primary_nature"),
+        "max_amount_type_ko": item.get("max_amount_type_ko"),
+        "support_ratio": item.get("support_ratio"),
         "required_documents_json": metadata["required_documents_json"],
         "metadata": metadata,
     }
@@ -1271,7 +1350,7 @@ async def get_support_projects(
                 },
             )
 
-        snapshot = row.get("policy_snapshot")
+        snapshot = hydrate_policy_snapshot_for_response(db, row.get("policy_snapshot"))
         if _is_empty_policy_snapshot(snapshot):
             return JSONResponse(
                 status_code=409,

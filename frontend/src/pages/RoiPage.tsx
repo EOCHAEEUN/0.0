@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom"
 import { fetchAnalysisEntryContext, fetchAnalysisResultSnapshot } from "../features/onboarding/onboardingAnalysisApi"
-import { getAnalysisResult } from "../features/onboarding/onboardingState"
+import { getAnalysisResult, saveAnalysisResult } from "../features/onboarding/onboardingState"
 import { hydrateAccountData } from "../services/accountHydration"
 import { useDashboardData } from "../features/dashboard/hooks/useDashboardData"
 import DashboardWorkspaceSidebar from "../components/layout/DashboardWorkspaceSidebar"
@@ -41,6 +41,39 @@ function getPolicySupportSummaryItemCount(summary: PolicySupportSummary | null |
     (summary.financing_support?.items?.length ?? 0) +
     (summary.execution_support?.items?.length ?? 0)
   )
+}
+
+const POLICY_HYDRATION_KEYS = [
+  "support_items",
+  "support_method",
+  "support_primary_category",
+  "support_categories",
+  "roi_support_type",
+  "policy_primary_nature",
+  "max_amount_type_ko",
+  "max_amount_actual",
+  "support_ratio",
+]
+
+function hasMeaningfulPolicyValue(value: unknown) {
+  if (Array.isArray(value)) return value.length > 0
+  if (value && typeof value === "object") return Object.keys(value).length > 0
+  if (typeof value === "string") return value.trim().length > 0
+  return value !== null && value !== undefined
+}
+
+function policyHasHydratedSupportFields(policy: unknown) {
+  const record = asRecord(policy)
+  const metadata = asRecord(record.metadata)
+  return POLICY_HYDRATION_KEYS.some(
+    (key) => hasMeaningfulPolicyValue(record[key]) || hasMeaningfulPolicyValue(metadata[key]),
+  )
+}
+
+function shouldRefreshPolicyHydration(result: AnalysisResultSnapshot | null) {
+  const policies = Array.isArray(result?.policies) ? result.policies : []
+  if (policies.length === 0) return false
+  return !policies.some(policyHasHydratedSupportFields)
 }
 
 // 0도 유효한 숫자로 처리 (지원금 0원 = "지원 없음"을 명시적으로 구분)
@@ -129,6 +162,14 @@ function buildMetrics(rec: Record<string, unknown>): ScenarioMetrics {
   }
 }
 
+function getRoiPeriodLabel(rec: Record<string, unknown>): string {
+  const months =
+    typeof rec.roi_period_months === "number" && Number.isFinite(rec.roi_period_months)
+      ? Math.round(rec.roi_period_months)
+      : 12
+  return months === 12 ? "연간 기준" : `${months}개월 기준`
+}
+
 function extractPriorityPolicyId(policies: unknown): string | null {
   if (!Array.isArray(policies) || policies.length === 0) return null
   const first = policies[0] as Record<string, unknown>
@@ -140,6 +181,7 @@ function formatSubsidyDisplay(m: ScenarioMetrics): string {
   const s = m.subsidyStatus
   if (s === "applied" || s === "estimated") {
     if (m.subsidyRaw !== null && m.subsidyRaw > 0) {
+      if (m.subsidyRaw < 10) return "지원 조건 재확인"
       return `${Math.round(m.subsidyRaw).toLocaleString("ko-KR")}만원`
     }
     return "지원금 미반영"
@@ -277,41 +319,66 @@ export default function RoiPage({ view = "strategy" }: { view?: RoiView }) {
   const [isResolvingReanalysis, setIsResolvingReanalysis] = useState(false)
 
   useEffect(() => {
+    let cancelled = false
     const cached = getAnalysisResult(analysisId)
+    const shouldRefreshCachedPolicies =
+      Boolean(analysisId) && shouldRefreshPolicyHydration(cached)
     if (cached) {
-      setResolvedResult(cached)
-      setIsLoadingResult(false)
-      setLoadFailed(false)
-      return
+      queueMicrotask(() => {
+        if (cancelled) return
+        setResolvedResult(cached)
+        setIsLoadingResult(false)
+        setLoadFailed(false)
+      })
+      if (!shouldRefreshCachedPolicies) {
+        return () => {
+          cancelled = true
+        }
+      }
     }
 
     if (!analysisId) {
-      setResolvedResult(null)
-      setIsLoadingResult(false)
-      setLoadFailed(true)
-      return
+      queueMicrotask(() => {
+        if (cancelled) return
+        setResolvedResult(null)
+        setIsLoadingResult(false)
+        setLoadFailed(true)
+      })
+      return () => {
+        cancelled = true
+      }
     }
 
-    let cancelled = false
-    setIsLoadingResult(true)
-    setLoadFailed(false)
+    queueMicrotask(() => {
+      if (cancelled) return
+      setIsLoadingResult(!cached)
+      setLoadFailed(false)
+    })
 
     void fetchAnalysisResultSnapshot(analysisId)
       .then((snapshot) => {
         if (cancelled) return
         if (snapshot) {
-          setResolvedResult(snapshot)
+          const nextSnapshot =
+            shouldRefreshCachedPolicies && snapshot.policies?.some(policyHasHydratedSupportFields)
+              ? saveAnalysisResult(snapshot)
+              : snapshot
+          setResolvedResult(nextSnapshot)
           setLoadFailed(false)
         } else {
-          setResolvedResult(null)
-          setLoadFailed(true)
+          if (!cached) {
+            setResolvedResult(null)
+            setLoadFailed(true)
+          }
         }
       })
       .catch((error) => {
         if (cancelled) return
         console.error("ROI 분석 결과를 불러오지 못했습니다.", error)
-        setResolvedResult(null)
-        setLoadFailed(true)
+        if (!cached) {
+          setResolvedResult(null)
+          setLoadFailed(true)
+        }
       })
       .finally(() => {
         if (!cancelled) setIsLoadingResult(false)
@@ -358,10 +425,28 @@ export default function RoiPage({ view = "strategy" }: { view?: RoiView }) {
     }
   }, [analysisId, resolvedResult, policySupportSnapshotSummary])
 
+  const loadingAnalysisId = analysisId || resolvedResult?.id || undefined
+  const loadingRoiStrategyPath = buildRoiPath("strategy", {
+    analysisId: loadingAnalysisId,
+  })
+  const loadingSupportProjectsPath = loadingAnalysisId
+    ? `/support-projects/priority?analysis_id=${encodeURIComponent(String(loadingAnalysisId))}`
+    : workspace.policyPath || "/support-projects/priority"
+
   if (isLoadingResult) {
     return (
       <main className="page ff-dashboard-workspace-page">
         <div className="ff-dashboard-layout">
+          <DashboardWorkspaceSidebar
+            paths={{
+              newRoiPath: loadingRoiStrategyPath || workspace.newRoiPath,
+              policyPath: workspace.policyPath || loadingSupportProjectsPath,
+              draftPath: workspace.draftPath,
+              advisorPath: workspace.advisorPath,
+              analysisId: loadingAnalysisId || workspace.analysisId,
+              priorityPolicyId: workspace.priorityPolicyId,
+            }}
+          />
           <div className="ff-dashboard-main-content ff-roi-workspace-content">
             <p>ROI 분석 결과를 불러오는 중입니다...</p>
           </div>
@@ -511,6 +596,7 @@ export default function RoiPage({ view = "strategy" }: { view?: RoiView }) {
     const isRec = rec === sId
     const isActive = activeScen === sId
     const m = sId === "a" ? mA : mB
+    const scenarioRecord = sId === "a" ? scenarioA : scenarioB
     return {
       id: sId,
       title: sId === "a" ? "전체 교체 분석" : "부분 교체 분석",
@@ -527,6 +613,7 @@ export default function RoiPage({ view = "strategy" }: { view?: RoiView }) {
       net: fmtWon(m.net),
       saving: fmtWon(m.saving),
       roi: fmtPct(m.roi),
+      roiPeriodLabel: getRoiPeriodLabel(scenarioRecord),
       payback: fmtYrs(m.payback),
       summary: buildScenarioSummary(sId, m),
       isRecommended: isRec,
@@ -640,7 +727,7 @@ export default function RoiPage({ view = "strategy" }: { view?: RoiView }) {
       <div className="ff-dashboard-layout">
         <DashboardWorkspaceSidebar
           paths={{
-            newRoiPath: workspace.newRoiPath || roiStrategyPath,
+            newRoiPath: roiStrategyPath || workspace.newRoiPath,
             policyPath: workspace.policyPath || supportProjectsPath,
             draftPath: workspace.draftPath,
             advisorPath: workspace.advisorPath,

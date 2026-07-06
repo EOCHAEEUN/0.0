@@ -894,6 +894,42 @@
   width: 100%;
 }
 
+.ff-advisor-draft-error {
+  background: #fff4f2;
+  border: 1px solid #f2b8ad;
+  border-radius: 8px;
+  color: #9f2d20;
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+}
+
+.ff-advisor-draft-error strong,
+.ff-advisor-draft-error p {
+  color: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.ff-advisor-draft-form > .ff-advisor-text-btn {
+  align-items: center;
+  background: #315bd6;
+  border-radius: 8px;
+  color: #fff;
+  display: inline-flex;
+  justify-content: center;
+  min-height: 40px;
+  padding: 9px 14px;
+  width: 100%;
+}
+
+.ff-advisor-draft-form > .ff-advisor-text-btn:disabled {
+  background: #cbd3e2;
+  color: #667085;
+  cursor: not-allowed;
+}
+
 .ff-advisor-draft-field textarea {
   line-height: 1.45;
   resize: vertical;

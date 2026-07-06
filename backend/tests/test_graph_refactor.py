@@ -233,6 +233,29 @@ def test_4_policy_calendar_snapshot_only(monkeypatch):
     assert state["cards"][0]["type"] == "policy_calendar"
 
 
+def test_draft_status_marks_incompatible_policy_unselectable(monkeypatch):
+    fixtures = _fixtures()
+    fixtures["company"][0]["region"] = "서울 구로구"
+    fixtures["roi_output"][0]["policy_snapshot"]["policies"] = [
+        {
+            "policy_id": "bad-policy",
+            "title": "[서울] 은평구 LED간판 설치 지원사업",
+            "summary": "은평구 소재 사업장에 LED 간판 설치비를 지원합니다.",
+        }
+    ]
+    monkeypatch.setattr(orch, "get_db", lambda: FakeDB(fixtures))
+    state = _base_state("application_draft_status")
+    state = orch.entry_dispatch_node(state)
+    state = orch.explicit_action_dispatch_node(state)
+    state = orch.analysis_snapshot_loader_node(state)
+    state = orch.draft_status_node(state)
+
+    policy = state["cards"][0]["data"]["policies"][0]
+    assert policy["compatible"] is False
+    assert "기업 소재지" in policy["incompatibility_reason"]
+    assert "투자 목적" in policy["incompatibility_reason"]
+
+
 def test_5_draft_status_snapshot_only(monkeypatch):
     monkeypatch.setattr(orch, "get_db", lambda: FakeDB(_fixtures()))
     state = _base_state("application_draft_status")

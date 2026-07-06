@@ -49,6 +49,7 @@ async def _generate_application_report_response(
             body.equipment_id,
             body.policy_id,
             analysis_id=body.analysis_id,
+            draft_result_id=body.draft_result_id,
             user_id=current_user.id,
             tone=body.tone,
         )
@@ -64,6 +65,15 @@ async def _generate_application_report_response(
         )
     except ValueError as exc:
         message = str(exc)
+        if "정책 불일치:" in message:
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "success": False,
+                    "message": message,
+                    "error_code": "POLICY_INCOMPATIBLE",
+                },
+            )
         if body.analysis_id:
             if "저장된 정책 정보 없음" in message:
                 return JSONResponse(

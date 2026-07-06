@@ -15,7 +15,7 @@ from app.agents.capex import (
     show_roi_detail,
 )
 from app.core.database import get_db
-from app.core.llm import llm
+from app.core.llm import llm_fast, llm_pro
 from app.prompts.policy import POLICY_SYSTEM_PROMPT
 from app.state import FactofitState
 from app.tools.query_builder import _get_impact_keywords
@@ -206,7 +206,7 @@ def policy_matching_node(state: FactofitState) -> FactofitState:
     )
 
     try:
-        response = llm.invoke(
+        response = llm_pro.invoke(
             [
                 SystemMessage(content=prompt),
                 HumanMessage(content=state.get("user_query", "")),
@@ -778,7 +778,7 @@ def evaluate_and_rerank_with_llm(
     )
 
     try:
-        response = llm.invoke([SystemMessage(content=prompt)])
+        response = llm_pro.invoke([SystemMessage(content=prompt)])
         content = response.content.strip()
         if content.startswith("```"):
             content = content.split("```", 2)[1]
@@ -1038,7 +1038,7 @@ def analyze_followup_query(user_query: str, matched_policies: list) -> dict:
 의도와 정책 번호를 JSON으로 반환하세요.
 {{"intent": "sort/more/filter/compare/detail/general", "policy_index": 0}}
 """
-    response = llm.invoke([SystemMessage(content=prompt)])
+    response = llm_fast.invoke([SystemMessage(content=prompt)])
     return json.loads(response.content)
 
 

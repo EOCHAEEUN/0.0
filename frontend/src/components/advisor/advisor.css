@@ -900,6 +900,45 @@ body.factofit-advisor-resizing {
   margin: 0 0 clamp(8px, 1.4cqh, 12px);
 }
 
+.factofit-advisor-draft-request {
+  display: grid;
+  gap: 10px;
+}
+
+.factofit-advisor-draft-request-toggle {
+  align-items: center;
+  color: #182a57;
+  cursor: pointer;
+  display: flex;
+  font-size: 13px;
+  font-weight: 850;
+  gap: 9px;
+}
+
+.factofit-advisor-draft-request-toggle input {
+  accent-color: #16295c;
+  height: 17px;
+  width: 17px;
+}
+
+.factofit-advisor-draft-request textarea {
+  background: #fff;
+  border: 1px solid #cfd9ea;
+  border-radius: 8px;
+  box-sizing: border-box;
+  color: #182a57;
+  font: 700 12.5px/1.55 inherit;
+  min-height: 82px;
+  padding: 10px 11px;
+  resize: vertical;
+  width: 100%;
+}
+
+.factofit-advisor-draft-request textarea:focus {
+  border-color: #3159a6;
+  outline: 2px solid rgba(49, 89, 166, 0.14);
+}
+
 .factofit-advisor-step-strip {
   align-items: center;
   background: rgba(255, 255, 255, 0.96);

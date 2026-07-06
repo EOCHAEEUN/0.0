@@ -73,11 +73,11 @@ function DraftStatusCard({
   const status = String(data.status || "")
   const cardAnalysisId = readText(data.analysis_id, analysisId)
   const selectedPolicyId = readText(data.policy_id)
-  const policyRows = Array.isArray(data.policies) ? data.policies : []
 
   const policies = useMemo(
-    () =>
-      policyRows
+    () => {
+      const policyRows = Array.isArray(data.policies) ? data.policies : []
+      return policyRows
         .slice(0, 5)
         .map((policy) => {
           const row = asRecord(policy)
@@ -85,21 +85,31 @@ function DraftStatusCard({
             policyId: readText(row.policy_id),
             title: readText(row.title) || "정책명 미확인",
             deadline: readText(row.deadline) || "마감일 미정",
+            compatible: row.compatible !== false,
+            incompatibilityReason: readText(row.incompatibility_reason),
           }
         })
-        .filter((item) => Boolean(item.policyId)),
-    [policyRows],
+        .filter((item) => Boolean(item.policyId))
+    },
+    [data.policies],
   )
 
-  const [policyId, setPolicyId] = useState(
-    () => selectedPolicyId || policies[0]?.policyId || "",
-  )
+  const [policyId, setPolicyId] = useState(() => {
+    const selected = policies.find((policy) => policy.policyId === selectedPolicyId)
+    if (selected?.compatible) return selected.policyId
+    return policies.find((policy) => policy.compatible)?.policyId || ""
+  })
   const [mustIncludeText, setMustIncludeText] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitMessage, setSubmitMessage] = useState("")
   const [submitError, setSubmitError] = useState("")
 
-  const canSubmit = Boolean(policyId) && Boolean(onApplyDraftRequirements) && !isSubmitting
+  const selectedPolicy = policies.find((policy) => policy.policyId === policyId)
+  const canSubmit =
+    Boolean(policyId) &&
+    selectedPolicy?.compatible === true &&
+    Boolean(onApplyDraftRequirements) &&
+    !isSubmitting
 
   const handleSubmit = async () => {
     if (!canSubmit) return
@@ -139,12 +149,29 @@ function DraftStatusCard({
               disabled={isSubmitting}
             >
               {policies.map((policy) => (
-                <option key={policy.policyId} value={policy.policyId}>
+                <option
+                  key={policy.policyId}
+                  value={policy.policyId}
+                  disabled={!policy.compatible}
+                >
                   {policy.title} ({policy.deadline})
+                  {!policy.compatible ? " - 선택 불가" : ""}
                 </option>
               ))}
             </select>
           </label>
+
+          {!policies.some((policy) => policy.compatible) ? (
+            <div className="ff-advisor-draft-error" role="alert">
+              <strong>현재 선택 가능한 정책이 없습니다.</strong>
+              <p>
+                기업 소재지와 설비 투자 목적에 맞는 정책으로 다시 분석해 주세요.
+              </p>
+              {policies[0]?.incompatibilityReason ? (
+                <p>{policies[0].incompatibilityReason}</p>
+              ) : null}
+            </div>
+          ) : null}
 
           <label className="ff-advisor-draft-field">
             <span>초안에 꼭 넣고 싶은 내용</span>
@@ -167,7 +194,12 @@ function DraftStatusCard({
           </button>
 
           {submitMessage ? <p className="ff-advisor-card-footnote">{submitMessage}</p> : null}
-          {submitError ? <p className="ff-advisor-card-footnote">{submitError}</p> : null}
+          {submitError ? (
+            <div className="ff-advisor-draft-error" role="alert">
+              <strong>신청서 초안을 반영하지 못했습니다.</strong>
+              <p>{submitError}</p>
+            </div>
+          ) : null}
         </div>
       ) : (
         <p className="ff-advisor-card-footnote">

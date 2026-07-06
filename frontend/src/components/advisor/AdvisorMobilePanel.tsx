@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react"
 import botIcon from "../../assets/advisor/engi-bot-transparent.png"
 import { requestAdvisorAnswer } from "../../features/aiAdvisor/aiAdvisor.api"
+import { APPLICATION_DRAFT_MUST_INCLUDE_KEY } from "../../features/applicationDraft/applicationDraft.constants"
 import {
   ANALYSIS_STEPS,
   COMPANY_REQUIRED,
@@ -773,6 +774,23 @@ function DraftScreen({
   onMove: (screen: AdvisorScreen) => void
   onClose: () => void
 }) {
+  const [mustIncludeText, setMustIncludeText] = useState(
+    () => window.localStorage.getItem(APPLICATION_DRAFT_MUST_INCLUDE_KEY) || "",
+  )
+  const [includeRequested, setIncludeRequested] = useState(
+    () => Boolean(window.localStorage.getItem(APPLICATION_DRAFT_MUST_INCLUDE_KEY)),
+  )
+
+  const openApplicationDraft = () => {
+    const normalized = mustIncludeText.trim()
+    if (includeRequested && normalized) {
+      window.localStorage.setItem(APPLICATION_DRAFT_MUST_INCLUDE_KEY, normalized)
+    } else {
+      window.localStorage.removeItem(APPLICATION_DRAFT_MUST_INCLUDE_KEY)
+    }
+    window.location.assign("/application-draft")
+  }
+
   return (
     <ScreenFrame
       title="신청서 초안 생성"
@@ -822,7 +840,27 @@ function DraftScreen({
         </div>
       </section>
 
-      <PrimaryCta onClick={() => onMove("company")}>신청서 초안 생성</PrimaryCta>
+      <section className="factofit-advisor-panel-card factofit-advisor-draft-request">
+        <label className="factofit-advisor-draft-request-toggle">
+          <input
+            type="checkbox"
+            checked={includeRequested}
+            onChange={(event) => setIncludeRequested(event.target.checked)}
+          />
+          <span>신청서에 추가할 내용 선택</span>
+        </label>
+        {includeRequested ? (
+          <textarea
+            value={mustIncludeText}
+            maxLength={1000}
+            rows={4}
+            placeholder="예: 안전커버 보강 완료 내용과 작업자 교육 계획을 사업 필요성에 포함"
+            onChange={(event) => setMustIncludeText(event.target.value)}
+          />
+        ) : null}
+      </section>
+
+      <PrimaryCta onClick={openApplicationDraft}>신청서 초안 생성</PrimaryCta>
     </ScreenFrame>
   )
 }

@@ -21,6 +21,7 @@ import {
   type AdvisorChatSessionItem,
 } from "../features/aiAdvisor/aiAdvisor.api"
 import { requestApplicationDraftGeneration } from "../features/applicationDraft/applicationDraft.api"
+import { APPLICATION_DRAFT_MUST_INCLUDE_KEY } from "../features/applicationDraft/applicationDraft.constants"
 import { fetchDashboardOnboarding } from "../features/dashboard/dashboard.api"
 import type { DashboardOnboardingMeResponse } from "../features/dashboard/dashboard.contract"
 import { clearAuthSession } from "../services/auth"
@@ -703,6 +704,15 @@ export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boole
       analysisId: targetAnalysisId || undefined,
       mustIncludeText: params.mustIncludeText,
     })
+    const normalizedMustIncludeText = params.mustIncludeText?.trim() || ""
+    if (normalizedMustIncludeText) {
+      window.localStorage.setItem(
+        APPLICATION_DRAFT_MUST_INCLUDE_KEY,
+        normalizedMustIncludeText,
+      )
+    } else {
+      window.localStorage.removeItem(APPLICATION_DRAFT_MUST_INCLUDE_KEY)
+    }
 
     const payload = asRecord(generated)
     const data = asRecord(payload.data || payload)

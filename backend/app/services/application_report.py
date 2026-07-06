@@ -29,6 +29,7 @@ from reportlab.platypus import (
 )
 
 from app.core.database import get_db
+from app.services.policy_compatibility import assert_policy_compatible
 
 
 REPORT_TITLE = "AI 신청서 초안 · 고도화 버전"
@@ -782,11 +783,354 @@ def _scenario_key(matched_policy: dict, roi_data: dict) -> str:
     return "scenario_a"
 
 
+_DRAFT_SECTION_CONTAINER_KEYS = frozenset(
+    {
+        "content",
+        "sections",
+        "application_draft",
+        "narratives",
+        "safety_improvement",
+        "safety_evidence_snapshot",
+        "safety_maintenance_evidence",
+        "safety_maintenance_records",
+        "safety_management_evidence",
+        "safety_management_records",
+        "maintenance_records",
+        "inspection_records",
+    }
+)
+
+_INVALID_LLM_NARRATIVE_VALUES = frozenset(
+    {
+        "",
+        "미입력",
+        "없음",
+        "null",
+        "undefined",
+        "none",
+    }
+)
+
+_NARRATIVE_FIELD_ALIASES: dict[str, tuple[str, ...]] = {
+    "business_necessity": ("background", "application_purpose"),
+    "implementation_plan": ("execution_plan", "추진계획"),
+    "application_background": ("background", "application_purpose"),
+    "company_context": ("equipment_context",),
+    "diagnostic_interpretation": ("diagnostic_summary",),
+    "execution_detail": ("execution_plan",),
+    "financial_assessment": ("financial_review", "investment_assessment"),
+    "policy_analysis": ("policy_review",),
+    "performance_plan": ("performance_management",),
+    "risk_review": ("risk_assessment",),
+    "scenario_rationale": ("scenario_selection",),
+    "submission_readiness": ("required_documents_summary",),
+    "performance_governance": ("governance_plan",),
+    "final_recommendation": ("recommendation", "conclusion"),
+}
+
+_CORE_PDF_NARRATIVE_FIELDS: tuple[str, ...] = (
+    "application_background",
+    "business_necessity",
+    "implementation_plan",
+    "expected_effects",
+    "policy_utilization_strategy",
+    "final_recommendation",
+)
+
+_ROI_CLAIM_PATTERN = re.compile(
+    r"(지원금|보조금|투자금|총\s*투자|자기부담|회수(?:기간)?)[^\d]{0,24}(\d[\d,]*(?:\.\d+)?)\s*(?:만원|개월|년|months?)?",
+    re.IGNORECASE,
+)
+
+
 def _draft_sections(draft_content: Any) -> dict:
     if not isinstance(draft_content, dict):
         return {}
-    nested = draft_content.get("content")
-    return nested if isinstance(nested, dict) else draft_content
+    merged: dict[str, Any] = {}
+    layers = [draft_content]
+    for key in ("content", "sections", "application_draft", "narratives"):
+        nested = draft_content.get(key)
+        if isinstance(nested, dict):
+            layers.append(nested)
+    for layer in layers:
+        for key, value in layer.items():
+            if key in _DRAFT_SECTION_CONTAINER_KEYS:
+                continue
+            merged[key] = value
+    return merged
+
+
+def _is_valid_llm_narrative(value: Any) -> bool:
+    if isinstance(value, (dict, list)):
+        return False
+    if value is None:
+        return False
+    text = str(value).strip()
+    if len(text) < 20:
+        return False
+    if text.lower() in _INVALID_LLM_NARRATIVE_VALUES:
+        return False
+    return True
+
+
+def _extract_narrative_text(value: Any) -> str:
+    if isinstance(value, str):
+        text = value.strip()
+        return text if _is_valid_llm_narrative(text) else ""
+    return ""
+
+
+def _extract_expected_benefits_items(
+    draft_sections: dict[str, Any],
+    draft_content: dict[str, Any],
+    *,
+    max_items: int = 3,
+) -> list[str]:
+    items: list[str] = []
+    for source in (draft_sections, draft_content):
+        raw = source.get("expected_benefits")
+        if not isinstance(raw, list):
+            continue
+        for entry in raw:
+            text = str(entry).strip()
+            if len(text) < 10:
+                continue
+            if text.lower() in _INVALID_LLM_NARRATIVE_VALUES:
+                continue
+            items.append(text)
+            if len(items) >= max_items:
+                return items
+        if items:
+            return items
+    return items
+
+
+def _join_expected_benefits_paragraph(items: list[str]) -> str:
+    if not items:
+        return ""
+    if len(items) == 1:
+        return items[0]
+    return " ".join(items)
+
+
+def _narrative_conflicts_with_roi(text: str, context: dict[str, Any]) -> bool:
+    investment = _number(context.get("investment_manwon"))
+    subsidy = _number(context.get("subsidy_manwon"))
+    self_funding = _number(context.get("self_funding_manwon"))
+    payback_months = context.get("payback_months")
+    payback_months_num = _number(payback_months) if payback_months is not None else None
+
+    for match in _ROI_CLAIM_PATTERN.finditer(text):
+        keyword = match.group(1)
+        claimed = _number(match.group(2))
+        if claimed <= 0:
+            continue
+        if "회수" in keyword and payback_months_num:
+            month_delta = abs(claimed - payback_months_num)
+            year_delta = abs(claimed - (payback_months_num / 12))
+            if month_delta > max(2.0, payback_months_num * 0.12) and year_delta > 0.3:
+                return True
+        elif ("지원" in keyword or "보조" in keyword) and subsidy:
+            if abs(claimed - subsidy) > max(50.0, subsidy * 0.08):
+                return True
+        elif "자기부담" in keyword and self_funding:
+            if abs(claimed - self_funding) > max(50.0, self_funding * 0.08):
+                return True
+        elif "투자" in keyword and investment:
+            if abs(claimed - investment) > max(50.0, investment * 0.08):
+                return True
+    return False
+
+
+def _narrative_passes_context_checks(text: str, context: dict[str, Any]) -> bool:
+    if not _is_valid_llm_narrative(text):
+        return False
+
+    draft_content = _as_dict(context.get("draft_content"))
+    entity_pairs = (
+        (draft_content.get("company_name"), context.get("company_name")),
+        (draft_content.get("equipment_name"), context.get("equipment_name")),
+        (draft_content.get("selected_policy"), context.get("policy_title")),
+    )
+    for draft_value, actual_value in entity_pairs:
+        draft_text = str(draft_value or "").strip()
+        actual_text = str(actual_value or "").strip()
+        if not draft_text or not actual_text:
+            continue
+        if draft_text != actual_text and draft_text in text:
+            return False
+
+    for placeholder in ("기업명 미입력", "설비명 미입력", "지원사업명 미확인", "추천 지원사업 미선택"):
+        if placeholder in text:
+            return False
+
+    actual_company = str(context.get("company_name") or "").strip()
+    actual_equipment = str(context.get("equipment_name") or "").strip()
+    actual_policy = str(context.get("policy_title") or "").strip()
+    for actual_name in (actual_company, actual_equipment, actual_policy):
+        if len(actual_name) < 2:
+            continue
+        # 다른 고유명사가 'OO(주)' 형태로 등장하면 충돌 가능성이 있어 보수적으로 제외하지 않음.
+        # draft 메타와 다른 명칭이 본문에 직접 등장할 때만 거부한다.
+
+    return not _narrative_conflicts_with_roi(text, context)
+
+
+def _lookup_draft_narrative(
+    draft_sections: dict[str, Any],
+    draft_content: dict[str, Any],
+    key: str,
+) -> str:
+    text = _extract_narrative_text(draft_sections.get(key))
+    if text:
+        return text
+    return _extract_narrative_text(draft_content.get(key))
+
+
+def _resolve_narrative(
+    draft_sections: dict[str, Any],
+    draft_content: dict[str, Any],
+    field_name: str,
+    fallback_text: str,
+    *,
+    aliases: list[str] | None = None,
+    context: dict[str, Any] | None = None,
+) -> tuple[str, str]:
+    for key in [field_name, *(aliases or [])]:
+        text = _lookup_draft_narrative(draft_sections, draft_content, key)
+        if text and _narrative_passes_context_checks(text, context or {}):
+            return text, "draft_result"
+    return fallback_text, "template_fallback"
+
+
+def _resolve_expected_effects_narrative(
+    draft_sections: dict[str, Any],
+    draft_content: dict[str, Any],
+    fallback_text: str,
+    *,
+    context: dict[str, Any],
+) -> tuple[str, str, list[str]]:
+    benefit_items = _extract_expected_benefits_items(draft_sections, draft_content)
+    for key in ("expected_effects",):
+        text = _lookup_draft_narrative(draft_sections, draft_content, key)
+        if text and _narrative_passes_context_checks(text, context):
+            return text, "draft_result", benefit_items
+
+    benefits_paragraph = _join_expected_benefits_paragraph(benefit_items)
+    if benefits_paragraph and _narrative_passes_context_checks(benefits_paragraph, context):
+        return benefits_paragraph, "draft_result", benefit_items
+
+    return fallback_text, "template_fallback", benefit_items
+
+
+def _apply_draft_narratives(
+    draft_sections: dict[str, Any],
+    draft_content: dict[str, Any],
+    fallbacks: dict[str, str],
+    *,
+    context: dict[str, Any] | None = None,
+) -> tuple[dict[str, str], dict[str, str], list[str]]:
+    resolved: dict[str, str] = {}
+    sources: dict[str, str] = {}
+    expected_effects_bullets: list[str] = []
+    narrative_context = context or {}
+
+    for field_name, fallback in fallbacks.items():
+        if field_name == "expected_effects":
+            text, source, expected_effects_bullets = _resolve_expected_effects_narrative(
+                draft_sections,
+                draft_content,
+                fallback,
+                context=narrative_context,
+            )
+        else:
+            text, source = _resolve_narrative(
+                draft_sections,
+                draft_content,
+                field_name,
+                fallback,
+                aliases=list(_NARRATIVE_FIELD_ALIASES.get(field_name, ())),
+                context=narrative_context,
+            )
+        resolved[field_name] = text
+        sources[field_name] = source
+    return resolved, sources, expected_effects_bullets
+
+
+def summarize_narrative_sources(sources: dict[str, str]) -> dict[str, Any]:
+    draft_count = sum(1 for value in sources.values() if value == "draft_result")
+    fallback_count = sum(1 for value in sources.values() if value != "draft_result")
+    core_draft_count = sum(
+        1 for key in _CORE_PDF_NARRATIVE_FIELDS if sources.get(key) == "draft_result"
+    )
+    status = "partial_llm" if draft_count <= 3 else "llm_enriched"
+    if draft_count == 0:
+        status = "template_only"
+    return {
+        "draft_result_count": draft_count,
+        "template_fallback_count": fallback_count,
+        "core_draft_result_count": core_draft_count,
+        "status": status,
+        "partial_llm": draft_count <= 3,
+        "by_field": dict(sources),
+    }
+
+
+def _load_draft_result_for_report(
+    db: Any,
+    *,
+    company_id: str,
+    equipment_id: str,
+    policy_id: str,
+    analysis_id: str | None = None,
+    draft_result_id: str | None = None,
+) -> dict[str, Any]:
+    draft: dict[str, Any] = {}
+    if draft_result_id:
+        try:
+            draft = _first(
+                db.table("draft_result")
+                .select("*")
+                .eq("draft_result_id", draft_result_id)
+                .eq("company_id", company_id)
+                .eq("equipment_id", equipment_id)
+                .limit(1)
+                .execute()
+                .data
+            )
+        except Exception:
+            draft = {}
+        if draft:
+            return draft
+
+    if analysis_id and policy_id:
+        try:
+            draft = _first(
+                db.table("draft_result")
+                .select("*")
+                .eq("company_id", company_id)
+                .eq("analysis_id", analysis_id)
+                .eq("policy_id", policy_id)
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+                .data
+            )
+        except Exception:
+            draft = {}
+    if not draft:
+        draft = _first(
+            db.table("draft_result")
+            .select("*")
+            .eq("company_id", company_id)
+            .eq("equipment_id", equipment_id)
+            .eq("policy_id", policy_id)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+            .data
+        )
+    return draft or {}
 
 
 def _normalize_safety_improvement_for_report(value: Any) -> dict:
@@ -1093,6 +1437,14 @@ def _normalize_safety_maintenance_evidence_for_report(
             "개선대책",
             "개선 대책",
         )
+        additional_info = _first_text_from_keys(
+            raw,
+            "additional_info",
+            "application_note",
+            "application_comment",
+            "한줄평",
+            "신청서 반영",
+        )
 
         # 프론트 표시값을 따로 보존합니다. 표 중심 PDF는 이 display 값을 사용합니다.
         display_equipment = equipment_name
@@ -1101,10 +1453,11 @@ def _normalize_safety_maintenance_evidence_for_report(
         display_inspection_content = inspection_content
         display_current_status = current_status
         display_improvement_plan = improvement_plan
+        display_additional_info = additional_info
 
-        if not any((display_equipment, display_inspection_purpose_label, display_inspection_item, display_inspection_content, display_current_status, display_improvement_plan)):
+        if not any((display_equipment, display_inspection_purpose_label, display_inspection_item, display_inspection_content, display_current_status, display_improvement_plan, display_additional_info)):
             continue
-        if not display_inspection_purpose_label and not display_inspection_item and not display_inspection_content and not display_improvement_plan:
+        if not display_inspection_purpose_label and not display_inspection_item and not display_inspection_content and not display_improvement_plan and not display_additional_info:
             continue
 
         key = (
@@ -1114,6 +1467,7 @@ def _normalize_safety_maintenance_evidence_for_report(
             display_inspection_content,
             display_current_status,
             display_improvement_plan,
+            display_additional_info,
         )
         if key in seen:
             continue
@@ -1133,6 +1487,7 @@ def _normalize_safety_maintenance_evidence_for_report(
                 "inspection_content": display_inspection_content or "점검 내용 확인 필요",
                 "current_status": display_current_status or "증빙 확인 필요",
                 "improvement_plan": display_improvement_plan,
+                "additional_info": display_additional_info,
                 "display": {
                     "equipment_name": display_equipment or default_equipment_name,
                     "inspection_purpose_label": display_inspection_purpose_label or display_inspection_item or "안전점검",
@@ -1140,6 +1495,7 @@ def _normalize_safety_maintenance_evidence_for_report(
                     "inspection_content": display_inspection_content or "점검 내용 확인 필요",
                     "current_status": display_current_status or "증빙 확인 필요",
                     "improvement_plan": display_improvement_plan,
+                    "additional_info": display_additional_info,
                 },
                 "raw": raw,
             }
@@ -1155,7 +1511,13 @@ def _has_safety_maintenance_improvement_plan(item: dict[str, Any]) -> bool:
 
 def _format_safety_maintenance_plan_for_table(item: dict[str, Any]) -> str:
     plan = str(item.get("improvement_plan") or "").strip()
-    return plan if _has_safety_maintenance_improvement_plan(item) else "X"
+    additional_info = str(item.get("additional_info") or "").strip()
+    values = []
+    if _has_safety_maintenance_improvement_plan(item):
+        values.append(plan)
+    if additional_info:
+        values.append(f"신청서 반영: {additional_info}")
+    return "\n".join(values) if values else "X"
 
 
 def _safety_maintenance_items_for_report(data: dict[str, Any]) -> list[dict[str, Any]]:
@@ -1331,23 +1693,33 @@ def _safety_maintenance_narrative(item: dict[str, Any], *, variant: int = 1) -> 
     )
     current_status = item.get("current_status") or ""
     future_plan = str(item.get("improvement_plan") or "").strip()
+    additional_info = _clean_sentence_fragment(item.get("additional_info"))
 
     evidence_phrase = _evidence_phrase_for_status(current_status)
     future_sentence = _as_future_sentence(future_plan)
+    application_sentence = (
+        f"사용자 확인 의견을 반영하여 {additional_info}을(를) 안전관리 실행 근거로 제시합니다. "
+        if additional_info
+        else ""
+    )
 
     pattern = (variant - 1) % 3
     if pattern == 0:
-        return f"{inspection_content} 자료를 {evidence_phrase}, {future_sentence}"
+        return (
+            f"{inspection_content} 자료를 {evidence_phrase}, {future_sentence} "
+            f"{application_sentence}"
+        ).strip()
     if pattern == 1:
         return (
             f"{inspection_item} 항목은 {inspection_content}을(를) 중심으로 증빙 상태를 관리합니다. "
             f"현재 확인된 자료는 {evidence_phrase.replace(' 있으며', ' 있는 상태로 정리합니다')}. "
-            f"{future_sentence} 해당 내용은 제출 전 보완 근거로 활용하겠습니다."
+            f"{future_sentence} {application_sentence}"
+            "해당 내용은 제출 전 보완 근거로 활용하겠습니다."
         )
     return (
         f"{equipment_name} 관련 {inspection_content} 결과는 신청서의 안전점검 보완 근거로 관리합니다. "
         f"보유 자료는 제출 증빙으로 정리합니다. {future_sentence} "
-        "점검 이력과 조치 내용을 지속적으로 남기겠습니다."
+        f"{application_sentence}점검 이력과 조치 내용을 지속적으로 남기겠습니다."
     )
 
 def _load_safety_improvement_fallback(
@@ -1457,6 +1829,7 @@ def load_application_report_data(
     policy_id: str | None = None,
     *,
     analysis_id: str | None = None,
+    draft_result_id: str | None = None,
     user_id: str | None = None,
     tone: str = "submission",
 ) -> dict:
@@ -1586,25 +1959,30 @@ def load_application_report_data(
         policy_id=policy_id,
     )
 
-    draft = _first(
-        db.table("draft_result")
-        .select("*")
-        .eq("company_id", company_id)
-        .eq("equipment_id", equipment_id)
-        .eq("policy_id", policy_id)
-        .order("created_at", desc=True)
-        .limit(1)
-        .execute()
-        .data
+    effective_analysis_id = str(roi_output.get("id") or analysis_id or "")
+    draft = _load_draft_result_for_report(
+        db,
+        company_id=company_id,
+        equipment_id=equipment_id,
+        policy_id=policy_id,
+        analysis_id=effective_analysis_id or None,
+        draft_result_id=draft_result_id,
+    )
+
+    assert_policy_compatible(
+        company=company,
+        equipment=equipment,
+        policy=policy,
+        matched_policy=matched_policy,
     )
 
     roi_data = roi_output.get("roi_data") or {}
-    effective_analysis_id = str(roi_output.get("id") or analysis_id or "")
     scenario_key = _scenario_key(matched_policy, roi_data)
     scenario = roi_data.get(scenario_key) or {}
     breakdown = scenario.get("breakdown") or {}
     benchmark = roi_data.get("benchmark") or {}
-    draft_sections = _draft_sections(draft.get("draft_content"))
+    draft_content = _as_dict(draft.get("draft_content"))
+    draft_sections = _draft_sections(draft_content)
 
     # 1순위: draft_result.draft_content.safety_improvement에 저장된 안전개선 항목
     safety_improvement = _normalize_safety_improvement_for_report(
@@ -1633,8 +2011,9 @@ def load_application_report_data(
 
     investment = _number(scenario.get("investment_manwon"))
     subsidy = _number(scenario.get("subsidy_manwon"))
-    if not subsidy and policy.get("max_amount"):
-        subsidy = min(investment, _number(policy.get("max_amount")))
+    policy_limit = _number(policy.get("max_amount"))
+    if policy_limit:
+        subsidy = min(subsidy or policy_limit, policy_limit, investment)
     payback_years = _number(scenario.get("payback_years"))
 
     company_name = company.get("company_name") or "기업명 미입력"
@@ -2084,27 +2463,59 @@ def load_application_report_data(
             )
         )
 
-        sanitized_narratives = _sanitize_submission_narratives(
-            {
-                "company_overview": company_overview,
-                "business_necessity": business_necessity,
-                "implementation_plan": implementation_plan,
-                "expected_effects": expected_effects,
-                "financial_assessment": financial_assessment,
-                "company_context": company_context,
-                "diagnostic_interpretation": diagnostic_interpretation,
-                "execution_detail": execution_detail,
-                "policy_analysis": policy_analysis,
-                "performance_plan": performance_plan,
-                "risk_review": risk_review,
-                "application_background": application_background,
-                "scenario_rationale": scenario_rationale,
-                "policy_utilization_strategy": policy_utilization_strategy,
-                "submission_readiness": submission_readiness,
-                "performance_governance": performance_governance,
-                "final_recommendation": final_recommendation,
-            }
-        )
+    resolved_narratives, narrative_sources, expected_effects_bullets = _apply_draft_narratives(
+        draft_sections,
+        draft_content,
+        {
+            "company_overview": company_overview,
+            "business_necessity": business_necessity,
+            "implementation_plan": implementation_plan,
+            "expected_effects": expected_effects,
+            "financial_assessment": financial_assessment,
+            "company_context": company_context,
+            "diagnostic_interpretation": diagnostic_interpretation,
+            "execution_detail": execution_detail,
+            "policy_analysis": policy_analysis,
+            "performance_plan": performance_plan,
+            "risk_review": risk_review,
+            "application_background": application_background,
+            "scenario_rationale": scenario_rationale,
+            "policy_utilization_strategy": policy_utilization_strategy,
+            "submission_readiness": submission_readiness,
+            "performance_governance": performance_governance,
+            "final_recommendation": final_recommendation,
+        },
+        context={
+            "company_name": company_name,
+            "equipment_name": equipment_name,
+            "policy_title": policy_title,
+            "investment_manwon": investment,
+            "subsidy_manwon": subsidy,
+            "self_funding_manwon": max(0, investment - subsidy),
+            "payback_months": payback_months,
+            "draft_content": draft_content,
+        },
+    )
+    company_overview = resolved_narratives["company_overview"]
+    business_necessity = resolved_narratives["business_necessity"]
+    implementation_plan = resolved_narratives["implementation_plan"]
+    expected_effects = resolved_narratives["expected_effects"]
+    financial_assessment = resolved_narratives["financial_assessment"]
+    company_context = resolved_narratives["company_context"]
+    diagnostic_interpretation = resolved_narratives["diagnostic_interpretation"]
+    execution_detail = resolved_narratives["execution_detail"]
+    policy_analysis = resolved_narratives["policy_analysis"]
+    performance_plan = resolved_narratives["performance_plan"]
+    risk_review = resolved_narratives["risk_review"]
+    application_background = resolved_narratives["application_background"]
+    scenario_rationale = resolved_narratives["scenario_rationale"]
+    policy_utilization_strategy = resolved_narratives["policy_utilization_strategy"]
+    submission_readiness = resolved_narratives["submission_readiness"]
+    performance_governance = resolved_narratives["performance_governance"]
+    final_recommendation = resolved_narratives["final_recommendation"]
+
+    if tone == "submission":
+        sanitized_narratives = _sanitize_submission_narratives(resolved_narratives)
         company_overview = sanitized_narratives["company_overview"]
         business_necessity = sanitized_narratives["business_necessity"]
         implementation_plan = sanitized_narratives["implementation_plan"]
@@ -2122,7 +2533,6 @@ def load_application_report_data(
         submission_readiness = sanitized_narratives["submission_readiness"]
         performance_governance = sanitized_narratives["performance_governance"]
         final_recommendation = sanitized_narratives["final_recommendation"]
-
         _validate_submission_narratives(sanitized_narratives)
 
     return {
@@ -2140,6 +2550,8 @@ def load_application_report_data(
         "breakdown": breakdown,
         "benchmark": benchmark,
         "draft": draft,
+        "narrative_sources": narrative_sources,
+        "narrative_source_summary": summarize_narrative_sources(narrative_sources),
         "safety_improvement": safety_improvement,
         "safety_maintenance_evidence": safety_maintenance_evidence,
         "summary": {
@@ -2159,6 +2571,7 @@ def load_application_report_data(
             "business_necessity": business_necessity,
             "implementation_plan": implementation_plan,
             "expected_effects": expected_effects,
+            "expected_effects_bullets": expected_effects_bullets,
             "financial_assessment": financial_assessment,
             "company_context": company_context,
             "diagnostic_interpretation": diagnostic_interpretation,
@@ -2172,6 +2585,12 @@ def load_application_report_data(
             "submission_readiness": submission_readiness,
             "performance_governance": performance_governance,
             "final_recommendation": final_recommendation,
+            "must_include_text": str(
+                draft_content.get("must_include_text") or ""
+            ).strip(),
+            "user_request_reflection": str(
+                draft_content.get("user_request_reflection") or ""
+            ).strip(),
             "tone_label": {
                 "analyst": "평서문 종결체",
                 "nominal": "명사형 종결체",
@@ -2289,6 +2708,7 @@ def build_report_context(
         equipment_id,
         policy_id,
         analysis_id=analysis_id,
+        draft_result_id=draft_result_id,
         user_id=user_id,
         tone=tone,
     )
@@ -3124,6 +3544,14 @@ def generate_consumer_summary_report_pdf(ctx: ReportContext) -> bytes:
             "제출 전 증빙 보완",
         ],
     ]
+    if summary.get("user_request_reflection"):
+        boss_rows.append(
+            [
+                "꼭 반영할\n내용",
+                summary["user_request_reflection"],
+                "AI 문장화 반영",
+            ]
+        )
 
     subsidy_basis = _policy_max_amount_type_reason(policy) or _policy_max_amount_type(policy) or "정책 지원한도 유형 미확인"
     budget_rows = [
@@ -3429,6 +3857,16 @@ def build_application_report_pdf(data: dict) -> bytes:
         ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
     ]))
     story += [review_box, Spacer(1, 3 * mm)]
+    if summary.get("user_request_reflection"):
+        story += [
+            _paragraph("AI 반영 문단", subheading),
+            make_application_callout(
+                summary["user_request_reflection"],
+                body,
+                width_mm=170,
+            ),
+            Spacer(1, 3 * mm),
+        ]
 
     overview = [
         ["기업명", summary["company_name"], "기업 규모", company.get("company_type") or company.get("company_size") or "-"],
@@ -3718,6 +4156,16 @@ def build_application_report_pdf(data: dict) -> bytes:
     )
     story += [
         *_paragraph_blocks(summary["expected_effects"], body),
+    ]
+    if summary.get("expected_effects_bullets"):
+        story += [
+            _paragraph("기대효과 세부", subheading),
+            *[
+                _paragraph(f"• {bullet}", body)
+                for bullet in summary["expected_effects_bullets"]
+            ],
+        ]
+    story += [
         _paragraph("성과 측정 및 사후관리", subheading),
         *_paragraph_blocks(summary["performance_plan"], body),
     ]

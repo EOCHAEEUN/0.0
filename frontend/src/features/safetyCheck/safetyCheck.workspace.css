@@ -265,6 +265,18 @@
   gap: 8px;
 }
 
+.safety-check-page .improvement-additional-info {
+  color: #4f5f78;
+  display: block;
+  font-size: 11px;
+  line-height: 1.45;
+  margin-top: 5px;
+}
+
+.safety-check-page .improvement-input + .improvement-input {
+  margin-top: 6px;
+}
+
 .safety-check-page .improvement-text {
   flex: 1;
   padding: 8px 12px;

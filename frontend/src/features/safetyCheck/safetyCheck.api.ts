@@ -8,12 +8,13 @@ import type {
 
 async function parseResponse<T>(response: Response): Promise<T> {
   const text = await response.text()
-  let payload: Record<string, unknown> | null = null
-  try {
-    payload = JSON.parse(text) as Record<string, unknown>
-  } catch {
-    payload = null
-  }
+  const payload = (() => {
+    try {
+      return JSON.parse(text) as Record<string, unknown>
+    } catch {
+      return null
+    }
+  })()
 
   if (!response.ok) {
     const detail =
@@ -68,9 +69,11 @@ export async function createSafetyCheckItem(payload: SafetyCheckCreatePayload) {
 export async function updateSafetyCheckImprovement(params: {
   itemId: string
   improvementPlan: string
+  additionalInfo: string
 }) {
   const body: SafetyCheckImprovementPayload = {
     improvement_plan: params.improvementPlan,
+    additional_info: params.additionalInfo,
   }
 
   const response = await fetch(

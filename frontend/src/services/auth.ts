@@ -145,3 +145,64 @@ export function clearAuthSession() {
   localStorage.removeItem("factofit_company_id")
   localStorage.removeItem("factofit_auth_session")
 }
+
+let refreshPromise: Promise<string> | null = null
+
+export async function refreshAccessToken(): Promise<string> {
+  if (refreshPromise) return refreshPromise
+
+  refreshPromise = (async () => {
+    const refreshToken =
+      localStorage.getItem("factofit_refresh_token")?.trim() ||
+      (() => {
+        try {
+          const raw = localStorage.getItem("factofit_auth_session")
+          if (!raw) return ""
+          const session = JSON.parse(raw) as Record<string, unknown>
+          return typeof session.refresh_token === "string"
+            ? session.refresh_token.trim()
+            : ""
+        } catch {
+          return ""
+        }
+      })()
+
+    if (!refreshToken) {
+      throw new Error("로그인 세션이 만료되었습니다. 다시 로그인해 주세요.")
+    }
+
+    const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    })
+    const payload = (await response.json()) as ApiResponse<AuthSession>
+    if (!response.ok || !payload.success || !payload.data?.access_token) {
+      clearAuthSession()
+      throw new Error(
+        payload.message || "로그인 세션이 만료되었습니다. 다시 로그인해 주세요.",
+      )
+    }
+
+    const previous = (() => {
+      try {
+        return JSON.parse(
+          localStorage.getItem("factofit_auth_session") || "{}",
+        ) as Partial<AuthSession>
+      } catch {
+        return {}
+      }
+    })()
+    const nextSession: AuthSession = {
+      ...previous,
+      ...payload.data,
+      user: payload.data.user || previous.user || { id: null, email: null },
+    }
+    saveAuthSession(nextSession)
+    return nextSession.access_token || ""
+  })().finally(() => {
+    refreshPromise = null
+  })
+
+  return refreshPromise
+}

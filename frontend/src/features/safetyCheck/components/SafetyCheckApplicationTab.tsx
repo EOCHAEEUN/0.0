@@ -13,6 +13,7 @@ type SafetyCheckApplicationTabProps = {
     itemId: string
     equipmentId: string
     improvementPlan: string
+    additionalInfo: string
   }) => Promise<void>
   onClearImprovement: (params: { itemId: string; equipmentId: string }) => Promise<void>
 }
@@ -27,6 +28,7 @@ export default function SafetyCheckApplicationTab({
 }: SafetyCheckApplicationTabProps) {
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [draftPlan, setDraftPlan] = useState("")
+  const [draftAdditionalInfo, setDraftAdditionalInfo] = useState("")
   const [savingItemId, setSavingItemId] = useState<string | null>(null)
   const [clearTarget, setClearTarget] = useState<SafetyCheckItem | null>(null)
   const [clearPending, setClearPending] = useState(false)
@@ -53,19 +55,22 @@ export default function SafetyCheckApplicationTab({
   const startEdit = (item: SafetyCheckItem) => {
     setEditingItemId(item.id)
     setDraftPlan(item.improvement_plan?.trim() || "")
+    setDraftAdditionalInfo(item.additional_info?.trim() || "")
   }
 
   const handleSave = async (item: SafetyCheckItem) => {
-    if (!draftPlan.trim()) return
+    if (!draftPlan.trim() && !draftAdditionalInfo.trim()) return
     setSavingItemId(item.id)
     try {
       await onSaveImprovement({
         itemId: item.id,
         equipmentId: item.equipment_id,
         improvementPlan: draftPlan.trim(),
+        additionalInfo: draftAdditionalInfo.trim(),
       })
       setEditingItemId(null)
       setDraftPlan("")
+      setDraftAdditionalInfo("")
     } finally {
       setSavingItemId(null)
     }
@@ -73,17 +78,22 @@ export default function SafetyCheckApplicationTab({
 
   const handleEditClick = (item: SafetyCheckItem) => {
     const isEditing = editingItemId === item.id
-    const hasPlan = Boolean(item.improvement_plan?.trim())
+    const hasPlan = Boolean(
+      item.improvement_plan?.trim() || item.additional_info?.trim(),
+    )
     if (isEditing) {
       void handleSave(item)
       return
     }
     startEdit(item)
-    if (!hasPlan) setDraftPlan("")
+    if (!hasPlan) {
+      setDraftPlan("")
+      setDraftAdditionalInfo("")
+    }
   }
 
   const handleDeleteClick = (item: SafetyCheckItem) => {
-    if (!item.improvement_plan?.trim()) return
+    if (!item.improvement_plan?.trim() && !item.additional_info?.trim()) return
     setClearTarget(item)
   }
 
@@ -127,16 +137,39 @@ export default function SafetyCheckApplicationTab({
                     <td>
                       <div className="improvement-cell">
                         {isEditing ? (
-                          <input
-                            type="text"
-                            className="improvement-input"
-                            value={draftPlan}
-                            disabled={isSaving}
-                            autoFocus
-                            onChange={(event) => setDraftPlan(event.target.value)}
-                          />
+                          <>
+                            <input
+                              type="text"
+                              className="improvement-input"
+                              value={draftPlan}
+                              disabled={isSaving}
+                              autoFocus
+                              placeholder="향후 관리 계획"
+                              onChange={(event) => setDraftPlan(event.target.value)}
+                            />
+                            <input
+                              type="text"
+                              className="improvement-input"
+                              value={draftAdditionalInfo}
+                              disabled={isSaving}
+                              maxLength={240}
+                              placeholder="신청서에 반영할 한줄평"
+                              onChange={(event) =>
+                                setDraftAdditionalInfo(event.target.value)
+                              }
+                            />
+                          </>
                         ) : hasPlan ? (
-                          <span className="improvement-text">{item.improvement_plan}</span>
+                          <>
+                            <span className="improvement-text">
+                              {item.improvement_plan || "향후 계획 미입력"}
+                            </span>
+                            {item.additional_info ? (
+                              <small className="improvement-additional-info">
+                                신청서 반영: {item.additional_info}
+                              </small>
+                            ) : null}
+                          </>
                         ) : (
                           <span className="improvement-empty">[선택입력]</span>
                         )}
@@ -150,7 +183,12 @@ export default function SafetyCheckApplicationTab({
                             ? "ff-draft-safety-save-btn"
                             : "ff-draft-edit-btn"
                         }
-                        disabled={isSaving || (isEditing && !draftPlan.trim())}
+                        disabled={
+                          isSaving ||
+                          (isEditing &&
+                            !draftPlan.trim() &&
+                            !draftAdditionalInfo.trim())
+                        }
                         onClick={() => handleEditClick(item)}
                       >
                         {isEditing
@@ -198,6 +236,7 @@ export default function SafetyCheckApplicationTab({
             if (editingItemId === clearTarget.id) {
               setEditingItemId(null)
               setDraftPlan("")
+              setDraftAdditionalInfo("")
             }
             setClearTarget(null)
           } finally {

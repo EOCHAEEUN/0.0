@@ -15,6 +15,7 @@ import {
   formatManwon,
   formatPaybackFromScenario,
 } from "../applicationDraft.utils"
+import { APPLICATION_DRAFT_MUST_INCLUDE_KEY } from "../applicationDraft.constants"
 
 type RouteContext = {
   analysisId?: string
@@ -170,6 +171,8 @@ export function useApplicationDraftWorkspace(route: RouteContext) {
         equipmentId: data.equipment_id,
         policyId: data.policy_id,
         analysisId: data.analysis_id || analysisId,
+        mustIncludeText:
+          readLocalStorage(APPLICATION_DRAFT_MUST_INCLUDE_KEY) || undefined,
       })
       await reload(data.policy_id)
     } catch (error) {
@@ -196,6 +199,8 @@ export function useApplicationDraftWorkspace(route: RouteContext) {
         equipmentId: data.equipment_id,
         policyId: normalizedPolicyId,
         analysisId: data.analysis_id || analysisId,
+        mustIncludeText:
+          readLocalStorage(APPLICATION_DRAFT_MUST_INCLUDE_KEY) || undefined,
       })
       await reload(normalizedPolicyId)
     } catch (error) {

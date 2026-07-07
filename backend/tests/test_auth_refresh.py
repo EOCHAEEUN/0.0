@@ -38,17 +38,64 @@ def test_refresh_session_returns_rotated_tokens(monkeypatch):
     assert result["data"]["refresh_token"] == "new-refresh"
 
 
-def test_refresh_session_rejects_invalid_token(monkeypatch):
+def _client_raising(exc):
     def fail(_token):
-        raise ValueError("invalid refresh token")
+        raise exc
 
-    auth_client = SimpleNamespace(
-        auth=SimpleNamespace(refresh_session=fail)
+    return SimpleNamespace(auth=SimpleNamespace(refresh_session=fail))
+
+
+def test_refresh_session_rejects_invalid_token(monkeypatch):
+    from supabase_auth.errors import AuthApiError
+
+    monkeypatch.setattr(
+        auth,
+        "create_service_client",
+        lambda: _client_raising(
+            AuthApiError(
+                "Invalid Refresh Token: Refresh Token Not Found",
+                400,
+                "refresh_token_not_found",
+            )
+        ),
     )
-    monkeypatch.setattr(auth, "create_service_client", lambda: auth_client)
 
     response = asyncio.run(
         auth.refresh_session(RefreshSessionRequest(refresh_token="expired"))
     )
 
     assert response.status_code == 401
+    assert b"REFRESH_TOKEN_INVALID" in response.body
+
+
+def test_refresh_session_treats_network_error_as_unavailable(monkeypatch):
+    from supabase_auth.errors import AuthRetryableError
+
+    monkeypatch.setattr(
+        auth,
+        "create_service_client",
+        lambda: _client_raising(AuthRetryableError("connection reset", 0)),
+    )
+
+    response = asyncio.run(
+        auth.refresh_session(RefreshSessionRequest(refresh_token="valid"))
+    )
+
+    # 일시 장애는 401(무효)로 반환하면 안 된다 — 프론트가 세션을 지우게 되므로
+    assert response.status_code == 503
+    assert b"AUTH_REFRESH_UNAVAILABLE" in response.body
+
+
+def test_refresh_session_treats_unknown_error_as_unavailable(monkeypatch):
+    monkeypatch.setattr(
+        auth,
+        "create_service_client",
+        lambda: _client_raising(ValueError("unexpected")),
+    )
+
+    response = asyncio.run(
+        auth.refresh_session(RefreshSessionRequest(refresh_token="valid"))
+    )
+
+    assert response.status_code == 503
+    assert b"AUTH_REFRESH_UNAVAILABLE" in response.body

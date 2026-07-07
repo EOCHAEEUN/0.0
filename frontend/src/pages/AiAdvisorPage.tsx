@@ -24,7 +24,7 @@ import { requestApplicationDraftGeneration } from "../features/applicationDraft/
 import { APPLICATION_DRAFT_MUST_INCLUDE_KEY } from "../features/applicationDraft/applicationDraft.constants"
 import { fetchDashboardOnboarding } from "../features/dashboard/dashboard.api"
 import type { DashboardOnboardingMeResponse } from "../features/dashboard/dashboard.contract"
-import { clearAuthSession } from "../services/auth"
+import { AuthSessionInvalidError } from "../services/auth"
 
 type ChatMessage = {
   id: string
@@ -417,8 +417,10 @@ export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boole
       .catch((error) => {
         if (cancelled) return
         const message = error instanceof Error ? error.message : "컨텍스트 조회 실패"
-        if (message.includes("세션이 만료") || message.includes("로그인이 필요")) {
-          clearAuthSession()
+        // refresh token 무효로 확정된 경우에만 로그인으로 이동한다.
+        // (세션 삭제는 refreshAccessToken이 이미 수행함 — 문자열 매칭으로
+        // 일시 장애 메시지에 로그아웃되던 동작을 제거)
+        if (error instanceof AuthSessionInvalidError) {
           const redirect = encodeURIComponent(location.pathname + location.search)
           navigate(`/login?redirect=${redirect}`, { replace: true })
           return

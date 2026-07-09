@@ -41,6 +41,8 @@ export type RoiApiScenario = {
   annual_net_benefit_manwon?: number
   payback_years?: number
   roi_pct?: number
+  roi_period_months?: number
+  roi_basis?: string
   breakdown?: RoiApiScenarioBreakdown | null
   assumptions?: RoiApiScenarioAssumptions | null
 }

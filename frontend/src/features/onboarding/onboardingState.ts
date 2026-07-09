@@ -187,6 +187,7 @@ function compactScenarioMetrics(record: Record<string, unknown>) {
     "saving_manwon",
     "roi_pct",
     "roi_percent",
+    "roi_period_months",
     "payback_years",
     "paybackYears",
   ]

@@ -144,7 +144,7 @@ function StrategyScenarioCard({
             <dd>{scenario.investment}</dd>
           </div>
           <div>
-            <dt>ROI (5년)</dt>
+            <dt>ROI ({scenario.roiPeriodLabel.replace(" 기준", "")})</dt>
             <dd className={scenario.isRecommended ? "is-accent" : ""}>{scenario.roi}</dd>
           </div>
           <div>
@@ -176,7 +176,7 @@ function AnalysisTopKpiRow({
         <span>EXPECTED ROI ({recommendedLabel})</span>
         <div className="ff-roi-analysis-kpi-value-row">
           <strong>{roiKpi?.value ?? "-"}</strong>
-          <em>/ 24개월 기준</em>
+          <em>/ {scenarioA.roiPeriodLabel}</em>
         </div>
         <p>연간 비용 절감 효과를 반영한 기대 수익률입니다.</p>
       </article>
@@ -358,7 +358,6 @@ const ROADMAP_PHASES = [
 export function RoiWorkspaceViews(props: RoiWorkspaceViewProps) {
   const {
     view,
-    equipmentName,
     recLabel,
     strategyCards,
     scenarios,

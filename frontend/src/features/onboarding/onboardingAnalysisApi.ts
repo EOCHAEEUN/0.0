@@ -332,6 +332,7 @@ function compactScenario(record: ApiRecord) {
     "saving_manwon",
     "roi_pct",
     "roi_percent",
+    "roi_period_months",
     "payback_years",
     "paybackYears",
   ]

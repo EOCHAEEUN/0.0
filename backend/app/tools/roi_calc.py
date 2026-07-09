@@ -352,6 +352,8 @@ def _build_scenario(
         "annual_net_benefit_manwon": annual_net_benefit,
         "payback_years": payback_years,
         "roi_pct": roi_pct,
+        "roi_period_months": 12,
+        "roi_basis": "annual_net_benefit",
         "policy_application": support,
         "assumptions": {
             "energy_cost_annual_used": energy_cost,

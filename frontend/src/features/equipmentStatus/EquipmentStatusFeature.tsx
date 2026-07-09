@@ -334,7 +334,7 @@ export default function EquipmentStatusFeature() {
               </p>
             </div>
             {!editingId ? (
-              <button type="button" className="ff-equipment-secondary-btn" onClick={startCreate}>
+              <button type="button" className="ff-equipment-secondary-btn ff-equipment-hero-action-btn" onClick={startCreate}>
                 <Plus aria-hidden="true" size={18} />
                 내 설비 등록
               </button>

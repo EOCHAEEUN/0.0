@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import os
 import re
 from dataclasses import dataclass
@@ -8,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from langchain_core.messages import HumanMessage, SystemMessage
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from reportlab.lib.pagesizes import A4
@@ -29,6 +31,7 @@ from reportlab.platypus import (
 )
 
 from app.core.database import get_db
+from app.core.llm import llm_advanced
 from app.services.policy_compatibility import assert_policy_compatible
 
 
@@ -3717,6 +3720,61 @@ def generate_application_evidence_report_pdf(ctx: ReportContext) -> bytes:
     return build_application_report_pdf(ctx.data)
 
 
+def _build_advanced_review_text(
+    fallback_text: str,
+    *,
+    summary: dict[str, Any],
+    equipment: dict[str, Any],
+    policy: dict[str, Any],
+    safety_items: list[dict[str, Any]],
+) -> str:
+    facts = {
+        "company_name": summary.get("company_name"),
+        "equipment_name": summary.get("equipment_name") or equipment.get("name"),
+        "policy_name": summary.get("policy_title") or policy.get("title"),
+        "scenario_label": summary.get("scenario_label"),
+        "investment_manwon": summary.get("investment_manwon"),
+        "subsidy_manwon": summary.get("subsidy_manwon"),
+        "self_funding_manwon": summary.get("self_funding_manwon"),
+        "payback_months": summary.get("payback_months"),
+        "roi_pct": summary.get("roi_pct"),
+        "match_score": summary.get("match_score"),
+        "submission_readiness": summary.get("submission_readiness"),
+        "safety_status_items": [
+            {
+                "label": str(item.get("label") or "").strip(),
+                "status": str(item.get("status") or "").strip(),
+            }
+            for item in safety_items
+            if isinstance(item, dict)
+        ],
+    }
+    prompt = """
+당신은 신청서 PDF의 '종합 검토 의견' 문단만 작성하는 편집기입니다.
+아래 제약을 반드시 지키세요.
+
+제약:
+1) 제공된 Facts에 없는 사실 추가 금지
+2) 숫자(투자금/지원금/자기부담금/회수기간/ROI/점수) 변경 금지
+3) 정책명/설비명/시나리오명 변경 금지
+4) 3~5문장 이내의 짧은 결론 문단으로만 작성
+5) 출력은 한국어 일반 텍스트만 반환 (JSON/머리말/불릿 금지)
+"""
+    try:
+        response = llm_advanced.invoke(
+            [
+                SystemMessage(content=prompt.strip()),
+                HumanMessage(content=f"Facts:\n{json.dumps(facts, ensure_ascii=False)}"),
+            ]
+        )
+        text = str(response.content or "").strip()
+        if not text:
+            return fallback_text
+        return f"종합 검토 의견\n{text}"
+    except Exception:
+        return fallback_text
+
+
 def build_application_report_pdf(data: dict) -> bytes:
     regular_font, bold_font = _register_fonts()
     buffer = io.BytesIO()
@@ -3777,7 +3835,7 @@ def build_application_report_pdf(data: dict) -> bytes:
     nominal_tone = data.get("tone") == "nominal"
 
     if nominal_tone:
-        review_text = (
+        fallback_review_text = (
             "종합 검토 의견\n"
             f"{summary['company_name']}의 {summary['policy_title']} 지원 대상 조건 연계 가능성이 확인됨. "
             f"'{summary['scenario_label']}' 시나리오 기준 총 "
@@ -3790,7 +3848,7 @@ def build_application_report_pdf(data: dict) -> bytes:
             "최종 제출 전 공고 원문, 지원비율, 제출서류 및 실제 견적의 재확인이 필요함."
         )
     elif analyst_tone:
-        review_text = (
+        fallback_review_text = (
             "종합 검토 의견\n"
             f"{summary['company_name']}은(는) {summary['policy_title']}의 지원 대상 조건과 "
             f"연계 가능성이 있다. '{summary['scenario_label']}' 시나리오를 기준으로 "
@@ -3804,7 +3862,7 @@ def build_application_report_pdf(data: dict) -> bytes:
             "확인해야 한다."
         )
     else:
-        review_text = (
+        fallback_review_text = (
             "종합 검토 의견\n"
             f"{summary['company_name']}은(는) {summary['policy_title']}의 지원 대상 조건과 "
             f"연계 가능성이 있으며, '{summary['scenario_label']}' 시나리오를 기준으로 "
@@ -3816,6 +3874,14 @@ def build_application_report_pdf(data: dict) -> bytes:
             "자동 생성한 신청서 참고 초안입니다. 최종 제출 전 공고 원문, 지원비율, "
             "제출서류 및 실제 견적을 담당자가 반드시 확인해야 합니다."
         )
+
+    review_text = _build_advanced_review_text(
+        fallback_review_text,
+        summary=summary,
+        equipment=equipment,
+        policy=policy,
+        safety_items=(data.get("safety_improvement") or {}).get("items") or [],
+    )
 
     story: list[Any] = [
         _paragraph(summary["policy_title"], title),

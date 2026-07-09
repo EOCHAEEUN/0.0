@@ -51,6 +51,15 @@ export default function EquipmentGuideChatPanel({
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [open, onClose])
 
+  useEffect(() => {
+    if (!open) return
+    const previous = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => {
+      document.body.style.overflow = previous
+    }
+  }, [open])
+
   const sendMessage = async (text: string) => {
     const trimmed = text.trim()
     if (!trimmed || isSending) return
@@ -86,16 +95,8 @@ export default function EquipmentGuideChatPanel({
     }
   }
 
-  useEffect(() => {
-    if (!open) return
-    const previous = document.body.style.overflow
-    document.body.style.overflow = "hidden"
-    return () => {
-      document.body.style.overflow = previous
-    }
-  }, [open])
-
   if (!open) return null
+
 
   return (
     <section

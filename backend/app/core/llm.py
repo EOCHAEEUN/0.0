@@ -2,26 +2,23 @@ from langchain_openai import ChatOpenAI
 
 from app.core.config import settings
 
+llm_fast = ChatOpenAI(
+    model=settings.openrouter_fast_model,
+    openai_api_key=settings.openrouter_api_key,
+    openai_api_base=settings.openrouter_base_url,
+    temperature=0,
+    request_timeout=12,
+)
 
-def _resolve_api_key() -> str:
-    api_key = (settings.openrouter_api_key or "").strip()
-    if not api_key:
-        raise ValueError("OPENROUTER_API_KEY is missing. Set it in backend/.env")
-    return api_key
+llm_advanced = ChatOpenAI(
+    model=settings.openrouter_advanced_model,
+    openai_api_key=settings.openrouter_api_key,
+    openai_api_base=settings.openrouter_base_url,
+    temperature=0,
+    request_timeout=20,
+)
 
-
-def _create_llm(model: str, *, temperature: float = 0) -> ChatOpenAI:
-    return ChatOpenAI(
-        model=model,
-        api_key=_resolve_api_key(),
-        base_url=settings.llm_api_base,
-        temperature=temperature,
-    )
-
-
-llm_fast = _create_llm(settings.llm_fast_model)
-llm_advisor = _create_llm(settings.llm_advisor_model, temperature=0.4)
-llm_pro = _create_llm(settings.llm_pro_model)
-
-# 기존 import 호환
-llm = _create_llm(settings.llm_model)
+# Backward-compatible aliases (기존 소비처: llm / llm_pro / llm_advisor)
+llm = llm_fast
+llm_pro = llm_advanced
+llm_advisor = llm_advanced

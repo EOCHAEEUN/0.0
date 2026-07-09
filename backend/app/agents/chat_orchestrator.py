@@ -20,10 +20,10 @@ EXPLICIT_ACTION_TO_ROUTE = {
     "roi_compare": "roi_snapshot",
     "matched_policies": "policy_snapshot",
     "policy_calendar": "calendar_snapshot",
-  "application_draft_status": "draft_status",
-  "safety_status": "safety_snapshot",
-  "safety_check_summary": "safety_check_summary",
-  "investment_simulation": "investment_simulation",
+    "application_draft_status": "draft_status",
+    "safety_status": "safety_snapshot",
+    "safety_check_summary": "safety_check_summary",
+    "investment_simulation": "investment_simulation",
     "current_analysis_summary": "current_analysis_summary",
 }
 
@@ -557,14 +557,18 @@ def draft_status_node(state: FactofitState) -> FactofitState:
 
     if draft_row:
         content = draft_row.get("draft_content")
+        additional_info = _as_text(draft_row.get("additional_info"))
         preview = ""
         if isinstance(content, dict):
             preview = _as_text(content.get("business_necessity") or json.dumps(content, ensure_ascii=False))
         else:
             preview = _as_text(content)
+        text = f"신청서 초안이 준비되어 있습니다.\n{preview[:360]}"
+        if additional_info:
+            text += f"\n\n최근 반영 요청: {additional_info}"
         _response_payload(
             state,
-            text=f"신청서 초안이 준비되어 있습니다.\n{preview[:360]}",
+            text=text,
             cards=[{
                 "type": "application_draft_status",
                 "data": {
@@ -573,6 +577,7 @@ def draft_status_node(state: FactofitState) -> FactofitState:
                     "policy_id": selected_policy_id,
                     "policies": policy_cards,
                     "preview": preview[:240],
+                    "additional_info": additional_info,
                 },
             }],
             intent="draft",

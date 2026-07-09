@@ -3,7 +3,12 @@ import type {
   DashboardOnboardingMeResponse,
   DashboardOverviewResponse,
 } from "./dashboard.contract"
-import { getAccessToken, getCurrentUserId, refreshAccessToken } from "../../services/auth"
+import {
+  getAccessToken,
+  getCurrentUserId,
+  markAuthExpired,
+  refreshAccessToken,
+} from "../../services/auth"
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000"
 const ANALYSIS_RESULT_STORAGE_KEY = "factofit_analysis_result"
@@ -85,6 +90,9 @@ export async function fetchDashboardOnboarding() {
   const responseText = await response.text()
 
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      markAuthExpired("로그인이 만료되었습니다. 다시 로그인해주세요.")
+    }
     console.error("[Dashboard company context] fetch failed", {
       status: response.status,
       hasToken: Boolean(accessToken),
@@ -150,6 +158,9 @@ export async function fetchDashboardOverview(params: {
 
   const responseText = await response.text()
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      markAuthExpired("로그인이 만료되었습니다. 다시 로그인해주세요.")
+    }
     throw new Error(
       `대시보드 정보를 불러오지 못했습니다. (${response.status}) ${responseText.slice(0, 120)}`,
     )

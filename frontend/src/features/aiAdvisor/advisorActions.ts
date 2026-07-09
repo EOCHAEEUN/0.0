@@ -16,6 +16,7 @@ export type AdvisorActionId =
   | "matched_policies"
   | "safety_check_summary"
   | "application_draft_status"
+  | "safety_check_summary"
   | "start_analysis"
   | "roi_analyze"
 
@@ -84,6 +85,15 @@ export const ANALYSIS_QUICK_ACTIONS: AdvisorActionDefinition[] = [
     icon: FileText,
     requiresAnalysis: true,
     loadingLabel: "초안 조회 중…",
+    responseType: "database",
+  },
+  {
+    id: "safety_check_summary",
+    label: "안전점검",
+    userMessage: "안전점검 현황 알려줘",
+    icon: ShieldCheck,
+    requiresAnalysis: true,
+    loadingLabel: "안전점검 조회 중...",
     responseType: "database",
   },
 ]

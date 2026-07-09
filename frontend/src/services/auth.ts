@@ -1,5 +1,7 @@
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api"
+export const AUTH_EXPIRED_EVENT = "factofit:auth-expired"
+const AUTH_EXPIRED_MESSAGE_KEY = "factofit_auth_expired_message"
 
 export type AuthSession = {
   access_token: string | null
@@ -71,6 +73,34 @@ export function getAccessToken() {
   const legacy =
     localStorage.getItem("access_token") ?? localStorage.getItem("token")
   return legacy?.trim() ? legacy.trim() : null
+}
+
+function readSessionExpiry() {
+  try {
+    const raw = localStorage.getItem("factofit_auth_session")
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as {
+      expires_at?: number | null
+      data?: { expires_at?: number | null }
+      session?: { expires_at?: number | null }
+    }
+    const expiry =
+      parsed.expires_at ?? parsed.data?.expires_at ?? parsed.session?.expires_at ?? null
+    if (typeof expiry !== "number" || !Number.isFinite(expiry)) return null
+    // Supabase/session payloads can be in seconds. Normalize to seconds.
+    return expiry > 1_000_000_000_000 ? Math.floor(expiry / 1000) : Math.floor(expiry)
+  } catch {
+    return null
+  }
+}
+
+export function hasValidAuthSession() {
+  const token = getAccessToken()
+  if (!token) return false
+  const expiresAt = readSessionExpiry()
+  if (!expiresAt) return true
+  const now = Math.floor(Date.now() / 1000)
+  return expiresAt > now
 }
 
 async function postAuth<T>(
@@ -255,5 +285,31 @@ export async function purgeStaleAuthSessionIfNeeded() {
   } catch {
     // refresh token 무효일 때는 refreshAccessToken이 이미 세션을 삭제했다.
     // 네트워크 오류·5xx·파싱 오류 등 일시 장애에서는 세션을 유지한다.
+  }
+}
+
+export function markAuthExpired(message = "로그인이 만료되었습니다. 다시 로그인해주세요.") {
+  if (typeof window === "undefined") return
+  clearAuthSession()
+  try {
+    window.sessionStorage.setItem(AUTH_EXPIRED_MESSAGE_KEY, message)
+  } catch {
+    // ignore
+  }
+  window.dispatchEvent(
+    new CustomEvent(AUTH_EXPIRED_EVENT, {
+      detail: { message },
+    }),
+  )
+}
+
+export function consumeAuthExpiredMessage() {
+  if (typeof window === "undefined") return ""
+  try {
+    const message = window.sessionStorage.getItem(AUTH_EXPIRED_MESSAGE_KEY) || ""
+    if (message) window.sessionStorage.removeItem(AUTH_EXPIRED_MESSAGE_KEY)
+    return message
+  } catch {
+    return ""
   }
 }

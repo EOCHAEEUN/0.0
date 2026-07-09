@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { Navigate, Outlet, useLocation } from "react-router-dom"
 import GlobalHeader from "./GlobalHeader"
-import { getAccessToken } from "../../services/auth"
+import { AUTH_EXPIRED_EVENT, hasValidAuthSession } from "../../services/auth"
 import { getCompanyProfileDraft } from "../../features/onboarding/onboardingState"
 import { hydrateAccountData } from "../../services/accountHydration"
 
@@ -21,9 +21,12 @@ export default function AuthenticatedLayout() {
     location.pathname.startsWith("/advisor/") ||
     location.pathname === "/ai" ||
     location.pathname === "/ai-advisor" ||
+    location.pathname === "/mobile" ||
+    location.pathname.startsWith("/mobile/") ||
     location.pathname === "/mypage" ||
     location.pathname === "/company"
-  const hasToken = !!getAccessToken()
+  const [, setAuthRefreshTick] = useState(0)
+  const hasToken = hasValidAuthSession()
 
   // 토큰은 있지만 기업 데이터가 없는 경우(재로그인·새 기기)만 hydrate
   const [hydrating, setHydrating] = useState(() => {
@@ -37,10 +40,22 @@ export default function AuthenticatedLayout() {
     void hydrateAccountData().finally(() => setHydrating(false))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      setAuthRefreshTick((prev) => prev + 1)
+      setHydrating(false)
+    }
+    window.addEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired)
+    return () => {
+      window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired)
+    }
+  }, [])
+
   if (!hasToken) {
     const redirect = encodeURIComponent(location.pathname + location.search)
     return <Navigate to={`/login?redirect=${redirect}`} replace />
   }
+
 
   if (hydrating) {
     return (

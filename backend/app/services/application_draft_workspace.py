@@ -903,6 +903,25 @@ def load_application_draft_workspace(
     if snapshot_policy:
         resolved_policy_id = _safe_text(snapshot_policy.get("policy_id"), resolved_policy_id)
 
+    available_policies: list[dict[str, Any]] = []
+    if not legacy_missing:
+        for row in _snapshot_policy_rows(snapshot)[:5]:
+            row_policy_id = _safe_text(row.get("policy_id"))
+            if not row_policy_id:
+                continue
+            available_policies.append(
+                {
+                    "policy_id": row_policy_id,
+                    "title": _safe_text(row.get("title"), "지원사업명 미확인"),
+                    "organization": _safe_text(row.get("organization")) or None,
+                    "deadline": _safe_text(
+                        row.get("deadline_display"), row.get("deadline")
+                    )
+                    or None,
+                    "is_selected": row_policy_id == resolved_policy_id,
+                }
+            )
+
     policy_detail: dict[str, Any] = {}
     if resolved_policy_id and not legacy_missing:
         policy_rows = (
@@ -917,29 +936,42 @@ def load_application_draft_workspace(
 
     draft_row: dict[str, Any] | None = None
     if resolved_policy_id:
-        draft_query = (
-            db.table("draft_result")
-            .select("*")
-            .eq("company_id", company_id)
-            .eq("analysis_id", analysis_id)
-            .eq("policy_id", resolved_policy_id)
-            .order("created_at", desc=True)
-            .limit(1)
-        )
-        draft_result = draft_query.execute()
-        if not draft_result.data:
-            draft_result = (
+        draft_policy_candidates = [resolved_policy_id]
+        draft_policy_candidates.append(re.sub(r":[AB](?:\d+)?$", "", resolved_policy_id, flags=re.IGNORECASE))
+        draft_policy_candidates.append(re.sub(r":\d+$", "", resolved_policy_id))
+        draft_policy_candidates.append(re.sub(r":[AB]$", "", resolved_policy_id, flags=re.IGNORECASE))
+
+        seen_policy_ids: set[str] = set()
+        for candidate in draft_policy_candidates:
+            policy_candidate = _safe_text(candidate)
+            if not policy_candidate or policy_candidate in seen_policy_ids:
+                continue
+            seen_policy_ids.add(policy_candidate)
+
+            draft_query = (
                 db.table("draft_result")
                 .select("*")
                 .eq("company_id", company_id)
-                .eq("equipment_id", equipment_id)
-                .eq("policy_id", resolved_policy_id)
+                .eq("analysis_id", analysis_id)
+                .eq("policy_id", policy_candidate)
                 .order("created_at", desc=True)
                 .limit(1)
-                .execute()
             )
-        if draft_result.data:
-            draft_row = draft_result.data[0]
+            draft_result = draft_query.execute()
+            if not draft_result.data:
+                draft_result = (
+                    db.table("draft_result")
+                    .select("*")
+                    .eq("company_id", company_id)
+                    .eq("equipment_id", equipment_id)
+                    .eq("policy_id", policy_candidate)
+                    .order("created_at", desc=True)
+                    .limit(1)
+                    .execute()
+                )
+            if draft_result.data:
+                draft_row = draft_result.data[0]
+                break
 
     roi_data = _as_dict(roi_output.get("roi_data"))
     selected_scenario = _resolve_selected_scenario(
@@ -995,6 +1027,35 @@ def load_application_draft_workspace(
         policy_detail.get("deadline_display"),
         policy_detail.get("deadline"),
     )
+    policy_options: list[dict[str, Any]] = []
+    if not legacy_missing:
+        for row in _snapshot_policy_rows(snapshot)[:5]:
+            option_id = _safe_text(row.get("policy_id"))
+            if not option_id:
+                continue
+            policy_options.append(
+                {
+                    "policy_id": option_id,
+                    "title": _safe_text(row.get("title")) or "정책명 미확인",
+                    "deadline": _safe_text(
+                        row.get("deadline_display"),
+                        row.get("deadline"),
+                        default="마감일 미정",
+                    ),
+                }
+            )
+    if (
+        resolved_policy_id
+        and not any(_safe_text(item.get("policy_id")) == resolved_policy_id for item in policy_options)
+    ):
+        policy_options.insert(
+            0,
+            {
+                "policy_id": resolved_policy_id,
+                "title": policy_title or "현재 선택 정책",
+                "deadline": policy_deadline or "마감일 미정",
+            },
+        )
 
     return {
         "state": "ready",
@@ -1027,18 +1088,13 @@ def load_application_draft_workspace(
             "deadline": policy_deadline or None,
             "source": "policy_snapshot" if not legacy_missing else "legacy_missing",
             "legacy_missing": legacy_missing,
-            "options": _build_policy_options(
-                db,
-                snapshot=snapshot if not legacy_missing else None,
-                legacy_missing=legacy_missing,
-                company_id=company_id,
-                analysis_id=str(analysis_id),
-                equipment_id=equipment_id,
-            ),
+            "options": policy_options[:5],
+            "available_policies": available_policies,
         },
         "draft": {
             "exists": bool(draft_row),
             "draft_result_id": (draft_row or {}).get("draft_result_id"),
+            "additional_info": _safe_text((draft_row or {}).get("additional_info")) or None,
             "content": draft_content if draft_row else {},
             "summary_paragraphs": _build_summary_paragraphs(draft_content)
             if draft_row

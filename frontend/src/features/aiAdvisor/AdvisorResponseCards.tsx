@@ -99,7 +99,9 @@ function DraftStatusCard({
     if (selected?.compatible) return selected.policyId
     return policies.find((policy) => policy.compatible)?.policyId || ""
   })
-  const [mustIncludeText, setMustIncludeText] = useState("")
+  const [mustIncludeText, setMustIncludeText] = useState(() =>
+    readText(data.additional_info),
+  )
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitMessage, setSubmitMessage] = useState("")
   const [submitError, setSubmitError] = useState("")
@@ -138,6 +140,11 @@ function DraftStatusCard({
           ? "현재 초안이 있습니다. 정책과 추가 요청을 입력해 다시 반영할 수 있습니다."
           : "초안이 아직 없습니다. 정책을 선택하고 요청사항을 입력하면 초안을 생성합니다."}
       </p>
+      {readText(data.additional_info) ? (
+        <p className="ff-advisor-card-footnote">
+          최근 반영 요청: {readText(data.additional_info)}
+        </p>
+      ) : null}
 
       {policies.length > 0 ? (
         <div className="ff-advisor-draft-form">

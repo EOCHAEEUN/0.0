@@ -326,6 +326,11 @@
   border-color: var(--blue);
 }
 
+.ff-placeholder-form input::placeholder {
+  color: var(--muted);
+  font-weight: 700;
+}
+
 .ff-setup-form em,
 .ff-field-error {
   color: var(--red);
@@ -591,7 +596,7 @@
 /* 필수 표시 */
 .ff-required-mark {
   font-style: normal;
-  color: var(--blue);
+  color: var(--red);
   margin-left: 2px;
 }
 
@@ -697,6 +702,38 @@
   color: var(--navy);
   font-size: 13px;
   font-weight: 900;
+}
+
+/* 새 설비 투자 분석 — 2열 그리드 (이 페이지 전용) */
+.ff-analysis-page--new-equipment .ff-analysis-field-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.ff-analysis-page--new-equipment .ff-analysis-field-grid--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ff-analysis-page--new-equipment .ff-analysis-field-grid > label {
+  margin-bottom: 0;
+}
+
+.ff-analysis-page--new-equipment .ff-optional-inner.ff-analysis-field-grid > label {
+  margin-bottom: 0;
+}
+
+.ff-analysis-page--new-equipment .ff-placeholder-form > .ff-purpose-field {
+  margin-bottom: 18px;
+}
+
+.ff-analysis-page--new-equipment .ff-analysis-field-grid + .ff-analysis-optional {
+  margin-top: 4px;
+}
+
+@media (max-width: 920px) {
+  .ff-analysis-page--new-equipment .ff-analysis-field-grid--two {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* 토스트 알림 */

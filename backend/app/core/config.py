@@ -10,11 +10,9 @@ DEFAULT_CHROMA_DIR = Path(__file__).resolve().parents[2] / "chroma_db"
 
 class Settings(BaseSettings):
     openrouter_api_key: str
-    llm_model: str = "openai/gpt-4.1"
-    llm_api_base: str = "https://openrouter.ai/api/v1"
-    llm_fast_model: str = "google/gemini-2.5-flash"
-    llm_advisor_model: str = "anthropic/claude-sonnet-4"
-    llm_pro_model: str = "google/gemini-2.5-pro"
+    openrouter_fast_model: str = "openai/gpt-5.4-mini"
+    openrouter_advanced_model: str = "openai/gpt-5.4"
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
     supabase_url: str
     supabase_service_key: str
     chroma_persist_dir: str = str(DEFAULT_CHROMA_DIR)

@@ -1,4 +1,5 @@
 import { buildApiUrl, getAccessToken } from "../mypage/myPage.parts"
+import { markAuthExpired } from "../../services/auth"
 import type {
   SafetyCheckCreatePayload,
   SafetyCheckImprovementPayload,
@@ -17,6 +18,9 @@ async function parseResponse<T>(response: Response): Promise<T> {
   })()
 
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      markAuthExpired("로그인이 만료되었습니다. 다시 로그인해주세요.")
+    }
     const detail =
       (typeof payload?.detail === "string" ? payload.detail : undefined) ||
       (typeof payload?.message === "string" ? payload.message : undefined) ||

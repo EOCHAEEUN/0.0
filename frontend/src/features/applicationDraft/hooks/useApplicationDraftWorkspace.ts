@@ -72,16 +72,16 @@ export function useApplicationDraftWorkspace(route: RouteContext) {
   })
   const [manualScenarioKey, setManualScenarioKey] = useState<ScenarioKey>("A")
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false)
-  const [isApplyingPolicy, setIsApplyingPolicy] = useState(false)
   const [generateError, setGenerateError] = useState("")
-  const [activePolicyId, setActivePolicyId] = useState<string | undefined>(route.policyId)
+  const [activePolicyId, setActivePolicyId] = useState(route.policyId || "")
+  const [lastGeneratedAt, setLastGeneratedAt] = useState("")
 
   const companyId = resolveCompanyId(route)
   const analysisId = route.analysisId
   const policyId = route.policyId
 
   useEffect(() => {
-    setActivePolicyId(route.policyId)
+    setActivePolicyId(route.policyId || "")
   }, [route.policyId])
 
   const reload = useCallback(async (overridePolicyId?: string) => {
@@ -101,15 +101,13 @@ export function useApplicationDraftWorkspace(route: RouteContext) {
       return
     }
 
-    const effectivePolicyId = overridePolicyId ?? activePolicyId ?? policyId
-
     setWorkspaceState({ kind: "loading" })
 
     try {
       const data = await fetchApplicationDraftWorkspace({
         companyId,
         analysisId,
-        policyId: effectivePolicyId,
+        policyId: overridePolicyId || activePolicyId || policyId,
       })
 
       if (data.state === "analysis_required") {
@@ -174,7 +172,8 @@ export function useApplicationDraftWorkspace(route: RouteContext) {
         mustIncludeText:
           readLocalStorage(APPLICATION_DRAFT_MUST_INCLUDE_KEY) || undefined,
       })
-      await reload(data.policy_id)
+      await reload()
+      setLastGeneratedAt(new Date().toISOString())
     } catch (error) {
       setGenerateError(
         error instanceof Error ? error.message : "신청서 초안 생성에 실패했습니다.",
@@ -185,13 +184,12 @@ export function useApplicationDraftWorkspace(route: RouteContext) {
   }
 
   const applyPolicyAndRegenerate = async (nextPolicyId: string) => {
+    if (!data?.company_id || !data.equipment_id) return
     const normalizedPolicyId = nextPolicyId.trim()
-    if (!data?.company_id || !data.equipment_id || !normalizedPolicyId) return
-    if (normalizedPolicyId === data.policy_id) return
+    if (!normalizedPolicyId) return
 
-    setIsApplyingPolicy(true)
+    setIsGeneratingDraft(true)
     setGenerateError("")
-    setActivePolicyId(normalizedPolicyId)
 
     try {
       await requestApplicationDraftGeneration({
@@ -202,13 +200,15 @@ export function useApplicationDraftWorkspace(route: RouteContext) {
         mustIncludeText:
           readLocalStorage(APPLICATION_DRAFT_MUST_INCLUDE_KEY) || undefined,
       })
+      setActivePolicyId(normalizedPolicyId)
       await reload(normalizedPolicyId)
     } catch (error) {
       setGenerateError(
-        error instanceof Error ? error.message : "지원사업 변경 후 초안 재생성에 실패했습니다.",
+        error instanceof Error ? error.message : "지원사업 변경 반영에 실패했습니다.",
       )
+      throw error
     } finally {
-      setIsApplyingPolicy(false)
+      setIsGeneratingDraft(false)
     }
   }
 
@@ -263,8 +263,8 @@ export function useApplicationDraftWorkspace(route: RouteContext) {
     summaryText,
     draftExists: Boolean(data?.draft.exists),
     isGeneratingDraft,
-    isApplyingPolicy,
     generateError,
+    lastGeneratedAt,
     handleGenerateDraft,
     applyPolicyAndRegenerate,
     reload,

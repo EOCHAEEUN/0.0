@@ -213,66 +213,23 @@ export function SsoDialog({
   onContinue: () => void
 }) {
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 500,
-        display: "grid",
-        placeItems: "center",
-        padding: "28px",
-        background: "rgba(6,27,52,.52)",
-        backdropFilter: "blur(10px)",
-      }}
-    >
-      <section
-        onClick={(event) => event.stopPropagation()}
-        style={{
-          width: "min(560px, 100%)",
-          maxHeight: "calc(100vh - 56px)",
-          overflowY: "auto",
-          borderRadius: "30px",
-          background: "#FFFFFF",
-          color: "#061B34",
-          padding: "36px 38px 40px",
-          boxShadow: "0 34px 100px rgba(6,27,52,.34)",
-          border: "1px solid rgba(255,255,255,.54)",
-        }}
-      >
+    <div className="ff-login-sso-overlay" onClick={onClose}>
+      <section className="ff-login-sso-modal" onClick={(event) => event.stopPropagation()}>
         <PreviewHeader onClose={onClose} />
 
-        <div style={{ marginBottom: "26px" }}>
-          <h2
-            style={{
-              margin: "0 0 10px",
-              color: "#061B34",
-              fontSize: "28px",
-              lineHeight: 1.25,
-              letterSpacing: "-1px",
-              fontWeight: 900,
-            }}
-          >
+        <div className="ff-login-sso-copy" style={{ marginBottom: "26px" }}>
+          <h2>
             회사 계정으로
             <br />
             FactoFit에 접속합니다.
           </h2>
 
-          <p
-            style={{
-              margin: 0,
-              color: "#667085",
-              fontSize: "15px",
-              lineHeight: 1.75,
-              fontWeight: 800,
-            }}
-          >
-            기업 SSO는 사내 계정, 관리자 승인, 조직 도메인을 통해 로그인하는
-            방식입니다.
+          <p>
+            기업 SSO는 사내 계정, 관리자 승인, 조직 도메인을 통해 로그인하는 방식입니다.
           </p>
         </div>
 
-        <div style={{ display: "grid", gap: "16px", marginBottom: "24px" }}>
+        <div className="ff-login-sso-fields">
           <label style={fieldWrapStyle}>
             <span style={fieldLabelStyle}>회사 이메일</span>
             <input placeholder="name@company.com" style={inputStyle} />
@@ -283,24 +240,13 @@ export function SsoDialog({
             <input placeholder="예: FACTOFIT-2026" style={inputStyle} />
           </label>
 
-          <div
-            style={{
-              borderRadius: "18px",
-              border: "1px solid #E2E8F0",
-              background: "#F8FAFC",
-              padding: "18px 20px",
-              color: "#475467",
-              fontSize: "14px",
-              lineHeight: 1.75,
-              fontWeight: 800,
-            }}
-          >
-            관리자 승인 후에는 구성원별 권한, 분석 기록, 지원사업 캘린더를 조직
-            단위로 관리할 수 있습니다.
+          <div className="ff-login-sso-note">
+            관리자 승인 후에는 구성원별 권한, 분석 기록, 지원사업 캘린더를 조직 단위로 관리할 수
+            있습니다.
           </div>
         </div>
 
-        <button type="button" onClick={onContinue} style={modalNextButtonStyle}>
+        <button type="button" className="ff-login-btn ff-login-btn-primary" onClick={onContinue} style={modalNextButtonStyle}>
           다음으로
         </button>
       </section>

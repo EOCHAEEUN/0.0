@@ -134,6 +134,27 @@ export default function AdvisorActionIcon({ actionId }: AdvisorActionIconProps) 
           </svg>
         </span>
       )
+    case "safety_check_summary":
+      return (
+        <span className="ff-advisor-action-icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" fill="none">
+            <path
+              d="M10 2.8L15.5 4.8V9.2C15.5 12.7 13.3 15.7 10 17.2C6.7 15.7 4.5 12.7 4.5 9.2V4.8L10 2.8Z"
+              fill="#E0F2FE"
+              stroke="#0284C7"
+              strokeWidth="1.5"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M7.4 9.8L9.2 11.6L12.8 7.8"
+              stroke="#0F766E"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </span>
+      )
     case "start_analysis":
       return (
         <span className="ff-advisor-action-icon" aria-hidden="true">

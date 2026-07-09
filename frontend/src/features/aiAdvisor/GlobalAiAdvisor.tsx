@@ -43,6 +43,8 @@ export function GlobalAiAdvisor() {
     location.pathname === "/advisor" ||
     location.pathname === "/ai-advisor" ||
     location.pathname === "/ai"
+  const isMobileAppRoute =
+    location.pathname === "/mobile" || location.pathname.startsWith("/mobile/")
 
   const usesGuestIntroAdvisor =
     location.pathname === "/" ||
@@ -72,7 +74,7 @@ export function GlobalAiAdvisor() {
     return () => window.removeEventListener(OPEN_AI_ADVISOR_EVENT, openAdvisor)
   }, [])
 
-  if (isEquipmentPage || isEmbeddedAdvisorHost || activeAdvisorRoute) {
+  if (isEquipmentPage || isEmbeddedAdvisorHost || activeAdvisorRoute || isMobileAppRoute) {
     return null
   }
 

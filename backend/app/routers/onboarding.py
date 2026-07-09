@@ -8,6 +8,9 @@ from app.models.auth import CurrentUser
 from app.models.company import CompanyOnboarding, CompanyUpdate
 from app.models.equipment import EquipmentInput
 from app.models.user_profile import UserProfileCreate, UserProfileUpdate
+from app.services.policy_snapshot_hydration import (
+    hydrate_roi_outputs_policy_snapshots_for_response,
+)
 from app.tools.equipment_normalizer import normalize_equipment_category
 
 router = APIRouter()
@@ -133,7 +136,10 @@ async def get_my_company(
                         .limit(50)
                         .execute()
                     )
-                    roi_outputs = roi_query.data or []
+                    roi_outputs = hydrate_roi_outputs_policy_snapshots_for_response(
+                        db,
+                        roi_query.data or [],
+                    )
                     latest_roi_output = roi_outputs[0] if roi_outputs else None
                     policy_query = (
                         db.table("matched_policy")

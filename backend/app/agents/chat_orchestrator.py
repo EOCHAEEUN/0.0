@@ -22,7 +22,7 @@ EXPLICIT_ACTION_TO_ROUTE = {
     "policy_calendar": "calendar_snapshot",
   "application_draft_status": "draft_status",
   "safety_status": "safety_snapshot",
-  "safety_check_summary": "safety_snapshot",
+  "safety_check_summary": "safety_check_summary",
   "investment_simulation": "investment_simulation",
     "current_analysis_summary": "current_analysis_summary",
 }
@@ -654,6 +654,59 @@ def safety_snapshot_node(state: FactofitState) -> FactofitState:
                 },
             },
         ],
+        intent="safety",
+        answer_source="database",
+    )
+    return state
+
+
+def safety_check_summary_node(state: FactofitState) -> FactofitState:
+    company_id = _as_text(state.get("company_id"))
+    equipment_id = _as_text(state.get("equipment_id"))
+    rows = (
+        get_db()
+        .table("safety_check_improvement")
+        .select("id,improvement_plan")
+        .eq("company_id", company_id)
+        .eq("equipment_id", equipment_id)
+        .execute()
+        .data
+        or []
+    )
+    total = len(rows)
+    planned = sum(
+        1
+        for row in rows
+        if _as_text(_as_dict(row).get("improvement_plan"))
+    )
+    unplanned = total - planned
+
+    if total <= 0:
+        text = (
+            "해당 설비에 등록된 안전점검 항목이 없습니다. "
+            "안전점검 메뉴에서 점검 증빙을 먼저 등록해 주세요."
+        )
+    else:
+        text = (
+            f"해당 설비에 등록된 안전점검 항목은 총 {total}건이며, "
+            f"이 중 향후 관리 계획이 작성된 항목은 {planned}건, "
+            f"미작성 항목은 {unplanned}건입니다. "
+            "점검 증빙과 향후 관리 계획은 신청서 탭에서 설비별로 등록하시면, "
+            "신청서 작성 시 자동으로 반영됩니다."
+        )
+
+    _response_payload(
+        state,
+        text=text,
+        cards=[{
+            "type": "safety_check_summary",
+            "data": {
+                "total": total,
+                "planned": planned,
+                "unplanned": unplanned,
+                "equipment_id": equipment_id,
+            },
+        }],
         intent="safety",
         answer_source="database",
     )

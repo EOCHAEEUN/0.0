@@ -169,6 +169,10 @@ def _fixtures():
         "safety_check_status": [
             {"company_id": "c1", "equipment_id": "e1", "status": "pending"}
         ],
+        "safety_check_improvement": [
+            {"id": "s1", "company_id": "c1", "equipment_id": "e1", "improvement_plan": "월 1회 점검"},
+            {"id": "s2", "company_id": "c1", "equipment_id": "e1", "improvement_plan": "  "},
+        ],
         "safety_rule_legal": [{"rule_id": "l1", "inspection_type": "법정", "purpose": "안전장치"}],
         "safety_rule_voluntary": [{"rule_id": "v1", "inspection_type": "자율", "purpose": "교육"}],
         "chat_history": [{"chat_id": "s1", "company_id": "c1", "chat_history": []}],
@@ -280,6 +284,29 @@ def test_6_safety_status_db_first(monkeypatch):
     data = state["cards"][0]["data"]
     assert data["summary"]["total"] >= 1
     assert data["rule_sources"]["legal_count"] >= 1
+
+
+def test_safety_check_summary_counts_improvement_plans(monkeypatch):
+    fake_db = FakeDB(_fixtures())
+    monkeypatch.setattr(orch, "get_db", lambda: fake_db)
+    state = _base_state("safety_check_summary")
+    state = orch.entry_dispatch_node(state)
+    state = orch.explicit_action_dispatch_node(state)
+    assert state["route"] == "safety_check_summary"
+    state = orch.analysis_snapshot_loader_node(state)
+    state = orch.safety_check_summary_node(state)
+
+    data = state["cards"][0]["data"]
+    assert data == {
+        "total": 2,
+        "planned": 1,
+        "unplanned": 1,
+        "equipment_id": "e1",
+    }
+    assert "총 2건" in state["response"]
+    assert "작성된 항목은 1건" in state["response"]
+    assert "미작성 항목은 1건" in state["response"]
+    assert fake_db.write_calls == []
 
 
 def test_7_investment_simulation_temporary(monkeypatch):

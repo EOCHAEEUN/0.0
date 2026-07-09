@@ -440,6 +440,8 @@ export default function AdvisorResponseCards({
           if (hasSafetyStatusCard) return null
 
           const total = readNumber(data.total)
+          const planned = readNumber(data.planned)
+          const unplanned = readNumber(data.unplanned)
           const needImprovement = readNumber(data.need_improvement)
           const missingEvidence = readNumber(data.missing_evidence)
           if (total === null) return null
@@ -449,14 +451,23 @@ export default function AdvisorResponseCards({
               <strong>안전점검 요약</strong>
               <div className="ff-advisor-safety-metrics">
                 <MetricRow label="총 점검 항목" value={`${total}건`} />
-                <MetricRow
-                  label="개선 필요"
-                  value={needImprovement === null ? "-" : `${needImprovement}건`}
-                />
-                <MetricRow
-                  label="증빙 미보유"
-                  value={missingEvidence === null ? "-" : `${missingEvidence}건`}
-                />
+                {planned !== null || unplanned !== null ? (
+                  <>
+                    <MetricRow label="향후 관리 계획 작성" value={`${planned ?? 0}건`} />
+                    <MetricRow label="향후 관리 계획 미작성" value={`${unplanned ?? 0}건`} />
+                  </>
+                ) : (
+                  <>
+                    <MetricRow
+                      label="개선 필요"
+                      value={needImprovement === null ? "-" : `${needImprovement}건`}
+                    />
+                    <MetricRow
+                      label="증빙 미보유"
+                      value={missingEvidence === null ? "-" : `${missingEvidence}건`}
+                    />
+                  </>
+                )}
               </div>
             </article>
           )

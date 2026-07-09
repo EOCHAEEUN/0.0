@@ -342,7 +342,7 @@ export default function AiAdvisorPage({ popupMode = false }: { popupMode?: boole
   const [sessionsError, setSessionsError] = useState("")
   const [sessions, setSessions] = useState<AdvisorChatSessionItem[]>([])
   const [activeChatId, setActiveChatId] = useState("")
-  const [deletingSessionId, setDeletingSessionId] = useState("")
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null)
 
   const selectedContext = useMemo(
     () => contexts.find((item) => item.analysisId === selectedAnalysisId) ?? null,

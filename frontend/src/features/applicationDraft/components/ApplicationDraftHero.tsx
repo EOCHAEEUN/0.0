@@ -1,9 +1,7 @@
 import type { ApplicationDraftWorkspaceModel } from "../hooks/useApplicationDraftWorkspace"
 import { ApplicationDraftProgressStepper } from "./ApplicationDraftProgressStepper"
 
-export function ApplicationDraftHero({
-  model,
-}: {
+export function ApplicationDraftHero({}: {
   model: ApplicationDraftWorkspaceModel
 }) {
   return (

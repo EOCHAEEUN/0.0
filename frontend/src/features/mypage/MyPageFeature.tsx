@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
   BarChart3,
   Building2,
@@ -15,11 +15,6 @@ import {
   MyPageSectionCard,
 } from "./MyPageWorkspaceParts";
 import "./mypage.workspace.css";
-import {
-  getStoredCompanyId,
-  patchRepresentativeEquipment,
-} from "../dashboard/dashboard.api";
-import { MYPAGE_DOCUMENT_STORAGE_KEY } from "../documents/documentStorage";
 import CompanyDocumentsManagement from "./components/CompanyDocumentsManagement";
 import type {
   BasicInfo,
@@ -31,7 +26,6 @@ import type {
   UserProfilePayload,
   CompanyOnboardingPayload,
   EquipmentPayload,
-  MyPagePanelKey,
 } from "./myPage.parts";
 import {
   STORAGE_KEY,
@@ -39,8 +33,6 @@ import {
   COMPANY_ID_STORAGE_KEY,
   EQUIPMENT_ID_STORAGE_KEY,
   SELECTED_EQUIPMENT_ID_STORAGE_KEY,
-  ANALYSIS_RESULT_STORAGE_KEY,
-  CURRENT_YEAR,
   PREVIOUS_YEAR,
   TWO_YEARS_AGO,
   THREE_YEARS_AGO,
@@ -49,19 +41,14 @@ import {
   createEmptyIndustry,
   emptyCompanyInfo,
   createEmptyEquipment,
-  savedPolicies,
-  analysisHistories,
   COMPANY_TYPE_OPTIONS,
   AFFILIATE_STATUS_OPTIONS,
   BUSINESS_SITE_TYPE_OPTIONS,
   PURPOSE_OPTIONS,
-  EQUIPMENT_CATEGORY_OPTIONS,
   submitUserPayload,
   submitCompanyPayload,
   submitEquipmentPayload,
-  deleteEquipmentPayload,
   fetchSavedOnboarding,
-  buildApiUrl,
   loadStoredMyPageData,
   parseIndustryCodes,
   formatIndustryCodes,
@@ -70,9 +57,7 @@ import {
   findCompanyId,
   findEquipmentId,
   getErrorMessage,
-  safeJsonParse,
   getAccessToken,
-  getApiErrorMessage,
   toPositiveNumber,
   toNumberOrNull,
   formatPhoneNumber,
@@ -84,16 +69,12 @@ import {
   getPasswordStrength,
   getCurrentUserId,
   FieldLabel,
-  EquipmentCategoryHelpTooltip,
   IndustryRemoveButton,
   Field,
   SelectField,
   InfoTooltip,
   FloatingModalNotice,
   hasRequiredEquipmentFields,
-  AccordionPanel,
-  EquipmentOptionalAccordion,
-  countEquipmentOptionalFieldsFilled,
 } from "./myPage.parts";
 
 
@@ -306,9 +287,6 @@ function mapRemoteEquipment(item: unknown, index: number): EquipmentInfo {
 
 export default function MyPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const returnToDashboard = searchParams.get("return_to") === "dashboard";
-  const focusRepresentative = searchParams.get("focus") === "representative";
 
   const storedData = useMemo(() => {
     if (typeof window === "undefined") return null;
@@ -317,36 +295,10 @@ export default function MyPage() {
 
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
 
   const [passwordTooltipOpen, setPasswordTooltipOpen] = useState(false);
   const [industryTooltipOpen, setIndustryTooltipOpen] = useState(false);
-  const [annualRevenueTooltipOpen, setAnnualRevenueTooltipOpen] =
-    useState(false);
-  const [companyInfoTooltipOpen, setCompanyInfoTooltipOpen] = useState(false);
-  const [capacityTooltipEquipmentId, setCapacityTooltipEquipmentId] = useState<
-    number | null
-  >(null);
-  const [energyTooltipEquipmentId, setEnergyTooltipEquipmentId] = useState<
-    number | null
-  >(null);
-  const [equipmentOptionalOpen, setEquipmentOptionalOpen] = useState<
-    Record<number, boolean>
-  >({});
-
-  const [openSections, setOpenSections] = useState<
-    Record<MyPagePanelKey, boolean>
-  >({
-    basic: false,
-    company: false,
-    equipment: false,
-    documents: false,
-  });
   const [analysisBlockNoticeOpen, setAnalysisBlockNoticeOpen] = useState(false);
-
-  const [profileCompleted, setProfileCompleted] = useState(
-    storedData?.profileCompleted ?? false,
-  );
 
   const [basicInfo, setBasicInfo] = useState<BasicInfo>(
     storedData?.basicInfo ?? emptyBasicInfo,
@@ -371,14 +323,6 @@ export default function MyPage() {
         storedData?.equipmentList?.[0]?.id ??
         1,
     );
-  const [representativeEquipmentId, setRepresentativeEquipmentId] = useState("");
-  const [representativeFeedback, setRepresentativeFeedback] = useState("");
-
-  useEffect(() => {
-    if (focusRepresentative || searchParams.get("panel") === "equipment") {
-      setOpenSections((prev) => ({ ...prev, equipment: true }));
-    }
-  }, [focusRepresentative, searchParams]);
 
   useEffect(() => {
     setBasicInfo((prev) => ({
@@ -464,10 +408,6 @@ export default function MyPage() {
         }
 
         if (company) {
-          const representativeId = getStringValue(company.representative_equipment_id);
-          if (representativeId) {
-            setRepresentativeEquipmentId(representativeId);
-          }
           const industryCodes = getStringArrayValue(company.industry_code);
           const industryName = getStringValue(company.industry_name);
           const remoteIndustries = normalizeRemoteIndustries(
@@ -560,8 +500,6 @@ export default function MyPage() {
         if (companyId) {
           window.localStorage.setItem(COMPANY_ID_STORAGE_KEY, companyId);
         }
-
-        setProfileCompleted(Boolean(userProfile && company && equipments.length > 0));
       } catch (error) {
         console.warn("마이페이지 온보딩 초기값 조회 실패:", error);
       }
@@ -595,10 +533,6 @@ export default function MyPage() {
     ["숫자 포함", /[0-9]/.test(passwordInfo.newPassword)],
     ["특수문자 포함", /[^A-Za-z0-9]/.test(passwordInfo.newPassword)],
   ];
-
-  const passwordMatched =
-    !passwordInfo.confirmPassword ||
-    passwordInfo.newPassword === passwordInfo.confirmPassword;
 
   const primaryIndustry = companyInfo.industries[0] ?? createEmptyIndustry(1);
   const optionalIndustries = companyInfo.industries.slice(1);
@@ -634,10 +568,6 @@ export default function MyPage() {
   }, [equipmentList]);
 
   const equipmentInfoDone = completedEquipmentCount > 0;
-
-  const needsInputGuide = useMemo(() => {
-    return !companyInfoDone || !equipmentInfoDone;
-  }, [companyInfoDone, equipmentInfoDone]);
 
   const completionScore = useMemo(() => {
     const basicRequiredValues = [
@@ -745,30 +675,6 @@ export default function MyPage() {
     equipmentList,
   ]);
 
-  const missingCoreCount = useMemo(() => {
-    let count = 0;
-
-    if (!basicInfo.name.trim()) count += 1;
-    if (!basicInfo.email.trim()) count += 1;
-    if (!basicInfo.phone.trim()) count += 1;
-    if (!passwordInfo.currentPassword.trim()) count += 1;
-    if (!companyInfo.companyName.trim()) count += 1;
-    if (companyInfo.companyType === "선택 필요") count += 1;
-    if (!primaryIndustry.industry.trim()) count += 1;
-    if (!primaryIndustry.industryCode.trim()) count += 1;
-    if (!companyInfo.region.trim()) count += 1;
-    if (!companyInfo.annualRevenue.trim()) count += 1;
-    if (!equipmentInfoDone) count += 1;
-
-    return count;
-  }, [
-    basicInfo,
-    passwordInfo.currentPassword,
-    companyInfo,
-    primaryIndustry,
-    equipmentInfoDone,
-  ]);
-
   const updateIndustry = (
     id: number,
     key: keyof Omit<IndustryItem, "id">,
@@ -843,217 +749,6 @@ export default function MyPage() {
       };
     });
   };
-
-  const updateEquipment = (
-    id: number,
-    key: keyof EquipmentInfo,
-    value: string,
-  ) => {
-    setEquipmentList((prev) =>
-      prev.map((equipment) =>
-        equipment.id === id
-          ? {
-              ...equipment,
-              [key]: value,
-            }
-          : equipment,
-      ),
-    );
-  };
-
-  const toggleEquipmentOptional = (equipmentId: number) => {
-    setEquipmentOptionalOpen((prev) => ({
-      ...prev,
-      [equipmentId]: !prev[equipmentId],
-    }));
-  };
-
-  const isEquipmentOptionalOpen = (equipmentId: number) =>
-    Boolean(equipmentOptionalOpen[equipmentId]);
-
-  const addEquipment = () => {
-    const nextId =
-      equipmentList.length > 0
-        ? Math.max(...equipmentList.map((equipment) => equipment.id)) + 1
-        : 1;
-
-    setEquipmentList((prev) => [...prev, createEmptyEquipment(nextId)]);
-
-    if (!selectedAnalysisEquipmentId) {
-      setSelectedAnalysisEquipmentId(nextId);
-    }
-  };
-
-  const handleSetRepresentativeEquipment = async (equipment: EquipmentInfo) => {
-    const companyId =
-      window.localStorage.getItem(COMPANY_ID_STORAGE_KEY) || getStoredCompanyId();
-    const equipmentId = equipment.equipmentId?.trim();
-    const equipmentLabel = equipment.name?.trim() || `설비 ${equipment.id}`;
-
-    if (!companyId || !equipmentId) {
-      window.alert("대표 설비를 저장하려면 먼저 설비 정보를 저장해주세요.");
-      return;
-    }
-
-    try {
-      await patchRepresentativeEquipment({ companyId, equipmentId });
-      setRepresentativeEquipmentId(equipmentId);
-      setRepresentativeFeedback(`대표 설비를 ${equipmentLabel}로 변경했습니다.`);
-      if (returnToDashboard) {
-        navigate("/dashboard");
-      }
-    } catch (error) {
-      window.alert(
-        error instanceof Error
-          ? error.message
-          : "대표 설비를 저장하지 못했습니다.",
-      );
-    }
-  };
-
-  const handleClearRepresentativeEquipment = async () => {
-    const companyId =
-      window.localStorage.getItem(COMPANY_ID_STORAGE_KEY) || getStoredCompanyId();
-
-    if (!companyId) {
-      window.alert("회사 정보를 먼저 저장해주세요.");
-      return;
-    }
-
-    try {
-      await patchRepresentativeEquipment({ companyId, equipmentId: null });
-      setRepresentativeEquipmentId("");
-      setRepresentativeFeedback("대표 설비를 해제했습니다.");
-      if (returnToDashboard) {
-        navigate("/dashboard");
-      }
-    } catch (error) {
-      window.alert(
-        error instanceof Error
-          ? error.message
-          : "대표 설비를 해제하지 못했습니다.",
-      );
-    }
-  };
-
-  const removeEquipment = async (id: number) => {
-    if (equipmentList.length <= 1) {
-      window.alert("설비 정보는 최소 1개 이상 필요합니다.");
-      return;
-    }
-
-    const targetEquipment = equipmentList.find((equipment) => equipment.id === id);
-    if (!targetEquipment) return;
-
-    if (targetEquipment.equipmentId) {
-      try {
-        await deleteEquipmentPayload(targetEquipment.equipmentId);
-      } catch (error) {
-        window.alert(getErrorMessage(error));
-        return;
-      }
-
-      if (representativeEquipmentId === targetEquipment.equipmentId) {
-        setRepresentativeEquipmentId("");
-      }
-    }
-
-    const nextEquipmentList = equipmentList.filter(
-      (equipment) => equipment.id !== id,
-    );
-    const nextSelectedAnalysisEquipmentId =
-      selectedAnalysisEquipmentId === id
-        ? nextEquipmentList[0]?.id ?? null
-        : selectedAnalysisEquipmentId;
-
-    setEquipmentList(nextEquipmentList);
-    setSelectedAnalysisEquipmentId(nextSelectedAnalysisEquipmentId);
-    setEquipmentOptionalOpen((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
-
-    const nextSelectedEquipmentUuid =
-      nextEquipmentList.find(
-        (equipment) => equipment.id === nextSelectedAnalysisEquipmentId,
-      )?.equipmentId ??
-      nextEquipmentList.find((equipment) => equipment.equipmentId)?.equipmentId;
-
-    if (nextSelectedEquipmentUuid) {
-      window.localStorage.setItem(EQUIPMENT_ID_STORAGE_KEY, nextSelectedEquipmentUuid);
-      window.localStorage.setItem(
-        SELECTED_EQUIPMENT_ID_STORAGE_KEY,
-        nextSelectedEquipmentUuid,
-      );
-    } else {
-      window.localStorage.removeItem(EQUIPMENT_ID_STORAGE_KEY);
-      window.localStorage.removeItem(SELECTED_EQUIPMENT_ID_STORAGE_KEY);
-    }
-
-    const currentUserIdForStorage = window.localStorage.getItem(USER_ID_STORAGE_KEY)?.trim() ?? "";
-    const storageData: MyPageStorageData = {
-      basicInfo,
-      companyInfo,
-      equipmentList: nextEquipmentList,
-      selectedAnalysisEquipmentId: nextSelectedAnalysisEquipmentId,
-      profileCompleted,
-      savedAt: new Date().toISOString(),
-      ...(currentUserIdForStorage ? { ownerId: currentUserIdForStorage } : {}),
-    };
-
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(storageData));
-  };
-
-  const toggleSection = (sectionKey: MyPagePanelKey) => {
-    setOpenSections((prev) => ({
-      ...prev,
-      [sectionKey]: !prev[sectionKey],
-    }));
-  };
-
-
-  const selectedEquipmentLabel = useMemo(() => {
-    const selected = equipmentList.find(
-      (item) => item.id === selectedAnalysisEquipmentId,
-    );
-
-    if (!selected) return "선택 없음";
-
-    return selected.name.trim()
-      ? selected.name
-      : `설비 ${equipmentList.findIndex((item) => item.id === selected.id) + 1}`;
-  }, [equipmentList, selectedAnalysisEquipmentId]);
-
-  const hasBlockingAnalysisMissing = useMemo(() => {
-    if (!basicInfo.name.trim()) return true;
-    if (!basicInfo.email.trim()) return true;
-    if (!basicInfo.phone.trim()) return true;
-    if (!passwordInfo.currentPassword.trim()) return true;
-
-    if (!companyInfo.companyName.trim()) return true;
-    if (companyInfo.companyType === "선택 필요") return true;
-    if (!primaryIndustry.industry.trim()) return true;
-    if (!primaryIndustry.industryCode.trim()) return true;
-    if (!companyInfo.region.trim()) return true;
-    if (!companyInfo.annualRevenue.trim()) return true;
-
-    const selectedEquipment = equipmentList.find(
-      (equipment) => equipment.id === selectedAnalysisEquipmentId,
-    );
-
-    if (!selectedEquipment) return true;
-    if (!hasRequiredEquipmentFields(selectedEquipment)) return true;
-
-    return false;
-  }, [
-    basicInfo,
-    passwordInfo.currentPassword,
-    companyInfo,
-    primaryIndustry,
-    equipmentList,
-    selectedAnalysisEquipmentId,
-  ]);
 
   const handleSave = async () => {
     if (saving) return;
@@ -1294,7 +989,6 @@ export default function MyPage() {
       window.localStorage.setItem(COMPANY_ID_STORAGE_KEY, companyId);
 
       setSaved(true);
-      setProfileCompleted(savedProfileCompleted);
 
       window.setTimeout(() => {
         setSaved(false);
@@ -1303,110 +997,6 @@ export default function MyPage() {
       window.alert(getErrorMessage(error));
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleReset = () => {
-    const confirmed = window.confirm("입력한 마이페이지 정보를 초기화할까요?");
-    if (!confirmed) return;
-
-    window.localStorage.removeItem(STORAGE_KEY);
-    window.localStorage.removeItem(COMPANY_ID_STORAGE_KEY);
-    window.localStorage.removeItem(EQUIPMENT_ID_STORAGE_KEY);
-    window.localStorage.removeItem(SELECTED_EQUIPMENT_ID_STORAGE_KEY);
-    window.localStorage.removeItem(ANALYSIS_RESULT_STORAGE_KEY);
-    window.localStorage.removeItem(MYPAGE_DOCUMENT_STORAGE_KEY);
-
-    setBasicInfo(emptyBasicInfo);
-    setPasswordInfo(emptyPasswordInfo);
-    setCompanyInfo(emptyCompanyInfo);
-    setEquipmentList([createEmptyEquipment(1)]);
-    setSelectedAnalysisEquipmentId(1);
-    setProfileCompleted(false);
-  };
-
-  const goToAnalysis = async () => {
-    if (analyzing) return;
-
-    if (hasBlockingAnalysisMissing) {
-      setAnalysisBlockNoticeOpen(true);
-      return;
-    }
-
-    const companyId = window.localStorage.getItem(COMPANY_ID_STORAGE_KEY);
-
-    if (!companyId) {
-      window.alert(
-        "먼저 저장하기를 눌러 기업·설비 정보를 저장한 뒤 분석을 시작해주세요.",
-      );
-      return;
-    }
-
-    const selectedEquipment = equipmentList.find(
-      (equipment) => equipment.id === selectedAnalysisEquipmentId,
-    );
-
-    if (!selectedEquipment) {
-      window.alert("ROI 분석에 사용할 설비를 선택해주세요.");
-      return;
-    }
-
-    if (selectedEquipment.equipmentId) {
-      window.location.assign(
-        `/analysis/new?mode=existing&equipmentId=${encodeURIComponent(selectedEquipment.equipmentId)}`,
-      );
-      return;
-    }
-
-    try {
-      setAnalyzing(true);
-
-      const equipmentQuery = selectedEquipment.equipmentId
-        ? `&equipment_id=${encodeURIComponent(selectedEquipment.equipmentId)}`
-        : "";
-
-      const query = `/api/analyze?company_id=${encodeURIComponent(
-        companyId,
-      )}${equipmentQuery}`;
-
-      const accessToken = getAccessToken();
-
-      const response = await fetch(buildApiUrl(query), {
-        method: "POST",
-        headers: {
-          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-        },
-        credentials: "include",
-      });
-
-      const responseText = await response.text();
-      const analysisResult = safeJsonParse(responseText);
-
-      if (!response.ok) {
-        console.error("분석 API 오류:", {
-          status: response.status,
-          companyId,
-          equipmentId: selectedEquipment.equipmentId,
-          response: analysisResult ?? responseText,
-        });
-
-        throw new Error(getApiErrorMessage(analysisResult, response.status));
-      }
-
-      window.localStorage.setItem(
-        ANALYSIS_RESULT_STORAGE_KEY,
-        JSON.stringify({
-          ...analysisResult,
-          selected_equipment_id: selectedEquipment.equipmentId ?? null,
-          selected_equipment_local_id: selectedAnalysisEquipmentId,
-        }),
-      );
-
-      window.location.assign("/dashboard");
-    } catch (error) {
-      window.alert(getErrorMessage(error));
-    } finally {
-      setAnalyzing(false);
     }
   };
 

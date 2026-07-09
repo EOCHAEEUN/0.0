@@ -5,11 +5,9 @@ import type {
   CreateEquipmentEvidencePayload,
   EquipmentEvidenceRecord,
   EvidenceReviewStatus,
-  EvidenceStructuredItem,
   EvidenceType,
 } from "../equipmentEvidence.contract"
 import {
-  EVIDENCE_STRUCTURED_ITEM_STATUS_OPTIONS,
   EVIDENCE_TYPE_OPTIONS,
   REVIEW_STATUS_LABELS,
 } from "../equipmentEvidence.contract"

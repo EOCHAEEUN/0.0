@@ -15,6 +15,7 @@ import {
   formatManwon,
   formatPaybackFromScenario,
 } from "../applicationDraft.utils"
+import { APPLICATION_DRAFT_MUST_INCLUDE_KEY } from "../applicationDraft.constants"
 
 type RouteContext = {
   analysisId?: string
@@ -119,6 +120,9 @@ export function useApplicationDraftWorkspace(route: RouteContext) {
 
       setWorkspaceState({ kind: "ready", data })
       setManualScenarioKey(scenarioKeyFromSelected(data.scenarios?.selected))
+      if (data.policy_id) {
+        setActivePolicyId(data.policy_id)
+      }
     } catch (error) {
       setWorkspaceState({
         kind: "error",
@@ -165,6 +169,8 @@ export function useApplicationDraftWorkspace(route: RouteContext) {
         equipmentId: data.equipment_id,
         policyId: data.policy_id,
         analysisId: data.analysis_id || analysisId,
+        mustIncludeText:
+          readLocalStorage(APPLICATION_DRAFT_MUST_INCLUDE_KEY) || undefined,
       })
       await reload()
       setLastGeneratedAt(new Date().toISOString())
@@ -191,6 +197,8 @@ export function useApplicationDraftWorkspace(route: RouteContext) {
         equipmentId: data.equipment_id,
         policyId: normalizedPolicyId,
         analysisId: data.analysis_id || analysisId,
+        mustIncludeText:
+          readLocalStorage(APPLICATION_DRAFT_MUST_INCLUDE_KEY) || undefined,
       })
       setActivePolicyId(normalizedPolicyId)
       await reload(normalizedPolicyId)

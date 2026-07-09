@@ -36,6 +36,7 @@ export type RoiScenarioView = {
   net: string
   saving: string
   roi: string
+  roiPeriodLabel: string
   payback: string
   summary: string
   isRecommended: boolean

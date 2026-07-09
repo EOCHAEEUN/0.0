@@ -16,6 +16,8 @@ import type {
   MobileHomeViewModel,
   MobileMapperInput,
   MobilePoliciesViewModel,
+  MobilePolicyTypeGroup,
+  MobilePriorityPolicyDetail,
   MobileReadinessSummary,
   MobileRoiKpi,
   MobileRoiViewModel,

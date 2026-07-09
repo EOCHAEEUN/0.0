@@ -1,10 +1,8 @@
 import { Hexagon, Star } from "lucide-react"
-import { useMemo } from "react"
 
 import type { MatchedPolicy } from "../applicationDraft.contract"
-import { readAnalysisData } from "../applicationDraft.utils"
 import type { ApplicationDraftWorkspaceModel } from "../hooks/useApplicationDraftWorkspace"
-
+import { buildPolicyOptions } from "../policyPickerOptions"
 function policyTitle(policy: MatchedPolicy) {
   return String(policy.title || policy.policy_title || "지원사업").trim()
 }
@@ -37,31 +35,11 @@ export function ApplicationDraftRecommendedPolicies({
 }: {
   model: ApplicationDraftWorkspaceModel
 }) {
-  const items = useMemo(() => {
-    const currentId = model.data?.policy_id
-    const currentTitle = model.data?.policy?.title
-    const matched = readAnalysisData().matched_policies ?? []
-
-    const deduped = new Map<string, MatchedPolicy>()
-
-    matched.forEach((policy) => {
-      const id = String(policy.policy_id || policy.id || policyTitle(policy))
-      if (!deduped.has(id)) deduped.set(id, policy)
-    })
-
-    if (currentTitle) {
-      const currentKey = currentId || currentTitle
-      if (!deduped.has(currentKey)) {
-        deduped.set(currentKey, {
-          policy_id: currentId,
-          title: currentTitle,
-        })
-      }
-    }
-
-    return Array.from(deduped.values()).slice(0, 2)
-  }, [model.data?.policy?.title, model.data?.policy_id])
-
+  const items = buildPolicyOptions(model).map((policy) => ({
+    policy_id: policy.policy_id,
+    title: policy.title,
+    organization: policy.agency,
+  })) as MatchedPolicy[]
   if (items.length === 0) {
     return (
       <article className="ff-card ff-draft-recommend-card">

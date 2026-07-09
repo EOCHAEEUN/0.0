@@ -3,11 +3,14 @@ import type {
   DashboardOnboardingMeResponse,
   DashboardOverviewResponse,
 } from "./dashboard.contract"
-import { getCurrentUserId, markAuthExpired } from "../../services/auth"
+import {
+  getAccessToken,
+  getCurrentUserId,
+  markAuthExpired,
+  refreshAccessToken,
+} from "../../services/auth"
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000"
-const ACCESS_TOKEN_STORAGE_KEY = "factofit_access_token"
-const AUTH_SESSION_STORAGE_KEY = "factofit_auth_session"
 const ANALYSIS_RESULT_STORAGE_KEY = "factofit_analysis_result"
 const DASHBOARD_ACTIVE_ANALYSIS_KEY = "factofit_dashboard_active_analysis_id"
 const COMPANY_ID_STORAGE_KEY = "factofit_company_id"
@@ -32,24 +35,8 @@ export function safeJsonParse<T = unknown>(value: string | null): T | null {
   }
 }
 
-function getStoredAuthSession() {
-  if (typeof window === "undefined") return null
-
-  return safeJsonParse<Record<string, unknown>>(
-    window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY),
-  )
-}
-
 export function getDashboardAccessToken() {
-  if (typeof window === "undefined") return null
-
-  const directToken = window.localStorage.getItem(ACCESS_TOKEN_STORAGE_KEY)
-  if (directToken?.trim()) return directToken.trim()
-
-  const session = getStoredAuthSession()
-  const token = session?.access_token
-
-  return typeof token === "string" && token.trim() ? token.trim() : null
+  return getAccessToken()
 }
 
 export function getStoredDashboardAnalysisResult() {
@@ -79,15 +66,26 @@ export function getStoredDashboardAnalysisResult() {
 
 export async function fetchDashboardOnboarding() {
   const accessToken = getDashboardAccessToken()
+  if (!accessToken) return null
 
-  const response = await fetch(buildApiUrl("/api/onboarding/me"), {
-    method: "GET",
-    headers: {
-      "Content-Type": "application/json",
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-    },
-    credentials: "include",
-  })
+  const send = (token: string) =>
+    fetch(buildApiUrl("/api/onboarding/me"), {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      credentials: "include",
+    })
+
+  let response = await send(accessToken)
+
+  if (response.status === 401) {
+    // access token 만료 가능성 — refresh 1회 후 원 요청 1회만 재시도.
+    // refresh token 무효면 refreshAccessToken이 세션을 삭제하고 throw하며,
+    // 일시 장애(네트워크/5xx)면 세션을 유지한 채 throw한다.
+    response = await send(await refreshAccessToken())
+  }
 
   const responseText = await response.text()
 
@@ -100,6 +98,10 @@ export async function fetchDashboardOnboarding() {
       hasToken: Boolean(accessToken),
       response: responseText.slice(0, 300),
     })
+    if (response.status === 401) {
+      // refresh 성공 후에도 401 — 무효 판정 없이는 세션을 지우지 않는다
+      throw new Error("세션이 만료되었습니다. 다시 로그인해주세요.")
+    }
     throw new Error(`마이페이지 온보딩 조회에 실패했습니다. (${response.status})`)
   }
 

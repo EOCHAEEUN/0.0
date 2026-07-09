@@ -332,6 +332,7 @@ function compactScenario(record: ApiRecord) {
     "saving_manwon",
     "roi_pct",
     "roi_percent",
+    "roi_period_months",
     "payback_years",
     "paybackYears",
   ]
@@ -447,6 +448,7 @@ function buildSnapshot(
     priorityPolicies: priorityPolicyName ? 1 : 0,
     priorityPolicyName,
     priorityPolicyId: priorityPolicyId || undefined,
+    policies,
     recommendedScenario: recommended,
     companyId,
     equipmentId,
@@ -754,6 +756,7 @@ function buildSnapshotFromStoredOutput(params: {
     priorityPolicies: priorityPolicyName ? 1 : 0,
     priorityPolicyName,
     priorityPolicyId: priorityPolicyId || undefined,
+    policies,
     recommendedScenario: recommended,
     companyId,
     equipmentId,

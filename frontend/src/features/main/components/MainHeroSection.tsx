@@ -25,11 +25,11 @@ export function MainHeroSection({ onScrollToWhy }: MainHeroSectionProps) {
         <p className="ff-hero-kicker">FACTOFIT ONE-PAGE AI DIAGNOSIS</p>
 
         <h1>
-          지원사업을 찾기 전에,
+          AI 기반 제조업 특화
           <br />
-          <span>우리 공장에 맞게</span>
+          <span>정부지원사업</span>
           <br />
-          먼저 해석합니다
+          스마트 매칭 플랫폼 
         </h1>
 
         <p className="ff-hero-description">

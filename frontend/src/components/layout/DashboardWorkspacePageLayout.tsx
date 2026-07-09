@@ -1,6 +1,7 @@
 import type { ReactNode } from "react"
 
 import { useDashboardData } from "../../features/dashboard/hooks/useDashboardData"
+import { buildRoiPath } from "../../features/roi/roiPaths"
 import { buildSupportProjectsPath } from "../../features/support/supportProjectsPaths"
 import DashboardWorkspaceSidebar from "./DashboardWorkspaceSidebar"
 import "../../features/dashboard/dashboard.workspace.css"
@@ -23,14 +24,18 @@ export default function DashboardWorkspacePageLayout({
   const { dashboard } = useDashboardData({ preferredAnalysisId: analysisId })
   const workspace = dashboard.workspace
 
-  const supportProjectsPath = buildSupportProjectsPath("priority", { analysisId })
+  const effectiveAnalysisId = analysisId || workspace.analysisId || undefined
+  const supportProjectsPath = buildSupportProjectsPath("priority", { analysisId: effectiveAnalysisId })
+  const newRoiPath = effectiveAnalysisId
+    ? buildRoiPath("strategy", { analysisId: effectiveAnalysisId })
+    : workspace.newRoiPath || "/roi/strategy"
 
   return (
     <main className={`page ff-dashboard-workspace-page ${pageClassName}`.trim()}>
       <div className="ff-dashboard-layout">
         <DashboardWorkspaceSidebar
           paths={{
-            newRoiPath: workspace.newRoiPath,
+            newRoiPath,
             policyPath: workspace.policyPath || supportProjectsPath,
             draftPath: workspace.draftPath || "/application-draft",
             advisorPath: workspace.advisorPath || "/advisor",

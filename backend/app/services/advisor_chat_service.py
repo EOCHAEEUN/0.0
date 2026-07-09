@@ -16,6 +16,7 @@ EXPLICIT_DB_ACTIONS = {
     "policy_calendar",
     "application_draft_status",
     "safety_status",
+    "safety_check_summary",
     "current_analysis_summary",
 }
 EXPLICIT_SIMULATION_ACTIONS = {"investment_simulation"}

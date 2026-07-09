@@ -16,6 +16,7 @@ export type SafetyCheckItem = {
   current_safety_measures?: string | null
   pdf_uploaded_at?: string | null
   improvement_plan?: string | null
+  additional_info?: string | null
   improvement_saved_at?: string | null
   status: string
   created_at: string
@@ -41,4 +42,5 @@ export type SafetyCheckCreatePayload = {
 
 export type SafetyCheckImprovementPayload = {
   improvement_plan: string
+  additional_info: string
 }

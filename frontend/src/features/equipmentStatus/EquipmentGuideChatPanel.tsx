@@ -97,6 +97,7 @@ export default function EquipmentGuideChatPanel({
 
   if (!open) return null
 
+
   return (
     <section
       className="ff-advisor-popup-shell ff-equipment-guide-popup-shell"

@@ -191,10 +191,16 @@ export function useSafetyCheckData() {
   }, [])
 
   const saveImprovementPlan = useCallback(
-    async (params: { itemId: string; equipmentId: string; improvementPlan: string }) => {
+    async (params: {
+      itemId: string
+      equipmentId: string
+      improvementPlan: string
+      additionalInfo: string
+    }) => {
       const updated = await updateSafetyCheckImprovement({
         itemId: params.itemId,
         improvementPlan: params.improvementPlan,
+        additionalInfo: params.additionalInfo,
       })
 
       setItemsByEquipmentId((prev) => {
@@ -217,6 +223,7 @@ export function useSafetyCheckData() {
         itemId: params.itemId,
         equipmentId: params.equipmentId,
         improvementPlan: "",
+        additionalInfo: "",
       })
       setFeedback("향후 관리 계획을 삭제했습니다.")
     },

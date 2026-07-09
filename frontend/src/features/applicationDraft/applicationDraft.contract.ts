@@ -110,6 +110,7 @@ export type AnalysisData = {
   roi_result?: RoiResult | null
   draft_result?: DraftResult | null
   matched_policies?: MatchedPolicy[]
+  policies?: MatchedPolicy[]
   raw_candidates?: MatchedPolicy[]
   response?: string
 }
@@ -174,6 +175,14 @@ export type WorkspaceScenario = {
   payback_months?: number | null
   roi_pct?: number | null
   annual_net_benefit_manwon?: number | null
+}
+
+export type WorkspacePolicyOption = {
+  policy_id: string
+  title: string
+  deadline?: string | null
+  agency?: string | null
+  match_score?: number | string | null
 }
 
 export type WorkspaceSafetyRow = {
@@ -262,11 +271,7 @@ export type ApplicationDraftWorkspaceData = {
     deadline?: string | null
     source: "policy_snapshot" | "legacy_missing"
     legacy_missing?: boolean
-    options?: Array<{
-      policy_id: string
-      title?: string | null
-      deadline?: string | null
-    }>
+    options?: WorkspacePolicyOption[]
     available_policies?: Array<{
       policy_id: string
       title?: string | null

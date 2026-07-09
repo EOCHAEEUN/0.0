@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
+from supabase_auth.errors import AuthApiError, AuthRetryableError
 
 from app.core.auth import get_current_user
 from app.core.database import create_service_client, get_db
@@ -7,11 +8,41 @@ from app.models.auth import (
     CurrentUser,
     EmailCodeRequest,
     LoginRequest,
+    RefreshSessionRequest,
     SignupRequest,
     VerifyEmailCodeRequest,
 )
 
 router = APIRouter()
+
+
+def _fetch_user_profile(db, user_id: str) -> dict | None:
+    try:
+        result = (
+            db.table("user_profile")
+            .select("*")
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+        return result.data[0] if result.data else None
+    except Exception:
+        return None
+
+
+def _fetch_latest_company(db, user_id: str) -> dict | None:
+    try:
+        result = (
+            db.table("company")
+            .select("*")
+            .eq("user_id", user_id)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        return result.data[0] if result.data else None
+    except Exception:
+        return None
 
 
 def _session_payload(auth_response) -> dict:
@@ -175,37 +206,6 @@ async def login(body: LoginRequest):
                 "password": body.password,
             }
         )
-
-        user_id = auth_response.user.id
-
-        profile = (
-            db.table("user_profile")
-            .select("*")
-            .eq("user_id", user_id)
-            .maybe_single()
-            .execute()
-        )
-
-        companies = (
-            db.table("company")
-            .select("*")
-            .eq("user_id", user_id)
-            .order("created_at", desc=True)
-            .execute()
-        )
-
-        company = companies.data[0] if companies.data else None
-
-        return {
-            "success": True,
-            "data": {
-                **_session_payload(auth_response),
-                "user_profile": profile.data,
-                "company": company,
-                "company_id": company.get("company_id") if company else None,
-            },
-        }
-
     except Exception as exc:
         return JSONResponse(
             status_code=401,
@@ -215,6 +215,89 @@ async def login(body: LoginRequest):
                 "error": str(exc),
             },
         )
+
+    user = getattr(auth_response, "user", None)
+    user_id = getattr(user, "id", None)
+    if not user_id:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "success": False,
+                "message": "로그인에 실패했습니다.",
+                "error": "Supabase user session is missing.",
+            },
+        )
+
+    profile_data = _fetch_user_profile(db, user_id)
+    company = _fetch_latest_company(db, user_id)
+
+    return {
+        "success": True,
+        "data": {
+            **_session_payload(auth_response),
+            "user_profile": profile_data,
+            "company": company,
+            "company_id": company.get("company_id") if company else None,
+        },
+    }
+
+
+# GoTrue가 refresh token 자체를 거부했음을 뜻하는 오류 코드들.
+# 이 목록(또는 4xx + refresh token 언급 메시지)에 해당할 때만 세션 무효로 판정하고,
+# 그 외(네트워크, 429, 5xx, 예상 밖 예외)는 일시 장애로 취급해 프론트가 세션을
+# 지우지 않도록 401 대신 503을 반환한다.
+_INVALID_REFRESH_TOKEN_CODES = {
+    "refresh_token_not_found",
+    "refresh_token_already_used",
+    "session_not_found",
+    "session_expired",
+    "invalid_grant",
+    "user_not_found",
+    "user_banned",
+}
+
+
+def _is_invalid_refresh_token_error(exc: Exception) -> bool:
+    if not isinstance(exc, AuthApiError):
+        return False
+    if getattr(exc, "status", None) not in (400, 401, 403, 404):
+        return False
+    code = str(getattr(exc, "code", "") or "").lower()
+    message = str(getattr(exc, "message", "") or "").lower()
+    return code in _INVALID_REFRESH_TOKEN_CODES or "refresh token" in message
+
+
+_REFRESH_TOKEN_INVALID_RESPONSE = {
+    "success": False,
+    "code": "REFRESH_TOKEN_INVALID",
+    "message": "로그인이 만료되었습니다. 다시 로그인해 주세요.",
+}
+
+_AUTH_REFRESH_UNAVAILABLE_RESPONSE = {
+    "success": False,
+    "code": "AUTH_REFRESH_UNAVAILABLE",
+    "message": "인증 서비스를 일시적으로 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.",
+}
+
+
+@router.post("/auth/refresh")
+async def refresh_session(body: RefreshSessionRequest):
+    try:
+        db = create_service_client()
+        auth_response = db.auth.refresh_session(body.refresh_token)
+    except AuthRetryableError:
+        return JSONResponse(status_code=503, content=_AUTH_REFRESH_UNAVAILABLE_RESPONSE)
+    except Exception as exc:
+        if _is_invalid_refresh_token_error(exc):
+            return JSONResponse(status_code=401, content=_REFRESH_TOKEN_INVALID_RESPONSE)
+        print(f"auth refresh 일시 장애: {type(exc).__name__}")
+        return JSONResponse(status_code=503, content=_AUTH_REFRESH_UNAVAILABLE_RESPONSE)
+
+    payload = _session_payload(auth_response)
+    if not payload.get("access_token") or not payload.get("refresh_token"):
+        # 성공 응답인데 토큰이 비어 있는 비정상 상태 — 무효로 단정하지 않는다.
+        return JSONResponse(status_code=503, content=_AUTH_REFRESH_UNAVAILABLE_RESPONSE)
+    return {"success": True, "data": payload}
 
 
 @router.get("/me")

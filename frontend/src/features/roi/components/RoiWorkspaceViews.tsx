@@ -2,6 +2,8 @@ import { Check, Lightbulb, Settings, Zap } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { ROI_ROADMAP_PHASES } from "../roiRoadmap.constants"
 import type { RoiEvidenceMetricsView, RoiKpiView, RoiScenarioView, RoiStrategyCardView } from "./RoiAnalysisResultView"
+import type { PolicySupportSummary } from "../roi.contract"
+import { PolicySupportComposition } from "./RoiResultSections"
 
 export type RoiWorkspaceViewProps = {
   view: "strategy" | "analysis" | "roadmap"
@@ -22,6 +24,8 @@ export type RoiWorkspaceViewProps = {
   evidenceTitle: string
   evidenceBullets: string[]
   evidenceMetrics: RoiEvidenceMetricsView
+  policySupportSummary?: PolicySupportSummary | null
+  policySupportPolicies?: unknown[] | null
   reanalysisError?: string
   isResolvingReanalysis?: boolean
   onSupportProjects: () => void
@@ -141,7 +145,7 @@ function StrategyScenarioCard({
             <dd>{scenario.investment}</dd>
           </div>
           <div>
-            <dt>ROI (5년)</dt>
+            <dt>ROI ({scenario.roiPeriodLabel.replace(" 기준", "")})</dt>
             <dd className={scenario.isRecommended ? "is-accent" : ""}>{scenario.roi}</dd>
           </div>
           <div>
@@ -173,7 +177,7 @@ function AnalysisTopKpiRow({
         <span>EXPECTED ROI ({recommendedLabel})</span>
         <div className="ff-roi-analysis-kpi-value-row">
           <strong>{roiKpi?.value ?? "-"}</strong>
-          <em>/ 24개월 기준</em>
+          <em>/ {scenarioA.roiPeriodLabel}</em>
         </div>
         <p>연간 비용 절감 효과를 반영한 기대 수익률입니다.</p>
       </article>
@@ -324,7 +328,6 @@ function RoiCumulativeChart({
 export function RoiWorkspaceViews(props: RoiWorkspaceViewProps) {
   const {
     view,
-    equipmentName,
     recLabel,
     strategyCards,
     scenarios,
@@ -338,6 +341,8 @@ export function RoiWorkspaceViews(props: RoiWorkspaceViewProps) {
     evidenceTitle,
     evidenceBullets,
     evidenceMetrics,
+    policySupportSummary,
+    policySupportPolicies,
     kpis,
     onSelectScenario,
     onGoAnalysis,
@@ -381,22 +386,28 @@ export function RoiWorkspaceViews(props: RoiWorkspaceViewProps) {
         </section>
 
         {hasScenarios ? (
-          <section className="ff-roi-scenario-section ff-roi-scenario-section--strategy" aria-label="시나리오 비교">
-            <header className="ff-roi-scenario-head">
-              <div className="ff-roi-scenario-head-row">
-                <div>
-                  <p className="ff-roi-live-badge">Live Simulation</p>
-                  <h2>시나리오 비교 분석</h2>
+          <>
+            <section className="ff-roi-scenario-section ff-roi-scenario-section--strategy" aria-label="시나리오 비교">
+              <header className="ff-roi-scenario-head">
+                <div className="ff-roi-scenario-head-row">
+                  <div>
+                    <p className="ff-roi-live-badge">Live Simulation</p>
+                    <h2>시나리오 비교 분석</h2>
+                  </div>
                 </div>
-              </div>
-              <p>초기 부담과 장기 효과를 함께 비교하세요.</p>
-            </header>
+                <p>초기 부담과 장기 효과를 함께 비교하세요.</p>
+              </header>
 
-            <div className="ff-roi-scenario-grid ff-roi-scenario-grid--strategy">
-              <StrategyScenarioCard scenario={scenarioA} onSelect={() => onSelectScenario("a")} />
-              <StrategyScenarioCard scenario={scenarioB} onSelect={() => onSelectScenario("b")} />
-            </div>
-          </section>
+              <div className="ff-roi-scenario-grid ff-roi-scenario-grid--strategy">
+                <StrategyScenarioCard scenario={scenarioA} onSelect={() => onSelectScenario("a")} />
+                <StrategyScenarioCard scenario={scenarioB} onSelect={() => onSelectScenario("b")} />
+              </div>
+            </section>
+            <PolicySupportComposition
+              summary={policySupportSummary ?? null}
+              policies={policySupportPolicies ?? null}
+            />
+          </>
         ) : null}
 
         <StrategyRecommendationSection
@@ -433,6 +444,10 @@ export function RoiWorkspaceViews(props: RoiWorkspaceViewProps) {
                 <AnalysisScenarioCard scenario={scenarioB} />
               </div>
             </section>
+            <PolicySupportComposition
+              summary={policySupportSummary ?? null}
+              policies={policySupportPolicies ?? null}
+            />
             <RoiCumulativeChart scenarioA={scenarioA} scenarioB={scenarioB} />
           </>
         ) : null}

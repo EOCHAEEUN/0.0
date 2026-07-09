@@ -1318,27 +1318,38 @@ function buildPaths(params: {
 
   const equipmentManagePath = "/equipment"
 
-  const roiPath =
-    analysisId
-      ? `/analysis/${encodeURIComponent(analysisId)}/result`
-      : params.equipmentId
-        ? buildRoiPath("strategy", {
-            company_id: params.companyId || undefined,
-            equipment_id: params.equipmentId || undefined,
-            source: "dashboard",
-          })
-        : buildRoiPath("strategy", {
-            company_id: params.companyId || undefined,
-            source: "dashboard",
-          })
-
-  const newRoiPath = params.equipmentId
+  const roiPath = analysisId
     ? buildRoiPath("strategy", {
+        analysisId,
         company_id: params.companyId || undefined,
         equipment_id: params.equipmentId || undefined,
         source: "dashboard",
       })
-    : equipmentManagePath
+    : params.equipmentId
+      ? buildRoiPath("strategy", {
+          company_id: params.companyId || undefined,
+          equipment_id: params.equipmentId || undefined,
+          source: "dashboard",
+        })
+      : buildRoiPath("strategy", {
+          company_id: params.companyId || undefined,
+          source: "dashboard",
+        })
+
+  const newRoiPath = analysisId
+    ? buildRoiPath("strategy", {
+        analysisId,
+        company_id: params.companyId || undefined,
+        equipment_id: params.equipmentId || undefined,
+        source: "dashboard",
+      })
+    : params.equipmentId
+      ? buildRoiPath("strategy", {
+          company_id: params.companyId || undefined,
+          equipment_id: params.equipmentId || undefined,
+          source: "dashboard",
+        })
+      : equipmentManagePath
 
   const policyPath = analysisId
     ? buildSupportProjectsPathWithQuery({

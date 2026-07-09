@@ -271,6 +271,7 @@ class SafetyCheckImprovementService:
         supabase: Client,
         item_id: UUID,
         improvement_plan: str,
+        additional_info: str = "",
     ) -> dict:
         """
         [신청서 탭] - 향후 관리 계획 저장/수정
@@ -287,6 +288,7 @@ class SafetyCheckImprovementService:
         try:
             data = {
                 "improvement_plan": improvement_plan,
+                "additional_info": additional_info,
                 "improvement_saved_at": datetime.utcnow().isoformat(),
                 "status": InspectionStatusEnum.SAVED.value,
                 "updated_at": datetime.utcnow().isoformat(),

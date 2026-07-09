@@ -1,4 +1,8 @@
 import type {
+  AnalyzeApiData,
+  PolicySupportItem,
+  PolicySupportLayer,
+  PolicySupportSummary,
   RoiApiData,
   RoiApiResponse,
   RoiApiScenario,
@@ -462,6 +466,162 @@ export function normalizeApiData(response: unknown): RoiApiData | null {
   }
 
   return null
+}
+
+function isPolicySupportSummary(value: unknown): value is PolicySupportSummary {
+  if (!value || typeof value !== "object") return false
+
+  const summary = value as PolicySupportSummary
+  return (
+    typeof summary.business_roi_support === "object" ||
+    typeof summary.financing_support === "object" ||
+    typeof summary.execution_support === "object"
+  )
+}
+
+function compactPolicySupportItem(item: PolicySupportItem): PolicySupportItem {
+  const evidenceText =
+    typeof item.evidence_text === "string" ? item.evidence_text.slice(0, 500) : item.evidence_text
+
+  return {
+    ...(item.id ? { id: item.id } : {}),
+    ...(item.policy_id ? { policy_id: item.policy_id } : {}),
+    ...(item.component_key ? { component_key: item.component_key } : {}),
+    ...(item.component_name ? { component_name: item.component_name } : {}),
+    ...(item.support_type ? { support_type: item.support_type } : {}),
+    ...(item.effect_layer ? { effect_layer: item.effect_layer } : {}),
+    ...(item.review_status ? { review_status: item.review_status } : {}),
+    ...(item.roi_apply_method ? { roi_apply_method: item.roi_apply_method } : {}),
+    ...(item.fixed_amount_manwon != null ? { fixed_amount_manwon: item.fixed_amount_manwon } : {}),
+    ...(item.cap_amount_manwon != null ? { cap_amount_manwon: item.cap_amount_manwon } : {}),
+    ...(item.support_ratio != null ? { support_ratio: item.support_ratio } : {}),
+    ...(evidenceText ? { evidence_text: evidenceText } : {}),
+    applied_amount_manwon: item.applied_amount_manwon ?? 0,
+    roi_effect_applied: item.roi_effect_applied ?? false,
+  }
+}
+
+function compactPolicySupportLayer(
+  layer: PolicySupportLayer | undefined,
+): PolicySupportLayer {
+  const items = Array.isArray(layer?.items)
+    ? layer.items.map(compactPolicySupportItem)
+    : []
+
+  return {
+    items,
+    ...(typeof layer?.pending_count === "number"
+      ? { pending_count: layer.pending_count }
+      : {}),
+    ...(typeof layer?.approved_count === "number"
+      ? { approved_count: layer.approved_count }
+      : {}),
+    ...(typeof layer?.roi_effect_applied === "boolean"
+      ? { roi_effect_applied: layer.roi_effect_applied }
+      : {}),
+  }
+}
+
+export function compactPolicySupportSummary(
+  summary: PolicySupportSummary | null | undefined,
+): PolicySupportSummary | null {
+  if (!isPolicySupportSummary(summary)) return null
+
+  return {
+    business_roi_support: compactPolicySupportLayer(summary.business_roi_support),
+    financing_support: compactPolicySupportLayer(summary.financing_support),
+    execution_support: compactPolicySupportLayer(summary.execution_support),
+  }
+}
+
+export function normalizePolicySupportSummary(
+  response: unknown,
+): PolicySupportSummary | null {
+  if (!response || typeof response !== "object") return null
+
+  if (isPolicySupportSummary(response)) {
+    return response
+  }
+
+  const target = response as RoiApiResponse & {
+    policy_support_summary?: PolicySupportSummary | null
+  }
+  const candidates: unknown[] = [
+    target.policy_support_summary,
+    target.data && typeof target.data === "object"
+      ? (target.data as AnalyzeApiData).policy_support_summary
+      : null,
+  ]
+
+  for (const candidate of candidates) {
+    if (isPolicySupportSummary(candidate)) {
+      return candidate
+    }
+  }
+
+  return null
+}
+
+export function readPolicySupportSummaryFromAnalysisCache(
+  analysisId?: string,
+): PolicySupportSummary | null {
+  if (typeof window === "undefined") return null
+
+  const keys = [
+    analysisId ? `factofit_analysis_result:${analysisId}` : null,
+    "factofit_analysis_result",
+  ].filter((key): key is string => Boolean(key))
+
+  for (const key of keys) {
+    try {
+      const raw = window.localStorage.getItem(key)
+      if (!raw) continue
+
+      const parsed = JSON.parse(raw) as unknown
+      const summary = normalizePolicySupportSummary(parsed)
+      if (summary) return summary
+    } catch {
+      continue
+    }
+  }
+
+  return null
+}
+
+function getPolicySupportSummaryItemCount(summary: PolicySupportSummary | null) {
+  if (!summary) return 0
+
+  return (
+    (summary.business_roi_support?.items?.length ?? 0) +
+    (summary.financing_support?.items?.length ?? 0) +
+    (summary.execution_support?.items?.length ?? 0)
+  )
+}
+
+export function resolvePolicySupportSummary(
+  ...sources: unknown[]
+): PolicySupportSummary | null {
+  let bestSummary: PolicySupportSummary | null = null
+  let bestCount = -1
+
+  for (const source of sources) {
+    const summary = normalizePolicySupportSummary(source)
+    if (!summary) continue
+
+    const count = getPolicySupportSummaryItemCount(summary)
+    if (count > bestCount) {
+      bestSummary = summary
+      bestCount = count
+    }
+  }
+
+  return bestSummary
+}
+
+export function hasBusinessPolicySupportItems(
+  summary: PolicySupportSummary | null | undefined,
+): boolean {
+  return (summary?.business_roi_support?.items?.length ?? 0) > 0
 }
 
 export function mergeApiScenarios(localScenarios: ScenarioCard[], apiData: RoiApiData | null) {

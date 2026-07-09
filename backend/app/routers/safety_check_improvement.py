@@ -176,6 +176,7 @@ async def update_improvement(
         supabase=supabase,
         item_id=item_id,
         improvement_plan=request.improvement_plan,
+        additional_info=request.additional_info,
     )
 
     if not item:

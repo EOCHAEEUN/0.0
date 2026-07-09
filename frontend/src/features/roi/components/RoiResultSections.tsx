@@ -1,8 +1,16 @@
 import type { CSSProperties, ReactNode } from "react"
 import { Landmark, Zap, Leaf, ShieldCheck, ChevronRight, SlidersHorizontal, ArrowLeft } from "lucide-react"
-import type { RoiFormState, ScenarioCard } from "../roi.contract"
+import type {
+  PolicySupportItem,
+  PolicySupportSummary,
+  RoiFormState,
+  ScenarioCard,
+} from "../roi.contract"
 import { colors } from "../roi.constants"
-import { formatMoneyFromManwon, formatPaybackYears } from "../roi.utils"
+import {
+  formatMoneyFromManwon,
+  formatPaybackYears,
+} from "../roi.utils"
 import engiBot from "../../../assets/advisor/engi-bot-transparent.png"
 
 // ── design tokens ─────────────────────────────────────────────────────────────
@@ -801,6 +809,606 @@ export function RoiScenarioCards({
         }
       `}</style>
     </div>
+  )
+}
+
+function supportTerms(item: PolicySupportItem) {
+  const amount = item.cap_amount_manwon ?? item.fixed_amount_manwon
+  const values: string[] = []
+
+  if (typeof amount === "number" && Number.isFinite(amount) && amount > 0) {
+    values.push(`지원 한도 ${formatMoneyFromManwon(amount)}`)
+  }
+  if (
+    typeof item.support_ratio === "number" &&
+    Number.isFinite(item.support_ratio) &&
+    item.support_ratio > 0
+  ) {
+    values.push(`지원율 ${Math.round(item.support_ratio * 100)}%`)
+  }
+
+  return values.join(" · ") || "지원 조건 확인 중"
+}
+
+type PolicySupportGroupKey = "business" | "financing" | "execution"
+
+type RecommendedPolicyCard = {
+  id: string
+  policyId: string
+  title: string
+  supportItemName: string
+  amountText: string
+  description: string
+  group: PolicySupportGroupKey
+  matchedSupport?: PolicySupportItem
+}
+
+function readRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {}
+}
+
+function readTextFrom(record: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = record[key]
+    if (typeof value === "string" && value.trim()) return value.trim()
+    if (typeof value === "number" && Number.isFinite(value)) return String(value)
+  }
+  return ""
+}
+
+function readNumberFrom(record: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = record[key]
+    if (typeof value === "number" && Number.isFinite(value)) return value
+    if (typeof value === "string") {
+      const parsed = Number(value.replace(/[^\d.-]/g, ""))
+      if (Number.isFinite(parsed)) return parsed
+    }
+  }
+  return null
+}
+
+function readArrayFrom(record: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = record[key]
+    if (Array.isArray(value)) return value
+  }
+  return []
+}
+
+function normalizeSupportText(value: unknown): string {
+  if (Array.isArray(value)) return value.map(normalizeSupportText).join(" ")
+  if (value && typeof value === "object") {
+    return Object.values(value as Record<string, unknown>)
+      .map(normalizeSupportText)
+      .join(" ")
+  }
+  return String(value ?? "").trim()
+}
+
+function getPolicyIdFrom(policy: Record<string, unknown>) {
+  const metadata = readRecord(policy.metadata)
+  return (
+    readTextFrom(policy, "policy_id", "policyId", "matched_policy_id", "id") ||
+    readTextFrom(metadata, "policy_id", "policyId", "matched_policy_id", "id")
+  )
+}
+
+function getPolicyTitleFrom(policy: Record<string, unknown>) {
+  const metadata = readRecord(policy.metadata)
+  return (
+    readTextFrom(policy, "title", "policy_title", "name") ||
+    readTextFrom(metadata, "title", "policy_title", "name")
+  )
+}
+
+function getPolicyDescriptionFrom(policy: Record<string, unknown>) {
+  const metadata = readRecord(policy.metadata)
+  return (
+    readTextFrom(
+      policy,
+      "reason",
+      "summary",
+      "support_summary",
+      "description",
+      "support_content",
+      "content",
+    ) ||
+    readTextFrom(
+      metadata,
+      "reason",
+      "summary",
+      "support_summary",
+      "description",
+      "support_content",
+      "content",
+    ) ||
+    "현재 분석 조건과의 적합성을 기준으로 추천된 정책입니다."
+  )
+}
+
+function getPolicyAmountText(policy: Record<string, unknown>) {
+  const metadata = readRecord(policy.metadata)
+  const amount =
+    readNumberFrom(
+      policy,
+      "max_amount_manwon",
+      "max_amount",
+      "support_amount",
+      "support_limit",
+      "subsidy_amount",
+    ) ??
+    readNumberFrom(
+      metadata,
+      "max_amount_manwon",
+      "max_amount",
+      "support_amount",
+      "support_limit",
+      "subsidy_amount",
+    )
+
+  if (amount !== null && amount > 0) return `지원 한도 ${formatMoneyFromManwon(amount)}`
+
+  const amountText =
+    readTextFrom(policy, "support_amount_text", "amount", "support_amount") ||
+    readTextFrom(metadata, "support_amount_text", "amount", "support_amount")
+  return amountText || "지원 한도 공고 확인 필요"
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function getPolicyGroup(policy: Record<string, unknown>): PolicySupportGroupKey {
+  const metadata = readRecord(policy.metadata)
+  const label = [
+    readTextFrom(policy, "support_type_label", "support_type_detail"),
+    readTextFrom(metadata, "support_type_label", "support_type_detail"),
+  ]
+    .join(" ")
+    .replace(/\s+/g, "")
+
+  if (label.includes("금융지원") || label.includes("융자") || label.includes("보증") || label.includes("이자")) {
+    return "financing"
+  }
+  if (label.includes("비금융연계지원") || label.includes("컨설팅") || label.includes("교육") || label.includes("지도")) {
+    return "execution"
+  }
+  return "business"
+}
+
+function getSupportItemAmountText(
+  supportItem: Record<string, unknown>,
+  policy: Record<string, unknown>,
+) {
+  const amountText = readTextFrom(
+    supportItem,
+    "amount",
+    "support_amount",
+    "support_limit",
+    "limit",
+  )
+  if (amountText) return amountText
+
+  const amount =
+    readNumberFrom(
+      supportItem,
+      "amount_manwon",
+      "max_amount_manwon",
+      "support_amount_manwon",
+    ) ?? readNumberFrom(supportItem, "amount_numeric", "support_amount")
+
+  if (amount !== null && amount > 0) return `지원 한도 ${formatMoneyFromManwon(amount)}`
+
+  return getPolicyAmountText(policy)
+}
+
+function getSupportItemDescription(
+  supportItem: Record<string, unknown>,
+  policy: Record<string, unknown>,
+) {
+  return (
+    readTextFrom(
+      supportItem,
+      "description",
+      "summary",
+      "content",
+      "support_content",
+      "detail",
+    ) || getPolicyDescriptionFrom(policy)
+  )
+}
+
+function getSupportItemGroup(
+  policy: Record<string, unknown>,
+  supportItem: Record<string, unknown>,
+): PolicySupportGroupKey {
+  const metadata = readRecord(policy.metadata)
+  const fundingType = readTextFrom(supportItem, "funding_type")
+  const itemCategory = readTextFrom(supportItem, "category")
+  const label = normalizeSupportText([
+    fundingType,
+    readTextFrom(supportItem, "amount_role"),
+    itemCategory,
+    readArrayFrom(policy, "support_method"),
+    readArrayFrom(metadata, "support_method"),
+    readTextFrom(policy, "roi_support_type", "support_primary_category"),
+    readTextFrom(policy, "policy_category", "policy_subcategory"),
+    readArrayFrom(policy, "support_categories"),
+    readTextFrom(policy, "policy_primary_nature"),
+    readTextFrom(metadata, "roi_support_type", "support_primary_category"),
+    readTextFrom(metadata, "policy_category", "policy_subcategory"),
+    readArrayFrom(metadata, "support_categories"),
+    readTextFrom(metadata, "policy_primary_nature"),
+  ]).replace(/\s+/g, "")
+
+  if (
+    label.includes("융자") ||
+    label.includes("이자지원") ||
+    label.includes("이차보전") ||
+    label.includes("보증") ||
+    label.includes("loan") ||
+    label.includes("interest_support") ||
+    label.includes("guarantee")
+  ) {
+    return "financing"
+  }
+
+  if (fundingType === "현금보조") return "business"
+
+  if (
+    fundingType === "현물서비스" ||
+    itemCategory.includes("인력·교육") ||
+    itemCategory.includes("기술·사업화") ||
+    label.includes("컨설팅") ||
+    label.includes("멘토링") ||
+    label.includes("교육") ||
+    label.includes("시험") ||
+    label.includes("인증") ||
+    label.includes("장비활용") ||
+    label.includes("공동장비") ||
+    label.includes("기술지원")
+  ) {
+    return "execution"
+  }
+
+  if (!normalizeSupportText(supportItem)) return getPolicyGroup(policy)
+
+  return "business"
+}
+
+function getPolicySupportItems(policy: Record<string, unknown>) {
+  const metadata = readRecord(policy.metadata)
+  const supportItems = readArrayFrom(policy, "support_items")
+  if (supportItems.length > 0) return supportItems
+  return readArrayFrom(metadata, "support_items")
+}
+
+function getSupportItemKey(supportItem: Record<string, unknown>, index: number) {
+  return (
+    readTextFrom(supportItem, "name", "title", "component_key", "category") ||
+    normalizeSupportText(supportItem).slice(0, 120) ||
+    `support-item-${index}`
+  )
+}
+
+function buildSupportItemIndex(summary: PolicySupportSummary | null) {
+  const entries = [
+    ...(summary?.business_roi_support?.items ?? []),
+    ...(summary?.financing_support?.items ?? []),
+    ...(summary?.execution_support?.items ?? []),
+  ]
+  const byPolicyId = new Map<string, PolicySupportItem[]>()
+  entries.forEach((item) => {
+    if (item.policy_id) {
+      byPolicyId.set(item.policy_id, [...(byPolicyId.get(item.policy_id) ?? []), item])
+    }
+  })
+  return byPolicyId
+}
+
+function findMatchedSupportItem(
+  items: PolicySupportItem[] | undefined,
+  supportItem: Record<string, unknown>,
+) {
+  if (!items || items.length === 0) return undefined
+  if (items.length === 1 && Object.keys(supportItem).length === 0) return items[0]
+
+  const supportName = normalizeSupportText(
+    readTextFrom(supportItem, "name", "title", "component_key", "category"),
+  ).replace(/\s+/g, "")
+  const supportAmount = normalizeSupportText(
+    readTextFrom(supportItem, "amount", "support_amount", "support_limit"),
+  ).replace(/\s+/g, "")
+  const supportText = normalizeSupportText([
+    readTextFrom(supportItem, "name", "title", "category", "funding_type"),
+    readTextFrom(supportItem, "amount", "amount_role"),
+  ]).replace(/\s+/g, "")
+
+  if (!supportText) return undefined
+
+  return items.find((item) => {
+    const componentName = normalizeSupportText(item.component_name).replace(/\s+/g, "")
+    const evidenceText = normalizeSupportText(item.evidence_text).replace(/\s+/g, "")
+    if (supportName && componentName && (componentName.includes(supportName) || supportName.includes(componentName))) {
+      return true
+    }
+    if (supportAmount && evidenceText && evidenceText.includes(supportAmount)) {
+      return true
+    }
+
+    const componentText = normalizeSupportText([
+      item.component_key,
+      item.component_name,
+      item.support_type,
+      item.evidence_text,
+    ]).replace(/\s+/g, "")
+    if (!componentText) return false
+    return componentText.includes(supportText) || supportText.includes(componentText)
+  })
+}
+
+function buildRecommendedPolicyCards(
+  policies: unknown[] | null | undefined,
+  summary: PolicySupportSummary | null,
+): RecommendedPolicyCard[] {
+  if (!Array.isArray(policies)) return []
+  const supportByPolicyId = buildSupportItemIndex(summary)
+  const deduped = new Map<string, RecommendedPolicyCard>()
+
+  policies.forEach((policy) => {
+    const record = readRecord(policy)
+    const policyId = getPolicyIdFrom(record)
+    const title = getPolicyTitleFrom(record)
+    if (!policyId || !title) return
+
+    const supportComponents = supportByPolicyId.get(policyId)
+    const supportItems = getPolicySupportItems(record)
+    const normalizedItems = supportItems.length > 0 ? supportItems : [null]
+
+    normalizedItems.forEach((supportItem, itemIndex) => {
+      const supportRecord = readRecord(supportItem)
+      const matchedSupport = findMatchedSupportItem(supportComponents, supportRecord)
+      const supportItemName =
+        readTextFrom(supportRecord, "name", "title", "category") || "공고 기준 지원 항목"
+      const supportItemKey = getSupportItemKey(supportRecord, itemIndex)
+      const card: RecommendedPolicyCard = {
+        id: `${policyId}:${supportItemKey}`,
+        policyId,
+        title,
+        supportItemName,
+        amountText: matchedSupport
+          ? supportTerms(matchedSupport)
+          : getSupportItemAmountText(supportRecord, record),
+        description:
+          matchedSupport?.evidence_text || getSupportItemDescription(supportRecord, record),
+        group: getSupportItemGroup(record, supportRecord),
+        matchedSupport,
+      }
+
+      if (!deduped.has(card.id)) deduped.set(card.id, card)
+    })
+  })
+
+  return Array.from(deduped.values())
+}
+
+function RecommendedPolicySupportCard({ card }: { card: RecommendedPolicyCard }) {
+  const isMatchedPending = card.matchedSupport?.review_status === "pending"
+  const isRoiNotApplied = card.matchedSupport?.roi_effect_applied === false
+
+  return (
+    <div
+      style={{
+        background: C.card,
+        border: `1px solid ${C.border}`,
+        borderRadius: "12px",
+        padding: "14px",
+        boxShadow: "0 8px 18px rgba(15, 23, 42, 0.04)",
+      }}
+    >
+      <div style={{ display: "flex", gap: "10px", alignItems: "flex-start", marginBottom: "9px" }}>
+        <h4
+          style={{
+            color: C.text,
+            fontSize: "14px",
+            fontWeight: 900,
+            lineHeight: 1.35,
+            flex: 1,
+          }}
+        >
+          {card.title}
+        </h4>
+        <span
+          style={{
+            flexShrink: 0,
+            borderRadius: "999px",
+            background: card.matchedSupport ? C.amberSoft : "#e0f2fe",
+            color: card.matchedSupport ? "#a16207" : "#0369a1",
+            padding: "3px 8px",
+            fontSize: "11px",
+            fontWeight: 900,
+          }}
+        >
+          {card.matchedSupport ? "검토 중" : "공고 기준"}
+        </span>
+      </div>
+      <p style={{ color: C.text, fontSize: "12px", fontWeight: 900, marginBottom: "6px" }}>
+        {card.supportItemName}
+      </p>
+      <p style={{ color: C.blue, fontSize: "12px", fontWeight: 900, marginBottom: "8px" }}>
+        {card.amountText}
+      </p>
+      <p
+        style={{
+          color: C.muted,
+          fontSize: "12px",
+          fontWeight: 700,
+          lineHeight: 1.55,
+          display: "-webkit-box",
+          WebkitLineClamp: 3,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
+        }}
+      >
+        - {card.description}
+      </p>
+      {isMatchedPending && isRoiNotApplied && (
+        <p style={{ color: C.muted, fontSize: "11px", fontWeight: 900, marginTop: "9px" }}>
+          현재 ROI 계산에는 반영되지 않음
+        </p>
+      )}
+      {!card.matchedSupport && (
+        <p style={{ color: C.muted, fontSize: "11px", fontWeight: 900, marginTop: "9px" }}>
+          세부 요건 확인 필요
+        </p>
+      )}
+    </div>
+  )
+}
+
+export function PolicySupportComposition({
+  summary,
+  policies,
+}: {
+  summary: PolicySupportSummary | null
+  policies?: unknown[] | null
+}) {
+  const cards = buildRecommendedPolicyCards(policies, summary)
+  if (cards.length === 0) return null
+
+  const businessItems = cards.filter((item) => item.group === "business")
+  const financingItems = cards.filter((item) => item.group === "financing")
+  const executionItems = cards.filter((item) => item.group === "execution")
+
+  const groups = [
+    {
+      key: "business",
+      title: "지원금·사업성 ROI 관련",
+      items: businessItems,
+      emptyText: "현재 확인된 지원금·사업화 ROI 관련 항목이 없습니다.",
+      showPendingState: true,
+    },
+    {
+      key: "financing",
+      title: "융자·보증·이자지원",
+      items: financingItems,
+      emptyText: "현재 확인된 자금조달 지원 항목이 없습니다.",
+      showPendingState: true,
+    },
+    {
+      key: "execution",
+      title: "실행지원",
+      items: executionItems,
+      emptyText: "현재 확인된 실행지원 항목이 없습니다.",
+      showPendingState: true,
+    },
+  ]
+
+  return (
+    <section
+      aria-labelledby="policy-support-composition-title"
+      style={{
+        background: C.card,
+        border: `1px solid ${C.border}`,
+        borderRadius: "20px",
+        padding: "24px",
+        marginBottom: "24px",
+      }}
+    >
+      <h2
+        id="policy-support-composition-title"
+        style={{
+          color: C.text,
+          fontSize: "17px",
+          fontWeight: 900,
+          letterSpacing: "-0.02em",
+          marginBottom: "6px",
+        }}
+      >
+        정책 지원 구성
+      </h2>
+      <p
+        style={{
+          color: C.muted,
+          fontSize: "13px",
+          fontWeight: 700,
+          lineHeight: 1.6,
+          marginBottom: "18px",
+        }}
+      >
+        정책별 지원 내용을 지원금·자금조달·실행지원으로 구분해 확인할 수 있습니다.
+        현재 검토 중인 항목은 ROI 계산에 반영되지 않습니다.
+      </p>
+      <p
+        style={{
+          color: C.muted,
+          fontSize: "12px",
+          fontWeight: 800,
+          lineHeight: 1.6,
+          marginBottom: "18px",
+        }}
+      >
+        검토 중인 항목은 위 ROI·실부담금 계산에 반영되지 않습니다.
+      </p>
+
+      <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 250px), 1fr))",
+            gap: "14px",
+            alignItems: "start",
+          }}
+      >
+        {groups.map((group) => (
+          <div
+            key={group.key}
+            style={{
+              borderRadius: "14px",
+              background: "#f8fafc",
+              padding: "14px",
+              minWidth: 0,
+            }}
+          >
+            <h3
+              style={{
+                color: C.text,
+                fontSize: "13px",
+                fontWeight: 900,
+                marginBottom: "10px",
+              }}
+            >
+              {group.title}
+            </h3>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "9px",
+                maxHeight: group.items.length > 4 ? "360px" : undefined,
+                overflowY: group.items.length > 4 ? "auto" : undefined,
+                paddingRight: group.items.length > 4 ? "4px" : undefined,
+              }}
+            >
+              {group.items.length > 0 ? (
+                group.items.map((item, index) => (
+                  <RecommendedPolicySupportCard
+                    key={item.id || `${group.key}-${index}`}
+                    card={item}
+                  />
+                ))
+              ) : (
+                <p style={{ color: C.muted, fontSize: "12px", fontWeight: 700, lineHeight: 1.55 }}>
+                  {group.emptyText}
+                </p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      {/*
+            현재 분석된 정책에는 구조화된 지원 항목이 아직 등록되지 않았습니다.
+      */}
+    </section>
   )
 }
 

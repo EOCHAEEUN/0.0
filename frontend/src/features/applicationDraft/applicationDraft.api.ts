@@ -9,13 +9,17 @@ import type {
   SafetyEvidenceSummary,
   ScenarioKey,
 } from "./applicationDraft.contract"
-import { markAuthExpired } from "../../services/auth"
+import {
+  getAccessToken as getStoredAccessToken,
+  markAuthExpired,
+  refreshAccessToken,
+} from "../../services/auth"
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") || "http://127.0.0.1:8000/api"
 
 function getAccessToken() {
-  return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || ""
+  return getStoredAccessToken() || window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || ""
 }
 
 function buildApiUrl(path: string) {
@@ -122,24 +126,30 @@ export async function requestApplicationDraftGeneration(params: {
     )
   }
 
-  const accessToken = getAccessToken()
-  const response = await fetch(buildApiUrl("/draft"), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-    },
-    credentials: "include",
-    body: JSON.stringify({
-      company_id: params.companyId,
-      equipment_id: params.equipmentId,
-      policy_id: params.policyId,
-      ...(params.analysisId ? { analysis_id: params.analysisId } : {}),
-      ...(params.mustIncludeText
-        ? { must_include_text: params.mustIncludeText }
-        : {}),
-    }),
+  const requestBody = JSON.stringify({
+    company_id: params.companyId,
+    equipment_id: params.equipmentId,
+    policy_id: params.policyId,
+    ...(params.analysisId ? { analysis_id: params.analysisId } : {}),
+    ...(params.mustIncludeText
+      ? { must_include_text: params.mustIncludeText }
+      : {}),
   })
+  const send = (accessToken: string) =>
+    fetch(buildApiUrl("/draft"), {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+      credentials: "include",
+      body: requestBody,
+    })
+
+  let response = await send(getAccessToken())
+  if (response.status === 401) {
+    response = await send(await refreshAccessToken())
+  }
 
   const text = await response.text()
   const data = text ? JSON.parse(text) : null

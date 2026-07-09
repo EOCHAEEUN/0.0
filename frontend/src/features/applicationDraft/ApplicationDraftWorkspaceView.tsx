@@ -20,7 +20,6 @@ type RoutePolicyContext = {
 
 export function ApplicationDraftWorkspaceView({
   routeState,
-  isAnalysisPolicyRoute,
   routeAnalysisId,
   resolvedPolicyId,
 }: {

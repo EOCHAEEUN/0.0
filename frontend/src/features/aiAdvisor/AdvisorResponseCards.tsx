@@ -73,11 +73,11 @@ function DraftStatusCard({
   const status = String(data.status || "")
   const cardAnalysisId = readText(data.analysis_id, analysisId)
   const selectedPolicyId = readText(data.policy_id)
-  const policyRows = Array.isArray(data.policies) ? data.policies : []
 
   const policies = useMemo(
-    () =>
-      policyRows
+    () => {
+      const policyRows = Array.isArray(data.policies) ? data.policies : []
+      return policyRows
         .slice(0, 5)
         .map((policy) => {
           const row = asRecord(policy)
@@ -85,15 +85,20 @@ function DraftStatusCard({
             policyId: readText(row.policy_id),
             title: readText(row.title) || "정책명 미확인",
             deadline: readText(row.deadline) || "마감일 미정",
+            compatible: row.compatible !== false,
+            incompatibilityReason: readText(row.incompatibility_reason),
           }
         })
-        .filter((item) => Boolean(item.policyId)),
-    [policyRows],
+        .filter((item) => Boolean(item.policyId))
+    },
+    [data.policies],
   )
 
-  const [policyId, setPolicyId] = useState(
-    () => selectedPolicyId || policies[0]?.policyId || "",
-  )
+  const [policyId, setPolicyId] = useState(() => {
+    const selected = policies.find((policy) => policy.policyId === selectedPolicyId)
+    if (selected?.compatible) return selected.policyId
+    return policies.find((policy) => policy.compatible)?.policyId || ""
+  })
   const [mustIncludeText, setMustIncludeText] = useState(() =>
     readText(data.additional_info),
   )
@@ -101,7 +106,12 @@ function DraftStatusCard({
   const [submitMessage, setSubmitMessage] = useState("")
   const [submitError, setSubmitError] = useState("")
 
-  const canSubmit = Boolean(policyId) && Boolean(onApplyDraftRequirements) && !isSubmitting
+  const selectedPolicy = policies.find((policy) => policy.policyId === policyId)
+  const canSubmit =
+    Boolean(policyId) &&
+    selectedPolicy?.compatible === true &&
+    Boolean(onApplyDraftRequirements) &&
+    !isSubmitting
 
   const handleSubmit = async () => {
     if (!canSubmit) return
@@ -146,12 +156,29 @@ function DraftStatusCard({
               disabled={isSubmitting}
             >
               {policies.map((policy) => (
-                <option key={policy.policyId} value={policy.policyId}>
+                <option
+                  key={policy.policyId}
+                  value={policy.policyId}
+                  disabled={!policy.compatible}
+                >
                   {policy.title} ({policy.deadline})
+                  {!policy.compatible ? " - 선택 불가" : ""}
                 </option>
               ))}
             </select>
           </label>
+
+          {!policies.some((policy) => policy.compatible) ? (
+            <div className="ff-advisor-draft-error" role="alert">
+              <strong>현재 선택 가능한 정책이 없습니다.</strong>
+              <p>
+                기업 소재지와 설비 투자 목적에 맞는 정책으로 다시 분석해 주세요.
+              </p>
+              {policies[0]?.incompatibilityReason ? (
+                <p>{policies[0].incompatibilityReason}</p>
+              ) : null}
+            </div>
+          ) : null}
 
           <label className="ff-advisor-draft-field">
             <span>초안에 꼭 넣고 싶은 내용</span>
@@ -174,7 +201,12 @@ function DraftStatusCard({
           </button>
 
           {submitMessage ? <p className="ff-advisor-card-footnote">{submitMessage}</p> : null}
-          {submitError ? <p className="ff-advisor-card-footnote">{submitError}</p> : null}
+          {submitError ? (
+            <div className="ff-advisor-draft-error" role="alert">
+              <strong>신청서 초안을 반영하지 못했습니다.</strong>
+              <p>{submitError}</p>
+            </div>
+          ) : null}
         </div>
       ) : (
         <p className="ff-advisor-card-footnote">
@@ -349,17 +381,103 @@ export default function AdvisorResponseCards({
           )
         }
 
-        if (type === "safety_check_summary" || type === "safety_status") {
+        if (type === "safety_status") {
           const summary = asRecord(data.summary)
-          const total = readNumber(data.total) ?? readNumber(summary.total)
-          return total !== null ? (
+          const rows = Array.isArray(data.rows) ? data.rows : []
+          const total = readNumber(summary.total) ?? rows.length
+          const needImprovement = readNumber(summary.need_improvement) ?? 0
+          const missingEvidence = readNumber(summary.missing_evidence) ?? 0
+
+          if (total <= 0) {
+            return (
+              <article key={`${type}-${index}`} className="ff-advisor-result-card is-warning">
+                <strong>안전점검 현황</strong>
+                <p>
+                  현재 분석 기준 안전점검 항목이 아직 생성되지 않았습니다. 안전 프리뷰를
+                  먼저 생성하거나 점검 항목을 등록해 주세요.
+                </p>
+              </article>
+            )
+          }
+
+          return (
             <article key={`${type}-${index}`} className="ff-advisor-result-card">
-              <strong>안전점검</strong>
-              <p className="ff-advisor-card-footnote">
-                등록된 안전점검 항목 {total.toLocaleString("ko-KR")}건
-              </p>
+              <strong>안전점검 현황</strong>
+              <div className="ff-advisor-safety-metrics">
+                <MetricRow label="총 점검 항목" value={`${total}건`} />
+                <MetricRow label="개선 필요" value={`${needImprovement}건`} />
+                <MetricRow label="증빙 미보유" value={`${missingEvidence}건`} />
+              </div>
+              <ul className="ff-advisor-safety-list">
+                {rows.slice(0, 8).map((row, rowIndex) => {
+                  const item = asRecord(row)
+                  const label = readText(item.viewpoint_label) || `점검 항목 ${rowIndex + 1}`
+                  const currentStatus = readText(item.current_status) || "상태 미기재"
+                  const evidenceStatus = readText(item.evidence_status) || "증빙 상태 미기재"
+                  const description = readText(item.description)
+                  const needsAttention =
+                    currentStatus.includes("개선") || evidenceStatus === "미보유"
+                  return (
+                    <li
+                      key={`${label}-${rowIndex}`}
+                      className={needsAttention ? "is-attention" : undefined}
+                    >
+                      <strong>{label}</strong>
+                      <span>
+                        {currentStatus} · {evidenceStatus}
+                      </span>
+                      {description ? <p>{description}</p> : null}
+                    </li>
+                  )
+                })}
+              </ul>
+              {rows.length > 8 ? (
+                <p className="ff-advisor-card-footnote">
+                  외 {rows.length - 8}건은 안전점검 메뉴에서 확인할 수 있습니다.
+                </p>
+              ) : null}
             </article>
-          ) : null
+          )
+        }
+
+        if (type === "safety_check_summary") {
+          const hasSafetyStatusCard = cards.some(
+            (item) => String(asRecord(item).type || "") === "safety_status",
+          )
+          if (hasSafetyStatusCard) return null
+
+          const total = readNumber(data.total)
+          const planned = readNumber(data.planned)
+          const unplanned = readNumber(data.unplanned)
+          const needImprovement = readNumber(data.need_improvement)
+          const missingEvidence = readNumber(data.missing_evidence)
+          if (total === null) return null
+
+          return (
+            <article key={`${type}-${index}`} className="ff-advisor-result-card">
+              <strong>안전점검 요약</strong>
+              <div className="ff-advisor-safety-metrics">
+                <MetricRow label="총 점검 항목" value={`${total}건`} />
+                {planned !== null || unplanned !== null ? (
+                  <>
+                    <MetricRow label="향후 관리 계획 작성" value={`${planned ?? 0}건`} />
+                    <MetricRow label="향후 관리 계획 미작성" value={`${unplanned ?? 0}건`} />
+                  </>
+                ) : (
+                  <>
+                    <MetricRow
+                      label="개선 필요"
+                      value={needImprovement === null ? "-" : `${needImprovement}건`}
+                    />
+                    <MetricRow
+                      label="증빙 미보유"
+                      value={missingEvidence === null ? "-" : `${missingEvidence}건`}
+                    />
+                  </>
+                )}
+              </div>
+            </article>
+          )
         }
 
         return null

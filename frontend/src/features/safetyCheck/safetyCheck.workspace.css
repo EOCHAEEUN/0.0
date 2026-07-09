@@ -75,11 +75,19 @@
   border-bottom: 3px solid transparent;
   transition: all 0.3s ease;
   font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .safety-check-page .tab-button.active {
   color: var(--sc-blue);
   border-bottom-color: var(--sc-blue);
+}
+
+.safety-check-page .tab-button.active svg {
+  color: #3b55c8;
+  opacity: 1;
 }
 
 .safety-check-page .tab-button:hover {
@@ -257,6 +265,18 @@
   gap: 8px;
 }
 
+.safety-check-page .improvement-additional-info {
+  color: #4f5f78;
+  display: block;
+  font-size: 11px;
+  line-height: 1.45;
+  margin-top: 5px;
+}
+
+.safety-check-page .improvement-input + .improvement-input {
+  margin-top: 6px;
+}
+
 .safety-check-page .improvement-text {
   flex: 1;
   padding: 8px 12px;
@@ -423,8 +443,17 @@
   background: rgba(51, 77, 167, 0.08);
 }
 
+.safety-check-modal .file-upload-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  color: #3b55c8;
+}
+
 .safety-check-modal .file-upload-text {
   font-size: 14px;
+  font-weight: 700;
   color: var(--sc-muted);
   margin-bottom: 8px;
 }
@@ -559,6 +588,11 @@
   border-bottom-width: 2px;
 }
 
+.ff-draft-safety-card .safety-check-page--embedded .tab-button.active svg {
+  color: #3b55c8;
+  opacity: 1;
+}
+
 .ff-draft-workspace-page .ff-draft-safety-card .safety-check-page--embedded .tab-button {
   padding: 8px 2px 10px;
   color: var(--sc-muted);
@@ -691,9 +725,13 @@
 }
 
 .ff-draft-safety-card .safety-check-page--embedded .empty-state--compact .empty-state-icon {
-  font-size: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   margin-bottom: 0;
   line-height: 1;
+  color: #3b55c8;
+  font-size: 0;
 }
 
 .ff-draft-safety-card .safety-check-page--embedded .empty-state--compact p {
@@ -796,6 +834,14 @@
 .safety-check-modal .ff-draft-safety-cancel-btn,
 .safety-check-modal .ff-draft-safety-save-btn {
   flex: 1;
+}
+
+.safety-check-modal .ff-draft-safety-save-btn {
+  background: #1a2744;
+}
+
+.safety-check-modal .ff-draft-safety-save-btn:hover:not(:disabled) {
+  background: #24345a;
 }
 
 .ff-draft-safety-card .ff-draft-safety-save-btn.danger,

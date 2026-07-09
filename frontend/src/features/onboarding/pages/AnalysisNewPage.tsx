@@ -333,21 +333,17 @@ export default function AnalysisNewPage() {
     )
   }
 
-  const readOnlyEquipment = mode !== "new_equipment"
+  // mode === "new_equipment"는 위의 early return에서 설비 등록 페이지로
+  // 이동하므로 여기서는 existing_equipment / reanalysis만 도달한다.
+  const readOnlyEquipment = true
   const isReanalysis = mode === "reanalysis"
-  const isNewEquipment = mode === "new_equipment"
-  const title =
-    mode === "new_equipment"
-      ? "새 설비 투자 분석"
-      : isReanalysis
-        ? `${condition.equipmentName || "설비"} 분석 조건 조정`
-        : `${condition.equipmentName || "설비"} 새 투자 분석`
-  const description =
-    mode === "new_equipment"
-      ? "새 설비 정보를 입력하고 투자 효과를 분석하세요."
-      : isReanalysis
-        ? "이전 분석 조건을 바탕으로 비용과 투자 가정을 수정해 새 결과를 만듭니다."
-        : "등록된 설비의 분석 조건을 조정해 새 ROI 결과를 만듭니다."
+  const isNewEquipment = false
+  const title = isReanalysis
+    ? `${condition.equipmentName || "설비"} 분석 조건 조정`
+    : `${condition.equipmentName || "설비"} 새 투자 분석`
+  const description = isReanalysis
+    ? "이전 분석 조건을 바탕으로 비용과 투자 가정을 수정해 새 결과를 만듭니다."
+    : "등록된 설비의 분석 조건을 조정해 새 ROI 결과를 만듭니다."
 
   const numericField = (
     label: string,

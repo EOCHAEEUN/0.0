@@ -17,6 +17,7 @@ from app.agents.chat_orchestrator import (
     policy_snapshot_node,
     reanalysis_request_node,
     roi_snapshot_node,
+    safety_check_summary_node,
     safety_preview_generation_node,
     safety_snapshot_node,
 )
@@ -37,6 +38,7 @@ def build_graph():
     graph.add_node("calendar_snapshot_node", calendar_snapshot_node)
     graph.add_node("draft_status_node", draft_status_node)
     graph.add_node("safety_snapshot_node", safety_snapshot_node)
+    graph.add_node("safety_check_summary_node", safety_check_summary_node)
     graph.add_node("safety_preview_generation_node", safety_preview_generation_node)
     graph.add_node("investment_simulation_node", investment_simulation_node)
     graph.add_node("reanalysis_request_node", reanalysis_request_node)
@@ -70,6 +72,7 @@ def build_graph():
             "calendar_snapshot": "analysis_snapshot_loader_node",
             "draft_status": "analysis_snapshot_loader_node",
             "safety_snapshot": "analysis_snapshot_loader_node",
+            "safety_check_summary": "analysis_snapshot_loader_node",
             "safety_preview_generation": "analysis_snapshot_loader_node",
             "investment_simulation": "analysis_snapshot_loader_node",
             "reanalysis_request": "analysis_snapshot_loader_node",
@@ -92,6 +95,7 @@ def build_graph():
             "calendar_snapshot": "analysis_snapshot_loader_node",
             "draft_status": "analysis_snapshot_loader_node",
             "safety_snapshot": "analysis_snapshot_loader_node",
+            "safety_check_summary": "analysis_snapshot_loader_node",
             "investment_simulation": "analysis_snapshot_loader_node",
             "current_analysis_summary": "analysis_snapshot_loader_node",
             "db_error": "db_error_node",
@@ -107,6 +111,7 @@ def build_graph():
             "calendar_snapshot": "calendar_snapshot_node",
             "draft_status": "draft_status_node",
             "safety_snapshot": "safety_snapshot_node",
+            "safety_check_summary": "safety_check_summary_node",
             "safety_preview_generation": "safety_preview_generation_node",
             "investment_simulation": "investment_simulation_node",
             "reanalysis_request": "reanalysis_request_node",
@@ -122,6 +127,7 @@ def build_graph():
         "calendar_snapshot_node",
         "draft_status_node",
         "safety_snapshot_node",
+        "safety_check_summary_node",
         "safety_preview_generation_node",
         "investment_simulation_node",
         "reanalysis_request_node",

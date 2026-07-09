@@ -1,33 +1,44 @@
-type AnalysisPickerItem = {
-  analysisId: string
+export type AnalysisPickerItem = {
   equipmentId: string
-  analysisTitle: string
   equipmentName: string
+  subtitle: string
+  analysisId: string
+  roiPct: number | null
+  createdAt: string
 }
 
 type AnalysisPickerDialogProps = {
   open: boolean
-  items: AnalysisPickerItem[]
-  selectedAnalysisId: string
   search: string
+  items: AnalysisPickerItem[]
+  selectedEquipmentId: string
+  selectedAnalysisId: string
   onSearchChange: (value: string) => void
   onSelect: (item: AnalysisPickerItem) => void
   onClose: () => void
 }
 
-function getDisplayTitle(item: AnalysisPickerItem) {
-  const title = item.analysisTitle.trim()
-  if (title) return title
-  const name = item.equipmentName.trim()
-  if (name) return name
-  return "이름 없는 설비"
+function formatPercent(value: number | null) {
+  return value === null ? "-" : `${Math.round(value)}%`
+}
+
+function formatDateTime(value: string) {
+  const parsed = Date.parse(value)
+  if (!Number.isFinite(parsed)) return "-"
+  const date = new Date(parsed)
+  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(
+    date.getDate(),
+  ).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(
+    date.getMinutes(),
+  ).padStart(2, "0")}`
 }
 
 export default function AnalysisPickerDialog({
   open,
-  items,
-  selectedAnalysisId,
   search,
+  items,
+  selectedEquipmentId,
+  selectedAnalysisId,
   onSearchChange,
   onSelect,
   onClose,
@@ -35,7 +46,7 @@ export default function AnalysisPickerDialog({
   if (!open) return null
 
   return (
-    <section className="ff-advisor-analysis-picker-shell" aria-label="분석 선택">
+    <section className="ff-advisor-analysis-picker-shell" aria-label="설비 선택">
       <div className="ff-advisor-analysis-picker-panel" role="dialog" aria-modal="true">
         <header className="ff-advisor-analysis-picker-header">
           <h3>분석 변경</h3>
@@ -43,34 +54,47 @@ export default function AnalysisPickerDialog({
             ×
           </button>
         </header>
-
         <div className="ff-advisor-analysis-picker-body">
           <input
+            className="ff-advisor-analysis-picker-search"
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder="설비명 검색"
-            aria-label="설비명 검색"
           />
-
-          <div className="ff-advisor-analysis-picker-list" role="listbox" aria-label="분석 목록">
+          <div className="ff-advisor-analysis-picker-list" role="listbox" aria-label="설비 목록">
             {items.map((item) => {
-              const isActive = item.analysisId === selectedAnalysisId
+              const isActive =
+                item.equipmentId === selectedEquipmentId &&
+                (!item.analysisId || item.analysisId === selectedAnalysisId)
               return (
                 <button
-                  key={item.analysisId}
+                  key={item.equipmentId}
                   type="button"
                   role="option"
                   aria-selected={isActive}
                   className={`ff-advisor-analysis-picker-item${isActive ? " is-active" : ""}`}
                   onClick={() => onSelect(item)}
                 >
-                  {getDisplayTitle(item)}
+                  <div className="ff-advisor-analysis-picker-item-main">
+                    <strong>{item.equipmentName}</strong>
+                    <span>{item.subtitle}</span>
+                  </div>
+                  <div className="ff-advisor-analysis-picker-item-meta">
+                    {item.analysisId ? (
+                      <>
+                        <span>ROI {formatPercent(item.roiPct)}</span>
+                        <time>{formatDateTime(item.createdAt)}</time>
+                      </>
+                    ) : (
+                      <span className="is-muted">분석 없음</span>
+                    )}
+                  </div>
                 </button>
               )
             })}
-            {!items.length && (
+            {!items.length ? (
               <p className="ff-advisor-analysis-picker-empty">검색 결과가 없습니다.</p>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

@@ -1768,22 +1768,18 @@
     3 * var(--ff-analysis-row-height) + 2 * var(--ff-analysis-row-gap)
   );
   overflow-y: hidden;
-  padding-right: 4px;
-  scrollbar-gutter: stable;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 .ff-analysis-list-scroll.is-scrollable {
   overflow-y: auto;
-  padding-right: 6px;
 }
 
 .ff-analysis-list-scroll::-webkit-scrollbar {
-  width: 6px;
-}
-
-.ff-analysis-list-scroll::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: #cbd5e1;
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .ff-analysis-list-footer {

@@ -5,6 +5,7 @@ import type {
   ScenarioKey,
   StatusTone,
 } from "../applicationDraft.contract"
+import { APPLICATION_DRAFT_MUST_INCLUDE_KEY } from "../applicationDraft.constants"
 
 type Dict = Record<string, unknown>
 
@@ -692,6 +693,15 @@ export function useApplicationDraft(
             equipment_id: equipmentId,
             policy_id: policyId,
             ...(analysisId ? { analysis_id: analysisId } : {}),
+            ...(window.localStorage
+              .getItem(APPLICATION_DRAFT_MUST_INCLUDE_KEY)
+              ?.trim()
+              ? {
+                  must_include_text: window.localStorage
+                    .getItem(APPLICATION_DRAFT_MUST_INCLUDE_KEY)
+                    ?.trim(),
+                }
+              : {}),
           }),
         })
 

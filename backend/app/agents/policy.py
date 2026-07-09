@@ -515,6 +515,10 @@ def _support_parse_number(value: Any) -> Optional[float]:
     if not text or text.lower() in {"none", "null", "nan", "-"}:
         return None
 
+    match = re.search(r"(\d+(?:\.\d+)?)조", text)
+    if match:
+        return float(match.group(1)) * 100000000
+
     match = re.search(r"(\d+(?:\.\d+)?)억", text)
     if match:
         return float(match.group(1)) * 10000
@@ -522,6 +526,18 @@ def _support_parse_number(value: Any) -> Optional[float]:
     match = re.search(r"(\d+(?:\.\d+)?)천만", text)
     if match:
         return float(match.group(1)) * 1000
+
+    match = re.search(r"(\d+(?:\.\d+)?)백만", text)
+    if match:
+        return float(match.group(1)) * 100
+
+    match = re.search(r"(\d+(?:\.\d+)?)만", text)
+    if match:
+        return float(match.group(1))
+
+    match = re.search(r"(\d+(?:\.\d+)?)원", text)
+    if match:
+        return float(match.group(1)) / 10000
 
     match = re.search(r"(\d+(?:\.\d+)?)", text)
     return float(match.group(1)) if match else None
@@ -596,6 +612,9 @@ NOT_APPLICABLE_BASIS = (
 def _selected_amount_candidate(policy: dict) -> Any:
     candidate = _support_value(policy, "selected_amount_candidate")
     if isinstance(candidate, dict):
+        display_amount = candidate.get("display_amount")
+        if display_amount and re.search(r"(조|억|천만|백만|만원|원)", str(display_amount)):
+            return display_amount
         return candidate.get("amount_manwon")
     return None
 
@@ -610,6 +629,34 @@ def _support_policy_score(policy: dict) -> float:
         except (TypeError, ValueError):
             continue
     return 0.0
+
+
+MIN_ROI_POLICY_MATCH_SCORE = 0.6
+
+
+def _roi_eligibility_score(raw_score: float) -> float:
+    """raw 매칭 점수를 ROI 반영 판정용 0~1 점수로 변환한다.
+
+    점수 생산 기준(rerank_policies_with_roi, evaluate_and_rerank_with_llm):
+      final_score = (1 - distance) + 보너스(최대 0.3)
+      hybrid_score = final_score * 0.6 + (llm_score/5) * 0.4
+    → raw 점수는 0~약 1.3 범위의 유사도 스케일이며 백분율이 아니다.
+    1.0 초과분은 가산 보너스이므로 판정 시 1.0으로 취급하고,
+    정렬에는 raw 점수를 그대로 사용해 원본 순서를 보존한다.
+    """
+    return max(0.0, min(raw_score, 1.0))
+
+
+def _financial_review_status(policy: dict) -> str:
+    return str(
+        _support_value(
+            policy,
+            "financial_review_status",
+            "policy_financial_review_status",
+            "review_status",
+        )
+        or ""
+    ).strip().lower()
 
 
 def _estimate_policy_support(policy: dict, investment_manwon: float) -> dict:
@@ -690,8 +737,16 @@ def _estimate_policy_support(policy: dict, investment_manwon: float) -> dict:
                 "reason": missing,
                 "message": missing,
             }
-        applied_support = min(investment_manwon, max_amount)
-        basis = "직접 지원금 한도와 투자금 중 작은 금액을 반영했습니다."
+        if support_rate is not None and 0 < support_rate <= 1:
+            applied_support = min(
+                investment_manwon,
+                investment_manwon * support_rate,
+                max_amount,
+            )
+            basis = "투자금, 투자금 × 지원율, 직접 지원금 한도 중 작은 금액을 반영했습니다."
+        else:
+            applied_support = min(investment_manwon, max_amount)
+            basis = "지원율이 없는 정액 직접지원으로 보고 지원금 한도와 투자금 중 작은 금액을 반영했습니다."
         return {
             **common,
             "status": "applied",
@@ -795,12 +850,58 @@ def resolve_scenario_policy_support(
 
     evaluated: list[dict] = []
     for policy in candidates:
-        finance = _estimate_policy_support(policy, investment)
+        raw_score = _support_policy_score(policy)
+        eligibility_score = _roi_eligibility_score(raw_score)
+        review_status = _financial_review_status(policy)
+        if eligibility_score < MIN_ROI_POLICY_MATCH_SCORE:
+            reason = (
+                f"정책 매칭 점수 {eligibility_score:.2f}가 자동 반영 기준 "
+                f"{MIN_ROI_POLICY_MATCH_SCORE:.2f}보다 낮아 지원금을 ROI에서 제외했습니다."
+            )
+            finance = {
+                "status": "review_required",
+                "roi_apply_method": "none",
+                "support_rate": _support_parse_rate(
+                    _support_value(policy, "support_rate", "support_ratio")
+                ),
+                "max_amount_manwon": _support_parse_number(
+                    _selected_amount_candidate(policy)
+                ),
+                "eligible_investment_manwon": round(max(0, investment), 1),
+                "applied_support_manwon": 0,
+                "calculation_basis": reason,
+                "reason": reason,
+                "message": reason,
+            }
+        elif review_status and review_status != "approved":
+            reason = (
+                f"정책 재무 규칙 검토 상태가 '{review_status}'이므로 "
+                "지원금을 ROI에서 제외했습니다."
+            )
+            finance = {
+                "status": "review_required",
+                "roi_apply_method": "none",
+                "support_rate": _support_parse_rate(
+                    _support_value(policy, "support_rate", "support_ratio")
+                ),
+                "max_amount_manwon": _support_parse_number(
+                    _selected_amount_candidate(policy)
+                ),
+                "eligible_investment_manwon": round(max(0, investment), 1),
+                "applied_support_manwon": 0,
+                "calculation_basis": reason,
+                "reason": reason,
+                "message": reason,
+            }
+        else:
+            finance = _estimate_policy_support(policy, investment)
         evaluated.append(
             {
                 "policy": policy,
                 "finance": finance,
-                "score": _support_policy_score(policy),
+                # 정렬용 raw 점수: 1.0 초과 보너스 구간의 순서 정보를 보존한다.
+                "score": raw_score,
+                "eligibility_score": eligibility_score,
                 "scenario_specific": int(scenario in _support_scenario_tags(policy)),
             }
         )
@@ -832,7 +933,7 @@ def resolve_scenario_policy_support(
         "status": finance["status"],
         "policy_id": _support_value(policy, "policy_id", "id", "matched_policy_id"),
         "policy_title": str(_support_value(policy, "title", "policy_title", "name") or ""),
-        "policy_match_score": selected["score"],
+        "policy_match_score": selected["eligibility_score"],
         "roi_apply_method": finance.get("roi_apply_method", "none"),
         "support_rate": finance.get("support_rate"),
         "max_amount_manwon": finance.get("max_amount_manwon"),

@@ -84,6 +84,196 @@ def _snapshot_policy_rows(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
+def _policy_option_dto(
+    *,
+    policy_id: str,
+    title: str = "",
+    deadline: str = "",
+    agency: str = "",
+    match_score: Any = None,
+) -> dict[str, Any]:
+    return {
+        "policy_id": policy_id,
+        "title": _safe_text(title, "정책명 미확인"),
+        "deadline": _safe_text(deadline) or None,
+        "agency": _safe_text(agency) or None,
+        "match_score": match_score,
+    }
+
+
+def _policy_option_from_snapshot_row(row: dict[str, Any]) -> dict[str, Any]:
+    return _policy_option_dto(
+        policy_id=_safe_text(row.get("policy_id")),
+        title=_safe_text(row.get("title")),
+        deadline=_safe_text(row.get("deadline_display"), row.get("deadline")),
+        agency=_safe_text(row.get("agency"), row.get("organization")),
+        match_score=row.get("match_score")
+        or row.get("final_score")
+        or row.get("hybrid_score"),
+    )
+
+
+def _fetch_matched_policy_rows(
+    db: Any,
+    *,
+    company_id: str,
+    analysis_id: str,
+    equipment_id: str,
+    limit: int = 10,
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    def extend_rows(query_rows: list[dict[str, Any]]) -> None:
+        for row in query_rows:
+            if not isinstance(row, dict):
+                continue
+            policy_id = _safe_text(row.get("policy_id"))
+            if not policy_id or policy_id in seen:
+                continue
+            seen.add(policy_id)
+            rows.append(row)
+
+    try:
+        if analysis_id:
+            result = (
+                db.table("matched_policy")
+                .select("*")
+                .eq("company_id", company_id)
+                .eq("analysis_id", analysis_id)
+                .order("match_score", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            extend_rows(result.data or [])
+
+        if len(rows) < limit and equipment_id:
+            result = (
+                db.table("matched_policy")
+                .select("*")
+                .eq("company_id", company_id)
+                .eq("equipment_id", equipment_id)
+                .order("match_score", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            extend_rows(result.data or [])
+    except Exception:
+        pass
+
+    return rows[:limit]
+
+
+def _fetch_policy_details_by_ids(
+    db: Any,
+    policy_ids: list[str],
+) -> dict[str, dict[str, Any]]:
+    unique_ids = [policy_id for policy_id in dict.fromkeys(policy_ids) if policy_id]
+    if not unique_ids:
+        return {}
+
+    try:
+        result = (
+            db.table("policy")
+            .select(
+                "policy_id,title,organization,agency,deadline,deadline_display,match_score"
+            )
+            .in_("policy_id", unique_ids)
+            .execute()
+        )
+        return {
+            _safe_text(row.get("policy_id")): row
+            for row in (result.data or [])
+            if isinstance(row, dict) and _safe_text(row.get("policy_id"))
+        }
+    except Exception:
+        return {}
+
+
+def _build_policy_options(
+    db: Any,
+    *,
+    snapshot: dict[str, Any] | None,
+    legacy_missing: bool,
+    company_id: str,
+    analysis_id: str,
+    equipment_id: str,
+    limit: int = 5,
+) -> list[dict[str, Any]]:
+    options: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    def append_option(option: dict[str, Any]) -> None:
+        policy_id = _safe_text(option.get("policy_id"))
+        if not policy_id or policy_id in seen:
+            return
+        seen.add(policy_id)
+        options.append(option)
+
+    if not legacy_missing and snapshot:
+        rows = _snapshot_policy_rows(snapshot)
+        rows.sort(
+            key=lambda item: float(_safe_number(item.get("match_score")) or 0),
+            reverse=True,
+        )
+        recommended_id = _safe_text(snapshot.get("recommended_policy_id"))
+        if recommended_id:
+            recommended = next(
+                (
+                    row
+                    for row in rows
+                    if _safe_text(row.get("policy_id")) == recommended_id
+                ),
+                None,
+            )
+            if recommended:
+                rows = [recommended] + [
+                    row
+                    for row in rows
+                    if _safe_text(row.get("policy_id")) != recommended_id
+                ]
+        for row in rows:
+            append_option(_policy_option_from_snapshot_row(row))
+            if len(options) >= limit:
+                return options[:limit]
+
+    matched_rows = _fetch_matched_policy_rows(
+        db,
+        company_id=company_id,
+        analysis_id=analysis_id,
+        equipment_id=equipment_id,
+        limit=max(limit * 2, limit),
+    )
+    detail_map = _fetch_policy_details_by_ids(
+        db,
+        [_safe_text(row.get("policy_id")) for row in matched_rows],
+    )
+
+    for row in matched_rows:
+        detail = _as_dict(detail_map.get(_safe_text(row.get("policy_id"))))
+        append_option(
+            _policy_option_dto(
+                policy_id=_safe_text(row.get("policy_id")),
+                title=_safe_text(row.get("title"), detail.get("title")),
+                deadline=_safe_text(
+                    row.get("deadline"),
+                    detail.get("deadline_display"),
+                    detail.get("deadline"),
+                ),
+                agency=_safe_text(
+                    row.get("organization"),
+                    detail.get("organization"),
+                    detail.get("agency"),
+                ),
+                match_score=row.get("match_score") or detail.get("match_score"),
+            )
+        )
+        if len(options) >= limit:
+            break
+
+    return options[:limit]
+
+
 def _snapshot_policy_by_id(
     snapshot: dict[str, Any],
     requested_policy_id: str,

@@ -1,4 +1,6 @@
 import { getCurrentUserId } from "../../services/auth"
+import type { PolicySupportSummary } from "../roi/roi.contract"
+import { compactPolicySupportSummary } from "../roi/roi.utils"
 
 export type CompanyProfileStatus = "not_started" | "in_progress" | "completed"
 export type EquipmentSetupStatus = "not_started" | "in_progress" | "completed"
@@ -72,6 +74,7 @@ export type AnalysisResultSnapshot = {
   equipmentId?: string
   roiResult?: unknown
   policies?: unknown[]
+  policy_support_summary?: PolicySupportSummary | null
   policyStatus?: string
   policyError?: string | null
   analysisInput?: AnalysisConditionDraft
@@ -184,6 +187,7 @@ function compactScenarioMetrics(record: Record<string, unknown>) {
     "saving_manwon",
     "roi_pct",
     "roi_percent",
+    "roi_period_months",
     "payback_years",
     "paybackYears",
   ]
@@ -211,6 +215,72 @@ function compactScenarioMetrics(record: Record<string, unknown>) {
   }
 
   return compact
+}
+
+function compactRecommendedPolicy(policy: unknown): Record<string, unknown> | null {
+  if (!policy || typeof policy !== "object" || Array.isArray(policy)) return null
+  const record = policy as Record<string, unknown>
+  const metadata =
+    record.metadata && typeof record.metadata === "object" && !Array.isArray(record.metadata)
+      ? (record.metadata as Record<string, unknown>)
+      : {}
+  const compact: Record<string, unknown> = {}
+  const metadataCompact: Record<string, unknown> = {}
+
+  const copyKeys = [
+    "policy_id",
+    "id",
+    "matched_policy_id",
+    "title",
+    "policy_title",
+    "name",
+    "summary",
+    "reason",
+    "description",
+    "support_summary",
+    "support_content",
+    "max_amount_manwon",
+    "max_amount",
+    "support_amount",
+    "support_limit",
+    "support_type_label",
+    "support_type_detail",
+    "policy_category",
+    "policy_subcategory",
+    "category",
+    "subcategory",
+    "service_category",
+    "agency",
+    "organization",
+    "provider",
+  ]
+
+  copyKeys.forEach((key) => {
+    const value = record[key]
+    if (value !== undefined && value !== null && value !== "") compact[key] = value
+    const metadataValue = metadata[key]
+    if (metadataValue !== undefined && metadataValue !== null && metadataValue !== "") {
+      metadataCompact[key] = metadataValue
+    }
+  })
+
+  if (Object.keys(metadataCompact).length > 0) compact.metadata = metadataCompact
+
+  const id = compact.policy_id ?? compact.id ?? compact.matched_policy_id ?? metadataCompact.policy_id
+  const title = compact.title ?? compact.policy_title ?? compact.name ?? metadataCompact.title
+  return id && title ? compact : null
+}
+
+function compactRecommendedPolicies(policies: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(policies)) return []
+  const deduped = new Map<string, Record<string, unknown>>()
+  policies.forEach((policy, index) => {
+    const compact = compactRecommendedPolicy(policy)
+    if (!compact) return
+    const key = String(compact.policy_id ?? compact.id ?? compact.matched_policy_id ?? compact.title ?? index)
+    if (!deduped.has(key)) deduped.set(key, compact)
+  })
+  return Array.from(deduped.values()).slice(0, 20)
 }
 
 function extractPriorityPolicyId(policies: unknown[], fallback?: string) {
@@ -247,6 +317,9 @@ function buildPersistedAnalysisResult(result: AnalysisResultSnapshot): AnalysisR
       ? aiRecommendation.summary.slice(0, 500)
       : recommendationDetail
 
+  const policySupportSummary = compactPolicySupportSummary(result.policy_support_summary)
+  const policies = compactRecommendedPolicies(result.policies)
+
   return {
     schemaVersion: ANALYSIS_RESULT_SCHEMA_VERSION,
     id: result.id,
@@ -259,7 +332,8 @@ function buildPersistedAnalysisResult(result: AnalysisResultSnapshot): AnalysisR
     matchedPolicies: result.matchedPolicies,
     priorityPolicies: result.priorityPolicies,
     priorityPolicyName: result.priorityPolicyName,
-    priorityPolicyId: extractPriorityPolicyId(result.policies ?? [], result.priorityPolicyId),
+    priorityPolicyId: extractPriorityPolicyId(policies, result.priorityPolicyId),
+    ...(policies.length > 0 ? { policies } : {}),
     recommendedScenario: result.recommendedScenario,
     companyId: result.companyId,
     equipmentId: result.equipmentId,
@@ -279,6 +353,7 @@ function buildPersistedAnalysisResult(result: AnalysisResultSnapshot): AnalysisR
           : [],
       },
     },
+    ...(policySupportSummary ? { policy_support_summary: policySupportSummary } : {}),
     policyStatus: result.policyStatus,
     policyError: result.policyError ?? null,
     createdAt: result.createdAt,

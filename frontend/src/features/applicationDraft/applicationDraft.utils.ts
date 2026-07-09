@@ -163,6 +163,7 @@ export function readAnalysisData(): AnalysisData {
       matched_policies: Array.isArray(data?.matched_policies)
         ? data.matched_policies
         : [],
+      policies: Array.isArray(data?.policies) ? data.policies : [],
       raw_candidates: Array.isArray(data?.raw_candidates)
         ? data.raw_candidates
         : [],

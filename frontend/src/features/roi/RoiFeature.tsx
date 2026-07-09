@@ -10,7 +10,13 @@ import {
   InputPanel,
   PageHero,
 } from "./components/RoiPageSections"
-import { ExpectedBenefits, PolicyCta, RoiHero, RoiScenarioCards } from "./components/RoiResultSections"
+import {
+  ExpectedBenefits,
+  PolicyCta,
+  PolicySupportComposition,
+  RoiHero,
+  RoiScenarioCards,
+} from "./components/RoiResultSections"
 import {
   buildLocalScenarios,
   buildPayload,
@@ -27,10 +33,17 @@ import {
   isDefaultEquipmentName,
   mergeApiScenarios,
   normalizeApiData,
+  readPolicySupportSummaryFromAnalysisCache,
+  resolvePolicySupportSummary,
   normalizeEquipmentTypeValue,
   toNumber,
 } from "./roi.utils"
-import type { ApiStatus, RoiFormState, ScenarioCard } from "./roi.contract"
+import type {
+  ApiStatus,
+  PolicySupportSummary,
+  RoiFormState,
+  ScenarioCard,
+} from "./roi.contract"
 
 export default function RoiFeature() {
   const navigate = useNavigate()
@@ -48,6 +61,9 @@ export default function RoiFeature() {
   const [selectedScenarioId, setSelectedScenarioId] = useState<"A" | "B">("A")
   const [recommendedScenarioId, setRecommendedScenarioId] = useState<"A" | "B">("A")
   const [apiStatus, setApiStatus] = useState<ApiStatus>("idle")
+  const [policySupportSummary, setPolicySupportSummary] =
+    useState<PolicySupportSummary | null>(null)
+  const [policySupportPolicies, setPolicySupportPolicies] = useState<unknown[]>([])
   const [errorMessage, setErrorMessage] = useState("")
   const [requiredNoticeOpen, setRequiredNoticeOpen] = useState(false)
   const [costOpen, setCostOpen] = useState(false)
@@ -75,6 +91,15 @@ export default function RoiFeature() {
     }
 
     const apiData = normalizeApiData(saved.roiResult)
+    setPolicySupportPolicies(Array.isArray(saved.policies) ? saved.policies : [])
+    setPolicySupportSummary(
+      resolvePolicySupportSummary(
+        saved.policy_support_summary,
+        saved,
+        saved.roiResult,
+        readPolicySupportSummaryFromAnalysisCache(analysisId),
+      ),
+    )
 
     console.log('[ROI DEBUG] normalizeApiData 결과', {
       success: !!apiData,
@@ -243,6 +268,13 @@ export default function RoiFeature() {
       const payload = buildPayload(form)
       const apiResponse = await requestRoiSimulation(payload)
       const apiData = normalizeApiData(apiResponse)
+      setPolicySupportSummary(
+        resolvePolicySupportSummary(
+          apiResponse,
+          readPolicySupportSummaryFromAnalysisCache(),
+        ),
+      )
+      setPolicySupportPolicies([])
 
       console.log("[ROI DEBUG] scenario A raw", apiData?.scenario_a)
       console.log("[ROI DEBUG] scenario B raw", apiData?.scenario_b)
@@ -277,6 +309,8 @@ export default function RoiFeature() {
       const nextRecommendedId = getRecommendedScenarioId(form, localScenarios, "")
 
       setScenarios(localScenarios)
+      setPolicySupportSummary(null)
+      setPolicySupportPolicies([])
       setRecommendedScenarioId(nextRecommendedId)
       setSelectedScenarioId(nextRecommendedId)
       setApiStatus("error")
@@ -297,6 +331,8 @@ export default function RoiFeature() {
 
     setForm(resetForm)
     setScenarios(initialScenarios)
+    setPolicySupportSummary(null)
+    setPolicySupportPolicies([])
     setRecommendedScenarioId("A")
     setSelectedScenarioId("A")
     setApiStatus("idle")
@@ -418,6 +454,11 @@ export default function RoiFeature() {
                 recommendedScenarioId={recommendedScenarioId}
                 selectedScenarioId={selectedScenarioId}
                 onSelect={setSelectedScenarioId}
+              />
+
+              <PolicySupportComposition
+                summary={policySupportSummary}
+                policies={policySupportPolicies}
               />
 
               <PolicyCta onNavigateSupport={() => navigate("/analysis/new")} />

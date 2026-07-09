@@ -1,3 +1,4 @@
+import { FolderOpen } from "lucide-react"
 import type { EquipmentInfo } from "../../mypage/myPage.parts"
 import type { SafetyCheckItem } from "../safetyCheck.contract"
 import { getCheckContent } from "../safetyCheck.constants"
@@ -57,7 +58,7 @@ export default function SafetyCheckEquipmentEvidenceTab({
             {items.length === 0 ? (
               <div className="empty-state empty-state--compact">
                 <span className="empty-state-icon" aria-hidden="true">
-                  📂
+                  <FolderOpen size={22} strokeWidth={1.8} />
                 </span>
                 <div>
                   <p>등록된 안전 점검이 없습니다</p>

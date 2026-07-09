@@ -166,7 +166,7 @@ function truncatePolicyTitle(title: string, max = 22) {
 export default function MobileApplicationScreen() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const [selectedPdfSection, setSelectedPdfSection] = useState(MOBILE_PDF_SECTIONS[0].id)
+  const [selectedPdfSection, setSelectedPdfSection] = useState<string>(MOBILE_PDF_SECTIONS[0].id)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [previewType, setPreviewType] = useState<MobileReportType>("consumer_summary")
   const [previewLoading, setPreviewLoading] = useState(false)

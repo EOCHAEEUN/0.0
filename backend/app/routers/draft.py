@@ -13,6 +13,12 @@ from app.models.company import CompanyContext
 from app.models.equipment import EquipmentInput
 from app.state import FactofitState
 from app.services.safety_evidence_service import build_safety_evidence_snapshot
+from app.services.draft_content import (
+    is_valid_stored_narrative,
+    normalize_expected_benefits,
+    normalize_llm_draft_payload,
+)
+from app.services.policy_compatibility import assert_policy_compatible
 
 
 router = APIRouter()
@@ -276,7 +282,7 @@ def _get_scenario_investment(scenario: dict, equipment_data: dict, scenario_used
 
 
 def _get_scenario_subsidy(scenario: dict, policy_detail: dict):
-    return _safe_number(
+    subsidy = _safe_number(
         scenario.get("subsidy_manwon"),
         scenario.get("subsidy_amount_manwon"),
         scenario.get("expected_subsidy_manwon"),
@@ -288,6 +294,14 @@ def _get_scenario_subsidy(scenario: dict, policy_detail: dict):
         policy_detail.get("subsidy_amount"),
         policy_detail.get("support_limit"),
     )
+    policy_limit = _safe_number(
+        policy_detail.get("max_amount"),
+        policy_detail.get("max_amount_manwon"),
+        policy_detail.get("support_limit"),
+    )
+    if subsidy is not None and policy_limit is not None:
+        return min(subsidy, policy_limit)
+    return subsidy
 
 
 def _get_scenario_payback(scenario: dict):
@@ -318,6 +332,54 @@ def _fetch_policy_detail_by_id(db: Any, policy_id: str) -> dict:
         print(f"policy 상세정보 조회 실패: {exc}")
 
     return {}
+
+
+def _load_safety_check_improvement_context(
+    db: Any,
+    *,
+    company_id: str,
+    equipment_id: str,
+) -> list[dict[str, Any]]:
+    try:
+        rows = (
+            db.table("safety_check_improvement")
+            .select("*")
+            .eq("company_id", company_id)
+            .eq("equipment_id", equipment_id)
+            .order("updated_at", desc=True)
+            .limit(20)
+            .execute()
+            .data
+            or []
+        )
+    except Exception:
+        return []
+
+    context: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        improvement_plan = _safe_text(row.get("improvement_plan"))
+        additional_info = _safe_text(row.get("additional_info"))
+        if not improvement_plan and not additional_info:
+            continue
+        context.append(
+            {
+                "id": _safe_text(row.get("id")),
+                "inspection_purpose": _safe_text(
+                    row.get("inspection_purpose_label"),
+                    row.get("inspection_purpose"),
+                ),
+                "check_item": _safe_text(row.get("check_item")),
+                "check_content": _safe_text(row.get("check_content")),
+                "current_safety_measures": _safe_text(
+                    row.get("current_safety_measures")
+                ),
+                "improvement_plan": improvement_plan,
+                "additional_info": additional_info,
+            }
+        )
+    return context
 
 
 def _resolve_policy_id_for_fk(db: Any, policy_id: str, selected_policy: dict[str, Any]) -> str:
@@ -573,6 +635,12 @@ def _enrich_draft_content(
     company/equipment names, policy details, scenario amounts and core values.
     """
     content = _coerce_draft_dict(draft_content)
+    content = normalize_llm_draft_payload(
+        content,
+        company_name=_safe_text(company_data.get("company_name")),
+        equipment_name=_safe_text(equipment_data.get("name")),
+        policy_title=_safe_text(selected_policy.get("title"), default="추천 지원사업 미선택"),
+    )
 
     company_name = _safe_text(company_data.get("company_name"), default="기업명 미입력")
     equipment_name = _safe_text(equipment_data.get("name"), default="설비명 미입력")
@@ -607,6 +675,46 @@ def _enrich_draft_content(
         f"{scenario_label} 기준 설비투자를 통해 에너지 효율 개선, 유지보수 부담 완화, 품질 안정화 효과를 기대할 수 있습니다.",
     )
 
+    extended_fields: dict[str, str] = {}
+    for key in (
+        "implementation_plan",
+        "policy_utilization_strategy",
+        "final_recommendation",
+        "company_context",
+        "diagnostic_interpretation",
+        "execution_detail",
+        "policy_analysis",
+        "performance_plan",
+        "risk_review",
+        "submission_readiness",
+        "performance_governance",
+        "user_request_reflection",
+    ):
+        text = _safe_text(content.get(key))
+        if is_valid_stored_narrative(
+            text,
+            company_name=company_name,
+            equipment_name=equipment_name,
+            policy_title=policy_title,
+        ):
+            extended_fields[key] = text
+
+    must_include_text = _safe_text(body.must_include_text)
+    user_request_reflection = _safe_text(
+        extended_fields.get("user_request_reflection")
+    )
+    if not must_include_text:
+        user_request_reflection = ""
+        extended_fields.pop("user_request_reflection", None)
+    if must_include_text and not user_request_reflection:
+        request_sentence = must_include_text.rstrip(" .。")
+        user_request_reflection = (
+            f"본 사업은 {request_sentence}을(를) 핵심 실행 조건으로 반영합니다. "
+            f"{equipment_name} 도입 및 운영 계획과 연계해 구체적인 추진 절차와 관리 근거를 "
+            "제시하고, 관련 실행 결과는 사업 성과와 제출 증빙을 통해 확인합니다."
+        )
+        extended_fields["user_request_reflection"] = user_request_reflection
+
     ai_reasons = content.get("ai_reasons")
     if not isinstance(ai_reasons, list) or not ai_reasons:
         ai_reasons = [
@@ -633,12 +741,16 @@ def _enrich_draft_content(
         "investment_manwon": investment_manwon,
         "subsidy_manwon": subsidy_manwon,
         "payback_months": payback_months,
-        "expected_benefits": _build_expected_benefits(content, selected_roi_scenario, equipment_data),
+        "expected_benefits": normalize_expected_benefits(content.get("expected_benefits"))
+        or _build_expected_benefits(content, selected_roi_scenario, equipment_data),
         "readiness_score": _safe_number(content.get("readiness_score"), selected_policy.get("match_score"), 70),
         "ai_reasons": [str(item).strip() for item in ai_reasons if str(item).strip()],
         "business_necessity": business_necessity,
         "expected_effects": expected_effects,
+        **extended_fields,
         "required_documents": _build_required_documents(content),
+        "must_include_text": must_include_text,
+        "user_request_reflection": user_request_reflection,
         "scenario_used": scenario_used,
         "scenario_label": scenario_label,
         "created_at": datetime.now().isoformat(),
@@ -812,10 +924,55 @@ async def generate_draft(
         roi_data,
     )
 
+    try:
+        assert_policy_compatible(
+            company=company_data,
+            equipment=equipment_data,
+            policy=selected_policy,
+            matched_policy=selected_matched_policy,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=str(exc),
+        ) from exc
+
     scenario_label = _safe_text(
         selected_policy.get("scenario_label"),
         "A안 전체교체 적합" if scenario_used == "a" else "B안 부분개선 적합",
     )
+
+    safety_evidence_snapshot: dict[str, Any] | None = None
+    if body.analysis_id:
+        try:
+            safety_evidence_snapshot = build_safety_evidence_snapshot(
+                company_id=body.company_id,
+                analysis_id=body.analysis_id,
+                policy_id=effective_policy_id,
+                equipment_id=body.equipment_id,
+            )
+        except Exception:
+            safety_evidence_snapshot = {
+                "snapshot_at": datetime.now().isoformat(),
+                "analysis_id": body.analysis_id,
+                "policy_id": effective_policy_id,
+                "equipment_id": body.equipment_id,
+                "total_required_count": 0,
+                "uploaded_required_count": 0,
+                "viewpoints": [],
+                "message": "현재 분석에 연결된 안전 증빙 기준이 아직 준비되지 않았습니다.",
+            }
+
+    safety_check_improvements = _load_safety_check_improvement_context(
+        db,
+        company_id=body.company_id,
+        equipment_id=body.equipment_id,
+    )
+    safety_management_context = {
+        "evidence_snapshot": safety_evidence_snapshot,
+        "saved_improvement_count": len(safety_check_improvements),
+        "saved_improvements": safety_check_improvements,
+    }
 
     state: FactofitState = {
         "user_query": f"{equipment.name} {selected_policy.get('title', '')} 신청서 초안 작성",
@@ -837,6 +994,8 @@ async def generate_draft(
             "scenario_label": scenario_label,
             "policy": selected_policy,
             "roi_recommended": roi_data.get("recommended"),
+            "safety_management": safety_management_context,
+            "must_include_text": _safe_text(body.must_include_text),
         },
         "chat_history": [],
         "final_response": "",
@@ -870,24 +1029,17 @@ async def generate_draft(
         scenario_label=scenario_label,
     )
     if body.analysis_id:
-        try:
-            draft_content["safety_evidence_snapshot"] = build_safety_evidence_snapshot(
-                company_id=body.company_id,
-                analysis_id=body.analysis_id,
-                policy_id=effective_policy_id,
-                equipment_id=body.equipment_id,
-            )
-        except Exception:
-            draft_content["safety_evidence_snapshot"] = {
-                "snapshot_at": datetime.now().isoformat(),
-                "analysis_id": body.analysis_id,
-                "policy_id": effective_policy_id,
-                "equipment_id": body.equipment_id,
-                "total_required_count": 0,
-                "uploaded_required_count": 0,
-                "viewpoints": [],
-                "message": "현재 분석에 연결된 안전 증빙 기준이 아직 준비되지 않았습니다.",
-            }
+        draft_content["safety_evidence_snapshot"] = safety_evidence_snapshot or {
+            "snapshot_at": datetime.now().isoformat(),
+            "analysis_id": body.analysis_id,
+            "policy_id": effective_policy_id,
+            "equipment_id": body.equipment_id,
+            "total_required_count": 0,
+            "uploaded_required_count": 0,
+            "viewpoints": [],
+            "message": "현재 분석에 연결된 안전 증빙 기준이 아직 준비되지 않았습니다.",
+        }
+    draft_content["safety_check_improvements"] = safety_check_improvements
 
     fk_policy_id = _resolve_policy_id_for_fk(db, effective_policy_id, selected_policy)
 

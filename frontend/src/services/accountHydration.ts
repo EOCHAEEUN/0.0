@@ -1,4 +1,4 @@
-import { getAccessToken, getCurrentUserId } from "./auth"
+import { getAccessToken, getCurrentUserId, refreshAccessToken } from "./auth"
 import {
   saveCompanyProfileDraft,
   saveAnalysisResult,
@@ -207,17 +207,35 @@ export async function hydrateAccountData(): Promise<HydrateResult> {
 
 async function _doHydrate(token: string, requestUserId: string): Promise<HydrateResult> {
   try {
-    const response = await fetch(buildApiUrl("/api/onboarding/me"), {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    })
+    const send = (accessToken: string) =>
+      fetch(buildApiUrl("/api/onboarding/me"), {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+      })
+
+    let response = await send(token)
+
+    if (response.status === 401) {
+      // access token 만료 가능성 — refresh 1회 후 원 요청 1회만 재시도.
+      // refresh token 무효면 refreshAccessToken이 세션을 삭제하고,
+      // 일시 장애(네트워크/5xx)면 세션을 유지한다. hydrate는 best-effort이므로
+      // 어느 쪽이든 기존 반환 계약(빈 결과)을 유지해 호출부를 깨지 않는다.
+      try {
+        response = await send(await refreshAccessToken())
+      } catch (refreshError) {
+        console.warn("[accountHydration] 토큰 갱신 실패 — hydrate 건너뜀", refreshError)
+        return { hasCompany: false, hasAnalysis: false }
+      }
+    }
 
     if (!response.ok) {
       if (response.status === 401 || response.status === 403) {
-        console.warn("[accountHydration] 토큰 만료 또는 미인증 — hydrate 건너뜀", response.status)
+        // 403은 권한 문제이지 세션 만료가 아니며, 재시도 후 401도 무효 판정
+        // 없이는 세션을 지우지 않는다.
+        console.warn("[accountHydration] 미인증/권한 없음 — hydrate 건너뜀", response.status)
       } else {
         console.warn("[accountHydration] /api/onboarding/me 실패", response.status)
       }

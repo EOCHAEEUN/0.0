@@ -4,9 +4,13 @@ import json
 import re
 from typing import Any
 
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+
 from app.agents.capex import compare_scenarios
 from app.agents.equipment_safety import build_safety_snapshot
 from app.core.database import get_db
+from app.services.policy_compatibility import evaluate_policy_compatibility
+from app.core.llm import llm_advisor, llm_fast
 from app.models.equipment import EquipmentInput
 from app.state import FactofitState
 from app.tools.roi_calc import calculate_roi
@@ -18,7 +22,7 @@ EXPLICIT_ACTION_TO_ROUTE = {
     "policy_calendar": "calendar_snapshot",
     "application_draft_status": "draft_status",
     "safety_status": "safety_snapshot",
-    "safety_check_summary": "safety_snapshot",
+    "safety_check_summary": "safety_check_summary",
     "investment_simulation": "investment_simulation",
     "current_analysis_summary": "current_analysis_summary",
 }
@@ -26,6 +30,44 @@ EXPLICIT_ACTION_TO_ROUTE = {
 NEW_ANALYSIS_ACTIONS = {"start_analysis", "new_analysis", "roi_analyze"}
 SIMULATION_ACTIONS = {"investment_simulation", "simulate", "roi_simulate", "investment_change"}
 REANALYSIS_ACTIONS = {"reanalyze", "reanalysis"}
+
+CONVERSATION_KEYWORDS = [
+    "안녕",
+    "반가",
+    "고마워",
+    "감사",
+    "무엇을 할 수",
+    "도움",
+    "소개",
+    "하이",
+    "hello",
+    "hi",
+    "누구",
+    "이름",
+    "자기소개",
+    "뭐야",
+    "뭐해",
+    "너 ",
+    "네가",
+    "니가",
+    "정체",
+]
+
+ROI_QUERY_KEYWORDS = [
+    "roi",
+    "투자",
+    "분석",
+    "회수",
+    "절감",
+    "교체",
+    "a안",
+    "b안",
+    "비교",
+    "상세",
+    "추천안",
+    "실부담",
+    "투자금",
+]
 
 
 def _as_dict(value: Any) -> dict[str, Any]:
@@ -192,6 +234,68 @@ def _contains_any(query: str, keywords: list[str]) -> bool:
     return any(keyword in query for keyword in keywords)
 
 
+def _is_conversational_query(query: str) -> bool:
+    if _contains_any(query, CONVERSATION_KEYWORDS):
+        return True
+    if len(query) <= 28 and not _contains_any(
+        query,
+        ROI_QUERY_KEYWORDS
+        + ["안전", "점검", "증빙", "정책", "지원", "공고", "초안", "신청", "마감", "캘린더"],
+    ):
+        return True
+    return False
+
+
+def _build_advisor_conversation_messages(state: FactofitState) -> list:
+    analysis_id = _as_text(state.get("analysis_id"))
+    user_query = _as_text(state.get("user_query") or state.get("message"))
+
+    system_prompt = f"""당신은 FactoFit 제조 설비 플랫폼의 AI Advisor "AI Engi"입니다.
+
+역할:
+- ROI 분석, 지원사업, 신청서 초안, 안전 점검을 돕는 제조업 전문 어시스턴트입니다.
+- 인사·자기소개·잡담에는 자연스럽게 답하고, 업무 질문에는 DB/분석 기준으로 안내합니다.
+
+규칙:
+- "너 누구야" 같은 질문에는 AI Engi로 소개하세요.
+- 같은 문장을 반복하지 마세요. 대화 맥락을 반영하세요.
+- 분석이 선택되지 않았다면(현재: {"선택됨" if analysis_id else "없음"}) 업무 질문 시 분석 선택을 부드럽게 안내하세요.
+- 2~5문장, 친절한 한국어. ROI 수치·카드 나열은 사용자가 요청할 때만 하세요.
+"""
+    messages: list = [SystemMessage(content=system_prompt)]
+
+    for msg in state.get("chat_history", [])[-10:]:
+        role = _as_text(msg.get("role")).lower()
+        content = _as_text(msg.get("content"))
+        if not content:
+            continue
+        if role == "user":
+            messages.append(HumanMessage(content=content))
+        elif role == "assistant":
+            messages.append(AIMessage(content=content))
+
+    if not messages or not isinstance(messages[-1], HumanMessage) or messages[-1].content != user_query:
+        messages.append(HumanMessage(content=user_query))
+
+    return messages
+
+
+def _invoke_advisor_conversation(state: FactofitState) -> tuple[str, bool]:
+    messages = _build_advisor_conversation_messages(state)
+    for candidate in (llm_advisor, llm_fast):
+        try:
+            response = candidate.invoke(messages)
+            text = _as_text(response.content)
+            if text:
+                return text, True
+        except Exception as exc:
+            print(
+                f"[conversation_fallback] LLM invoke failed "
+                f"(model={getattr(candidate, 'model_name', 'unknown')}): {exc}"
+            )
+    return "", False
+
+
 def entry_dispatch_node(state: FactofitState) -> FactofitState:
     state["used_graph"] = True
     action = _as_text(state.get("action")).lower()
@@ -219,7 +323,9 @@ def entry_dispatch_node(state: FactofitState) -> FactofitState:
 
     analysis_id = _as_text(state.get("analysis_id"))
     if analysis_id:
-        if _contains_any(query, ["안전", "점검", "증빙"]):
+        if _is_conversational_query(query):
+            state["route"] = "conversation_fallback"
+        elif _contains_any(query, ["안전", "점검", "증빙"]):
             state["route"] = "safety_snapshot"
         elif _contains_any(query, ["마감", "캘린더", "일정", "d-day", "디데이"]):
             state["route"] = "calendar_snapshot"
@@ -227,8 +333,10 @@ def entry_dispatch_node(state: FactofitState) -> FactofitState:
             state["route"] = "policy_snapshot"
         elif _contains_any(query, ["초안", "신청서", "draft", "pdf"]):
             state["route"] = "draft_status"
-        else:
+        elif _contains_any(query, ROI_QUERY_KEYWORDS):
             state["route"] = "roi_snapshot"
+        else:
+            state["route"] = "conversation_fallback"
         return state
 
     if _contains_any(query, ["새 설비", "새로 분석", "roi 분석", "투자 분석"]):
@@ -239,7 +347,7 @@ def entry_dispatch_node(state: FactofitState) -> FactofitState:
         state["route"] = "policy_discovery"
         return state
 
-    if _contains_any(query, ["안녕", "무엇을 할 수", "도움", "소개", "하이", "hello"]):
+    if _is_conversational_query(query):
         state["route"] = "conversation_fallback"
         return state
 
@@ -423,17 +531,27 @@ def draft_status_node(state: FactofitState) -> FactofitState:
     selected_policy_id = _as_text(state.get("policy_id"))
     policy_snapshot = _as_dict(state.get("policy_snapshot"))
     policy_rows = policy_snapshot.get("policies") if isinstance(policy_snapshot.get("policies"), list) else []
+    company = _as_dict(state.get("company_snapshot"))
+    equipment = _as_dict(state.get("equipment_snapshot"))
     policy_cards = []
     for row in policy_rows[:5]:
         item = _as_dict(row)
         policy_id = _as_text(item.get("policy_id"))
         if not policy_id:
             continue
+        compatibility = evaluate_policy_compatibility(
+            company=company,
+            equipment=equipment,
+            policy=item,
+            matched_policy=item,
+        )
         policy_cards.append(
             {
                 "policy_id": policy_id,
                 "title": _as_text(item.get("title")) or "정책명 미확인",
                 "deadline": _as_text(item.get("deadline_display") or item.get("deadline")) or "마감일 미정",
+                "compatible": compatibility.compatible,
+                "incompatibility_reason": compatibility.message(),
             }
         )
 
@@ -492,10 +610,108 @@ def safety_snapshot_node(state: FactofitState) -> FactofitState:
         equipment_id=_as_text(state.get("equipment_id")),
         policy_id=_as_text(state.get("policy_id")),
     )
+    summary = _as_dict(snapshot.get("summary"))
+    rows = snapshot.get("rows") if isinstance(snapshot.get("rows"), list) else []
+    total = _safe_int(summary.get("total"))
+    need_improvement = _safe_int(summary.get("need_improvement"))
+    missing_evidence = _safe_int(summary.get("missing_evidence"))
+
+    if total <= 0:
+        text = (
+            "현재 분석 기준 안전점검 항목이 아직 생성되지 않았습니다. "
+            "안전 프리뷰를 먼저 생성하거나 점검 항목을 등록해 주세요."
+        )
+    else:
+        text_lines = [
+            f"안전점검 요약: 총 {total}건",
+            f"- 개선 필요: {need_improvement}건",
+            f"- 증빙 미보유: {missing_evidence}건",
+        ]
+        highlight_rows = []
+        for row in rows:
+            item = _as_dict(row)
+            if _as_text(item.get("current_status")).find("개선") >= 0 or _as_text(item.get("evidence_status")) == "미보유":
+                highlight_rows.append(item)
+            if len(highlight_rows) >= 3:
+                break
+        if highlight_rows:
+            text_lines.append("")
+            text_lines.append("우선 확인 항목:")
+            for item in highlight_rows:
+                text_lines.append(
+                    f"- {_as_text(item.get('viewpoint_label')) or '안전점검 항목'}"
+                    f" ({_as_text(item.get('current_status')) or '상태 미기재'} / "
+                    f"{_as_text(item.get('evidence_status')) or '증빙 상태 미기재'})"
+                )
+        text = "\n".join(text_lines)
+
     _response_payload(
         state,
-        text="현재 분석 기준 안전 현황입니다.",
-        cards=[{"type": "safety_status", "data": snapshot}],
+        text=text,
+        cards=[
+            {"type": "safety_status", "data": snapshot},
+            {
+                "type": "safety_check_summary",
+                "data": {
+                    "total": total,
+                    "need_improvement": need_improvement,
+                    "missing_evidence": missing_evidence,
+                },
+            },
+        ],
+        intent="safety",
+        answer_source="database",
+    )
+    return state
+
+
+def safety_check_summary_node(state: FactofitState) -> FactofitState:
+    company_id = _as_text(state.get("company_id"))
+    equipment_id = _as_text(state.get("equipment_id"))
+    rows = (
+        get_db()
+        .table("safety_check_improvement")
+        .select("id,improvement_plan")
+        .eq("company_id", company_id)
+        .eq("equipment_id", equipment_id)
+        .execute()
+        .data
+        or []
+    )
+    total = len(rows)
+    planned = sum(
+        1
+        for row in rows
+        if _as_text(_as_dict(row).get("improvement_plan"))
+    )
+    unplanned = total - planned
+
+    if total <= 0:
+        text = (
+            "해당 설비에 등록된 안전점검 항목이 없습니다. "
+            "안전점검 메뉴에서 점검 증빙을 먼저 등록해 주세요."
+        )
+    else:
+        text = (
+            f"해당 설비에 등록된 안전점검 항목은 총 {total}건이며, "
+            f"이 중 향후 관리 계획이 작성된 항목은 {planned}건, "
+            f"미작성 항목은 {unplanned}건입니다. "
+            "점검 증빙과 향후 관리 계획은 신청서 탭에서 설비별로 등록하시면, "
+            "신청서 작성 시 자동으로 반영됩니다."
+        )
+
+    _response_payload(
+        state,
+        text=text,
+        cards=[{
+            "type": "safety_check_summary",
+            "data": {
+                "total": total,
+                "planned": planned,
+                "unplanned": unplanned,
+                "equipment_id": equipment_id,
+            },
+        }],
         intent="safety",
         answer_source="database",
     )
@@ -654,12 +870,21 @@ def db_error_node(state: FactofitState) -> FactofitState:
 
 
 def conversation_fallback_node(state: FactofitState) -> FactofitState:
+    text, used_llm = _invoke_advisor_conversation(state)
+    if not text:
+        text = (
+            "안녕하세요, AI Engi입니다. "
+            "ROI·지원사업·신청서·안전 점검을 도와드릴 수 있어요. "
+            "궁금한 점을 편하게 말씀해 주세요."
+        )
+
     _response_payload(
         state,
-        text="안녕하세요. 분석을 선택하면 ROI/정책/초안/안전 상태를 DB 기준으로 바로 안내해드릴게요.",
+        text=text,
         cards=[],
         intent="response",
         answer_source="conversation",
+        used_llm=used_llm,
     )
     return state
 

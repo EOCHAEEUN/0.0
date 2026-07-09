@@ -56,6 +56,7 @@ class SafetyCheckImprovementUpdate(BaseModel):
     [신청서 탭] - 향후 관리 계획 입력 시 PATCH 요청
     """
     improvement_plan: str  # 향후 관리 계획 (사용자 입력)
+    additional_info: str = ""  # 신청서 반영 한줄평
 
 
 class SafetyCheckImprovementResponse(BaseModel):
@@ -77,6 +78,7 @@ class SafetyCheckImprovementResponse(BaseModel):
     current_safety_measures: str | None = None
     pdf_uploaded_at: datetime | None = None
     improvement_plan: str | None = None
+    additional_info: str | None = None
     improvement_saved_at: datetime | None = None
     status: str
     created_at: datetime

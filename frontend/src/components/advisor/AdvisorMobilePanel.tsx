@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react"
 import botIcon from "../../assets/advisor/engi-bot-transparent.png"
+import { requestAdvisorAnswer } from "../../features/aiAdvisor/aiAdvisor.api"
+import { APPLICATION_DRAFT_MUST_INCLUDE_KEY } from "../../features/applicationDraft/applicationDraft.constants"
 import {
   ANALYSIS_STEPS,
   COMPANY_REQUIRED,
@@ -474,13 +476,80 @@ function AiAdvisorHomeScreen({
     Array<{ id: string; role: "assistant" | "user"; content: string }>
   >([{ id: "welcome", role: "assistant", content: GUEST_ENGI_GREETING }])
 
-  const appendExchange = (question: string) => {
+  const appendExchange = async (
+    question: string,
+    options?: { action?: string; requiresEquipment?: boolean },
+  ) => {
     const trimmed = question.trim()
     if (!trimmed) return
 
+    const userMessage = { id: `user-${Date.now()}`, role: "user" as const, content: trimmed }
+    const nextMessages = [...messages, userMessage]
+    setMessages(nextMessages)
+
+    if (options?.action) {
+      const selectedEquipmentId =
+        (typeof window !== "undefined" &&
+          (window.localStorage.getItem("factofit_selected_equipment_id") ||
+            window.localStorage.getItem("factofit_equipment_id"))) ||
+        ""
+      if (options.requiresEquipment && !selectedEquipmentId) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `assistant-${Date.now()}`,
+            role: "assistant",
+            content: "설비를 먼저 선택해주세요.",
+          },
+        ])
+        setInput("")
+        return
+      }
+
+      const companyId =
+        (typeof window !== "undefined" && window.localStorage.getItem("factofit_company_id")) || ""
+
+      try {
+        const response = await requestAdvisorAnswer(
+          trimmed,
+          nextMessages.map((message) => ({
+            role: message.role,
+            content: message.content,
+          })),
+          {
+            companyId,
+            action: options.action,
+            selectedEquipmentId,
+            source: "advisor",
+          },
+        )
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `assistant-${Date.now()}`,
+            role: "assistant",
+            content: response.text,
+          },
+        ])
+      } catch (error) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `assistant-${Date.now()}`,
+            role: "assistant",
+            content:
+              error instanceof Error
+                ? error.message
+                : "AI 상담 서비스를 일시적으로 연결하지 못했습니다.",
+          },
+        ])
+      }
+      setInput("")
+      return
+    }
+
     setMessages((prev) => [
       ...prev,
-      { id: `user-${Date.now()}`, role: "user", content: trimmed },
       {
         id: `assistant-${Date.now()}`,
         role: "assistant",
@@ -526,8 +595,17 @@ function AiAdvisorHomeScreen({
 
       <div className="factofit-advisor-guest-chip-row">
         {GUEST_SUGGESTION_CHIPS.map((chip) => (
-          <button key={chip} type="button" onClick={() => appendExchange(chip)}>
-            {chip}
+          <button
+            key={chip.id}
+            type="button"
+            onClick={() =>
+              void appendExchange(chip.message, {
+                action: chip.action,
+                requiresEquipment: chip.requiresEquipment,
+              })
+            }
+          >
+            {chip.label}
           </button>
         ))}
       </div>
@@ -559,13 +637,13 @@ function AiAdvisorHomeScreen({
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault()
-              appendExchange(input)
+              void appendExchange(input)
             }
           }}
           placeholder="질문 입력 (Enter 전송 / Shift+Enter 줄바꿈)"
           rows={1}
         />
-        <button type="button" onClick={() => appendExchange(input)}>
+        <button type="button" onClick={() => void appendExchange(input)}>
           보내기
           <span aria-hidden="true">➤</span>
         </button>
@@ -696,6 +774,23 @@ function DraftScreen({
   onMove: (screen: AdvisorScreen) => void
   onClose: () => void
 }) {
+  const [mustIncludeText, setMustIncludeText] = useState(
+    () => window.localStorage.getItem(APPLICATION_DRAFT_MUST_INCLUDE_KEY) || "",
+  )
+  const [includeRequested, setIncludeRequested] = useState(
+    () => Boolean(window.localStorage.getItem(APPLICATION_DRAFT_MUST_INCLUDE_KEY)),
+  )
+
+  const openApplicationDraft = () => {
+    const normalized = mustIncludeText.trim()
+    if (includeRequested && normalized) {
+      window.localStorage.setItem(APPLICATION_DRAFT_MUST_INCLUDE_KEY, normalized)
+    } else {
+      window.localStorage.removeItem(APPLICATION_DRAFT_MUST_INCLUDE_KEY)
+    }
+    window.location.assign("/application-draft")
+  }
+
   return (
     <ScreenFrame
       title="신청서 초안 생성"
@@ -745,7 +840,27 @@ function DraftScreen({
         </div>
       </section>
 
-      <PrimaryCta onClick={() => onMove("company")}>신청서 초안 생성</PrimaryCta>
+      <section className="factofit-advisor-panel-card factofit-advisor-draft-request">
+        <label className="factofit-advisor-draft-request-toggle">
+          <input
+            type="checkbox"
+            checked={includeRequested}
+            onChange={(event) => setIncludeRequested(event.target.checked)}
+          />
+          <span>신청서에 추가할 내용 선택</span>
+        </label>
+        {includeRequested ? (
+          <textarea
+            value={mustIncludeText}
+            maxLength={1000}
+            rows={4}
+            placeholder="예: 안전커버 보강 완료 내용과 작업자 교육 계획을 사업 필요성에 포함"
+            onChange={(event) => setMustIncludeText(event.target.value)}
+          />
+        ) : null}
+      </section>
+
+      <PrimaryCta onClick={openApplicationDraft}>신청서 초안 생성</PrimaryCta>
     </ScreenFrame>
   )
 }

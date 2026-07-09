@@ -30,7 +30,14 @@ export function useLoginForm() {
       }
       setModalType("preview")
     } catch (error) {
-      alert(error instanceof Error ? error.message : "로그인에 실패했습니다.")
+      const message =
+        error instanceof Error ? error.message : "로그인에 실패했습니다."
+      const normalized = message.toLowerCase()
+      if (normalized.includes("invalid login credentials")) {
+        alert("이메일 또는 비밀번호가 올바르지 않습니다.")
+        return
+      }
+      alert(message)
     } finally {
       setIsLoggingIn(false)
     }

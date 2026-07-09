@@ -1,4 +1,7 @@
+import { useEffect } from "react"
+
 import SignupModal from "../../../components/auth/SignupModal"
+import { purgeStaleAuthSessionIfNeeded } from "../../../services/auth"
 
 import { LoginHeroSection } from "./components/LoginHeroSection"
 import { LoginFormPanel } from "./components/LoginFormPanel"
@@ -7,6 +10,10 @@ import { useLoginForm } from "./hooks/useLoginForm"
 
 export default function LoginFeature() {
   const login = useLoginForm()
+
+  useEffect(() => {
+    void purgeStaleAuthSessionIfNeeded()
+  }, [])
 
   return (
     <main

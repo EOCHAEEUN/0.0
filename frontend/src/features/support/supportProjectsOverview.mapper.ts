@@ -100,6 +100,12 @@ function mapPolicyCard(raw: unknown): SupportProjectsPolicyCard | null {
     support_component_types: Array.isArray(record.support_component_types)
       ? record.support_component_types.map((value) => String(value)).filter(Boolean)
       : [],
+    support_items: record.support_items ?? null,
+    support_method: record.support_method ?? null,
+    roi_support_type: pickString(record.roi_support_type) || null,
+    support_primary_category: pickString(record.support_primary_category) || null,
+    support_categories: record.support_categories ?? null,
+    policy_primary_nature: pickString(record.policy_primary_nature) || null,
     recommendation_summary: pickString(
       record.recommendation_summary,
       record.match_reason,

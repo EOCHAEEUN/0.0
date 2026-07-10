@@ -72,7 +72,17 @@ function buildOverviewCacheKey(
 
 
 
-const overviewMemoryCache = new Map<string, unknown>()
+const OVERVIEW_CACHE_TTL_MS = 60_000
+
+type OverviewCacheEntry = {
+
+  data: unknown
+
+  cachedAt: number
+
+}
+
+const overviewMemoryCache = new Map<string, OverviewCacheEntry>()
 
 const overviewInFlightCache = new Map<string, Promise<unknown>>()
 
@@ -124,7 +134,7 @@ export async function fetchSupportProjectsOverview({
 
     const cached = overviewMemoryCache.get(cacheKey)
 
-    if (cached !== undefined) return cached
+    if (cached && Date.now() - cached.cachedAt < OVERVIEW_CACHE_TTL_MS) return cached.data
 
 
 
@@ -203,7 +213,7 @@ export async function fetchSupportProjectsOverview({
 
     .then((data) => {
 
-      overviewMemoryCache.set(cacheKey, data)
+      overviewMemoryCache.set(cacheKey, { data, cachedAt: Date.now() })
 
       return data
 

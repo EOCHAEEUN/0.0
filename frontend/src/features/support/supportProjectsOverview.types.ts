@@ -34,6 +34,12 @@ export type SupportProjectsPolicyCard = {
   support_type_label: string
   support_type_detail?: string | null
   support_component_types?: string[]
+  support_items?: unknown
+  support_method?: unknown
+  roi_support_type?: string | null
+  support_primary_category?: string | null
+  support_categories?: unknown
+  policy_primary_nature?: string | null
   recommendation_summary: string
   match_reason: string
   why_check_now: string[]

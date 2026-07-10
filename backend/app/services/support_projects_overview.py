@@ -759,6 +759,14 @@ def _map_policy_card(
         "support_component_types": _resolve_support_component_types(
             policy, support["support_type_label"]
         ),
+        # 원본 구조화 필드 그대로 노출: support_component_types가 비어 있는 경우
+        # 프론트에서도 동일한 우선순위로 폴백 분류를 할 수 있게 하기 위함.
+        "support_items": policy.get("support_items"),
+        "support_method": policy.get("support_method"),
+        "roi_support_type": policy.get("roi_support_type"),
+        "support_primary_category": policy.get("support_primary_category"),
+        "support_categories": policy.get("support_categories"),
+        "policy_primary_nature": policy.get("policy_primary_nature"),
         "recommendation_summary": _summarize_reason(reason),
         "match_reason": reason,
         "why_check_now": _build_why_check_now(

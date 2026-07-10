@@ -39,6 +39,48 @@ FINANCIAL_NATURES = ("자금지원", "융자", "보증")
 FINANCIAL_AMOUNT_TYPES = ("loan", "guarantee", "interest_support")
 DIRECT_AMOUNT_TYPES = ("subsidy", "support_amount", "voucher")
 
+# 지원사업 유형별 분석(SupportTypeGuideSection) 카드 집계용 분류.
+# support_type_label(위 _resolve_support_type)과 별개로, 구조화 필드 우선순위 기반으로
+# 정책 하나가 여러 유형(직접/금융/비금융)에 동시에 걸쳐 있을 수 있음을 반영한다.
+SUPPORT_COMPONENT_DIRECT = "direct_grant"
+SUPPORT_COMPONENT_FINANCE = "financial_support"
+SUPPORT_COMPONENT_LINKED = "non_financial_linked"
+
+DIRECT_GRANT_KEYWORDS = (
+    "현금보조",
+    "현금지원",
+    "사업비 지원",
+    "보조금",
+    "투자비 직접 보전",
+    "시설투자비",
+    "설비투자비",
+    "장비투자비",
+)
+FINANCE_SUPPORT_KEYWORDS = (
+    "융자",
+    "보증",
+    "이자지원",
+    "이자 지원",
+    "대출",
+    "정책자금",
+)
+NON_FINANCIAL_LINKED_KEYWORDS = (
+    "현물서비스",
+    "컨설팅",
+    "멘토링",
+    "교육",
+    "시험",
+    "인증",
+    "장비활용",
+    "공동장비",
+    "기술지원",
+    "기술지도",
+    "판로",
+    "전시",
+    "수출",
+    "디지털 인프라",
+)
+
 
 def _seoul_today() -> date:
     return datetime.now(SEOUL).date()
@@ -132,6 +174,91 @@ def _resolve_support_type(policy: dict[str, Any]) -> dict[str, str]:
         "support_type_label": "지원 조건 확인 필요",
         "support_type_detail": "지원 형태와 한도는 공고문에서 확인",
     }
+
+
+def _classify_support_text(text: str) -> str | None:
+    if not text:
+        return None
+    if _contains_any(text, FINANCE_SUPPORT_KEYWORDS):
+        return SUPPORT_COMPONENT_FINANCE
+    if _contains_any(text, NON_FINANCIAL_LINKED_KEYWORDS):
+        return SUPPORT_COMPONENT_LINKED
+    if _contains_any(text, DIRECT_GRANT_KEYWORDS):
+        return SUPPORT_COMPONENT_DIRECT
+    return None
+
+
+def _classify_support_item(item: Any) -> str | None:
+    if not isinstance(item, dict):
+        return _classify_support_text(_safe_text(item))
+    return (
+        _classify_support_text(_safe_text(item.get("funding_type")))
+        or _classify_support_text(_safe_text(item.get("category")))
+        or _classify_support_text(_safe_text(item.get("name")))
+    )
+
+
+def _map_legacy_label_to_component(label: str) -> str | None:
+    if label == "금융지원":
+        return SUPPORT_COMPONENT_FINANCE
+    if label == "비금융 연계지원":
+        return SUPPORT_COMPONENT_LINKED
+    if label in ("직접 지원금", "바우처 지원", "지원비율형 지원"):
+        return SUPPORT_COMPONENT_DIRECT
+    return None
+
+
+def _classify_tag_list(value: Any) -> set[str]:
+    tags = value if isinstance(value, list) else [value]
+    return {
+        classified
+        for classified in (_classify_support_text(_safe_text(tag)) for tag in tags)
+        if classified
+    }
+
+
+def _classify_policy_fallback(policy: dict[str, Any], legacy_label: str) -> list[str]:
+    types: set[str] = set()
+    types |= _classify_tag_list(policy.get("support_method"))
+
+    roi_classified = _classify_support_text(_safe_text(policy.get("roi_support_type")))
+    if roi_classified:
+        types.add(roi_classified)
+
+    category = _safe_text(policy.get("support_primary_category"))
+    if category == "금융지원":
+        types.add(SUPPORT_COMPONENT_FINANCE)
+    elif category in ("지원금", "바우처", "바우처 지원"):
+        types.add(SUPPORT_COMPONENT_DIRECT)
+    else:
+        category_classified = _classify_support_text(category)
+        if category_classified:
+            types.add(category_classified)
+
+    types |= _classify_tag_list(policy.get("support_categories"))
+
+    nature = _safe_text(policy.get("policy_primary_nature"))
+    if any(token in nature for token in FINANCIAL_NATURES):
+        types.add(SUPPORT_COMPONENT_FINANCE)
+
+    if types:
+        return sorted(types)
+
+    legacy = _map_legacy_label_to_component(legacy_label)
+    return [legacy] if legacy else []
+
+
+def _resolve_support_component_types(policy: dict[str, Any], legacy_label: str) -> list[str]:
+    items = _coerce_support_items(policy.get("support_items"))
+    item_types = {
+        classified
+        for classified in (_classify_support_item(item) for item in items)
+        if classified
+    }
+    if item_types:
+        return sorted(item_types)
+
+    return _classify_policy_fallback(policy, legacy_label)
 
 
 def _documents_need_check(policy: dict[str, Any]) -> bool:
@@ -334,6 +461,7 @@ def _enrich_policy_with_detail(
         "support_items",
         "policy_primary_nature",
         "support_primary_category",
+        "support_categories",
         "roi_support_type",
         "roi_support_reason",
         "required_documents_count",
@@ -628,6 +756,9 @@ def _map_policy_card(
         "application_status": application_status,
         "support_type_label": support["support_type_label"],
         "support_type_detail": support["support_type_detail"],
+        "support_component_types": _resolve_support_component_types(
+            policy, support["support_type_label"]
+        ),
         "recommendation_summary": _summarize_reason(reason),
         "match_reason": reason,
         "why_check_now": _build_why_check_now(

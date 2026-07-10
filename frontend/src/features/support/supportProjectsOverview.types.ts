@@ -33,6 +33,7 @@ export type SupportProjectsPolicyCard = {
   application_status: string
   support_type_label: string
   support_type_detail?: string | null
+  support_component_types?: string[]
   recommendation_summary: string
   match_reason: string
   why_check_now: string[]

@@ -43,7 +43,7 @@ export function SupportTypeGuideSection({
       body: "전문가 컨설팅, 시장 개척, 글로벌 전시회 참가 등 무형 자산을 지원합니다. 투자 효율과 실행 리스크를 함께 줄일 수 있습니다.",
       statPrimaryLabel: "추천 프로그램",
       statPrimaryValue: `${stats?.linkedCount ?? 0}건`,
-      statSecondaryLabel: "연계 바우처",
+      statSecondaryLabel: "연계 지원 형태",
       statSecondaryValue: stats?.linkedVoucherLabel ?? "-",
     },
   ]

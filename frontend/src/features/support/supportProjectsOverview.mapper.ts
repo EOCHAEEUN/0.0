@@ -97,6 +97,9 @@ function mapPolicyCard(raw: unknown): SupportProjectsPolicyCard | null {
     application_status: pickString(record.application_status, "조건 확인 필요"),
     support_type_label: pickString(record.support_type_label, "지원 조건 확인 필요"),
     support_type_detail: pickString(record.support_type_detail) || null,
+    support_component_types: Array.isArray(record.support_component_types)
+      ? record.support_component_types.map((value) => String(value)).filter(Boolean)
+      : [],
     recommendation_summary: pickString(
       record.recommendation_summary,
       record.match_reason,

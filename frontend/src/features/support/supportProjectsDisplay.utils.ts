@@ -83,19 +83,41 @@ export function formatDiscoveryMeta(policy: SupportProjectsPolicyCard) {
   return parts.join(" · ")
 }
 
+const SUPPORT_COMPONENT_DIRECT = "direct_grant"
+const SUPPORT_COMPONENT_FINANCE = "financial_support"
+const SUPPORT_COMPONENT_LINKED = "non_financial_linked"
+
+// 백엔드가 support_component_types(구조화 필드 기반 분류)를 채우지 못한 정책에 대해서만
+// 기존 support_type_label 라벨을 그대로 대응시키는 레거시 폴백.
+function resolvePolicySupportComponentTypes(policy: SupportProjectsPolicyCard): string[] {
+  if (Array.isArray(policy.support_component_types) && policy.support_component_types.length > 0) {
+    return policy.support_component_types
+  }
+  if (["직접 지원금", "바우처 지원"].includes(policy.support_type_label)) return [SUPPORT_COMPONENT_DIRECT]
+  if (policy.support_type_label === "금융지원") return [SUPPORT_COMPONENT_FINANCE]
+  if (policy.support_type_label === "비금융 연계지원") return [SUPPORT_COMPONENT_LINKED]
+  return []
+}
+
 export function computeSupportTypeGuideStats(policies: SupportProjectsPolicyCard[]) {
-  const direct = policies.filter((policy) =>
-    ["직접 지원금", "바우처 지원"].includes(policy.support_type_label),
-  )
-  const finance = policies.filter((policy) => policy.support_type_label === "금융지원")
-  const linked = policies.filter((policy) => policy.support_type_label === "비금융 연계지원")
+  const directIds = new Set<string>()
+  const financeIds = new Set<string>()
+  const linkedIds = new Set<string>()
+
+  for (const policy of policies) {
+    if (!policy.policy_id) continue
+    const types = resolvePolicySupportComponentTypes(policy)
+    if (types.includes(SUPPORT_COMPONENT_DIRECT)) directIds.add(policy.policy_id)
+    if (types.includes(SUPPORT_COMPONENT_FINANCE)) financeIds.add(policy.policy_id)
+    if (types.includes(SUPPORT_COMPONENT_LINKED)) linkedIds.add(policy.policy_id)
+  }
 
   return {
-    directCount: direct.length,
-    financeCount: finance.length,
-    linkedCount: linked.length,
-    directAmountLabel: direct.length > 0 ? "850억+" : "-",
-    financeBenefitLabel: finance.length > 0 ? "-1.5%p" : "-",
-    linkedVoucherLabel: linked.length > 0 ? "2,500만" : "-",
+    directCount: directIds.size,
+    financeCount: financeIds.size,
+    linkedCount: linkedIds.size,
+    directAmountLabel: directIds.size > 0 ? "850억+" : "-",
+    financeBenefitLabel: financeIds.size > 0 ? "확인 필요" : "-",
+    linkedVoucherLabel: linkedIds.size > 0 ? `연계 프로그램 ${linkedIds.size}건` : "-",
   }
 }

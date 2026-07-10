@@ -588,30 +588,30 @@ export function readPolicySupportSummaryFromAnalysisCache(
   return null
 }
 
-function getPolicySupportSummaryItemCount(summary: PolicySupportSummary | null) {
-  if (!summary) return 0
+function getPolicySupportSummaryScore(summary: PolicySupportSummary | null) {
+  if (!summary) return -1
 
-  return (
-    (summary.business_roi_support?.items?.length ?? 0) +
-    (summary.financing_support?.items?.length ?? 0) +
-    (summary.execution_support?.items?.length ?? 0)
-  )
+  const financingCount = summary.financing_support?.items?.length ?? 0
+  const executionCount = summary.execution_support?.items?.length ?? 0
+  const businessCount = summary.business_roi_support?.items?.length ?? 0
+
+  return (financingCount + executionCount) * 100 + businessCount
 }
 
 export function resolvePolicySupportSummary(
   ...sources: unknown[]
 ): PolicySupportSummary | null {
   let bestSummary: PolicySupportSummary | null = null
-  let bestCount = -1
+  let bestScore = -1
 
   for (const source of sources) {
     const summary = normalizePolicySupportSummary(source)
     if (!summary) continue
 
-    const count = getPolicySupportSummaryItemCount(summary)
-    if (count > bestCount) {
+    const score = getPolicySupportSummaryScore(summary)
+    if (score > bestScore) {
       bestSummary = summary
-      bestCount = count
+      bestScore = score
     }
   }
 

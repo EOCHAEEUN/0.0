@@ -841,6 +841,7 @@ type RecommendedPolicyCard = {
   description: string
   group: PolicySupportGroupKey
   matchedSupport?: PolicySupportItem
+  isGuidance?: boolean
 }
 
 function readRecord(value: unknown): Record<string, unknown> {
@@ -1106,6 +1107,84 @@ function buildSupportItemIndex(summary: PolicySupportSummary | null) {
   return byPolicyId
 }
 
+function getPolicySupportSummaryItems(summary: PolicySupportSummary | null) {
+  return [
+    ...(summary?.business_roi_support?.items ?? []),
+    ...(summary?.financing_support?.items ?? []),
+    ...(summary?.execution_support?.items ?? []),
+  ]
+}
+
+function getComponentGroup(item: PolicySupportItem): PolicySupportGroupKey {
+  const supportType = String(item.support_type || "")
+  const effectLayer = String(item.effect_layer || "")
+
+  if (effectLayer === "capex_offset") return "business"
+  if (
+    effectLayer === "financing_effect" ||
+    supportType === "loan" ||
+    supportType === "interest_support" ||
+    supportType === "guarantee"
+  ) {
+    return "financing"
+  }
+  return "execution"
+}
+
+function getComponentIdentity(item: PolicySupportItem) {
+  return [
+    item.id,
+    item.policy_id,
+    item.component_key,
+    item.component_name,
+    item.support_type,
+  ]
+    .filter(Boolean)
+    .join(":")
+}
+
+function getComponentSupportItemName(item: PolicySupportItem) {
+  if (item.component_name) return item.component_name
+  if (item.support_type === "loan") return "정책자금 융자 검토"
+  if (item.support_type === "interest_support") return "이자지원 검토"
+  if (item.support_type === "guarantee") return "보증지원 검토"
+  if (item.support_type === "consulting") return "컨설팅 지원"
+  if (item.support_type === "education") return "교육 지원"
+  if (item.support_type === "mentoring") return "멘토링 지원"
+  return "공고 기준 지원 항목"
+}
+
+function buildComponentPolicyCards(
+  summary: PolicySupportSummary | null,
+  policyTitles: Map<string, string>,
+  matchedComponentIds: Set<string>,
+) {
+  return getPolicySupportSummaryItems(summary).reduce<RecommendedPolicyCard[]>((cards, item, index) => {
+    const identity = getComponentIdentity(item)
+    if (identity && matchedComponentIds.has(identity)) return cards
+
+    const policyId = item.policy_id || `component-policy-${index}`
+    const title =
+      (item.policy_id ? policyTitles.get(item.policy_id) : "") ||
+      item.component_name ||
+      "정책 지원 항목"
+
+    cards.push({
+      id: `component:${identity || index}`,
+      policyId,
+      title,
+      supportItemName: getComponentSupportItemName(item),
+      amountText: supportTerms(item),
+      description:
+        item.evidence_text ||
+        "공고 기준 지원 항목입니다. 세부 요건 확인 후 신청서와 실행계획에 반영할 수 있습니다.",
+      group: getComponentGroup(item),
+      matchedSupport: item,
+    })
+    return cards
+  }, [])
+}
+
 function findMatchedSupportItem(
   items: PolicySupportItem[] | undefined,
   supportItem: Record<string, unknown>,
@@ -1154,12 +1233,15 @@ function buildRecommendedPolicyCards(
   if (!Array.isArray(policies)) return []
   const supportByPolicyId = buildSupportItemIndex(summary)
   const deduped = new Map<string, RecommendedPolicyCard>()
+  const policyTitles = new Map<string, string>()
+  const matchedComponentIds = new Set<string>()
 
   policies.forEach((policy) => {
     const record = readRecord(policy)
     const policyId = getPolicyIdFrom(record)
     const title = getPolicyTitleFrom(record)
     if (!policyId || !title) return
+    policyTitles.set(policyId, title)
 
     const supportComponents = supportByPolicyId.get(policyId)
     const supportItems = getPolicySupportItems(record)
@@ -1168,6 +1250,7 @@ function buildRecommendedPolicyCards(
     normalizedItems.forEach((supportItem, itemIndex) => {
       const supportRecord = readRecord(supportItem)
       const matchedSupport = findMatchedSupportItem(supportComponents, supportRecord)
+      if (matchedSupport) matchedComponentIds.add(getComponentIdentity(matchedSupport))
       const supportItemName =
         readTextFrom(supportRecord, "name", "title", "category") || "공고 기준 지원 항목"
       const supportItemKey = getSupportItemKey(supportRecord, itemIndex)
@@ -1187,6 +1270,10 @@ function buildRecommendedPolicyCards(
 
       if (!deduped.has(card.id)) deduped.set(card.id, card)
     })
+  })
+
+  buildComponentPolicyCards(summary, policyTitles, matchedComponentIds).forEach((card) => {
+    if (!deduped.has(card.id)) deduped.set(card.id, card)
   })
 
   return Array.from(deduped.values())
@@ -1262,6 +1349,72 @@ function RecommendedPolicySupportCard({ card }: { card: RecommendedPolicyCard })
           세부 요건 확인 필요
         </p>
       )}
+    </div>
+  )
+}
+
+function EmptyPolicySupportGuidanceCard({
+  groupKey,
+  text,
+}: {
+  groupKey: PolicySupportGroupKey
+  text: string
+}) {
+  const title =
+    groupKey === "financing"
+      ? "자금조달 연계 검토"
+      : groupKey === "execution"
+        ? "실행지원 연계 검토"
+        : "지원 항목 검토"
+  const description =
+    groupKey === "financing"
+      ? "현재 분석에 확정된 융자·보증·이자지원 정책은 없지만, 사업 신청 전 정책자금·보증·이자보전 가능성을 별도 확인하는 항목입니다."
+      : "현재 분석에 확정된 실행지원 항목은 없지만, 컨설팅·교육·시험인증·장비활용 가능성을 별도 확인하는 항목입니다."
+
+  return (
+    <div
+      style={{
+        background: C.card,
+        border: `1px dashed ${C.border}`,
+        borderRadius: "12px",
+        padding: "14px",
+      }}
+    >
+      <div style={{ display: "flex", gap: "10px", alignItems: "flex-start", marginBottom: "9px" }}>
+        <h4
+          style={{
+            color: C.text,
+            fontSize: "14px",
+            fontWeight: 900,
+            lineHeight: 1.35,
+            flex: 1,
+          }}
+        >
+          {title}
+        </h4>
+        <span
+          style={{
+            flexShrink: 0,
+            borderRadius: "999px",
+            background: "#e0f2fe",
+            color: "#0369a1",
+            padding: "3px 8px",
+            fontSize: "11px",
+            fontWeight: 900,
+          }}
+        >
+          확인 필요
+        </span>
+      </div>
+      <p style={{ color: C.text, fontSize: "12px", fontWeight: 900, marginBottom: "6px" }}>
+        {text}
+      </p>
+      <p style={{ color: C.muted, fontSize: "12px", fontWeight: 700, lineHeight: 1.55 }}>
+        - {description}
+      </p>
+      <p style={{ color: C.muted, fontSize: "11px", fontWeight: 900, marginTop: "9px" }}>
+        현재 ROI·실부담금 계산에는 반영되지 않음
+      </p>
     </div>
   )
 }
@@ -1397,9 +1550,10 @@ export function PolicySupportComposition({
                   />
                 ))
               ) : (
-                <p style={{ color: C.muted, fontSize: "12px", fontWeight: 700, lineHeight: 1.55 }}>
-                  {group.emptyText}
-                </p>
+                <EmptyPolicySupportGuidanceCard
+                  groupKey={group.key as PolicySupportGroupKey}
+                  text={group.emptyText}
+                />
               )}
             </div>
           </div>

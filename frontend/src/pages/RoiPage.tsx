@@ -33,16 +33,6 @@ function getNum(rec: Record<string, unknown>, ...keys: string[]): number | null 
   return null
 }
 
-function getPolicySupportSummaryItemCount(summary: PolicySupportSummary | null | undefined) {
-  if (!summary) return 0
-
-  return (
-    (summary.business_roi_support?.items?.length ?? 0) +
-    (summary.financing_support?.items?.length ?? 0) +
-    (summary.execution_support?.items?.length ?? 0)
-  )
-}
-
 const POLICY_HYDRATION_KEYS = [
   "support_items",
   "support_method",
@@ -393,15 +383,7 @@ export default function RoiPage({ view = "strategy" }: { view?: RoiView }) {
     const currentId = analysisId || resolvedResult?.id
     if (!currentId) return
 
-    const currentSummary = resolvePolicySupportSummary(
-      policySupportSnapshotSummary,
-      resolvedResult?.policy_support_summary,
-      resolvedResult,
-      resolvedResult?.roiResult,
-      readPolicySupportSummaryFromAnalysisCache(currentId),
-    )
-    if (getPolicySupportSummaryItemCount(currentSummary) > 0) return
-    const fetchKey = `${currentId}:${getPolicySupportSummaryItemCount(currentSummary)}`
+    const fetchKey = `${currentId}:policy-support-summary`
     if (policySupportSnapshotFetchKeyRef.current === fetchKey) return
     policySupportSnapshotFetchKeyRef.current = fetchKey
 

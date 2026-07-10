@@ -10,7 +10,6 @@ from zoneinfo import ZoneInfo
 from app.core.database import get_db
 from app.services.dashboard_overview import (
     _d_day_label,
-    _format_deadline_display,
     _is_empty_policy_snapshot,
     _parse_deadline,
     _policy_deadline_raw,
@@ -286,7 +285,7 @@ def _eligibility_needs_check(policy: dict[str, Any]) -> bool:
 
 
 def _is_closing_urgent(policy: dict[str, Any]) -> bool:
-    deadline = _parse_deadline(_policy_deadline_raw(policy))
+    deadline = _resolve_deadline_date(policy)
     if not deadline:
         return False
     today = _seoul_today()
@@ -339,22 +338,169 @@ def _summarize_reason(reason: str, *, max_len: int = 120) -> str:
     return truncated.rstrip(" ,.·") + "…"
 
 
-def _resolve_notice_date_label(policy: dict[str, Any]) -> str:
-    posted_at = _safe_text(policy.get("posted_at"))
-    if posted_at:
-        date_part = posted_at[:10]
-        if re.match(r"^\d{4}-\d{2}-\d{2}$", date_part):
-            return f"{date_part} 등록"
-        return posted_at
+_ISO_DATE_PATTERN = re.compile(r"^(\d{4})-(\d{1,2})-(\d{1,2})")
+_LOOSE_DATE_PATTERN = re.compile(r"(20\d{2})[.\-/]\s*(\d{1,2})[.\-/]\s*(\d{1,2})")
+_NOTICE_LABEL_PATTERNS = (
+    re.compile(r"공고일\s*[:：]?\s*(20\d{2}[.\-/]\s*\d{1,2}[.\-/]\s*\d{1,2})"),
+    re.compile(r"등록일\s*[:：]?\s*(20\d{2}[.\-/]\s*\d{1,2}[.\-/]\s*\d{1,2})"),
+    re.compile(r"게시일\s*[:：]?\s*(20\d{2}[.\-/]\s*\d{1,2}[.\-/]\s*\d{1,2})"),
+)
+_RECEPTION_RANGE_START_PATTERN = re.compile(
+    r"(20\d{2}\.\s*\d{1,2}\.\s*\d{1,2})\([월화수목금토일]\)\s*~"
+)
+_RECEPTION_PERIOD_PATTERN = re.compile(r"접수기간.*?(20\d{2}[.\-/]\s*\d{1,2}[.\-/]\s*\d{1,2})")
 
-    application_start = _safe_text(policy.get("application_start_date"))
-    if application_start:
-        date_part = application_start[:10]
-        if re.match(r"^\d{4}-\d{2}-\d{2}$", date_part):
-            return f"{date_part} 접수 시작"
-        return application_start
+
+def _normalize_date_str(raw: str) -> str | None:
+    match = _ISO_DATE_PATTERN.match(raw.strip()) or _LOOSE_DATE_PATTERN.search(raw)
+    if not match:
+        return None
+    year, month, day = match.group(1), match.group(2), match.group(3)
+    try:
+        return date(int(year), int(month), int(day)).isoformat()
+    except ValueError:
+        return None
+
+
+def _extract_notice_date_from_text(text: str) -> tuple[str, str] | None:
+    """반환값: (YYYY-MM-DD, '등록' 또는 '접수 시작'). 못 찾으면 None."""
+    if not text:
+        return None
+    for pattern in _NOTICE_LABEL_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            normalized = _normalize_date_str(match.group(1))
+            if normalized:
+                return normalized, "등록"
+    match = _RECEPTION_RANGE_START_PATTERN.search(text)
+    if match:
+        normalized = _normalize_date_str(match.group(1))
+        if normalized:
+            return normalized, "접수 시작"
+    match = _RECEPTION_PERIOD_PATTERN.search(text)
+    if match:
+        normalized = _normalize_date_str(match.group(1))
+        if normalized:
+            return normalized, "접수 시작"
+    return None
+
+
+def _resolve_notice_date_label(policy: dict[str, Any]) -> str:
+    """우선순위: posted_at/notice_date/published_at → 접수 시작일 필드 →
+    raw_text/attachment_text/summary/deadline_note 정규식 추출 → created_at(등록 추정)
+    → '공고문 확인 필요'. 특정 정책 하드코딩 없음."""
+    for key in ("posted_at", "notice_date", "published_at"):
+        value = _safe_text(policy.get(key))
+        if not value:
+            continue
+        normalized = _normalize_date_str(value)
+        if normalized:
+            return f"{normalized} 등록"
+
+    for key in ("application_start_date", "start_date"):
+        value = _safe_text(policy.get(key))
+        if not value:
+            continue
+        normalized = _normalize_date_str(value)
+        if normalized:
+            return f"{normalized} 접수 시작"
+
+    text_blob = " ".join(
+        _safe_text(policy.get(key))
+        for key in ("raw_text", "attachment_text", "summary", "deadline_note")
+        if _safe_text(policy.get(key))
+    )
+    extracted = _extract_notice_date_from_text(text_blob)
+    if extracted:
+        date_iso, kind = extracted
+        return f"{date_iso} {kind}"
+
+    created_at = _safe_text(policy.get("created_at"))
+    normalized_created = _normalize_date_str(created_at) if created_at else None
+    if normalized_created:
+        return f"{normalized_created} 등록 추정"
 
     return "공고문 확인 필요"
+
+
+# 접수 마감일(deadline) 추출용 원문 후보 필드. deadline_display/deadline_note가
+# "미정"/"예산 소진 시" 같은 placeholder만 담고 있을 때 실제 날짜를 찾기 위한 폴백.
+DEADLINE_TEXT_FIELDS = ("raw_text", "attachment_text", "summary", "deadline_note")
+
+_DEADLINE_STATEMENT_PATTERN = re.compile(r"신청\s*마감일은\s*(20\d{2}-\d{2}-\d{2})")
+_DEADLINE_LABELED_PATTERNS = (
+    re.compile(r"접수\s*마감[^0-9]{0,10}(20\d{2}[.\-/]\s*\d{1,2}[.\-/]\s*\d{1,2})"),
+    re.compile(r"신청\s*마감[^0-9]{0,10}(20\d{2}[.\-/]\s*\d{1,2}[.\-/]\s*\d{1,2})"),
+)
+_DEADLINE_PERIOD_RANGE_PATTERN = re.compile(
+    r"(?:접수기간|신청기간)[^0-9]{0,10}(20\d{2}[.\-/]\s*\d{1,2}[.\-/]\s*\d{1,2})"
+    r"[^0-9]{0,20}[~∼\-][^0-9]{0,20}(20\d{2}[.\-/]\s*\d{1,2}[.\-/]\s*\d{1,2})"
+)
+_DEADLINE_WEEKDAY_RANGE_PATTERN = re.compile(
+    r"(20\d{2}\.\s*\d{1,2}\.\s*\d{1,2})\([월화수목금토일]\)\s*~\s*(20\d{2}\.\s*\d{1,2}\.\s*\d{1,2})"
+)
+
+
+def _collect_deadline_raw_text(policy: dict[str, Any]) -> str:
+    parts = [_safe_text(policy.get(key)) for key in DEADLINE_TEXT_FIELDS]
+    return " ".join(part for part in parts if part)
+
+
+def _extract_deadline_date_from_text(text: str) -> str | None:
+    """반환값: YYYY-MM-DD 문자열 또는 None. 기간 표현은 종료일을 사용한다."""
+    if not text:
+        return None
+
+    match = _DEADLINE_STATEMENT_PATTERN.search(text)
+    if match:
+        return match.group(1)
+
+    for pattern in _DEADLINE_LABELED_PATTERNS:
+        match = pattern.search(text)
+        if match:
+            normalized = _normalize_date_str(match.group(1))
+            if normalized:
+                return normalized
+
+    match = _DEADLINE_WEEKDAY_RANGE_PATTERN.search(text)
+    if match:
+        normalized = _normalize_date_str(match.group(2))
+        if normalized:
+            return normalized
+
+    match = _DEADLINE_PERIOD_RANGE_PATTERN.search(text)
+    if match:
+        normalized = _normalize_date_str(match.group(2))
+        if normalized:
+            return normalized
+
+    return None
+
+
+def _resolve_deadline_date(policy: dict[str, Any]) -> date | None:
+    """구조화 필드(deadline/deadline_display/end_date/application_end_date)로 실제
+    날짜를 못 찾으면 raw_text/attachment_text/summary/deadline_note에서 접수·신청
+    마감일을 추출한다. "미정"/"예산 소진 시" 같은 placeholder는 날짜로 취급하지 않는다.
+    특정 policy_id에 대한 예외 처리는 없다."""
+    parsed = _parse_deadline(_policy_deadline_raw(policy))
+    if parsed:
+        return parsed
+
+    for key in ("application_end_date", "end_date"):
+        value = _safe_text(policy.get(key))
+        if value:
+            parsed = _parse_deadline(value)
+            if parsed:
+                return parsed
+
+    extracted = _extract_deadline_date_from_text(_collect_deadline_raw_text(policy))
+    if extracted:
+        try:
+            return date.fromisoformat(extracted)
+        except ValueError:
+            return None
+
+    return None
 
 
 # 지원내용 상세(funding_detail_lines) 추출용 원문 후보 필드. 정책마다 채워진 필드가 달라
@@ -587,6 +733,15 @@ def _enrich_policy_with_detail(
         "eligibility_text",
         "eligibility_extraction_status",
         "posted_at",
+        "notice_date",
+        "published_at",
+        "application_start_date",
+        "application_end_date",
+        "start_date",
+        "end_date",
+        "application_period",
+        "created_at",
+        "deadline_note",
         "max_amount_basis_text",
         "max_amount_basis_evidence_text",
         "max_amount_note",
@@ -687,12 +842,18 @@ def _passes_live_company_filters(policy: dict[str, Any], company: dict[str, Any]
 
 def _format_deadline_label(policy: dict[str, Any]) -> str:
     display = _safe_text(policy.get("deadline_display"))
+    # deadline_display에 이미 실제 날짜가 들어있으면(예: "2026-07-30 마감") 그대로 쓴다.
+    if display and _parse_deadline(display):
+        return display
+
+    # "미정"/"예산 소진 시" 같은 placeholder만 있는 경우 실제 날짜를 다시 찾아본다.
+    resolved = _resolve_deadline_date(policy)
+    if resolved:
+        return f"{resolved.isoformat()} 마감"
+
     if display:
         return display
     deadline = _policy_deadline_raw(policy)
-    parsed = _parse_deadline(deadline)
-    if parsed:
-        return _format_deadline_display(parsed)
     if deadline:
         return str(deadline)
     return "마감일 공고문 확인"
@@ -714,21 +875,22 @@ def _scenario_label_from_match(scenario_match: Any) -> str:
 
 def _deadline_info(policy: dict[str, Any]) -> dict[str, Any]:
     raw = _policy_deadline_raw(policy)
-    deadline = _parse_deadline(raw)
+    deadline = _resolve_deadline_date(policy)
     today = _seoul_today()
     if deadline:
+        deadline_iso = deadline.isoformat()
         days_remaining = (deadline - today).days
         if days_remaining < 0:
             return {
-                "deadline": raw,
-                "deadline_display": _format_deadline_display(deadline),
+                "deadline": deadline_iso,
+                "deadline_display": f"{deadline_iso} 마감",
                 "d_day": "마감됨",
                 "days_remaining": days_remaining,
                 "is_past": True,
             }
         return {
-            "deadline": raw,
-            "deadline_display": _format_deadline_display(deadline),
+            "deadline": deadline_iso,
+            "deadline_display": f"{deadline_iso} 마감",
             "d_day": _d_day_label(days_remaining),
             "days_remaining": days_remaining,
             "is_past": False,

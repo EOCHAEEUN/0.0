@@ -1025,6 +1025,11 @@
   font-size: 14px;
   font-weight: 700;
   line-height: 1.7;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: break-word;
 }
 
 .ff-support-why-check {

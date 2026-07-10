@@ -186,6 +186,24 @@ function classifyPolicyByStructuredFields(policy: SupportProjectsPolicyCard): st
 }
 
 // 우선순위: support_component_types(백엔드 분류) > 구조화 필드 프론트 폴백 > support_type_label 레거시 폴백.
+function classifyPolicyByCardText(policy: SupportProjectsPolicyCard): string[] {
+  const types = new Set<string>()
+  const textFields = [
+    policy.support_type_detail,
+    policy.support_amount_text,
+    policy.recommendation_summary,
+    policy.match_reason,
+    policy.summary,
+    ...(policy.tags ?? []),
+  ]
+
+  for (const text of textFields) {
+    const classified = classifySupportText(text)
+    if (classified) types.add(classified)
+  }
+
+  return [...types]
+}
 function resolvePolicySupportComponentTypes(policy: SupportProjectsPolicyCard): string[] {
   if (Array.isArray(policy.support_component_types) && policy.support_component_types.length > 0) {
     return policy.support_component_types
@@ -193,6 +211,9 @@ function resolvePolicySupportComponentTypes(policy: SupportProjectsPolicyCard): 
 
   const structured = classifyPolicyByStructuredFields(policy)
   if (structured.length > 0) return structured
+
+  const cardText = classifyPolicyByCardText(policy)
+  if (cardText.length > 0) return cardText
 
   if (["직접 지원금", "바우처 지원"].includes(policy.support_type_label)) return [SUPPORT_COMPONENT_DIRECT]
   if (policy.support_type_label === "금융지원") return [SUPPORT_COMPONENT_FINANCE]

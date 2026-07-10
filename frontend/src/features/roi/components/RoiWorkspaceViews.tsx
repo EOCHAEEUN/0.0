@@ -444,6 +444,10 @@ export function RoiWorkspaceViews(props: RoiWorkspaceViewProps) {
                 <AnalysisScenarioCard scenario={scenarioB} />
               </div>
             </section>
+            <PolicySupportComposition
+              summary={policySupportSummary ?? null}
+              policies={policySupportPolicies ?? null}
+            />
             <RoiCumulativeChart scenarioA={scenarioA} scenarioB={scenarioB} />
           </>
         ) : null}

@@ -832,6 +832,9 @@ function supportTerms(item: PolicySupportItem) {
 
 type PolicySupportGroupKey = "business" | "financing" | "execution"
 
+const POLICY_SUPPORT_VISIBLE_CARD_LIMIT = 3
+const POLICY_SUPPORT_COLUMN_MAX_HEIGHT = "640px"
+
 type RecommendedPolicyCard = {
   id: string
   policyId: string
@@ -980,6 +983,7 @@ function getPolicyGroup(policy: Record<string, unknown>): PolicySupportGroupKey 
 function getSupportItemAmountText(
   supportItem: Record<string, unknown>,
   policy: Record<string, unknown>,
+  group: PolicySupportGroupKey,
 ) {
   const amountText = readTextFrom(
     supportItem,
@@ -999,6 +1003,9 @@ function getSupportItemAmountText(
     ) ?? readNumberFrom(supportItem, "amount_numeric", "support_amount")
 
   if (amount !== null && amount > 0) return `지원 한도 ${formatMoneyFromManwon(amount)}`
+
+  if (group === "execution") return "실행 조건 확인 필요"
+  if (group === "financing") return "자금조달 조건 확인 필요"
 
   return getPolicyAmountText(policy)
 }
@@ -1254,6 +1261,7 @@ function buildRecommendedPolicyCards(
       const supportItemName =
         readTextFrom(supportRecord, "name", "title", "category") || "공고 기준 지원 항목"
       const supportItemKey = getSupportItemKey(supportRecord, itemIndex)
+      const group = getSupportItemGroup(record, supportRecord)
       const card: RecommendedPolicyCard = {
         id: `${policyId}:${supportItemKey}`,
         policyId,
@@ -1261,10 +1269,10 @@ function buildRecommendedPolicyCards(
         supportItemName,
         amountText: matchedSupport
           ? supportTerms(matchedSupport)
-          : getSupportItemAmountText(supportRecord, record),
+          : getSupportItemAmountText(supportRecord, record, group),
         description:
           matchedSupport?.evidence_text || getSupportItemDescription(supportRecord, record),
-        group: getSupportItemGroup(record, supportRecord),
+        group,
         matchedSupport,
       }
 
@@ -1509,55 +1517,61 @@ export function PolicySupportComposition({
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 250px), 1fr))",
             gap: "14px",
-            alignItems: "start",
+            alignItems: "stretch",
           }}
       >
-        {groups.map((group) => (
-          <div
-            key={group.key}
-            style={{
-              borderRadius: "14px",
-              background: "#f8fafc",
-              padding: "14px",
-              minWidth: 0,
-            }}
-          >
-            <h3
-              style={{
-                color: C.text,
-                fontSize: "13px",
-                fontWeight: 900,
-                marginBottom: "10px",
-              }}
-            >
-              {group.title}
-            </h3>
+        {groups.map((group) => {
+          const shouldScroll = group.items.length > POLICY_SUPPORT_VISIBLE_CARD_LIMIT
+
+          return (
             <div
+              key={group.key}
               style={{
+                borderRadius: "14px",
+                background: "#f8fafc",
+                padding: "14px",
+                minWidth: 0,
                 display: "flex",
                 flexDirection: "column",
-                gap: "9px",
-                maxHeight: group.items.length > 4 ? "360px" : undefined,
-                overflowY: group.items.length > 4 ? "auto" : undefined,
-                paddingRight: group.items.length > 4 ? "4px" : undefined,
               }}
             >
-              {group.items.length > 0 ? (
-                group.items.map((item, index) => (
-                  <RecommendedPolicySupportCard
-                    key={item.id || `${group.key}-${index}`}
-                    card={item}
+              <h3
+                style={{
+                  color: C.text,
+                  fontSize: "13px",
+                  fontWeight: 900,
+                  marginBottom: "10px",
+                }}
+              >
+                {group.title}
+              </h3>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "9px",
+                  maxHeight: shouldScroll ? POLICY_SUPPORT_COLUMN_MAX_HEIGHT : undefined,
+                  overflowY: shouldScroll ? "auto" : undefined,
+                  paddingRight: shouldScroll ? "4px" : undefined,
+                }}
+              >
+                {group.items.length > 0 ? (
+                  group.items.map((item, index) => (
+                    <RecommendedPolicySupportCard
+                      key={item.id || `${group.key}-${index}`}
+                      card={item}
+                    />
+                  ))
+                ) : (
+                  <EmptyPolicySupportGuidanceCard
+                    groupKey={group.key as PolicySupportGroupKey}
+                    text={group.emptyText}
                   />
-                ))
-              ) : (
-                <EmptyPolicySupportGuidanceCard
-                  groupKey={group.key as PolicySupportGroupKey}
-                  text={group.emptyText}
-                />
-              )}
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
       {/*
             현재 분석된 정책에는 구조화된 지원 항목이 아직 등록되지 않았습니다.

@@ -11,9 +11,46 @@ from app.models.user_profile import UserProfileCreate, UserProfileUpdate
 from app.services.policy_snapshot_hydration import (
     hydrate_roi_outputs_policy_snapshots_for_response,
 )
+from app.services.policy_support_summary import load_policy_support_summary
 from app.tools.equipment_normalizer import normalize_equipment_category
 
 router = APIRouter()
+
+
+def _policy_ids_from_roi_output(roi_output: dict) -> list[str]:
+    snapshot = roi_output.get("policy_snapshot")
+    if not isinstance(snapshot, dict):
+        return []
+
+    ids: list[str] = []
+    for item in snapshot.get("policies") or []:
+        if not isinstance(item, dict):
+            continue
+        policy_id = str(item.get("policy_id") or item.get("id") or "").strip()
+        if policy_id and policy_id not in ids:
+            ids.append(policy_id)
+    return ids
+
+
+def _attach_policy_support_summaries(db, roi_outputs: list[dict]) -> list[dict]:
+    hydrated: list[dict] = []
+    for roi_output in roi_outputs:
+        if not isinstance(roi_output, dict):
+            hydrated.append(roi_output)
+            continue
+
+        policy_ids = _policy_ids_from_roi_output(roi_output)
+        if not policy_ids:
+            hydrated.append(roi_output)
+            continue
+
+        hydrated.append(
+            {
+                **roi_output,
+                "policy_support_summary": load_policy_support_summary(db, policy_ids),
+            }
+        )
+    return hydrated
 
 @router.post("/onboarding")
 async def register_company(
@@ -140,6 +177,7 @@ async def get_my_company(
                         db,
                         roi_query.data or [],
                     )
+                    roi_outputs = _attach_policy_support_summaries(db, roi_outputs)
                     latest_roi_output = roi_outputs[0] if roi_outputs else None
                     policy_query = (
                         db.table("matched_policy")

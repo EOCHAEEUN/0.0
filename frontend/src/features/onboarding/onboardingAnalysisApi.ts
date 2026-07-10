@@ -761,6 +761,8 @@ function buildSnapshotFromStoredOutput(params: {
     companyId,
     equipmentId,
     roiResult: buildCompactRoiResult(roiResult),
+    policy_support_summary:
+      roiOutput.policy_support_summary as AnalysisResultSnapshot["policy_support_summary"],
     policyStatus:
       getText(asRecord(roiOutput.policy_snapshot), "policy_status") ||
       (canonical.missingState === "missing" ? "missing" : undefined),

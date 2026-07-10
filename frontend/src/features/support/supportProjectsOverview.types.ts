@@ -40,6 +40,8 @@ export type SupportProjectsPolicyCard = {
   support_primary_category?: string | null
   support_categories?: unknown
   policy_primary_nature?: string | null
+  notice_date_label?: string | null
+  funding_detail_lines?: string[]
   recommendation_summary: string
   match_reason: string
   why_check_now: string[]

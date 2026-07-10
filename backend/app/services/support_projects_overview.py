@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import date, datetime
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -330,7 +331,124 @@ def _summarize_reason(reason: str, *, max_len: int = 120) -> str:
         return ""
     if len(text) <= max_len:
         return text
-    return text[: max_len - 1].rstrip() + "…"
+    # 단어 중간에서 끊기지 않도록 마지막 공백 기준으로 잘라낸다(예: "...확..." 방지).
+    truncated = text[: max_len - 1]
+    last_space = truncated.rfind(" ")
+    if last_space > 0:
+        truncated = truncated[:last_space]
+    return truncated.rstrip(" ,.·") + "…"
+
+
+def _resolve_notice_date_label(policy: dict[str, Any]) -> str:
+    posted_at = _safe_text(policy.get("posted_at"))
+    if posted_at:
+        date_part = posted_at[:10]
+        if re.match(r"^\d{4}-\d{2}-\d{2}$", date_part):
+            return f"{date_part} 등록"
+        return posted_at
+
+    application_start = _safe_text(policy.get("application_start_date"))
+    if application_start:
+        date_part = application_start[:10]
+        if re.match(r"^\d{4}-\d{2}-\d{2}$", date_part):
+            return f"{date_part} 접수 시작"
+        return application_start
+
+    return "공고문 확인 필요"
+
+
+# 지원내용 상세(funding_detail_lines) 추출용 원문 후보 필드. 정책마다 채워진 필드가 달라
+# 모두 이어붙여 하나의 텍스트로 놓고 패턴을 찾는다(특정 정책 하드코딩 없음).
+FUNDING_TEXT_FIELDS = (
+    "max_amount_basis_evidence_text",
+    "max_amount_basis_text",
+    "max_amount_note",
+    "summary",
+    "eligibility_evidence",
+    "raw_text",
+    "attachment_text",
+)
+
+_SCALE_TOTAL_PATTERN = re.compile(r"총\s*([0-9][0-9,\.]*)\s*(억원|백만원|만원)")
+_SCALE_SITE_COUNT_PATTERN = re.compile(r"([0-9]+)\s*개소")
+_PER_UNIT_CAP_PATTERN = re.compile(
+    r"(사업장|기업)\s*당\s*최대\s*([0-9][0-9,\.]*)\s*(만원|억원|백만원|천만원)"
+)
+_ENTITY_RATIO_PATTERN = re.compile(r"(중소기업|중견기업|소상공인)\s*([0-9]{1,3})\s*%")
+_DUPLICATE_BAN_PATTERN = re.compile(r"중복\s*지원[^.]{0,20}(불가능|불가)")
+
+
+def _collect_funding_raw_text(policy: dict[str, Any]) -> str:
+    parts = [_safe_text(policy.get(key)) for key in FUNDING_TEXT_FIELDS]
+    return " ".join(part for part in parts if part)
+
+
+def _build_funding_detail_lines(policy: dict[str, Any]) -> list[str]:
+    """support_items(구조화) 우선, 부족하면 원문 텍스트에서 지원규모/한도/비율/중복지원
+    패턴을 일반 규칙으로 추출한다. 특정 정책명/ID를 위한 예외 처리는 두지 않는다."""
+    lines: list[str] = []
+    seen: set[str] = set()
+
+    def add(line: str) -> None:
+        normalized = line.strip()
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            lines.append(normalized)
+
+    for item in _coerce_support_items(policy.get("support_items")):
+        if not isinstance(item, dict):
+            continue
+        name = _safe_text(item.get("name"))
+        amount = _safe_text(item.get("amount"))
+        ratio = _safe_number(item.get("support_ratio"))
+        if name and amount:
+            line = f"{name}: {amount}"
+            if ratio is not None and "%" not in amount:
+                line += f" (지원비율 {round(ratio * 100)}%)"
+            add(line)
+
+    # support_items가 이미 개별 한도/금액을 알려주면 원문 정규식으로 같은 한도를 또
+    # 뽑아 중복 표시하지 않는다. 단, 비율·중복지원 여부는 items에 없는 정보라 항상 확인한다.
+    has_item_lines = len(lines) > 0
+
+    raw_text = _collect_funding_raw_text(policy)
+    if raw_text:
+        if not has_item_lines:
+            cap_match = _PER_UNIT_CAP_PATTERN.search(raw_text)
+            if cap_match:
+                add(f"{cap_match.group(1)}당 지원한도: 최대 {cap_match.group(2)}{cap_match.group(3)}")
+
+            total_match = _SCALE_TOTAL_PATTERN.search(raw_text)
+            site_match = _SCALE_SITE_COUNT_PATTERN.search(raw_text)
+            if site_match:
+                # 원문에 총액 표현이 없으면 이미 계산된 max_amount_actual로 보완한다
+                # (헤더와 같은 값을 반복 표시하는 대신, 개소 수와 묶어 새로운 정보를 준다).
+                total_label = (
+                    f"총 {total_match.group(1)}{total_match.group(2)}"
+                    if total_match
+                    else _safe_text(policy.get("max_amount_actual"))
+                )
+                if total_label:
+                    add(f"지원규모: {total_label} / 약 {site_match.group(1)}개소")
+                else:
+                    add(f"지원규모: 약 {site_match.group(1)}개소")
+            elif total_match:
+                add(f"지원규모: 총 {total_match.group(1)}{total_match.group(2)}")
+
+        seen_entities: set[str] = set()
+        ratio_parts: list[str] = []
+        for entity, percent in _ENTITY_RATIO_PATTERN.findall(raw_text):
+            if entity in seen_entities:
+                continue
+            seen_entities.add(entity)
+            ratio_parts.append(f"{entity} {percent}%")
+        if ratio_parts:
+            add(f"지원비율: {', '.join(ratio_parts)}")
+
+        if _DUPLICATE_BAN_PATTERN.search(raw_text):
+            add("타 유사사업과의 중복지원 불가")
+
+    return lines[:6]
 
 
 def _coerce_support_items(value: Any) -> list[Any]:
@@ -468,6 +586,12 @@ def _enrich_policy_with_detail(
         "required_documents_json",
         "eligibility_text",
         "eligibility_extraction_status",
+        "posted_at",
+        "max_amount_basis_text",
+        "max_amount_basis_evidence_text",
+        "max_amount_note",
+        "raw_text",
+        "attachment_text",
     ):
         if not merged.get(key) and detail.get(key) is not None:
             merged[key] = detail.get(key)
@@ -767,6 +891,8 @@ def _map_policy_card(
         "support_primary_category": policy.get("support_primary_category"),
         "support_categories": policy.get("support_categories"),
         "policy_primary_nature": policy.get("policy_primary_nature"),
+        "notice_date_label": _resolve_notice_date_label(policy),
+        "funding_detail_lines": _build_funding_detail_lines(policy),
         "recommendation_summary": _summarize_reason(reason),
         "match_reason": reason,
         "why_check_now": _build_why_check_now(

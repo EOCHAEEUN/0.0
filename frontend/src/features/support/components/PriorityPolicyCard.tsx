@@ -28,6 +28,7 @@ export function PriorityPolicyCard({
   policy: SupportProjectsPolicyCard
   onOpenDetail: (policy: SupportProjectsPolicyCard) => void
 }) {
+  const reasonText = policy.match_reason || policy.recommendation_summary
   const whyCheckItems =
     policy.why_check_now.length > 0
       ? policy.why_check_now
@@ -81,7 +82,7 @@ export function PriorityPolicyCard({
                 </span>
                 <strong>추천 사유</strong>
               </div>
-              <p>{policy.recommendation_summary || policy.match_reason}</p>
+              <p>{reasonText}</p>
             </div>
 
             <div className="ff-support-why-check">

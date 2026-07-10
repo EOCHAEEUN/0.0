@@ -36,6 +36,8 @@ function MetaCard({ label, value }: { label: string; value: string }) {
           fontSize: "15px",
           lineHeight: 1.45,
           fontWeight: 900,
+          overflowWrap: "break-word",
+          wordBreak: "keep-all",
         }}
       >
         {value}
@@ -55,10 +57,13 @@ export function PolicyDetailDialog({
 }) {
   if (!project) return null
 
-  const supportLines = project.supportContent
-    .split(/\n|•|- /)
-    .map((item) => item.trim())
-    .filter(Boolean)
+  const supportLines = [
+    ...project.supportContent
+      .split(/\n|•|- /)
+      .map((item) => item.trim())
+      .filter(Boolean),
+    ...(project.fundingDetailLines ?? []),
+  ].filter((line, index, all) => all.indexOf(line) === index)
 
   return (
     <div
@@ -127,6 +132,8 @@ export function PolicyDetailDialog({
                   lineHeight: 1.28,
                   fontWeight: 900,
                   letterSpacing: "-0.7px",
+                  overflowWrap: "break-word",
+                  wordBreak: "keep-all",
                 }}
               >
                 <DialogHighlightedText text={project.title} />
@@ -138,6 +145,8 @@ export function PolicyDetailDialog({
                   fontSize: "14px",
                   lineHeight: 1.75,
                   fontWeight: 800,
+                  overflowWrap: "break-word",
+                  wordBreak: "keep-all",
                 }}
               >
                 <DialogHighlightedText text={project.agency} /> · {project.scenarioLabel} · {project.amount}
@@ -213,6 +222,8 @@ export function PolicyDetailDialog({
                   fontSize: "15px",
                   lineHeight: 1.75,
                   fontWeight: 800,
+                  overflowWrap: "break-word",
+                  wordBreak: "keep-all",
                 }}
               >
                 {supportLines.map((line) => (
@@ -228,6 +239,8 @@ export function PolicyDetailDialog({
                   fontSize: "15px",
                   lineHeight: 1.8,
                   fontWeight: 800,
+                  overflowWrap: "break-word",
+                  wordBreak: "keep-all",
                 }}
               >
                 <DialogHighlightedText text={project.supportContent || "지원내용 준비 중"} />

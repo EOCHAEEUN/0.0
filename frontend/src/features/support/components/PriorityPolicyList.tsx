@@ -149,7 +149,7 @@ export function PriorityPolicyList({
                 </div>
 
                 <div className="ff-support-priority-list-reason">
-                  <p>{policy.recommendation_summary || policy.match_reason}</p>
+                  <p>{policy.match_reason || policy.recommendation_summary}</p>
                 </div>
 
                 <button

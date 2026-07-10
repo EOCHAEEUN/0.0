@@ -17,6 +17,7 @@ export type SupportProject = {
   policyCategory: string
   description: string
   supportContent: string
+  fundingDetailLines?: string[]
   reasonText: string
   reasons: string[]
   tags: string[]

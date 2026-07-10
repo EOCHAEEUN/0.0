@@ -106,6 +106,10 @@ function mapPolicyCard(raw: unknown): SupportProjectsPolicyCard | null {
     support_primary_category: pickString(record.support_primary_category) || null,
     support_categories: record.support_categories ?? null,
     policy_primary_nature: pickString(record.policy_primary_nature) || null,
+    notice_date_label: pickString(record.notice_date_label) || null,
+    funding_detail_lines: Array.isArray(record.funding_detail_lines)
+      ? record.funding_detail_lines.map((value) => String(value)).filter(Boolean)
+      : [],
     recommendation_summary: pickString(
       record.recommendation_summary,
       record.match_reason,

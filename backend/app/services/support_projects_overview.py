@@ -1359,6 +1359,15 @@ def _build_overview_payload(
     }
 
 
+def _empty_live_discovery_payload() -> dict[str, Any]:
+    return {
+        "source": "current_policy_database",
+        "total_count": 0,
+        "items": [],
+        "error": None,
+    }
+
+
 def load_support_projects_overview(
     *,
     company_id: str,
@@ -1440,17 +1449,11 @@ def _load_analysis_snapshot_overview(
         "equipment_name": _safe_text((equipment or {}).get("name"), default="설비명 미확인"),
         "snapshot_status": "legacy_missing",
     }
-    live_items, live_total, live_error = _load_live_discovery_candidates(
-        db,
-        company=company,
-        exclude_policy_ids=set(),
-    )
-    live_discovery = {
-        "source": "current_policy_database",
-        "total_count": live_total,
-        "items": live_items,
-        "error": live_error,
-    }
+    # This route is used by the analysis snapshot view, which already has a
+    # canonical policy list. Avoid scanning the full policy table here: pulling
+    # every policy raw text on small production instances can time out and
+    # surface as a Render 502 before FastAPI can return a JSON error.
+    live_discovery = _empty_live_discovery_payload()
 
     if _is_empty_policy_snapshot(snapshot):
         return _build_overview_payload(
@@ -1511,23 +1514,6 @@ def _load_analysis_snapshot_overview(
         priority_id=priority_id,
         policy_details=policy_details,
     )
-
-    exclude_ids = {
-        _normalize_policy_id(policy.get("policy_id"))
-        for policy in policies[:PRIORITY_DISPLAY_LIMIT]
-        if _normalize_policy_id(policy.get("policy_id"))
-    }
-    live_items, live_total, live_error = _load_live_discovery_candidates(
-        db,
-        company=company,
-        exclude_policy_ids=exclude_ids,
-    )
-    live_discovery = {
-        "source": "current_policy_database",
-        "total_count": live_total,
-        "items": live_items,
-        "error": live_error,
-    }
 
     return _build_overview_payload(
         mode="analysis_snapshot",

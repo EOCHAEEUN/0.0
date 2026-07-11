@@ -1,5 +1,4 @@
-import { Clock3, Pencil, Sparkles } from "lucide-react"
-import { useState } from "react"
+import { Clock3, Sparkles } from "lucide-react"
 
 import {
   formatCurrencyWonFromManwon,
@@ -7,10 +6,8 @@ import {
   formatPaybackYearsCompact,
 } from "../applicationDraft.utils"
 import type { ApplicationDraftWorkspaceModel } from "../hooks/useApplicationDraftWorkspace"
-import {
-  APPLICATION_DRAFT_RECOMMEND_POLICIES_ID,
-  ApplicationDraftRecommendedPolicies,
-} from "./ApplicationDraftRecommendedPolicies"
+import { ApplicationDraftPolicyDropdown } from "./ApplicationDraftPolicyDropdown"
+import { ApplicationDraftRecommendedPolicies } from "./ApplicationDraftRecommendedPolicies"
 import { ScenarioToggle } from "./ApplicationDraftShared"
 
 type EffectItem = {
@@ -117,15 +114,6 @@ export function ApplicationDraftSummary({
     payback_months: scenario?.payback_months,
     payback_years: scenario?.payback_years,
   })
-  const [highlightRecommended, setHighlightRecommended] = useState(false)
-
-  const handleChangePolicyClick = () => {
-    const target = document.getElementById(APPLICATION_DRAFT_RECOMMEND_POLICIES_ID)
-    target?.scrollIntoView({ behavior: "smooth", block: "center" })
-    setHighlightRecommended(true)
-    window.setTimeout(() => setHighlightRecommended(false), 1600)
-  }
-
   return (
     <section className="ff-draft-summary-section">
       <article className="ff-card ff-draft-executive-card">
@@ -133,14 +121,7 @@ export function ApplicationDraftSummary({
           <h3>
             핵심 요약 <span className="ff-draft-executive-en">(Executive Summary)</span>
           </h3>
-          <button
-            type="button"
-            className="ff-draft-edit-btn"
-            onClick={handleChangePolicyClick}
-          >
-            <Pencil size={13} strokeWidth={2.2} aria-hidden="true" />
-            신청 지원사업 변경
-          </button>
+          <ApplicationDraftPolicyDropdown model={model} />
         </div>
 
         {!model.draftExists ? (
@@ -249,7 +230,7 @@ export function ApplicationDraftSummary({
           </div>
         </article>
 
-        <ApplicationDraftRecommendedPolicies model={model} highlighted={highlightRecommended} />
+        <ApplicationDraftRecommendedPolicies model={model} />
       </aside>
     </section>
   )

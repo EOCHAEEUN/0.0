@@ -253,6 +253,18 @@ function compactRecommendedPolicy(policy: unknown): Record<string, unknown> | nu
     "agency",
     "organization",
     "provider",
+    // ROI "정책 지원 구성" 카드가 policy_support_summary 매칭이 없을 때 support_items
+    // 단위로 직접/금융/실행지원을 분류하는 fallback 경로에 필요한 필드.
+    // (backend policy_snapshot_hydration.POLICY_HYDRATION_FIELDS와 동일 목록)
+    "support_items",
+    "support_method",
+    "support_primary_category",
+    "support_categories",
+    "roi_support_type",
+    "policy_primary_nature",
+    "max_amount_type_ko",
+    "max_amount_actual",
+    "support_ratio",
   ]
 
   copyKeys.forEach((key) => {

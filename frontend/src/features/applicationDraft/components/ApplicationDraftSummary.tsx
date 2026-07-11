@@ -1,15 +1,16 @@
 import { Clock3, Pencil, Sparkles } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useState } from "react"
 
 import {
   formatCurrencyWonFromManwon,
   formatPaybackFromScenario,
   formatPaybackYearsCompact,
-  readAnalysisData,
 } from "../applicationDraft.utils"
-import type { MatchedPolicy } from "../applicationDraft.contract"
 import type { ApplicationDraftWorkspaceModel } from "../hooks/useApplicationDraftWorkspace"
-import { ApplicationDraftRecommendedPolicies } from "./ApplicationDraftRecommendedPolicies"
+import {
+  APPLICATION_DRAFT_RECOMMEND_POLICIES_ID,
+  ApplicationDraftRecommendedPolicies,
+} from "./ApplicationDraftRecommendedPolicies"
 import { ScenarioToggle } from "./ApplicationDraftShared"
 
 type EffectItem = {
@@ -92,40 +93,6 @@ function buildNecessityText(model: ApplicationDraftWorkspaceModel) {
   return "현재 설비의 노후화로 인해 에너지 비용, 유지보수 부담, 품질 손실 문제가 발생하고 있어 지능형 자동화 설비 도입이 필요합니다."
 }
 
-type DraftPolicyOption = {
-  policyId: string
-  title: string
-  subtitle: string
-  isCurrent: boolean
-}
-
-function policyTitle(policy: MatchedPolicy) {
-  return String(policy.title || policy.policy_title || "지원사업").trim()
-}
-
-function policySubtitle(policy: MatchedPolicy) {
-  const metadata = policy.metadata as Record<string, unknown> | undefined
-  const ratio =
-    metadata?.support_ratio ||
-    metadata?.subsidy_rate ||
-    metadata?.max_support_ratio
-
-  if (ratio) {
-    const text = String(ratio).includes("%") ? String(ratio) : `최대 ${ratio}%`
-    return `지원 비율: ${text}`
-  }
-
-  if (policy.max_amount_manwon) {
-    return `지원 한도: ${Math.round(Number(policy.max_amount_manwon)).toLocaleString()}만원`
-  }
-
-  if (policy.agency || policy.organization) {
-    return String(policy.agency || policy.organization)
-  }
-
-  return "지원 조건은 공고 원문을 확인해 주세요."
-}
-
 export function ApplicationDraftSummary({
   model,
 }: {
@@ -150,78 +117,13 @@ export function ApplicationDraftSummary({
     payback_months: scenario?.payback_months,
     payback_years: scenario?.payback_years,
   })
-  const [policyPickerOpen, setPolicyPickerOpen] = useState(false)
-  const [policyChangeError, setPolicyChangeError] = useState("")
-  const [pendingPolicyId, setPendingPolicyId] = useState("")
+  const [highlightRecommended, setHighlightRecommended] = useState(false)
 
-  const policyOptions = useMemo(() => {
-    const currentPolicyId = String(model.data?.policy_id || "").trim()
-    const currentTitle = String(model.data?.policy?.title || "").trim()
-    const fromWorkspace = Array.isArray(model.data?.policy?.options)
-      ? model.data.policy.options
-      : []
-    const deduped = new Map<string, DraftPolicyOption>()
-
-    fromWorkspace.forEach((policy) => {
-      const id = String(policy.policy_id || "").trim()
-      if (!id || deduped.has(id)) return
-      const deadline = String(policy.deadline || "").trim()
-      deduped.set(id, {
-        policyId: id,
-        title: String(policy.title || "정책명 미확인").trim(),
-        subtitle: deadline ? `마감일: ${deadline}` : "마감일 미정",
-        isCurrent: id === currentPolicyId,
-      })
-    })
-
-    if (deduped.size >= 5) {
-      return Array.from(deduped.values()).slice(0, 5)
-    }
-
-    const matched = readAnalysisData().matched_policies ?? []
-
-    matched.forEach((policy) => {
-      const id = String(policy.policy_id || policy.id || "").trim()
-      if (!id || deduped.has(id)) return
-      deduped.set(id, {
-        policyId: id,
-        title: policyTitle(policy),
-        subtitle: policySubtitle(policy),
-        isCurrent: id === currentPolicyId,
-      })
-    })
-
-    if (currentPolicyId && !deduped.has(currentPolicyId)) {
-      deduped.set(currentPolicyId, {
-        policyId: currentPolicyId,
-        title: currentTitle || "현재 선택 정책",
-        subtitle: "현재 신청서에 반영된 정책입니다.",
-        isCurrent: true,
-      })
-    }
-
-    return Array.from(deduped.values()).slice(0, 5)
-  }, [model.data?.policy?.options, model.data?.policy?.title, model.data?.policy_id])
-
-  const handlePolicyChange = async (policyId: string) => {
-    if (!policyId || model.isGeneratingDraft) return
-    if (policyId === model.data?.policy_id) {
-      setPolicyPickerOpen(false)
-      return
-    }
-
-    setPolicyChangeError("")
-    setPendingPolicyId(policyId)
-    try {
-      await model.applyPolicyAndRegenerate(policyId)
-      setPolicyPickerOpen(false)
-    } catch (error) {
-      setPolicyChangeError(
-        error instanceof Error ? error.message : "지원사업 변경 반영에 실패했습니다.",
-      )
-    } finally {
-      setPendingPolicyId("")
-    }
+  const handleChangePolicyClick = () => {
+    const target = document.getElementById(APPLICATION_DRAFT_RECOMMEND_POLICIES_ID)
+    target?.scrollIntoView({ behavior: "smooth", block: "center" })
+    setHighlightRecommended(true)
+    window.setTimeout(() => setHighlightRecommended(false), 1600)
   }
 
   return (
@@ -234,55 +136,12 @@ export function ApplicationDraftSummary({
           <button
             type="button"
             className="ff-draft-edit-btn"
-            onClick={() => setPolicyPickerOpen(true)}
+            onClick={handleChangePolicyClick}
           >
             <Pencil size={13} strokeWidth={2.2} aria-hidden="true" />
             신청 지원사업 변경
           </button>
         </div>
-        {policyPickerOpen ? (
-          <div className="ff-draft-policy-picker">
-            <p className="ff-draft-policy-picker-title">
-              신청서에 반영할 지원사업을 선택하세요.
-            </p>
-            {policyOptions.length > 0 ? (
-              <ul className="ff-draft-policy-picker-list">
-                {policyOptions.map((option) => (
-                  <li key={option.policyId}>
-                    <button
-                      type="button"
-                      className={`ff-draft-policy-option ${option.isCurrent ? "is-current" : ""}`}
-                      onClick={() => void handlePolicyChange(option.policyId)}
-                      disabled={model.isGeneratingDraft}
-                    >
-                      <strong>{option.title}</strong>
-                      <span>{option.subtitle}</span>
-                      {option.isCurrent ? <em>현재 적용</em> : null}
-                      {pendingPolicyId === option.policyId ? <em>반영 중...</em> : null}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="ff-draft-policy-picker-empty">
-                선택 가능한 지원사업이 없습니다. 분석을 다시 실행해 주세요.
-              </p>
-            )}
-            {policyChangeError ? (
-              <p className="ff-draft-policy-picker-error">{policyChangeError}</p>
-            ) : null}
-            <div className="ff-draft-policy-picker-actions">
-              <button
-                type="button"
-                className="ff-draft-footlink"
-                onClick={() => setPolicyPickerOpen(false)}
-                disabled={model.isGeneratingDraft}
-              >
-                닫기
-              </button>
-            </div>
-          </div>
-        ) : null}
 
         {!model.draftExists ? (
           <div className="ff-draft-empty-state">
@@ -390,7 +249,7 @@ export function ApplicationDraftSummary({
           </div>
         </article>
 
-        <ApplicationDraftRecommendedPolicies model={model} />
+        <ApplicationDraftRecommendedPolicies model={model} highlighted={highlightRecommended} />
       </aside>
     </section>
   )

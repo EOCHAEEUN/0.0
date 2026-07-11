@@ -320,11 +320,10 @@ export default function RoiPage({ view = "strategy" }: { view?: RoiView }) {
         setIsLoadingResult(false)
         setLoadFailed(false)
       })
-      if (!shouldRefreshCachedPolicies) {
-        return () => {
-          cancelled = true
-        }
-      }
+      // 캐시는 즉시 화면에 보여주되(빠른 첫 렌더), policy_support_summary/support_items는
+      // DB(policy_support_component 등) 변경으로 캐시 이후 갱신될 수 있으므로 항상
+      // 백그라운드에서 최신 데이터를 다시 받아와 덮어쓴다(stale-while-revalidate).
+      // shouldRefreshCachedPolicies는 아래 fetch 성공 시 캐시에 "저장"할지 여부만 결정한다.
     }
 
     if (!analysisId) {

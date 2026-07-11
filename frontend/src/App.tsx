@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Routes, Route, useParams, useSearchParams } fr
 
 import MainPage from "./pages/MainPage"
 import LoginPage from "./pages/LoginPage"
+import ResetPasswordPage from "./pages/ResetPasswordPage"
 import DashboardPage from "./pages/DashboardPage"
 import RoiPage from "./pages/RoiPage"
 import RoiHistoryPage from "./pages/RoiHistoryPage"
@@ -79,6 +80,7 @@ function App() {
         {/* /main 은 레거시 경로 — / 로 리다이렉트 */}
         <Route path="/main" element={<Navigate to="/" replace />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/welcome" element={<WelcomePage />} />
         <Route path="/setup/company" element={<CompanySetupPage />} />
         <Route path="/setup/equipment" element={<EquipmentSetupPage />} />

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react"
 import {
+  checkSignupEmailAvailability,
   saveAuthSession,
   sendSignupEmailCode,
   signupWithProfile,
@@ -22,6 +23,10 @@ export function useSignupForm({
   const [emailCode, setEmailCode] = useState("")
   const [isCodeSent, setIsCodeSent] = useState(false)
   const [isEmailVerified, setIsEmailVerified] = useState(false)
+  const [emailCheckStatus, setEmailCheckStatus] = useState<
+    "idle" | "checking" | "available" | "taken" | "error"
+  >("idle")
+  const [emailCheckMessage, setEmailCheckMessage] = useState("")
 
   const [password, setPassword] = useState("")
   const [passwordCheck, setPasswordCheck] = useState("")
@@ -33,6 +38,7 @@ export function useSignupForm({
   const [agreePrivacy, setAgreePrivacy] = useState(false)
 
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isCheckingEmail, setIsCheckingEmail] = useState(false)
   const [isSendingCode, setIsSendingCode] = useState(false)
   const [isVerifyingCode, setIsVerifyingCode] = useState(false)
 
@@ -76,10 +82,47 @@ export function useSignupForm({
     setEmailCode("")
     setIsCodeSent(false)
     setIsEmailVerified(false)
+    setEmailCheckStatus("idle")
+    setEmailCheckMessage("")
   }
 
   const handlePhoneChange = (value: string) => {
     setPhone(formatPhoneNumber(value))
+  }
+
+  const handleCheckEmailDuplicate = async () => {
+    if (isCheckingEmail) return false
+
+    const trimmedEmail = email.trim()
+
+    if (!trimmedEmail.includes("@")) {
+      setEmailCheckStatus("error")
+      setEmailCheckMessage("올바른 이메일 형식으로 입력해 주세요.")
+      return false
+    }
+
+    try {
+      setIsCheckingEmail(true)
+      setEmailCheckStatus("checking")
+      setEmailCheckMessage("이메일 중복을 확인하고 있습니다.")
+      const result = await checkSignupEmailAvailability(trimmedEmail)
+      if (result.available) {
+        setEmailCheckStatus("available")
+        setEmailCheckMessage(result.message || "사용 가능한 이메일입니다.")
+        return true
+      }
+      setEmailCheckStatus("taken")
+      setEmailCheckMessage(result.message || "이미 가입된 이메일입니다.")
+      return false
+    } catch (error) {
+      setEmailCheckStatus("error")
+      setEmailCheckMessage(
+        error instanceof Error ? error.message : "이메일 중복 확인에 실패했습니다.",
+      )
+      return false
+    } finally {
+      setIsCheckingEmail(false)
+    }
   }
 
   const handleSendEmailCode = async () => {
@@ -90,6 +133,11 @@ export function useSignupForm({
     if (!trimmedEmail.includes("@")) {
       alert("이메일 형식을 확인해주세요.")
       return
+    }
+
+    if (emailCheckStatus !== "available") {
+      const isAvailable = await handleCheckEmailDuplicate()
+      if (!isAvailable) return
     }
 
     try {
@@ -202,6 +250,8 @@ export function useSignupForm({
     emailCode,
     isCodeSent,
     isEmailVerified,
+    emailCheckStatus,
+    emailCheckMessage,
     password,
     passwordCheck,
     userName,
@@ -209,6 +259,7 @@ export function useSignupForm({
     agreeService,
     agreePrivacy,
     isSubmitting,
+    isCheckingEmail,
     isSendingCode,
     isVerifyingCode,
 
@@ -226,6 +277,7 @@ export function useSignupForm({
     setAgreePrivacy,
 
     handleEmailChange,
+    handleCheckEmailDuplicate,
     handlePhoneChange,
     handleSendEmailCode,
     handleVerifyEmail,

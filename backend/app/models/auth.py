@@ -45,9 +45,21 @@ class EmailCodeRequest(BaseModel):
     email: str
 
 
+class EmailAvailabilityRequest(BaseModel):
+    email: str
+
+
 class VerifyEmailCodeRequest(BaseModel):
     email: str
     token: str = Field(min_length=4)
+
+
+class PasswordResetRequest(BaseModel):
+    email: str
+
+
+class PasswordUpdateRequest(BaseModel):
+    password: str = Field(min_length=8)
 
 
 class CurrentUser(BaseModel):

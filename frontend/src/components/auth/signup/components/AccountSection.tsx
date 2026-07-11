@@ -5,6 +5,8 @@ type AccountSectionProps = {
   email: string
   emailCode: string
   isEmailVerified: boolean
+  emailCheckStatus: "idle" | "checking" | "available" | "taken" | "error"
+  emailCheckMessage: string
   password: string
   passwordCheck: string
   passwordChecks: PasswordCheck[]
@@ -12,12 +14,14 @@ type AccountSectionProps = {
   passwordLabel: string
   isPasswordMatched: boolean
   isPasswordMismatch: boolean
+  isCheckingEmail: boolean
   isSendingCode: boolean
   isVerifyingCode: boolean
   onEmailChange: (value: string) => void
   onEmailCodeChange: (value: string) => void
   onPasswordChange: (value: string) => void
   onPasswordCheckChange: (value: string) => void
+  onCheckEmailDuplicate: () => void
   onSendEmailCode: () => void
   onVerifyEmail: () => void
 }
@@ -26,17 +30,21 @@ export default function AccountSection({
   email,
   emailCode,
   isEmailVerified,
+  emailCheckStatus,
+  emailCheckMessage,
   password,
   passwordCheck,
   passwordChecks,
   isPasswordMatched,
   isPasswordMismatch,
+  isCheckingEmail,
   isSendingCode,
   isVerifyingCode,
   onEmailChange,
   onEmailCodeChange,
   onPasswordChange,
   onPasswordCheckChange,
+  onCheckEmailDuplicate,
   onSendEmailCode,
   onVerifyEmail,
 }: AccountSectionProps) {
@@ -47,7 +55,7 @@ export default function AccountSection({
       <div className="ff-signup-two-col ff-signup-verify-row">
         <div className="ff-signup-field">
           <FieldLabel text="이메일" required />
-          <div className="ff-signup-inline">
+          <div className="ff-signup-inline ff-signup-inline--email">
             <input
               type="email"
               placeholder="이메일을 입력하세요"
@@ -58,12 +66,29 @@ export default function AccountSection({
             />
             <button
               type="button"
+              onClick={onCheckEmailDuplicate}
+              disabled={isCheckingEmail || isEmailVerified}
+            >
+              {isCheckingEmail ? "확인 중..." : "중복 확인"}
+            </button>
+            <button
+              type="button"
               onClick={onSendEmailCode}
-              disabled={isSendingCode || isEmailVerified}
+              disabled={isSendingCode || isEmailVerified || emailCheckStatus === "taken"}
             >
               {isSendingCode ? "발송 중..." : "인증번호 받기"}
             </button>
           </div>
+
+          {emailCheckMessage && (
+            <p
+              className={`ff-signup-message ${
+                emailCheckStatus === "available" ? "is-success" : "is-error"
+              }`}
+            >
+              {emailCheckMessage}
+            </p>
+          )}
 
           {email && !email.includes("@") && (
             <p className="ff-signup-message is-error">

@@ -101,6 +101,10 @@
   gap: 8px;
 }
 
+.ff-signup-inline--email {
+  grid-template-columns: minmax(0, 1fr) 92px 112px;
+}
+
 .ff-signup-inline button {
   height: 42px;
   border: 0;

@@ -1,3 +1,5 @@
+import os
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from supabase_auth.errors import AuthApiError, AuthRetryableError
@@ -6,14 +8,38 @@ from app.core.auth import get_current_user
 from app.core.database import create_service_client, get_db
 from app.models.auth import (
     CurrentUser,
+    EmailAvailabilityRequest,
     EmailCodeRequest,
     LoginRequest,
+    PasswordResetRequest,
+    PasswordUpdateRequest,
     RefreshSessionRequest,
     SignupRequest,
     VerifyEmailCodeRequest,
 )
 
 router = APIRouter()
+
+
+def _normalize_email(email: str) -> str:
+    return (email or "").strip().lower()
+
+
+def _fetch_user_profile_by_email(db, email: str) -> dict | None:
+    normalized = _normalize_email(email)
+    if not normalized:
+        return None
+    try:
+        result = (
+            db.table("user_profile")
+            .select("user_id,email")
+            .ilike("email", normalized)
+            .limit(1)
+            .execute()
+        )
+        return result.data[0] if result.data else None
+    except Exception:
+        return None
 
 
 def _fetch_user_profile(db, user_id: str) -> dict | None:
@@ -45,6 +71,18 @@ def _fetch_latest_company(db, user_id: str) -> dict | None:
         return None
 
 
+def _password_reset_redirect_url() -> str:
+    explicit = os.getenv("FRONTEND_PASSWORD_RESET_URL", "").strip()
+    if explicit:
+        return explicit
+
+    frontend_url = os.getenv("FRONTEND_URL", "").strip()
+    if frontend_url:
+        return f"{frontend_url.rstrip('/')}/reset-password"
+
+    return "http://127.0.0.1:5173/reset-password"
+
+
 def _session_payload(auth_response) -> dict:
     session = getattr(auth_response, "session", None)
     user = getattr(auth_response, "user", None)
@@ -60,14 +98,64 @@ def _session_payload(auth_response) -> dict:
     }
 
 
+@router.post("/auth/check-email")
+async def check_email_availability(body: EmailAvailabilityRequest):
+    email = _normalize_email(body.email)
+    if "@" not in email:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "message": "올바른 이메일 형식으로 입력해 주세요.",
+                "error": "Invalid email format.",
+            },
+        )
+
+    db = create_service_client()
+    existing_profile = _fetch_user_profile_by_email(db, email)
+
+    return {
+        "success": True,
+        "data": {
+            "email": email,
+            "available": existing_profile is None,
+            "message": (
+                "사용 가능한 이메일입니다."
+                if existing_profile is None
+                else "이미 가입된 이메일입니다. 로그인으로 진행해 주세요."
+            ),
+        },
+    }
+
+
 @router.post("/auth/send-email-code")
 async def send_email_code(body: EmailCodeRequest):
+    email = _normalize_email(body.email)
+    if "@" not in email:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "message": "올바른 이메일 형식으로 입력해 주세요.",
+                "error": "Invalid email format.",
+            },
+        )
+
     db = create_service_client()
+    if _fetch_user_profile_by_email(db, email):
+        return JSONResponse(
+            status_code=409,
+            content={
+                "success": False,
+                "message": "이미 가입된 이메일입니다. 로그인으로 진행해 주세요.",
+                "error": "Email already registered.",
+            },
+        )
 
     try:
         db.auth.sign_in_with_otp(
             {
-                "email": body.email,
+                "email": email,
                 "options": {
                     "should_create_user": True,
                 },
@@ -77,7 +165,7 @@ async def send_email_code(body: EmailCodeRequest):
         return {
             "success": True,
             "data": {
-                "email": body.email,
+                "email": email,
                 "message": "Verification email sent.",
             },
         }
@@ -329,5 +417,80 @@ async def me(current_user: CurrentUser = Depends(get_current_user)):
             "user_profile": profile.data,
             "company": company,
             "company_id": company.get("company_id") if company else None,
+        },
+    }
+
+
+_PASSWORD_RESET_SENT_MESSAGE = "비밀번호 재설정 메일을 발송했습니다."
+
+
+@router.post("/auth/password-reset")
+async def request_password_reset(body: PasswordResetRequest):
+    email = _normalize_email(body.email)
+    if "@" not in email:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "message": "올바른 이메일 형식으로 입력해 주세요.",
+                "error": "Invalid email format.",
+            },
+        )
+
+    db = create_service_client()
+
+    try:
+        db.auth.reset_password_for_email(
+            email,
+            {"redirect_to": _password_reset_redirect_url()},
+        )
+    except Exception as exc:
+        # 이메일 존재 여부는 노출하지 않되, 실제 API 오류는 서버 로그에만 남긴다.
+        print(f"password-reset 메일 발송 실패: {type(exc).__name__}: {exc}")
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "message": "비밀번호 재설정 메일을 발송하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+                "error": "Password reset email failed.",
+            },
+        )
+
+    return {
+        "success": True,
+        "data": {
+            "email": email,
+            "message": _PASSWORD_RESET_SENT_MESSAGE,
+        },
+    }
+
+
+@router.post("/auth/password-update")
+async def update_password(
+    body: PasswordUpdateRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    db = create_service_client()
+
+    try:
+        db.auth.admin.update_user_by_id(
+            current_user.id,
+            {"password": body.password},
+        )
+    except Exception as exc:
+        print(f"password-update 실패: {type(exc).__name__}: {exc}")
+        return JSONResponse(
+            status_code=400,
+            content={
+                "success": False,
+                "message": "비밀번호를 변경하지 못했습니다.",
+                "error": "Password update failed.",
+            },
+        )
+
+    return {
+        "success": True,
+        "data": {
+            "message": "비밀번호가 변경되었습니다.",
         },
     }

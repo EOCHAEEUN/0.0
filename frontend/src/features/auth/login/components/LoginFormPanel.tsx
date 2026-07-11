@@ -10,12 +10,14 @@ type LoginFormPanelProps = {
   password: string
   remember: boolean
   isLoggingIn: boolean
+  isRequestingPasswordReset?: boolean
   onEmailChange: (value: string) => void
   onPasswordChange: (value: string) => void
   onRememberChange: (value: boolean) => void
   onLogin: () => void
   onOpenSignup: () => void
   onOpenSso: () => void
+  onPasswordReset?: () => void
 }
 
 export function LoginFormPanel({
@@ -23,12 +25,14 @@ export function LoginFormPanel({
   password,
   remember,
   isLoggingIn,
+  isRequestingPasswordReset,
   onEmailChange,
   onPasswordChange,
   onRememberChange,
   onLogin,
   onOpenSignup,
   onOpenSso,
+  onPasswordReset,
 }: LoginFormPanelProps) {
   return (
     <section className="ff-login-form-panel">
@@ -70,8 +74,13 @@ export function LoginFormPanel({
             로그인 상태 유지
           </label>
 
-          <button type="button" style={textButtonStyle}>
-            비밀번호 찾기
+          <button
+            type="button"
+            style={textButtonStyle}
+            onClick={onPasswordReset}
+            disabled={isRequestingPasswordReset}
+          >
+            {isRequestingPasswordReset ? "발송 중..." : "비밀번호 찾기"}
           </button>
         </div>
 

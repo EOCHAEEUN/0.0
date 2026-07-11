@@ -384,6 +384,8 @@ export default function SignupModal({
           email={form.email}
           emailCode={form.emailCode}
           isEmailVerified={form.isEmailVerified}
+          emailCheckStatus={form.emailCheckStatus}
+          emailCheckMessage={form.emailCheckMessage}
           password={form.password}
           passwordCheck={form.passwordCheck}
           passwordChecks={form.passwordChecks}
@@ -391,12 +393,14 @@ export default function SignupModal({
           passwordLabel={form.passwordLabel}
           isPasswordMatched={form.isPasswordMatched}
           isPasswordMismatch={form.isPasswordMismatch}
+          isCheckingEmail={form.isCheckingEmail}
           isSendingCode={form.isSendingCode}
           isVerifyingCode={form.isVerifyingCode}
           onEmailChange={form.handleEmailChange}
           onEmailCodeChange={form.setEmailCode}
           onPasswordChange={form.setPassword}
           onPasswordCheckChange={form.setPasswordCheck}
+          onCheckEmailDuplicate={form.handleCheckEmailDuplicate}
           onSendEmailCode={form.handleSendEmailCode}
           onVerifyEmail={form.handleVerifyEmail}
         />

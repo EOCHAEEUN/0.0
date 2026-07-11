@@ -23,6 +23,7 @@ from app.core.database import get_db
 from app.models.auth import CurrentUser
 from app.models.company import CompanyContext
 from app.models.equipment import EquipmentInput
+from app.services.policy_rag_validation import attach_rag_validation_to_candidates
 from app.services.policy_snapshot_hydration import (
     hydrate_canonical_policies_from_public_policy,
     hydrate_policy_snapshot_for_response,
@@ -455,6 +456,9 @@ def _build_snapshot_policy_item(
         policy_detail.get("policy_id"),
         policy_detail.get("id"),
     )
+    # RAG(Chroma) 문맥 검증 메타데이터 - 표시/추천 근거 보조용, ROI 계산에는 쓰이지 않는다.
+    matched_metadata = matched_policy.get("metadata")
+    matched_metadata = matched_metadata if isinstance(matched_metadata, dict) else {}
     required_documents_json = _snapshot_json_list(
         policy_detail.get("required_documents_json")
     )
@@ -587,6 +591,11 @@ def _build_snapshot_policy_item(
         "safety_justification_usable": _snapshot_optional_text(
             policy_detail.get("safety_justification_usable")
         ),
+        "rag_validated": bool(matched_metadata.get("rag_validated", False)),
+        "rag_similarity": matched_metadata.get("rag_similarity"),
+        "rag_distance": matched_metadata.get("rag_distance"),
+        "rag_evidence": _snapshot_optional_text(matched_metadata.get("rag_evidence")),
+        "rag_source": _snapshot_optional_text(matched_metadata.get("rag_source")),
     }
 
 
@@ -793,6 +802,16 @@ async def analyze(
 
         policy_stage = "query_builder"
         queries = build_policy_queries_from_roi(equipment, base_roi_result)
+
+        policy_stage = "rag_validation"
+        # RAG(Chroma) 문맥 검증 - 표시/추천 근거 보조 필드만 부착한다.
+        # 후보 순서·개수·ROI 계산 입력값은 바꾸지 않으며, 실패해도 원본 후보로 계속 진행한다.
+        raw_candidates = attach_rag_validation_to_candidates(
+            raw_candidates,
+            queries=queries,
+            company_context=company_context,
+            equipment_name=equipment.name,
+        )
 
         policy_stage = "rank_a"
         a_candidates = rank_candidates_by_query(

@@ -136,8 +136,29 @@ export async function signupWithProfile(payload: unknown) {
   return postAuth<AuthSession>("/auth/signup", payload, { authenticated: true })
 }
 
+export async function checkSignupEmailAvailability(email: string) {
+  return postAuth<{ email: string; available: boolean; message: string }>(
+    "/auth/check-email",
+    { email },
+  )
+}
+
 export async function loginWithPassword(email: string, password: string) {
   return postAuth<AuthSession>("/auth/login", { email, password })
+}
+
+export async function requestPasswordReset(email: string) {
+  return postAuth<{ email: string; message: string }>("/auth/password-reset", {
+    email,
+  })
+}
+
+export async function updatePassword(password: string) {
+  return postAuth<{ message: string }>(
+    "/auth/password-update",
+    { password },
+    { authenticated: true },
+  )
 }
 
 export async function sendSignupEmailCode(email: string) {

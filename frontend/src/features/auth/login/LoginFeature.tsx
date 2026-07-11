@@ -45,12 +45,14 @@ export default function LoginFeature() {
           password={login.password}
           remember={login.remember}
           isLoggingIn={login.isLoggingIn}
+          isRequestingPasswordReset={login.isRequestingPasswordReset}
           onEmailChange={login.setEmail}
           onPasswordChange={login.setPassword}
           onRememberChange={login.setRemember}
           onLogin={login.handleLogin}
           onOpenSignup={() => login.setModalType("signup")}
           onOpenSso={() => login.setModalType("sso")}
+          onPasswordReset={login.handlePasswordReset}
         />
       </section>
 

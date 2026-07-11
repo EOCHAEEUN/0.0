@@ -5,6 +5,7 @@ import { submitLogin } from "../login.api"
 import type { LoginModalType } from "../login.contract"
 import { resolvePostLoginPath } from "../../../onboarding/onboardingState"
 import { hydrateAccountData } from "../../../../services/accountHydration"
+import { requestPasswordReset } from "../../../../services/auth"
 
 export function useLoginForm() {
   const navigate = useNavigate()
@@ -15,6 +16,7 @@ export function useLoginForm() {
   const [remember, setRemember] = useState(false)
   const [modalType, setModalType] = useState<LoginModalType>(null)
   const [isLoggingIn, setIsLoggingIn] = useState(false)
+  const [isRequestingPasswordReset, setIsRequestingPasswordReset] = useState(false)
 
   const handleLogin = async () => {
     if (isLoggingIn) return
@@ -43,6 +45,28 @@ export function useLoginForm() {
     }
   }
 
+  const handlePasswordReset = async () => {
+    if (isRequestingPasswordReset) return
+
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail) {
+      alert("이메일을 입력해 주세요.")
+      return
+    }
+
+    try {
+      setIsRequestingPasswordReset(true)
+      const result = await requestPasswordReset(trimmedEmail)
+      alert(result.message || "비밀번호 재설정 메일을 발송했습니다.")
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "비밀번호 재설정 메일을 발송하지 못했습니다."
+      alert(message)
+    } finally {
+      setIsRequestingPasswordReset(false)
+    }
+  }
+
   const handleContinue = () => {
     setModalType(null)
     const redirectParam = searchParams.get("redirect")
@@ -62,11 +86,13 @@ export function useLoginForm() {
     remember,
     modalType,
     isLoggingIn,
+    isRequestingPasswordReset,
     setEmail,
     setPassword,
     setRemember,
     setModalType,
     handleLogin,
+    handlePasswordReset,
     handleContinue,
     handleBackToMain,
   }

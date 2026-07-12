@@ -1,10 +1,13 @@
 import {
   AlertTriangle,
+  Building2,
   CalendarDays,
   ChevronRight,
   MoreVertical,
   Settings,
   Sparkles,
+  Wrench,
+  X,
   UserRound,
 } from "lucide-react"
 import { useMemo, useState } from "react"
@@ -45,6 +48,7 @@ export default function MobileHomeScreen() {
   const preferredAnalysisId = searchParams.get("analysisId") || searchParams.get("analysis_id") || undefined
   const { dashboard, loading, error, refetch } = useDashboardData({ preferredAnalysisId })
   const [policyImageError, setPolicyImageError] = useState(false)
+  const [companyMenuOpen, setCompanyMenuOpen] = useState(false)
   const workspace = dashboard.workspace
   const flowContext = useMemo(
     () => resolveMobileFlowContext(searchParams, workspace),
@@ -104,7 +108,7 @@ export default function MobileHomeScreen() {
                 type="button"
                 className="ff-mobile-company-menu"
                 aria-label="기업 및 설비 상태 확인"
-                onClick={() => navigate(buildMobilePath("/mobile/safety", flowContext))}
+                onClick={() => setCompanyMenuOpen(true)}
               >
                 <MoreVertical size={18} strokeWidth={2.1} />
               </button>
@@ -152,6 +156,61 @@ export default function MobileHomeScreen() {
               </div>
             </div>
           </article>
+
+          {companyMenuOpen ? (
+            <div
+              className="ff-mobile-company-action-backdrop"
+              role="presentation"
+              onClick={() => setCompanyMenuOpen(false)}
+            >
+              <div
+                className="ff-mobile-company-action-sheet"
+                role="dialog"
+                aria-modal="true"
+                aria-label="기업 및 설비 관리"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <div className="ff-mobile-company-action-head">
+                  <strong>기업 및 설비 관리</strong>
+                  <button type="button" aria-label="닫기" onClick={() => setCompanyMenuOpen(false)}>
+                    <X size={18} strokeWidth={2.2} />
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  className="ff-mobile-company-action-item"
+                  onClick={() => {
+                    setCompanyMenuOpen(false)
+                    navigate("/company")
+                  }}
+                >
+                  <span className="ff-mobile-company-action-icon" aria-hidden="true">
+                    <Building2 size={18} strokeWidth={2.2} />
+                  </span>
+                  <span>
+                    <strong>기업정보 관리</strong>
+                    <small>기업 업종, 지역, 기본 정보를 확인합니다.</small>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="ff-mobile-company-action-item"
+                  onClick={() => {
+                    setCompanyMenuOpen(false)
+                    navigate(buildMobilePath("/mobile/safety", flowContext))
+                  }}
+                >
+                  <span className="ff-mobile-company-action-icon" aria-hidden="true">
+                    <Wrench size={18} strokeWidth={2.2} />
+                  </span>
+                  <span>
+                    <strong>설비관리</strong>
+                    <small>안전 점검, 유지보수 근거를 관리합니다.</small>
+                  </span>
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           <article className="ff-mobile-card ff-mobile-today-card">
             <div className="ff-mobile-today-head">

@@ -1,3 +1,4 @@
+import traceback
 from typing import Literal
 from urllib.parse import quote
 
@@ -103,6 +104,8 @@ async def _generate_application_report_response(
                 )
         raise HTTPException(status_code=404, detail=message) from exc
     except Exception as exc:
+        print(f"[reports] PDF 생성 실패 report_type={selected_report_type}: {exc}")
+        traceback.print_exc()
         raise HTTPException(
             status_code=500,
             detail="Failed to generate application PDF.",

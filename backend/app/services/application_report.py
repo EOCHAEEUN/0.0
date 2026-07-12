@@ -2739,25 +2739,44 @@ def build_report_context(
     )
 
 
-def _find_font(paths: tuple[Path, ...]) -> Path:
+def _find_font(paths: tuple[Path, ...]) -> Path | None:
     env_path = os.getenv("FACTOFIT_REPORT_FONT")
     candidates = ([Path(env_path)] if env_path else []) + list(paths)
     for path in candidates:
         if path.is_file():
             return path
-    raise RuntimeError("한글 PDF 폰트를 찾을 수 없습니다.")
+    return None
+
+
+def _register_ttf_or_fallback(name: str, fallback: str, paths: tuple[Path, ...]) -> str:
+    if name in pdfmetrics.getRegisteredFontNames():
+        return name
+    font_path = _find_font(paths)
+    if font_path is None:
+        print(
+            f"[application_report] '{name}' 한글 폰트 파일을 찾지 못해 "
+            f"'{fallback}'로 대체합니다(한글이 깨져 보일 수 있음)."
+        )
+        return fallback
+    try:
+        pdfmetrics.registerFont(TTFont(name, str(font_path)))
+        return name
+    except Exception as exc:
+        print(f"[application_report] '{name}' 폰트 등록 실패, '{fallback}'로 대체합니다: {exc}")
+        return fallback
 
 
 def _register_fonts() -> tuple[str, str]:
     # 이름은 내부 등록명이며, 실제 파일은 맑은 고딕을 최우선으로 찾습니다.
-    regular_name = "MalgunGothic"
-    bold_name = "MalgunGothicBold"
-    if regular_name not in pdfmetrics.getRegisteredFontNames():
-        pdfmetrics.registerFont(TTFont(regular_name, str(_find_font(DEFAULT_FONT_PATHS))))
-    if bold_name not in pdfmetrics.getRegisteredFontNames():
-        bold_env = os.getenv("FACTOFIT_REPORT_BOLD_FONT")
-        bold_paths = ([Path(bold_env)] if bold_env else []) + list(DEFAULT_BOLD_FONT_PATHS)
-        pdfmetrics.registerFont(TTFont(bold_name, str(_find_font(tuple(bold_paths)))))
+    # 한글 트루타입 폰트가 없는 환경(Render 등 폰트 미설치 Linux 컨테이너)에서도
+    # PDF 생성 자체가 500으로 죽으면 안 되므로, 찾지 못하면 ReportLab 내장
+    # 기본 폰트(Helvetica)로 대체해 PDF는 계속 생성한다.
+    regular_name = _register_ttf_or_fallback("MalgunGothic", "Helvetica", DEFAULT_FONT_PATHS)
+
+    bold_env = os.getenv("FACTOFIT_REPORT_BOLD_FONT")
+    bold_paths = ([Path(bold_env)] if bold_env else []) + list(DEFAULT_BOLD_FONT_PATHS)
+    bold_name = _register_ttf_or_fallback("MalgunGothicBold", "Helvetica-Bold", tuple(bold_paths))
+
     return regular_name, bold_name
 
 

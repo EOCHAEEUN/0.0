@@ -53,11 +53,14 @@ class ReportContext:
     user_safety_files: list[dict[str, Any]]
 
 
-# PDF 내 모든 문자는 맑은 고딕을 1순위로 사용합니다.
-# Windows 배포 환경에서는 C:\Windows\Fonts\malgun.ttf / malgunbd.ttf가 적용되고,
-# Linux 서버에서는 동일 폰트를 FACTOFIT_REPORT_FONT / FACTOFIT_REPORT_BOLD_FONT로 지정할 수 있습니다.
-# 지정 폰트가 없을 때만 NanumGothic으로 fallback합니다.
+# PDF 내 모든 한글은 repo에 번들된 나눔고딕(OFL 1.1, NHN/Naver)을 최우선으로
+# 사용합니다. Render 같은 배포 환경은 시스템에 한글 폰트가 설치돼 있지 않으므로,
+# OS에 뭐가 깔려 있는지와 무관하게 항상 같은 폰트가 잡히도록 repo 경로를 1순위로
+# 둡니다. 시스템 경로(맑은 고딕 등)는 repo 폰트가 없는 예외적인 경우를 위한
+# 2차 fallback으로만 남겨둡니다.
+FONT_DIR = Path(__file__).resolve().parent.parent / "assets" / "fonts"
 DEFAULT_FONT_PATHS = (
+    FONT_DIR / "NanumGothic-Regular.ttf",
     Path(r"C:\Windows\Fonts\malgun.ttf"),
     Path(r"C:\Windows\Fonts\malgunsl.ttf"),
     Path("/usr/share/fonts/truetype/malgun/malgun.ttf"),
@@ -65,6 +68,7 @@ DEFAULT_FONT_PATHS = (
     Path("/usr/share/fonts/truetype/nanum/NanumGothic.ttf"),
 )
 DEFAULT_BOLD_FONT_PATHS = (
+    FONT_DIR / "NanumGothic-Bold.ttf",
     Path(r"C:\Windows\Fonts\malgunbd.ttf"),
     Path("/usr/share/fonts/truetype/malgun/malgunbd.ttf"),
     Path("/usr/local/share/fonts/malgunbd.ttf"),
@@ -2767,15 +2771,19 @@ def _register_ttf_or_fallback(name: str, fallback: str, paths: tuple[Path, ...])
 
 
 def _register_fonts() -> tuple[str, str]:
-    # 이름은 내부 등록명이며, 실제 파일은 맑은 고딕을 최우선으로 찾습니다.
-    # 한글 트루타입 폰트가 없는 환경(Render 등 폰트 미설치 Linux 컨테이너)에서도
-    # PDF 생성 자체가 500으로 죽으면 안 되므로, 찾지 못하면 ReportLab 내장
-    # 기본 폰트(Helvetica)로 대체해 PDF는 계속 생성한다.
+    # 이름은 내부 등록명이며, 실제 파일은 repo에 번들된 나눔고딕을 최우선으로
+    # 찾습니다(DEFAULT_FONT_PATHS/DEFAULT_BOLD_FONT_PATHS 참고). 한글 트루타입
+    # 폰트를 전혀 못 찾는 예외적인 상황에서도 PDF 생성 자체가 500으로 죽으면
+    # 안 되므로, 그럴 때만 ReportLab 내장 기본 폰트(Helvetica)로 대체한다.
     regular_name = _register_ttf_or_fallback("MalgunGothic", "Helvetica", DEFAULT_FONT_PATHS)
 
     bold_env = os.getenv("FACTOFIT_REPORT_BOLD_FONT")
     bold_paths = ([Path(bold_env)] if bold_env else []) + list(DEFAULT_BOLD_FONT_PATHS)
-    bold_name = _register_ttf_or_fallback("MalgunGothicBold", "Helvetica-Bold", tuple(bold_paths))
+    # Bold 파일이 없을 때 Helvetica-Bold(한글 미지원)로 바로 떨어지면 굵은 글씨
+    # 부분만 깨져 보인다. Regular 한글 폰트가 이미 잡혀 있다면 그걸 그대로
+    # Bold 자리에도 써서(비록 굵게는 안 보여도) 한글 자체는 유지되게 한다.
+    bold_fallback = regular_name if regular_name != "Helvetica" else "Helvetica-Bold"
+    bold_name = _register_ttf_or_fallback("MalgunGothicBold", bold_fallback, tuple(bold_paths))
 
     return regular_name, bold_name
 

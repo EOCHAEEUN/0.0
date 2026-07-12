@@ -59,6 +59,8 @@ NON_CASH_KEYWORDS = (
 FINANCIAL_NATURES = ("자금지원", "융자", "보증")
 FINANCIAL_AMOUNT_TYPES = ("loan", "guarantee", "interest_support")
 DIRECT_AMOUNT_TYPES = ("subsidy", "support_amount", "voucher")
+DISTRICT_PATTERN = re.compile(r"([\uac00-\ud7a3]{1,12}(?:시|군|구))")
+NATIONWIDE_TERMS = ("\uc804\uad6d",)
 
 # 지원사업 유형별 분석(SupportTypeGuideSection) 카드 집계용 분류.
 # support_type_label(위 _resolve_support_type)과 별개로, 구조화 필드 우선순위 기반으로
@@ -787,6 +789,27 @@ def _is_live_policy_excluded(policy: dict[str, Any]) -> bool:
     return False
 
 
+def _district_tokens(value: Any) -> set[str]:
+    return {token.strip() for token in DISTRICT_PATTERN.findall(_safe_text(value)) if token.strip()}
+
+
+def _region_matches_company(policy_region: Any, company_region: Any) -> bool:
+    policy_text = _safe_text(policy_region)
+    company_text = _safe_text(company_region)
+    if not company_text or not policy_text:
+        return True
+    if any(term in policy_text for term in NATIONWIDE_TERMS):
+        return True
+
+    policy_districts = _district_tokens(policy_text)
+    if policy_districts:
+        company_districts = _district_tokens(company_text)
+        return bool(company_districts and policy_districts.intersection(company_districts))
+
+    region_short = company_text.split()[0] if company_text else ""
+    return bool(region_short and region_short in policy_text)
+
+
 def _passes_live_company_filters(policy: dict[str, Any], company: dict[str, Any]) -> bool:
     company_codes = [
         code.strip()
@@ -799,7 +822,6 @@ def _passes_live_company_filters(policy: dict[str, Any], company: dict[str, Any]
         if code.strip()
     ]
     region = _safe_text(company.get("region"))
-    region_short = region.split()[0] if region else ""
     policy_region = _safe_text(policy.get("region"))
     code_match = (
         not company_codes
@@ -807,12 +829,7 @@ def _passes_live_company_filters(policy: dict[str, Any], company: dict[str, Any]
         or "C" in policy_codes
         or any(code in policy_codes for code in company_codes)
     )
-    region_match = (
-        not region
-        or not policy_region
-        or "전국" in policy_region
-        or region_short in policy_region
-    )
+    region_match = _region_matches_company(policy_region, region)
     company_types = [
         item.strip()
         for item in str(company.get("company_type") or "").split(",")

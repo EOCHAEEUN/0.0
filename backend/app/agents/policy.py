@@ -32,6 +32,8 @@ POLICY_RAW_CANDIDATE_SELECT = (
     "posted_at,created_at"
 )
 POLICY_RAW_CANDIDATE_LIMIT = 120
+DISTRICT_PATTERN = re.compile(r"([\uac00-\ud7a3]{1,12}(?:시|군|구))")
+NATIONWIDE_TERMS = ("\uc804\uad6d",)
 
 
 UNKNOWN_DEADLINE_VALUES = {"", "none", "null", "nan", "마감일 미정", "상시"}
@@ -50,6 +52,31 @@ def _normalize_list(value: Any) -> list[str]:
     if isinstance(value, list):
         return [str(item).strip() for item in value if str(item).strip()]
     return [item.strip() for item in str(value).split(",") if item.strip()]
+
+
+def _region_text(value: Any) -> str:
+    return "" if value is None else str(value).strip()
+
+
+def _district_tokens(value: Any) -> set[str]:
+    return {token.strip() for token in DISTRICT_PATTERN.findall(_region_text(value)) if token.strip()}
+
+
+def _region_matches_company(policy_region: Any, company_region: Any) -> bool:
+    policy_text = _region_text(policy_region)
+    company_text = _region_text(company_region)
+    if not company_text or not policy_text:
+        return True
+    if any(term in policy_text for term in NATIONWIDE_TERMS):
+        return True
+
+    policy_districts = _district_tokens(policy_text)
+    if policy_districts:
+        company_districts = _district_tokens(company_text)
+        return bool(company_districts and policy_districts.intersection(company_districts))
+
+    region_short = company_text.split()[0] if company_text else ""
+    return bool(region_short and region_short in policy_text)
 
 
 def _parse_deadline(value: Any) -> Optional[date]:
@@ -137,7 +164,6 @@ def _policy_key(policy: dict) -> Optional[str]:
 def match_policies(company_context: dict, query: str) -> list[dict]:
     company_codes = _normalize_list(company_context.get("industry_code"))
     region = company_context.get("region", "")
-    region_short = region.split()[0] if region else ""
     company_type_values = _normalize_list(company_context.get("company_type"))
 
     results = search_policies(query, n_results=20, where=None)
@@ -158,12 +184,7 @@ def match_policies(company_context: dict, query: str) -> list[dict]:
         )
 
         policy_region = str(metadata.get("region") or "")
-        region_match = (
-            not region
-            or not policy_region
-            or region_short in policy_region
-            or "전국" in policy_region
-        )
+        region_match = _region_matches_company(policy_region, region)
 
         eligible_types = _normalize_list(
             metadata.get("eligible_company_types", [])
@@ -1108,12 +1129,7 @@ def get_policy_raw_candidates(company_context: dict) -> list[dict]:
             or "C" in codes
             or any(code in codes for code in company_codes)
         )
-        region_match = (
-            not region
-            or not policy_region
-            or "전국" in policy_region
-            or region_short in policy_region
-        )
+        region_match = _region_matches_company(policy_region, region)
         type_match = (
             not eligible_types
             or not company_types

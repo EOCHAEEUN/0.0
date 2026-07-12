@@ -13,6 +13,8 @@ DASHBOARD_POLICY_FALLBACK_SELECT = (
     "policy_id,title,deadline,deadline_display,industry_codes,region,"
     "eligible_company_types,summary,created_at"
 )
+DISTRICT_PATTERN = re.compile(r"([\uac00-\ud7a3]{1,12}(?:시|군|구))")
+NATIONWIDE_TERMS = ("\uc804\uad6d",)
 
 
 def _as_dict(value: Any) -> dict[str, Any]:
@@ -53,6 +55,27 @@ def _safe_number(*values: Any) -> float | int | None:
             return int(number)
         return number
     return None
+
+
+def _district_tokens(value: Any) -> set[str]:
+    return {token.strip() for token in DISTRICT_PATTERN.findall(_safe_text(value)) if token.strip()}
+
+
+def _region_matches_company(policy_region: Any, company_region: Any) -> bool:
+    policy_text = _safe_text(policy_region)
+    company_text = _safe_text(company_region)
+    if not company_text or not policy_text:
+        return True
+    if any(term in policy_text for term in NATIONWIDE_TERMS):
+        return True
+
+    policy_districts = _district_tokens(policy_text)
+    if policy_districts:
+        company_districts = _district_tokens(company_text)
+        return bool(company_districts and policy_districts.intersection(company_districts))
+
+    region_short = company_text.split()[0] if company_text else ""
+    return bool(region_short and region_short in policy_text)
 
 
 def _is_empty_policy_snapshot(snapshot: Any) -> bool:
@@ -212,7 +235,6 @@ def _passes_dashboard_policy_filters(policy: dict[str, Any], company: dict[str, 
     company_codes = _normalize_text_list(company.get("industry_code"))
     policy_codes = _normalize_text_list(policy.get("industry_codes"))
     region = _safe_text(company.get("region"))
-    region_short = region.split()[0] if region else ""
     policy_region = _safe_text(policy.get("region"))
     company_types = _normalize_text_list(company.get("company_type"))
     eligible_types = _normalize_text_list(policy.get("eligible_company_types"))
@@ -223,12 +245,7 @@ def _passes_dashboard_policy_filters(policy: dict[str, Any], company: dict[str, 
         or "C" in policy_codes
         or any(code in policy_codes for code in company_codes)
     )
-    region_match = (
-        not region
-        or not policy_region
-        or "전국" in policy_region
-        or region_short in policy_region
-    )
+    region_match = _region_matches_company(policy_region, region)
     type_match = (
         not eligible_types
         or not company_types

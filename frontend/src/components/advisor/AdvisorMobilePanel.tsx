@@ -26,7 +26,7 @@ import type { AdvisorScreen } from "./advisor.types"
 
 const KAKAO_CHANNEL_URL =
   (import.meta.env.VITE_KAKAO_CHANNEL_URL as string | undefined)?.trim() ||
-  "https://pf.kakao.com/_factofit/chat"
+  "http://pf.kakao.com/_tpeXX/friend"
 
 function openKakaoChannel() {
   window.open(KAKAO_CHANNEL_URL, "_blank", "noopener,noreferrer")

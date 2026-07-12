@@ -29,7 +29,7 @@ POLICY_RAW_CANDIDATE_SELECT = (
     "max_amount_type,max_amount_numeric_manwon,deadline,deadline_display,"
     "industry_codes,region,eligible_company_types,eligibility_text,"
     "eligibility_evidence,url,summary,support_method,source_name,source_id,"
-    "posted_at,created_at,updated_at"
+    "posted_at,created_at"
 )
 POLICY_RAW_CANDIDATE_LIMIT = 120
 

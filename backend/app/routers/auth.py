@@ -1,3 +1,4 @@
+import asyncio
 import os
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -19,6 +20,8 @@ from app.models.auth import (
 )
 
 router = APIRouter()
+AUTH_LOGIN_TIMEOUT_SECONDS = 35
+AUTH_LOGIN_COMPANY_LOOKUP_TIMEOUT_SECONDS = 4
 
 
 def _normalize_email(email: str) -> str:
@@ -67,6 +70,24 @@ def _fetch_latest_company(db, user_id: str) -> dict | None:
             .execute()
         )
         return result.data[0] if result.data else None
+    except Exception:
+        return None
+
+
+def _fetch_latest_company_id(db, user_id: str) -> str | None:
+    try:
+        result = (
+            db.table("company")
+            .select("company_id")
+            .eq("user_id", user_id)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if not result.data:
+            return None
+        company_id = result.data[0].get("company_id")
+        return str(company_id) if company_id else None
     except Exception:
         return None
 
@@ -288,11 +309,24 @@ async def login(body: LoginRequest):
     db = create_service_client()
 
     try:
-        auth_response = db.auth.sign_in_with_password(
-            {
-                "email": body.email,
-                "password": body.password,
-            }
+        auth_response = await asyncio.wait_for(
+            asyncio.to_thread(
+                db.auth.sign_in_with_password,
+                {
+                    "email": body.email,
+                    "password": body.password,
+                },
+            ),
+            timeout=AUTH_LOGIN_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "success": False,
+                "message": "인증 서버 응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요.",
+                "error": "Auth login timed out.",
+            },
         )
     except Exception as exc:
         return JSONResponse(
@@ -316,16 +350,22 @@ async def login(body: LoginRequest):
             },
         )
 
-    profile_data = _fetch_user_profile(db, user_id)
-    company = _fetch_latest_company(db, user_id)
+    try:
+        company_id = await asyncio.wait_for(
+            asyncio.to_thread(_fetch_latest_company_id, db, user_id),
+            timeout=AUTH_LOGIN_COMPANY_LOOKUP_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError:
+        print(f"auth login company lookup timed out for user_id={user_id}")
+        company_id = None
 
     return {
         "success": True,
         "data": {
             **_session_payload(auth_response),
-            "user_profile": profile_data,
-            "company": company,
-            "company_id": company.get("company_id") if company else None,
+            "user_profile": None,
+            "company": {"company_id": company_id} if company_id else None,
+            "company_id": company_id,
         },
     }
 

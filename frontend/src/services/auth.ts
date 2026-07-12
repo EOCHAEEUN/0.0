@@ -2,7 +2,7 @@ const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api"
 export const AUTH_EXPIRED_EVENT = "factofit:auth-expired"
 const AUTH_EXPIRED_MESSAGE_KEY = "factofit_auth_expired_message"
-const AUTH_REQUEST_TIMEOUT_MS = 20_000
+const AUTH_REQUEST_TIMEOUT_MS = 45_000
 
 export type AuthSession = {
   access_token: string | null

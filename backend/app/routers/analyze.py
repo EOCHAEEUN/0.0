@@ -1743,14 +1743,21 @@ async def get_policy_summary(
 
     try:
         total_policy_count = _count_rows(
-            db.table("policy").select("*", count="exact")
+            db.table("policy").select("policy_id", count="exact")
         )
     except Exception as exc:
         print(f"policy 전체 count 조회 실패: {exc}")
         total_policy_count = 0
 
     try:
-        result = db.table("policy").select("*").execute()
+        # _is_active_policy는 마감일 관련 필드만 읽는다. select("*")로 전체
+        # 컬럼(raw_text/attachment_text 등 261행/33MB급)을 매 요청마다 긁어오면
+        # Render 저사양 환경에서 502가 나므로 필요한 컬럼만 조회한다.
+        result = (
+            db.table("policy")
+            .select("policy_id,deadline,deadline_display")
+            .execute()
+        )
         active_policy_count = sum(
             1
             for row in (result.data or [])

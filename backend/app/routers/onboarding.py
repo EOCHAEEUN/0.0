@@ -11,7 +11,10 @@ from app.models.user_profile import UserProfileCreate, UserProfileUpdate
 from app.services.policy_snapshot_hydration import (
     hydrate_roi_outputs_policy_snapshots_for_response,
 )
-from app.services.policy_support_summary import load_policy_support_summary
+from app.services.policy_support_summary import (
+    build_policy_support_summary,
+    fetch_policy_support_components,
+)
 from app.tools.equipment_normalizer import normalize_equipment_category
 
 router = APIRouter()
@@ -33,21 +36,44 @@ def _policy_ids_from_roi_output(roi_output: dict) -> list[str]:
 
 
 def _attach_policy_support_summaries(db, roi_outputs: list[dict]) -> list[dict]:
+    # roi_output마다 policy_support_component를 따로 조회하면 요청당 최대
+    # len(roi_outputs)번의 순차 Supabase round-trip이 발생한다. 모든 roi_output의
+    # policy_id를 모아 한 번만 조회한 뒤 각 roi_output에 필요한 부분만 나눠준다.
+    per_output_ids: list[list[str]] = [
+        _policy_ids_from_roi_output(roi_output) if isinstance(roi_output, dict) else []
+        for roi_output in roi_outputs
+    ]
+    all_policy_ids = [policy_id for ids in per_output_ids for policy_id in ids]
+    if not all_policy_ids:
+        return roi_outputs
+
+    try:
+        components = fetch_policy_support_components(db, all_policy_ids)
+    except Exception as exc:
+        print(f"[onboarding/me] policy_support_summary 일괄 조회 실패: {exc}")
+        return roi_outputs
+
+    components_by_policy_id: dict[str, list[dict]] = {}
+    for component in components:
+        policy_id = str(component.get("policy_id") or "").strip()
+        if policy_id:
+            components_by_policy_id.setdefault(policy_id, []).append(component)
+
     hydrated: list[dict] = []
-    for roi_output in roi_outputs:
-        if not isinstance(roi_output, dict):
+    for roi_output, policy_ids in zip(roi_outputs, per_output_ids):
+        if not isinstance(roi_output, dict) or not policy_ids:
             hydrated.append(roi_output)
             continue
 
-        policy_ids = _policy_ids_from_roi_output(roi_output)
-        if not policy_ids:
-            hydrated.append(roi_output)
-            continue
-
+        own_components = [
+            component
+            for policy_id in policy_ids
+            for component in components_by_policy_id.get(policy_id, [])
+        ]
         hydrated.append(
             {
                 **roi_output,
-                "policy_support_summary": load_policy_support_summary(db, policy_ids),
+                "policy_support_summary": build_policy_support_summary(own_components),
             }
         )
     return hydrated

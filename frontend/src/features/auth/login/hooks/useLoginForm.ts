@@ -7,6 +7,12 @@ import { resolvePostLoginPath } from "../../../onboarding/onboardingState"
 import { hydrateAccountData } from "../../../../services/accountHydration"
 import { requestPasswordReset } from "../../../../services/auth"
 
+const MOBILE_VIEWPORT_MAX_WIDTH = 768
+
+function isMobileViewport() {
+  return typeof window !== "undefined" && window.innerWidth <= MOBILE_VIEWPORT_MAX_WIDTH
+}
+
 export function useLoginForm() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -31,6 +37,10 @@ export function useLoginForm() {
         })
       } catch {
         // hydrate 실패는 로그인 흐름을 막지 않는다
+      }
+      if (isMobileViewport()) {
+        navigate("/mobile", { replace: true })
+        return
       }
       setModalType("preview")
     } catch (error) {

@@ -60,6 +60,8 @@ def _is_empty_policy_snapshot(snapshot: Any) -> bool:
         return True
     if not snapshot.get("snapshot_version"):
         return True
+    if not _snapshot_policy_rows(snapshot):
+        return True
     return False
 
 

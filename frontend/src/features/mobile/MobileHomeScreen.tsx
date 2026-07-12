@@ -100,7 +100,12 @@ export default function MobileHomeScreen() {
                 <strong>{model.companyCard.companyName}</strong>
                 <span>{model.companyCard.locationLine}</span>
               </div>
-              <button type="button" className="ff-mobile-company-menu" aria-label="기업 메뉴">
+              <button
+                type="button"
+                className="ff-mobile-company-menu"
+                aria-label="기업 및 설비 상태 확인"
+                onClick={() => navigate(buildMobilePath("/mobile/safety", flowContext))}
+              >
                 <MoreVertical size={18} strokeWidth={2.1} />
               </button>
             </div>

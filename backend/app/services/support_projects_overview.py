@@ -1548,6 +1548,11 @@ def _load_analysis_snapshot_overview(
         )
         for policy in policies
     ]
+    policies = [
+        policy
+        for policy in policies
+        if _passes_live_company_filters(policy, company)
+    ]
     matched_total = len(policies)
     priority_row = policies[0] if policies else None
     priority_id = _normalize_policy_id((priority_row or {}).get("policy_id"))

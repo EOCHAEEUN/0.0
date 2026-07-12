@@ -11,6 +11,11 @@ from app.services.safety_preview import (
     create_safety_preview,
 )
 from app.services.safety_evidence_service import build_safety_evidence_summary
+from app.services.dashboard_overview import (
+    _fetch_dashboard_policy_details,
+    _merge_dashboard_policy_detail,
+    _passes_dashboard_policy_filters,
+)
 
 
 VIEWPOINT_LABELS: dict[str, str] = {
@@ -885,27 +890,53 @@ def load_application_draft_workspace(
 
     snapshot = _as_dict(roi_output.get("policy_snapshot"))
     legacy_missing = _is_empty_policy_snapshot(snapshot)
+    snapshot_rows: list[dict[str, Any]] = []
+    if not legacy_missing:
+        raw_snapshot_rows = _snapshot_policy_rows(snapshot)
+        snapshot_detail_map = _fetch_dashboard_policy_details(
+            db,
+            [_safe_text(row.get("policy_id")) for row in raw_snapshot_rows],
+        )
+        snapshot_rows = [
+            _merge_dashboard_policy_detail(
+                row,
+                snapshot_detail_map.get(_safe_text(row.get("policy_id"))),
+            )
+            for row in raw_snapshot_rows
+        ]
+        snapshot_rows = [
+            row
+            for row in snapshot_rows
+            if _passes_dashboard_policy_filters(row, company)
+        ]
 
     resolved_policy_id = _safe_text(policy_id)
     if not resolved_policy_id and not legacy_missing:
-        resolved_policy_id = _safe_text(snapshot.get("recommended_policy_id"))
+        recommended_id = _safe_text(snapshot.get("recommended_policy_id"))
+        if any(_safe_text(row.get("policy_id")) == recommended_id for row in snapshot_rows):
+            resolved_policy_id = recommended_id
+        elif snapshot_rows:
+            resolved_policy_id = _safe_text(snapshot_rows[0].get("policy_id"))
 
     snapshot_policy = (
-        _snapshot_policy_by_id(snapshot, resolved_policy_id)
+        _snapshot_policy_by_id({"policies": snapshot_rows}, resolved_policy_id)
         if resolved_policy_id and not legacy_missing
         else None
     )
     if not snapshot_policy and not legacy_missing:
-        snapshot_policy = _snapshot_policy_by_id(
-            snapshot,
-            _safe_text(snapshot.get("recommended_policy_id")),
-        )
+        recommended_id = _safe_text(snapshot.get("recommended_policy_id"))
+        if any(_safe_text(row.get("policy_id")) == recommended_id for row in snapshot_rows):
+            snapshot_policy = _snapshot_policy_by_id({"policies": snapshot_rows}, recommended_id)
+        elif snapshot_rows:
+            snapshot_policy = snapshot_rows[0]
     if snapshot_policy:
         resolved_policy_id = _safe_text(snapshot_policy.get("policy_id"), resolved_policy_id)
+    elif not legacy_missing:
+        resolved_policy_id = ""
 
     available_policies: list[dict[str, Any]] = []
     if not legacy_missing:
-        for row in _snapshot_policy_rows(snapshot)[:5]:
+        for row in snapshot_rows[:5]:
             row_policy_id = _safe_text(row.get("policy_id"))
             if not row_policy_id:
                 continue
@@ -956,7 +987,11 @@ def load_application_draft_workspace(
             "match_score": policy_detail.get("match_score"),
         }
 
-    effective_legacy_missing = legacy_missing and not snapshot_policy and not policy_detail
+    effective_legacy_missing = (
+        (legacy_missing or not snapshot_rows)
+        and not snapshot_policy
+        and not policy_detail
+    )
 
     draft_row: dict[str, Any] | None = None
     if resolved_policy_id:
@@ -1053,7 +1088,7 @@ def load_application_draft_workspace(
     )
     policy_options: list[dict[str, Any]] = []
     if not effective_legacy_missing:
-        for row in _snapshot_policy_rows(snapshot)[:5]:
+        for row in snapshot_rows[:5]:
             option_id = _safe_text(row.get("policy_id"))
             if not option_id:
                 continue

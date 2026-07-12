@@ -291,6 +291,74 @@ def _load_dashboard_policy_fallback_candidates(
     return sorted(candidates, key=sort_key)[:DASHBOARD_POLICY_FALLBACK_LIMIT]
 
 
+def _fetch_dashboard_policy_details(
+    db: Any,
+    policy_ids: list[str],
+) -> dict[str, dict[str, Any]]:
+    unique: list[str] = []
+    seen: set[str] = set()
+    for policy_id in policy_ids:
+        normalized = _safe_text(policy_id)
+        if normalized and normalized not in seen:
+            unique.append(normalized)
+            seen.add(normalized)
+    if not unique:
+        return {}
+
+    try:
+        result = (
+            db.table("policy")
+            .select(DASHBOARD_POLICY_FALLBACK_SELECT)
+            .in_("policy_id", unique)
+            .execute()
+        )
+    except Exception:
+        logger.exception("dashboard_overview policy detail query failed")
+        return {}
+
+    return {
+        _safe_text(row.get("policy_id")): row
+        for row in (result.data or [])
+        if isinstance(row, dict) and _safe_text(row.get("policy_id"))
+    }
+
+
+def _merge_dashboard_policy_detail(
+    policy: dict[str, Any],
+    detail: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if not detail:
+        return policy
+    merged = dict(detail)
+    merged.update(policy)
+    merged["policy_id"] = _safe_text(policy.get("policy_id"), detail.get("policy_id"))
+    return merged
+
+
+def _load_dashboard_snapshot_policies(
+    db: Any,
+    snapshot: dict[str, Any],
+    company: dict[str, Any],
+) -> list[dict[str, Any]]:
+    snapshot_policies = _snapshot_policy_rows(snapshot)
+    policy_details = _fetch_dashboard_policy_details(
+        db,
+        [_safe_text(policy.get("policy_id")) for policy in snapshot_policies],
+    )
+    policies = [
+        _merge_dashboard_policy_detail(
+            policy,
+            policy_details.get(_safe_text(policy.get("policy_id"))),
+        )
+        for policy in snapshot_policies
+    ]
+    return [
+        policy
+        for policy in policies
+        if _passes_dashboard_policy_filters(policy, company)
+    ]
+
+
 def _build_deadlines(
     policies: list[dict[str, Any]],
     *,
@@ -824,7 +892,7 @@ def load_dashboard_overview(
     policies = (
         _load_dashboard_policy_fallback_candidates(db, company)
         if snapshot_missing
-        else _snapshot_policy_rows(snapshot)
+        else _load_dashboard_snapshot_policies(db, snapshot, company)
     )
     legacy_missing = bool(snapshot_missing and not policies)
     priority_policy = _priority_policy(snapshot, policies)

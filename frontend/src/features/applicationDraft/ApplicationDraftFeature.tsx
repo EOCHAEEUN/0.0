@@ -22,7 +22,10 @@ export function ApplicationDraftFeature() {
   const { location, routeAnalysisId, resolvedPolicyId, isAnalysisPolicyRoute } =
     useApplicationDraftRouteState()
 
-  const support = useSupportProjects({ analysisId: routeAnalysisId })
+  const support = useSupportProjects({
+    analysisId: routeAnalysisId,
+    enabled: isAnalysisPolicyRoute,
+  })
   const routeProject = useMemo(
     () => findProjectByRouteId(support.policyCards, resolvedPolicyId),
     [resolvedPolicyId, support.policyCards],

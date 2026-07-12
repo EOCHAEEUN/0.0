@@ -36,8 +36,9 @@ function normalizeProjectIds(projects: SupportProject[]) {
   }))
 }
 
-export function useSupportProjects(options?: { analysisId?: string }) {
+export function useSupportProjects(options?: { analysisId?: string; enabled?: boolean }) {
   const analysisId = options?.analysisId
+  const enabled = options?.enabled ?? true
   const [policyState, setPolicyState] = useState<PolicyState>("loading")
   const [policyCards, setPolicyCards] = useState<SupportProject[]>([])
   const [policyCounters, setPolicyCounters] = useState<PolicyCounters>(() =>
@@ -104,6 +105,11 @@ export function useSupportProjects(options?: { analysisId?: string }) {
     }
 
     async function loadPolicies() {
+      if (!enabled) {
+        applyEmptyState()
+        return
+      }
+
       if (!companyId) {
         applyEmptyState()
         return
@@ -172,7 +178,7 @@ export function useSupportProjects(options?: { analysisId?: string }) {
     return () => {
       ignore = true
     }
-  }, [companyId, equipmentId, analysisFingerprint, analysisId])
+  }, [companyId, equipmentId, analysisFingerprint, analysisId, enabled])
 
   const rankedPolicyCards = useMemo(() => rankProjects(policyCards), [policyCards])
 

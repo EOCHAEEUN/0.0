@@ -7,7 +7,7 @@ import {
   Pencil,
   Sparkles,
 } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import type { ApplicationDraftReportParams } from "../applicationDraft/applicationDraft.contract"
 import { useApplicationDraftWorkspace } from "../applicationDraft/hooks/useApplicationDraftWorkspace"
@@ -35,6 +35,11 @@ const STEPPER = [
 ] as const
 
 type MobileReportType = "consumer_summary" | "application_evidence"
+type CachedMobilePdf = {
+  blob: Blob
+  filename: string
+  url: string
+}
 
 const MOBILE_REPORT_OPTIONS: Array<{ key: MobileReportType; label: string }> = [
   { key: "consumer_summary", label: "한눈에 보는 분석 PDF" },
@@ -167,11 +172,16 @@ export default function MobileApplicationScreen() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [selectedPdfSection, setSelectedPdfSection] = useState<string>(MOBILE_PDF_SECTIONS[0].id)
+  const [selectedReportType, setSelectedReportType] = useState<MobileReportType>("consumer_summary")
   const [previewOpen, setPreviewOpen] = useState(false)
   const [previewType, setPreviewType] = useState<MobileReportType>("consumer_summary")
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewError, setPreviewError] = useState("")
   const [previewUrl, setPreviewUrl] = useState("")
+  const pdfCacheRef = useRef<Record<MobileReportType, CachedMobilePdf | null>>({
+    consumer_summary: null,
+    application_evidence: null,
+  })
   const [downloadOpen, setDownloadOpen] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [downloadMessage, setDownloadMessage] = useState("")
@@ -244,11 +254,11 @@ export default function MobileApplicationScreen() {
 
   useEffect(() => {
     return () => {
-      if (previewUrl) {
-        window.URL.revokeObjectURL(previewUrl)
-      }
+      Object.values(pdfCacheRef.current).forEach((cached) => {
+        if (cached?.url) window.URL.revokeObjectURL(cached.url)
+      })
     }
-  }, [previewUrl])
+  }, [])
 
   const availablePolicies = draft.data?.policy?.available_policies ?? []
   const generatedAtLabel = draft.lastGeneratedAt
@@ -265,8 +275,23 @@ export default function MobileApplicationScreen() {
     navigate(buildMobilePath("/mobile/application", flowContext, { policyId }))
   }
 
-  const selectedReportType: MobileReportType =
-    selectedPdfSection === "01" ? "consumer_summary" : "application_evidence"
+  const ensureMobilePdf = async (
+    reportType: MobileReportType,
+    options: { force?: boolean } = {},
+  ): Promise<CachedMobilePdf> => {
+    if (!draft.reportParams) throw new Error("PDF 생성 정보가 부족합니다.")
+
+    const cached = pdfCacheRef.current[reportType]
+    if (cached && !options.force) return cached
+
+    const { blob, filename } = await requestMobilePdf(draft.reportParams, reportType)
+    const url = window.URL.createObjectURL(blob)
+    if (cached?.url) window.URL.revokeObjectURL(cached.url)
+
+    const next = { blob, filename, url }
+    pdfCacheRef.current[reportType] = next
+    return next
+  }
 
   const openMobilePreview = async () => {
     if (!draft.reportParams || unavailablePdfReason) {
@@ -275,18 +300,22 @@ export default function MobileApplicationScreen() {
       return
     }
 
+    const previewWindow = window.open("", "_blank")
     setPreviewType(selectedReportType)
     setPreviewOpen(true)
     setPreviewLoading(true)
     setPreviewError("")
 
     try {
-      const { blob } = await requestMobilePdf(draft.reportParams, selectedReportType)
-      if (previewUrl) window.URL.revokeObjectURL(previewUrl)
-      const nextUrl = window.URL.createObjectURL(blob)
-      setPreviewUrl(nextUrl)
+      const pdf = await ensureMobilePdf(selectedReportType)
+      setPreviewUrl(pdf.url)
+      if (previewWindow) {
+        previewWindow.opener = null
+        previewWindow.location.href = pdf.url
+      }
     } catch (error) {
-      setPreviewError(error instanceof Error ? error.message : "PDF 바로보기를 준비하지 못했습니다.")
+      previewWindow?.close()
+      setPreviewError(error instanceof Error ? error.message : "PDF 미리보기를 준비하지 못했습니다.")
     } finally {
       setPreviewLoading(false)
     }
@@ -301,9 +330,15 @@ export default function MobileApplicationScreen() {
     setDownloadMessage("")
 
     try {
-      for (const option of targets) {
-        const { blob, filename } = await requestMobilePdf(draft.reportParams, option.key)
-        await triggerBrowserDownload(blob, filename)
+      const pdfs = await Promise.all(
+        targets.map(async (option) => ({
+          option,
+          pdf: await ensureMobilePdf(option.key),
+        })),
+      )
+
+      for (const { pdf } of pdfs) {
+        await triggerBrowserDownload(pdf.blob, pdf.filename)
       }
       setDownloadMessage(`PDF ${targets.length}개 다운로드를 시작했습니다.`)
     } catch (error) {
@@ -555,6 +590,29 @@ export default function MobileApplicationScreen() {
               다운로드할 수 있습니다.
             </p>
 
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 8,
+                marginBottom: 10,
+              }}
+            >
+              {MOBILE_REPORT_OPTIONS.map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  className={`ff-mobile-application-report-section${
+                    selectedReportType === option.key ? " is-active" : ""
+                  }`}
+                  onClick={() => setSelectedReportType(option.key)}
+                >
+                  <strong>{option.key === "consumer_summary" ? "표중심" : "신청서"}</strong>
+                  <span>{option.label}</span>
+                </button>
+              ))}
+            </div>
+
             <div className="ff-mobile-application-report-sections">
               {MOBILE_PDF_SECTIONS.map((section) => (
                 <button
@@ -653,11 +711,30 @@ export default function MobileApplicationScreen() {
                     <p className="ff-mobile-application-error">{previewError}</p>
                   ) : null}
                   {!previewLoading && !previewError && previewUrl ? (
-                    <iframe
-                      title={`${previewType}-preview`}
-                      src={previewUrl}
-                      style={{ width: "100%", height: "100%", border: 0, borderRadius: 10 }}
-                    />
+                    <div style={{ display: "grid", gap: 10 }}>
+                      <p style={{ margin: 0, color: "#334155", fontSize: 13, lineHeight: 1.5 }}>
+                        전체 PDF 미리보기를 새 탭으로 열었습니다. 새 탭이 열리지 않았다면 아래 버튼을 눌러주세요.
+                      </p>
+                      <a
+                        href={previewUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="ff-mobile-application-report-download"
+                        style={{ textAlign: "center", textDecoration: "none" }}
+                      >
+                        전체 PDF 열기
+                      </a>
+                      <button
+                        type="button"
+                        className="ff-mobile-application-report-preview"
+                        onClick={() => {
+                          const cached = pdfCacheRef.current[previewType]
+                          if (cached) void triggerBrowserDownload(cached.blob, cached.filename)
+                        }}
+                      >
+                        PDF 다운로드
+                      </button>
+                    </div>
                   ) : null}
                 </div>
               </div>

@@ -12,8 +12,6 @@ from app.services.application_report import (
     REPORT_TYPE_APPLICATION_EVIDENCE,
     REPORT_TYPE_CONSUMER_SUMMARY,
     generate_application_report_pdf,
-    load_application_report_data,
-    report_file_name,
 )
 
 
@@ -45,15 +43,6 @@ async def _generate_application_report_response(
 ):
     selected_report_type = report_type or body.report_type
     try:
-        data = load_application_report_data(
-            body.company_id,
-            body.equipment_id,
-            body.policy_id,
-            analysis_id=body.analysis_id,
-            draft_result_id=body.draft_result_id,
-            user_id=current_user.id,
-            tone=body.tone,
-        )
         pdf = generate_application_report_pdf(
             report_type=selected_report_type,
             analysis_id=body.analysis_id,
@@ -111,7 +100,11 @@ async def _generate_application_report_response(
             detail="Failed to generate application PDF.",
         ) from exc
 
-    file_name = report_file_name(data, selected_report_type)
+    file_name = (
+        "factofit_consumer_summary.pdf"
+        if selected_report_type == REPORT_TYPE_CONSUMER_SUMMARY
+        else "factofit_application_evidence.pdf"
+    )
     return Response(
         content=pdf,
         media_type="application/pdf",

@@ -14,6 +14,16 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000
 const ANALYSIS_RESULT_STORAGE_KEY = "factofit_analysis_result"
 const DASHBOARD_ACTIVE_ANALYSIS_KEY = "factofit_dashboard_active_analysis_id"
 const COMPANY_ID_STORAGE_KEY = "factofit_company_id"
+const ONBOARDING_CACHE_TTL_MS = 45_000
+
+type OnboardingCacheEntry = {
+  key: string
+  expiresAt: number
+  data: DashboardOnboardingMeResponse | null
+  promise: Promise<DashboardOnboardingMeResponse | null> | null
+}
+
+let onboardingCache: OnboardingCacheEntry | null = null
 
 function buildApiUrl(path: string) {
   const normalizedBase = API_BASE_URL
@@ -37,6 +47,14 @@ export function safeJsonParse<T = unknown>(value: string | null): T | null {
 
 export function getDashboardAccessToken() {
   return getAccessToken()
+}
+
+function getOnboardingCacheKey(accessToken: string) {
+  return `${getCurrentUserId() || "anonymous"}:${accessToken.slice(-16)}`
+}
+
+export function clearDashboardOnboardingCache() {
+  onboardingCache = null
 }
 
 export function getStoredDashboardAnalysisResult() {
@@ -67,7 +85,29 @@ export function getStoredDashboardAnalysisResult() {
 export async function fetchDashboardOnboarding() {
   const accessToken = getDashboardAccessToken()
   if (!accessToken) return null
+  const cacheKey = getOnboardingCacheKey(accessToken)
+  const now = Date.now()
 
+  if (onboardingCache?.key === cacheKey) {
+    if (onboardingCache.promise) return onboardingCache.promise
+    if (onboardingCache.expiresAt > now) return onboardingCache.data
+  }
+
+  const request = fetchDashboardOnboardingUncached(accessToken, cacheKey)
+  onboardingCache = {
+    key: cacheKey,
+    expiresAt: 0,
+    data: null,
+    promise: request,
+  }
+
+  return request
+}
+
+async function fetchDashboardOnboardingUncached(
+  accessToken: string,
+  cacheKey: string,
+) {
   const send = (token: string) =>
     fetch(buildApiUrl("/api/onboarding/me"), {
       method: "GET",
@@ -116,6 +156,12 @@ export async function fetchDashboardOnboarding() {
   }
 
   const onboarding = raw.data
+  onboardingCache = {
+    key: cacheKey,
+    expiresAt: Date.now() + ONBOARDING_CACHE_TTL_MS,
+    data: onboarding,
+    promise: null,
+  }
 
   return onboarding
 }
@@ -223,5 +269,6 @@ export async function patchRepresentativeEquipment(params: {
 
 export function notifyDashboardRefresh() {
   if (typeof window === "undefined") return
+  clearDashboardOnboardingCache()
   window.dispatchEvent(new CustomEvent("factofit:dashboard-refresh"))
 }

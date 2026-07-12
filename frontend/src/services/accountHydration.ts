@@ -187,6 +187,15 @@ export type HydrateResult = {
   hasAnalysis: boolean
 }
 
+const HYDRATE_CACHE_TTL_MS = 45_000
+
+type HydrateCacheEntry = {
+  expiresAt: number
+  result: HydrateResult
+}
+
+const hydrateCacheByUserId = new Map<string, HydrateCacheEntry>()
+
 // in-flight guard: 동일 사용자 중복 hydrate 방지
 const inflightByUserId = new Map<string, Promise<HydrateResult>>()
 
@@ -196,10 +205,19 @@ export async function hydrateAccountData(): Promise<HydrateResult> {
 
   const userId = getCurrentUserId() ?? "anonymous"
 
+  const cached = hydrateCacheByUserId.get(userId)
+  if (cached && cached.expiresAt > Date.now()) return cached.result
+
   const inflight = inflightByUserId.get(userId)
   if (inflight) return inflight
 
-  const promise = _doHydrate(token, userId)
+  const promise = _doHydrate(token, userId).then((result) => {
+    hydrateCacheByUserId.set(userId, {
+      expiresAt: Date.now() + HYDRATE_CACHE_TTL_MS,
+      result,
+    })
+    return result
+  })
   inflightByUserId.set(userId, promise)
   promise.finally(() => inflightByUserId.delete(userId))
   return promise

@@ -2,6 +2,7 @@ const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api"
 export const AUTH_EXPIRED_EVENT = "factofit:auth-expired"
 const AUTH_EXPIRED_MESSAGE_KEY = "factofit_auth_expired_message"
+const AUTH_REQUEST_TIMEOUT_MS = 20_000
 
 export type AuthSession = {
   access_token: string | null
@@ -103,6 +104,21 @@ export function hasValidAuthSession() {
   return expiresAt > now
 }
 
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  timeoutMs = AUTH_REQUEST_TIMEOUT_MS,
+) {
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal })
+  } finally {
+    window.clearTimeout(timeout)
+  }
+}
+
 async function postAuth<T>(
   path: string,
   payload: unknown,
@@ -114,16 +130,24 @@ async function postAuth<T>(
     throw new Error("인증 정보가 없습니다. 다시 로그인해주세요.")
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(payload),
-  })
+  let response: Response
+  try {
+    response = await fetchWithTimeout(`${API_BASE_URL}${path}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    })
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("인증 서버 응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요.")
+    }
+    throw new Error("인증 서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.")
+  }
 
-  const json = (await response.json()) as ApiResponse<T>
+  const json = (await response.json().catch(() => ({}))) as ApiResponse<T>
 
   if (!response.ok || !json.success || !json.data) {
     throw new Error(json.error || json.message || "API request failed.")

@@ -26,7 +26,9 @@ export function useLoginForm() {
       await submitLogin({ email, password })
       // 재로그인 시 서버에서 기업·설비·ROI 데이터를 복원한다 (토큰 저장 직후 실행)
       try {
-        await hydrateAccountData()
+        void hydrateAccountData().catch((error) => {
+          console.warn("[login] account hydration skipped after login", error)
+        })
       } catch {
         // hydrate 실패는 로그인 흐름을 막지 않는다
       }

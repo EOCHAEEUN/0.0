@@ -136,16 +136,24 @@ export async function fetchPolicyCards(
   equipmentId: string,
   analysisFingerprint: string,
   analysisId?: string,
+  options?: { refresh?: boolean },
 ): Promise<{ cards: SupportProject[]; counters: PolicyCounters }> {
+  // refresh=true는 무거운 재계산(정책 매칭 파이프라인)을 다시 돌리는 요청이라,
+  // 사용자가 "다시 계산/새로고침/최신 추천" 버튼을 명시적으로 눌렀을 때만
+  // (options.refresh === true) 요청한다. 페이지 진입/탭 이동 같은 일반 호출은
+  // 항상 matched_policy 캐시(또는 analysis_id 스냅샷)를 우선 사용한다.
+  const refresh = Boolean(options?.refresh)
   const cacheKey = analysisId
     ? `support-projects:${companyId}:${equipmentId || "all"}:analysis:${analysisId}:${POLICY_FETCH_LIMIT}`
     : `support-projects:${companyId}:${equipmentId || "all"}:${analysisFingerprint || "latest"}:${POLICY_FETCH_LIMIT}`
 
-  const cached = policyCardsMemoryCache.get(cacheKey)
-  if (cached) return cached
+  if (!refresh) {
+    const cached = policyCardsMemoryCache.get(cacheKey)
+    if (cached) return cached
 
-  const inFlight = policyCardsInFlightCache.get(cacheKey)
-  if (inFlight) return inFlight
+    const inFlight = policyCardsInFlightCache.get(cacheKey)
+    if (inFlight) return inFlight
+  }
 
   const query = new URLSearchParams({
     company_id: companyId,
@@ -156,9 +164,7 @@ export async function fetchPolicyCards(
   }
   if (analysisId) {
     query.set("analysis_id", analysisId)
-  } else {
-    // /support-projects 일반 탭은 최신 정책 조회 화면이므로
-    // matched_policy 캐시보다 최신 추천 결과를 우선 조회합니다.
+  } else if (refresh) {
     query.set("refresh", "true")
   }
   const url = buildApiUrl(`/api/analyze/support-projects?${query.toString()}`)

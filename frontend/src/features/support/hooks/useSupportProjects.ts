@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type {
   PolicyCounters,
   PolicySummary,
@@ -79,32 +79,40 @@ export function useSupportProjects(options?: { analysisId?: string; enabled?: bo
     )
   }, [analysisData])
 
-  useEffect(() => {
-    let ignore = false
+  const requestIdRef = useRef(0)
 
-    function applyEmptyState(summary: PolicySummary = EMPTY_POLICY_SUMMARY) {
-      setPolicyCards([])
-      setPolicyCounters(buildPolicyCounters([]))
-      setPolicySummary(summary)
-      setSelectedProjectId(null)
-      setDetailProject(null)
-      setPolicyErrorCode("")
-      setPolicyErrorMessage("")
-      setPolicyState("empty")
-    }
+  // refresh=true(무거운 재계산)는 명시적으로 요청했을 때만 사용한다.
+  // 페이지 진입/탭 이동으로 실행되는 effect 쪽 호출은 항상 refresh=false로
+  // 고정해, 캐시(analysis_id 스냅샷 또는 matched_policy 캐시)를 우선 쓴다.
+  const loadPolicies = useCallback(
+    async (options?: { refresh?: boolean }) => {
+      const requestId = requestIdRef.current + 1
+      requestIdRef.current = requestId
 
-    function applyErrorState(errorCode = "", message = "") {
-      setPolicyCards([])
-      setPolicyCounters(buildPolicyCounters([]))
-      setPolicySummary(EMPTY_POLICY_SUMMARY)
-      setSelectedProjectId(null)
-      setDetailProject(null)
-      setPolicyErrorCode(errorCode)
-      setPolicyErrorMessage(message)
-      setPolicyState("error")
-    }
+      function applyEmptyState(summary: PolicySummary = EMPTY_POLICY_SUMMARY) {
+        if (requestId !== requestIdRef.current) return
+        setPolicyCards([])
+        setPolicyCounters(buildPolicyCounters([]))
+        setPolicySummary(summary)
+        setSelectedProjectId(null)
+        setDetailProject(null)
+        setPolicyErrorCode("")
+        setPolicyErrorMessage("")
+        setPolicyState("empty")
+      }
 
-    async function loadPolicies() {
+      function applyErrorState(errorCode = "", message = "") {
+        if (requestId !== requestIdRef.current) return
+        setPolicyCards([])
+        setPolicyCounters(buildPolicyCounters([]))
+        setPolicySummary(EMPTY_POLICY_SUMMARY)
+        setSelectedProjectId(null)
+        setDetailProject(null)
+        setPolicyErrorCode(errorCode)
+        setPolicyErrorMessage(message)
+        setPolicyState("error")
+      }
+
       if (!enabled) {
         applyEmptyState()
         return
@@ -121,11 +129,13 @@ export function useSupportProjects(options?: { analysisId?: string; enabled?: bo
         setPolicyErrorMessage("")
 
         const [result, summary] = await Promise.all([
-          fetchPolicyCards(companyId, equipmentId, analysisFingerprint, analysisId),
+          fetchPolicyCards(companyId, equipmentId, analysisFingerprint, analysisId, {
+            refresh: Boolean(options?.refresh),
+          }),
           fetchPolicySummary(companyId, equipmentId),
         ])
 
-        if (ignore) return
+        if (requestId !== requestIdRef.current) return
 
         if (!result.cards || result.cards.length === 0) {
           applyEmptyState(summary)
@@ -163,22 +173,23 @@ export function useSupportProjects(options?: { analysisId?: string; enabled?: bo
       } catch (error) {
         console.error("정책 추천 API 호출 실패:", error)
 
-        if (!ignore) {
-          if (error instanceof PolicyCardsApiError) {
-            applyErrorState(error.errorCode, error.message)
-          } else {
-            applyErrorState("", error instanceof Error ? error.message : "")
-          }
+        if (error instanceof PolicyCardsApiError) {
+          applyErrorState(error.errorCode, error.message)
+        } else {
+          applyErrorState("", error instanceof Error ? error.message : "")
         }
       }
-    }
+    },
+    [companyId, equipmentId, analysisFingerprint, analysisId, enabled],
+  )
 
+  useEffect(() => {
     void loadPolicies()
+  }, [loadPolicies])
 
-    return () => {
-      ignore = true
-    }
-  }, [companyId, equipmentId, analysisFingerprint, analysisId, enabled])
+  // "다시 계산/새로고침/최신 추천"처럼 사용자가 명시적으로 누르는 액션에서만
+  // 호출한다. 페이지 진입/탭 이동 등 일반 흐름에서는 호출하지 않는다.
+  const refreshPolicyCards = useCallback(() => loadPolicies({ refresh: true }), [loadPolicies])
 
   const rankedPolicyCards = useMemo(() => rankProjects(policyCards), [policyCards])
 
@@ -216,5 +227,6 @@ export function useSupportProjects(options?: { analysisId?: string; enabled?: bo
     detailProject,
     setSelectedProjectId,
     setDetailProject,
+    refreshPolicyCards,
   }
 }

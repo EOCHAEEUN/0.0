@@ -26,6 +26,27 @@ CLOSING_SOON_DAYS = 30
 PRIORITY_DISPLAY_LIMIT = 5
 LIVE_DISCOVERY_DISPLAY_LIMIT = 6
 CLOSING_URGENT_DAYS = 7
+
+# 지원사업 카드/요약에 실제로 쓰이는 policy 컬럼만 선택한다.
+# raw_text/attachment_text/raw_json/temp_extraction_json/amount_candidates/
+# selected_amount_candidate 같은 대용량 원문·중간산출물 컬럼(정책 261건 기준
+# select("*") 시 약 34MB, 이 6개 컬럼만으로 약 14MB)은 이 화면에서 쓰이지 않아
+# 제외한다. summary/eligibility_evidence/max_amount_basis_* 등 짧은 근거 텍스트는
+# 카드의 fallback 문구(_build_funding_detail_lines, _resolve_deadline_date 등)에
+# 실제로 쓰이므로 유지한다.
+POLICY_OVERVIEW_SELECT_FIELDS = (
+    "policy_id,title,organization,deadline,deadline_display,deadline_note,summary,url,"
+    "max_amount,max_amount_actual,max_amount_numeric_manwon,max_amount_type,"
+    "max_amount_type_ko,max_amount_basis_text,max_amount_basis_evidence_text,"
+    "max_amount_note,support_method,support_items,support_primary_category,"
+    "support_categories,support_ratio,policy_primary_nature,policy_category,"
+    "policy_subcategory,roi_support_type,roi_support_reason,"
+    "required_documents_count,required_documents_json,eligibility_text,"
+    "eligibility_extraction_status,eligibility_evidence,eligible_company_types,"
+    "industry_codes,region,company_age_min,company_age_max,employee_min,"
+    "employee_max,revenue_min_manwon,revenue_max_manwon,posted_at,created_at,"
+    "is_selected"
+)
 NON_CASH_KEYWORDS = (
     "컨설팅",
     "멘토링",
@@ -1145,7 +1166,12 @@ def _fetch_policy_details(db: Any, policy_ids: list[str]) -> dict[str, dict[str,
     if not unique:
         return {}
     try:
-        result = db.table("policy").select("*").in_("policy_id", unique).execute()
+        result = (
+            db.table("policy")
+            .select(POLICY_OVERVIEW_SELECT_FIELDS)
+            .in_("policy_id", unique)
+            .execute()
+        )
         return {
             _normalize_policy_id(row.get("policy_id") or row.get("id")): row
             for row in (result.data or [])
@@ -1291,7 +1317,7 @@ def _load_live_discovery_candidates(
 ) -> tuple[list[dict[str, Any]], int, str | None]:
     exclude_policy_ids = exclude_policy_ids or set()
     try:
-        result = db.table("policy").select("*").execute()
+        result = db.table("policy").select(POLICY_OVERVIEW_SELECT_FIELDS).execute()
     except Exception:
         logger.exception("support_projects live discovery policy query failed")
         return [], 0, "추가 정책 후보를 불러오지 못했습니다."

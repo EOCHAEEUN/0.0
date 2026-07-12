@@ -801,6 +801,13 @@ async def analyze(
         )
     except ValueError as exc:
         return {"success": False, "message": str(exc)}
+    except Exception as exc:
+        print(f"base ROI calculation failed: {exc}")
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail="기본 ROI 계산 중 오류가 발생했습니다.",
+        ) from exc
 
     # 4. 기존 정책 후보/랭킹 로직 유지
     raw_candidates: list[dict] = []

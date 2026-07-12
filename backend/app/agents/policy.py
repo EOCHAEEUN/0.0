@@ -23,6 +23,16 @@ from app.tools.roi_calc_tool import calculate_equipment_roi
 from app.tools.vector_search import search_policies
 
 
+POLICY_RAW_CANDIDATE_SELECT = (
+    "policy_id,title,organization,policy_category,policy_subcategory,"
+    "service_category,service_subcategory,max_amount,max_amount_actual,"
+    "max_amount_type,max_amount_numeric_manwon,deadline,deadline_display,"
+    "industry_codes,region,eligible_company_types,eligibility_text,"
+    "eligibility_evidence,url,summary,support_method,source_name,source_id,"
+    "posted_at,created_at,updated_at"
+)
+
+
 UNKNOWN_DEADLINE_VALUES = {"", "none", "null", "nan", "마감일 미정", "상시"}
 POLICY_REASON_CHECK_SENTENCE = (
     "세부 지원한도와 제출서류, 마감일, 자격조건은 공고 원문 확인이 필요합니다."
@@ -1060,7 +1070,7 @@ def get_policy_raw_candidates(company_context: dict) -> list[dict]:
     region_short = region.split()[0] if region else ""
     company_types = _normalize_list(company_context.get("company_type"))
 
-    result = db.table("policy").select("*").execute()
+    result = db.table("policy").select(POLICY_RAW_CANDIDATE_SELECT).execute()
     rows = result.data or []
     candidates: list[dict] = []
 

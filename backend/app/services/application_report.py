@@ -1900,15 +1900,12 @@ def load_application_report_data(
             raise ValueError("분석 이력을 찾을 수 없습니다.")
 
         snapshot = _as_dict(roi_output.get("policy_snapshot"))
-        if _is_empty_policy_snapshot(snapshot):
-            raise ValueError("저장된 정책 정보 없음")
-
-        snapshot_policy = _snapshot_policy_by_id(
-            snapshot,
-            requested_policy_id=policy_id,
-        )
-        if not snapshot_policy:
-            raise ValueError("저장된 정책 정보에서 요청한 정책을 찾을 수 없습니다.")
+        snapshot_policy = None
+        if not _is_empty_policy_snapshot(snapshot):
+            snapshot_policy = _snapshot_policy_by_id(
+                snapshot,
+                requested_policy_id=policy_id,
+            )
     else:
         roi_output = _first(
             db.table("roi_output")

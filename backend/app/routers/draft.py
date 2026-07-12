@@ -856,23 +856,53 @@ async def generate_draft(
 
         roi_output = roi_row.data[0]
         snapshot = _as_dict(roi_output.get("policy_snapshot"))
-        if _is_empty_policy_snapshot(snapshot):
-            raise HTTPException(
-                status_code=409,
-                detail="저장된 정책 정보 없음",
-            )
-
-        snapshot_policy = _snapshot_policy_by_id(snapshot, body.policy_id)
-        if not snapshot_policy:
-            raise HTTPException(
-                status_code=409,
-                detail="저장된 정책 정보에서 요청한 정책을 찾을 수 없습니다.",
-            )
-
-        effective_policy_id = _safe_text(snapshot_policy.get("policy_id"), body.policy_id)
+        snapshot_policy = None
+        if not _is_empty_policy_snapshot(snapshot):
+            snapshot_policy = _snapshot_policy_by_id(snapshot, body.policy_id)
         roi_data = _as_dict(roi_output.get("roi_data"))
-        selected_matched_policy = _matched_policy_from_snapshot(snapshot_policy)
-        selected_policy = _policy_from_snapshot(snapshot_policy)
+        if snapshot_policy:
+            effective_policy_id = _safe_text(snapshot_policy.get("policy_id"), body.policy_id)
+            selected_matched_policy = _matched_policy_from_snapshot(snapshot_policy)
+            selected_policy = _policy_from_snapshot(snapshot_policy)
+        else:
+            try:
+                selected_matched_policy = (
+                    db.table("matched_policy")
+                    .select("*")
+                    .eq("company_id", body.company_id)
+                    .eq("equipment_id", body.equipment_id)
+                    .eq("policy_id", body.policy_id)
+                    .order("match_score", desc=True)
+                    .limit(1)
+                    .execute()
+                    .data
+                    or [None]
+                )[0] or {}
+            except Exception:
+                selected_matched_policy = {}
+            policy_detail = _fetch_policy_detail_by_id(db, body.policy_id)
+            if not selected_matched_policy and not policy_detail:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Selected policy could not be resolved for this analysis.",
+                )
+            if not selected_matched_policy:
+                selected_matched_policy = {
+                    "policy_id": body.policy_id,
+                    "title": policy_detail.get("title") or "Selected support project",
+                    "organization": (
+                        policy_detail.get("organization")
+                        or policy_detail.get("agency")
+                        or policy_detail.get("provider")
+                        or "Unknown organization"
+                    ),
+                    "reason": "Using policy database details because the saved policy snapshot is missing.",
+                    "scenario_match": None,
+                    "scenario_label": None,
+                    "match_score": None,
+                }
+            selected_policy = _merge_policy(selected_matched_policy, policy_detail)
+            effective_policy_id = _safe_text(selected_policy.get("policy_id"), body.policy_id)
     else:
         roi_result = (
             db.table("roi_output")

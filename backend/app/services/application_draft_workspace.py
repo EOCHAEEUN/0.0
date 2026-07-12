@@ -923,7 +923,7 @@ def load_application_draft_workspace(
             )
 
     policy_detail: dict[str, Any] = {}
-    if resolved_policy_id and not legacy_missing:
+    if resolved_policy_id:
         policy_rows = (
             db.table("policy")
             .select("*")
@@ -933,6 +933,30 @@ def load_application_draft_workspace(
         )
         if policy_rows.data:
             policy_detail = policy_rows.data[0]
+
+    if legacy_missing and resolved_policy_id and policy_detail:
+        snapshot_policy = {
+            "policy_id": resolved_policy_id,
+            "title": _safe_text(policy_detail.get("title")),
+            "organization": _safe_text(
+                policy_detail.get("organization"),
+                policy_detail.get("agency"),
+                policy_detail.get("provider"),
+            ),
+            "deadline": _safe_text(
+                policy_detail.get("deadline"),
+                policy_detail.get("deadline_display"),
+                policy_detail.get("end_date"),
+            ),
+            "deadline_display": _safe_text(
+                policy_detail.get("deadline_display"),
+                policy_detail.get("deadline"),
+                policy_detail.get("end_date"),
+            ),
+            "match_score": policy_detail.get("match_score"),
+        }
+
+    effective_legacy_missing = legacy_missing and not snapshot_policy and not policy_detail
 
     draft_row: dict[str, Any] | None = None
     if resolved_policy_id:
@@ -1010,10 +1034,10 @@ def load_application_draft_workspace(
         ),
         "roi": _roi_readiness(roi_data),
         "policy": _policy_readiness(
-            snapshot=snapshot if not legacy_missing else None,
+            snapshot=snapshot if not effective_legacy_missing else None,
             snapshot_policy=snapshot_policy,
             draft_content=draft_content,
-            legacy_missing=legacy_missing,
+            legacy_missing=effective_legacy_missing,
         ),
     }
 
@@ -1028,7 +1052,7 @@ def load_application_draft_workspace(
         policy_detail.get("deadline"),
     )
     policy_options: list[dict[str, Any]] = []
-    if not legacy_missing:
+    if not effective_legacy_missing:
         for row in _snapshot_policy_rows(snapshot)[:5]:
             option_id = _safe_text(row.get("policy_id"))
             if not option_id:
@@ -1086,8 +1110,8 @@ def load_application_draft_workspace(
             "policy_id": resolved_policy_id or None,
             "title": policy_title or None,
             "deadline": policy_deadline or None,
-            "source": "policy_snapshot" if not legacy_missing else "legacy_missing",
-            "legacy_missing": legacy_missing,
+            "source": "policy_snapshot" if not effective_legacy_missing else "legacy_missing",
+            "legacy_missing": effective_legacy_missing,
             "options": policy_options[:5],
             "available_policies": available_policies,
         },

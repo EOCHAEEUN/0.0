@@ -28,9 +28,9 @@ export function resolveMobileFlowContext(
     queryAnalysisId,
   )
   const policyId = pickText(
-    workspace.priorityPolicyId || undefined,
     searchParams.get("policyId"),
     searchParams.get("policy_id"),
+    workspace.priorityPolicyId || undefined,
   )
   const shouldIgnoreQueryEquipment =
     Boolean(workspace.analysisId) &&

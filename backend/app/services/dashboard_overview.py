@@ -78,6 +78,24 @@ def _region_matches_company(policy_region: Any, company_region: Any) -> bool:
     return bool(region_short and region_short in policy_text)
 
 
+def _policy_region_text(policy: dict[str, Any]) -> str:
+    return " ".join(
+        _safe_text(policy.get(key))
+        for key in (
+            "region",
+            "title",
+            "summary",
+            "organization",
+            "agency",
+            "provider",
+            "eligibility_text",
+            "target",
+            "support_content",
+        )
+        if _safe_text(policy.get(key))
+    )
+
+
 def _is_empty_policy_snapshot(snapshot: Any) -> bool:
     if not isinstance(snapshot, dict) or not snapshot:
         return True
@@ -235,7 +253,7 @@ def _passes_dashboard_policy_filters(policy: dict[str, Any], company: dict[str, 
     company_codes = _normalize_text_list(company.get("industry_code"))
     policy_codes = _normalize_text_list(policy.get("industry_codes"))
     region = _safe_text(company.get("region"))
-    policy_region = _safe_text(policy.get("region"))
+    policy_region = _policy_region_text(policy)
     company_types = _normalize_text_list(company.get("company_type"))
     eligible_types = _normalize_text_list(policy.get("eligible_company_types"))
 

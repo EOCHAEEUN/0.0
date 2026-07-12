@@ -239,9 +239,8 @@ export default function MobileApplicationScreen() {
   const unavailablePdfReason = useMemo(() => {
     if (draft.isLoading) return "신청서 화면 데이터를 불러오는 중입니다."
     if (!draft.reportParams) return "분석·정책 정보가 준비되면 PDF를 생성할 수 있습니다."
-    if (draft.data?.policy?.legacy_missing) return "정책 스냅샷 이력이 없어 PDF를 생성할 수 없습니다."
     return ""
-  }, [draft.isLoading, draft.reportParams, draft.data?.policy?.legacy_missing])
+  }, [draft.isLoading, draft.reportParams])
 
   useEffect(() => {
     return () => {
@@ -499,7 +498,7 @@ export default function MobileApplicationScreen() {
             <button
               type="button"
               className="ff-mobile-application-primary-cta"
-              disabled={draft.isGeneratingDraft || draft.data?.policy?.legacy_missing}
+              disabled={draft.isGeneratingDraft}
               onClick={() => void draft.handleGenerateDraft()}
             >
               {draft.isGeneratingDraft ? "신청서 생성 중..." : "신청서 생성 시작"}

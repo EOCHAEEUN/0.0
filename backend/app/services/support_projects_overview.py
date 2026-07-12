@@ -810,6 +810,24 @@ def _region_matches_company(policy_region: Any, company_region: Any) -> bool:
     return bool(region_short and region_short in policy_text)
 
 
+def _policy_region_text(policy: dict[str, Any]) -> str:
+    return " ".join(
+        _safe_text(policy.get(key))
+        for key in (
+            "region",
+            "title",
+            "summary",
+            "organization",
+            "agency",
+            "provider",
+            "eligibility_text",
+            "target",
+            "support_content",
+        )
+        if _safe_text(policy.get(key))
+    )
+
+
 def _passes_live_company_filters(policy: dict[str, Any], company: dict[str, Any]) -> bool:
     company_codes = [
         code.strip()
@@ -822,7 +840,7 @@ def _passes_live_company_filters(policy: dict[str, Any], company: dict[str, Any]
         if code.strip()
     ]
     region = _safe_text(company.get("region"))
-    policy_region = _safe_text(policy.get("region"))
+    policy_region = _policy_region_text(policy)
     code_match = (
         not company_codes
         or not policy_codes

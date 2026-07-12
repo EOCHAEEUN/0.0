@@ -8,6 +8,11 @@ from typing import Any
 from app.core.database import get_db
 
 logger = logging.getLogger(__name__)
+DASHBOARD_POLICY_FALLBACK_LIMIT = 6
+DASHBOARD_POLICY_FALLBACK_SELECT = (
+    "policy_id,title,deadline,deadline_display,industry_codes,region,"
+    "eligible_company_types,summary,created_at"
+)
 
 
 def _as_dict(value: Any) -> dict[str, Any]:
@@ -16,6 +21,14 @@ def _as_dict(value: Any) -> dict[str, Any]:
 
 def _as_list(value: Any) -> list[Any]:
     return value if isinstance(value, list) else []
+
+
+def _normalize_text_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    return [item.strip() for item in str(value).split(",") if item.strip()]
 
 
 def _safe_text(*values: Any, default: str = "") -> str:
@@ -191,6 +204,72 @@ def _priority_policy(
         return dated[0][1]
 
     return scored[0] if scored else None
+
+
+def _passes_dashboard_policy_filters(policy: dict[str, Any], company: dict[str, Any]) -> bool:
+    company_codes = _normalize_text_list(company.get("industry_code"))
+    policy_codes = _normalize_text_list(policy.get("industry_codes"))
+    region = _safe_text(company.get("region"))
+    region_short = region.split()[0] if region else ""
+    policy_region = _safe_text(policy.get("region"))
+    company_types = _normalize_text_list(company.get("company_type"))
+    eligible_types = _normalize_text_list(policy.get("eligible_company_types"))
+
+    code_match = (
+        not company_codes
+        or not policy_codes
+        or "C" in policy_codes
+        or any(code in policy_codes for code in company_codes)
+    )
+    region_match = (
+        not region
+        or not policy_region
+        or "전국" in policy_region
+        or region_short in policy_region
+    )
+    type_match = (
+        not eligible_types
+        or not company_types
+        or any(company_type in eligible_types for company_type in company_types)
+    )
+    return code_match and region_match and type_match
+
+
+def _load_dashboard_policy_fallback_candidates(
+    db: Any,
+    company: dict[str, Any],
+) -> list[dict[str, Any]]:
+    try:
+        result = (
+            db.table("policy")
+            .select(DASHBOARD_POLICY_FALLBACK_SELECT)
+            .order("created_at", desc=True)
+            .limit(60)
+            .execute()
+        )
+    except Exception:
+        logger.exception(
+            "dashboard_overview policy fallback query failed company_id=%s",
+            company.get("company_id"),
+        )
+        return []
+
+    candidates = [
+        row
+        for row in (result.data or [])
+        if isinstance(row, dict)
+        and _safe_text(row.get("policy_id"))
+        and _passes_dashboard_policy_filters(row, company)
+    ]
+
+    def sort_key(policy: dict[str, Any]) -> tuple:
+        deadline = _parse_deadline(_policy_deadline_raw(policy))
+        today = date.today()
+        if deadline and deadline >= today:
+            return ((deadline - today).days, _safe_text(policy.get("title")))
+        return (99999, _safe_text(policy.get("title")))
+
+    return sorted(candidates, key=sort_key)[:DASHBOARD_POLICY_FALLBACK_LIMIT]
 
 
 def _build_deadlines(
@@ -722,9 +801,14 @@ def load_dashboard_overview(
     )
 
     snapshot = _as_dict((active_roi or {}).get("policy_snapshot"))
-    legacy_missing = bool(active_analysis_id and _is_empty_policy_snapshot(snapshot))
-    policies = [] if legacy_missing else _snapshot_policy_rows(snapshot)
-    priority_policy = None if legacy_missing else _priority_policy(snapshot, policies)
+    snapshot_missing = bool(active_analysis_id and _is_empty_policy_snapshot(snapshot))
+    policies = (
+        _load_dashboard_policy_fallback_candidates(db, company)
+        if snapshot_missing
+        else _snapshot_policy_rows(snapshot)
+    )
+    legacy_missing = bool(snapshot_missing and not policies)
+    priority_policy = _priority_policy(snapshot, policies)
     priority_policy_id = str((priority_policy or {}).get("policy_id") or "") or None
     logger.info(
         "dashboard_overview step=policy_snapshot_parse success company_id=%s analysis_id=%s legacy_missing=%s policy_count=%s",

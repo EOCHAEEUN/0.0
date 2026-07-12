@@ -308,6 +308,25 @@ export function mapMobileHomeViewModel({
         { label: "매칭 지원사업", value: workspace.matchedPolicyCount || "0" },
       ]
 
+  // dashboard.companyRows/workspace가 비어 있는 운영 데이터에서도 설비명·카테고리·
+  // 공정·사용현황 중 이미 받아온 값이 있으면 그대로 보이도록 대표 설비(equipmentRows[0])
+  // 를 우선 사용하고, 그것도 없으면 workspace.equipmentName만으로 최소 한 줄은 표시한다.
+  const representativeEquipmentRow = dashboard.equipmentRows[0]
+  const equipmentInfoRows = [
+    {
+      label: "설비명",
+      value: representativeEquipmentRow?.title || workspace.equipmentName || "-",
+    },
+    {
+      label: "카테고리·공정",
+      value: representativeEquipmentRow?.subtitle || "-",
+    },
+    {
+      label: "사용현황",
+      value: representativeEquipmentRow?.status || "-",
+    },
+  ]
+
   const priorityCards = [
     {
       id: "deadline",
@@ -455,6 +474,7 @@ export function mapMobileHomeViewModel({
     equipmentAlert,
     companyCard,
     companyRows,
+    equipmentInfoRows,
     matchedPolicyCount: workspace.matchedPolicyCount || "0",
     summaryStatusText: hasDisplayValue(workspace.summaryStatusText) ? workspace.summaryStatusText : "",
     todayTaskCount,

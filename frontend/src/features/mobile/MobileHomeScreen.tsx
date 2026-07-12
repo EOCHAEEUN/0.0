@@ -104,20 +104,26 @@ export default function MobileHomeScreen() {
                 <MoreVertical size={18} strokeWidth={2.1} />
               </button>
             </div>
-            {model.companyRows.length > 0 ? (
+            <div className="ff-mobile-company-grid">
+              {model.companyRows.map((row) => (
+                <div key={row.label} className="ff-mobile-company-cell">
+                  <span>{row.label}</span>
+                  <strong>{row.value || "-"}</strong>
+                </div>
+              ))}
+            </div>
+            <div className="ff-mobile-company-stats-panel">
+              <div className="ff-mobile-company-equipment-line">
+                <Settings size={15} strokeWidth={2.2} aria-hidden="true" />
+                <span>{model.companyCard.equipmentStatusLine}</span>
+              </div>
               <div className="ff-mobile-company-grid">
-                {model.companyRows.map((row) => (
+                {model.equipmentInfoRows.map((row) => (
                   <div key={row.label} className="ff-mobile-company-cell">
                     <span>{row.label}</span>
                     <strong>{row.value || "-"}</strong>
                   </div>
                 ))}
-              </div>
-            ) : null}
-            <div className="ff-mobile-company-stats-panel">
-              <div className="ff-mobile-company-equipment-line">
-                <Settings size={15} strokeWidth={2.2} aria-hidden="true" />
-                <span>{model.companyCard.equipmentStatusLine}</span>
               </div>
               <div className="ff-mobile-company-kpis">
                 <div>

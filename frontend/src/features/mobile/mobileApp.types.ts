@@ -83,6 +83,7 @@ export type MobileHomeViewModel = {
   equipmentAlert: MobileEquipmentAlert
   companyCard: MobileCompanyCard
   companyRows: MobileCompanySummaryRow[]
+  equipmentInfoRows: MobileCompanySummaryRow[]
   matchedPolicyCount: string
   summaryStatusText: string
   todayTaskCount: number

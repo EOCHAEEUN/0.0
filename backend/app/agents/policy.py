@@ -31,6 +31,7 @@ POLICY_RAW_CANDIDATE_SELECT = (
     "eligibility_evidence,url,summary,support_method,source_name,source_id,"
     "posted_at,created_at,updated_at"
 )
+POLICY_RAW_CANDIDATE_LIMIT = 120
 
 
 UNKNOWN_DEADLINE_VALUES = {"", "none", "null", "nan", "마감일 미정", "상시"}
@@ -1070,7 +1071,27 @@ def get_policy_raw_candidates(company_context: dict) -> list[dict]:
     region_short = region.split()[0] if region else ""
     company_types = _normalize_list(company_context.get("company_type"))
 
-    result = db.table("policy").select(POLICY_RAW_CANDIDATE_SELECT).execute()
+    try:
+        query = db.table("policy").select(POLICY_RAW_CANDIDATE_SELECT)
+        if region_short:
+            query = query.or_(
+                f"region.is.null,region.eq.,region.ilike.%전국%,region.ilike.%{region_short}%"
+            )
+        result = (
+            query
+            .order("created_at", desc=True)
+            .limit(POLICY_RAW_CANDIDATE_LIMIT)
+            .execute()
+        )
+    except Exception as exc:
+        print(f"filtered policy candidate query failed, using limited fallback: {exc}")
+        result = (
+            db.table("policy")
+            .select(POLICY_RAW_CANDIDATE_SELECT)
+            .order("created_at", desc=True)
+            .limit(POLICY_RAW_CANDIDATE_LIMIT)
+            .execute()
+        )
     rows = result.data or []
     candidates: list[dict] = []
 

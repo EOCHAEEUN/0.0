@@ -40,6 +40,7 @@ from app.tools.roi_calc import calculate_roi
 
 
 router = APIRouter()
+POLICY_LLM_RERANK_TIMEOUT_SECONDS = 8
 
 
 class RoiSimulationRequest(BaseModel):
@@ -865,12 +866,35 @@ async def analyze(
         ranked = rerank_policies_with_roi(merged, base_roi_result)
 
         policy_stage = "llm_evaluate"
-        matched_policies = evaluate_and_rerank_with_llm(
-            ranked[:10],
-            company_context,
-            equipment.name,
-            base_roi_result,
-        )
+        try:
+            matched_policies = await asyncio.wait_for(
+                asyncio.to_thread(
+                    evaluate_and_rerank_with_llm,
+                    ranked[:10],
+                    company_context,
+                    equipment.name,
+                    base_roi_result,
+                ),
+                timeout=POLICY_LLM_RERANK_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            policy_status = "partial"
+            policy_error = "AI 정책 재랭킹이 지연되어 기본 매칭 점수로 추천했습니다."
+            matched_policies = [
+                {
+                    **policy,
+                    "llm_score": policy.get("llm_score") or "기본 점수",
+                    "reason": policy.get("reason")
+                    or "AI 정책 재랭킹 지연으로 기본 매칭 점수 기반 추천을 적용했습니다.",
+                    "hybrid_score": policy.get("hybrid_score")
+                    or policy.get("final_score")
+                    or policy.get("match_score")
+                    or 0,
+                    "display_rank": index,
+                }
+                for index, policy in enumerate(ranked[:10], start=1)
+            ]
+            print(f"policy LLM rerank timed out after {POLICY_LLM_RERANK_TIMEOUT_SECONDS}s")
 
         if not raw_candidates:
             policy_status = "empty"

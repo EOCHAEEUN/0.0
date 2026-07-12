@@ -16,6 +16,7 @@ const COMPANY_ID_STORAGE_KEY = "factofit_company_id"
 const EQUIPMENT_ID_STORAGE_KEY = "factofit_equipment_id"
 const SELECTED_EQUIPMENT_ID_STORAGE_KEY = "factofit_selected_equipment_id"
 const AUTH_SESSION_STORAGE_KEY = "factofit_auth_session"
+const ANALYZE_RETRY_DELAY_MS = 1_200
 
 type ApiRecord = Record<string, unknown>
 
@@ -129,6 +130,40 @@ async function requestJson(path: string, init: RequestInit) {
   }
 
   return json
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms)
+  })
+}
+
+function isRetryableAnalyzeError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "")
+  return (
+    message.includes("Failed to fetch") ||
+    message.includes("(502)") ||
+    message.includes("(503)") ||
+    message.includes("(504)") ||
+    message.includes("API request failed")
+  )
+}
+
+async function requestAnalyzeJson(path: string, init: RequestInit) {
+  let lastError: unknown
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await requestJson(path, init)
+    } catch (error) {
+      lastError = error
+      if (attempt > 0 || !isRetryableAnalyzeError(error)) break
+      console.warn("[onboarding-analysis] analyze request failed; retrying once.", error)
+      await delay(ANALYZE_RETRY_DELAY_MS)
+    }
+  }
+
+  throw lastError
 }
 
 function toNumber(value: unknown, fallback = 0) {
@@ -657,7 +692,7 @@ export async function runOnboardingAnalysis(
     company_id: companyId,
     equipment_id: equipmentId,
   })
-  const analyzeJson = (await requestJson(`/api/analyze?${query.toString()}`, {
+  const analyzeJson = (await requestAnalyzeJson(`/api/analyze?${query.toString()}`, {
     method: "POST",
   })) as ApiRecord
 
@@ -842,7 +877,7 @@ export async function runExistingEquipmentAnalysis(
   })
 
   const query = new URLSearchParams({ company_id: companyId, equipment_id: equipmentId })
-  const analyzeJson = (await requestJson(`/api/analyze?${query.toString()}`, {
+  const analyzeJson = (await requestAnalyzeJson(`/api/analyze?${query.toString()}`, {
     method: "POST",
   })) as ApiRecord
   return {
@@ -859,7 +894,7 @@ export async function runSetupRoiAnalysis(
     company_id: companyId,
     equipment_id: equipmentId,
   })
-  const analyzeJson = (await requestJson(`/api/analyze?${query.toString()}`, {
+  const analyzeJson = (await requestAnalyzeJson(`/api/analyze?${query.toString()}`, {
     method: "POST",
   })) as ApiRecord
 

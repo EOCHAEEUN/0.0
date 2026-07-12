@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, Optional
 import asyncio
+import traceback
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
@@ -692,79 +693,93 @@ async def analyze(
 ):
     db = get_db()
 
-    # 1. 현재 로그인 사용자가 소유한 기업 조회
-    company_result = (
-        db.table("company")
-        .select("*")
-        .eq("company_id", company_id)
-        .eq("user_id", current_user.id)
-        .execute()
-    )
-    if not company_result.data:
-        return {"success": False, "message": "기업 정보를 찾을 수 없습니다."}
-
-    company_row = company_result.data[0]
-    if isinstance(company_row.get("industry_code"), str):
-        company_row["industry_code"] = [
-            code.strip()
-            for code in company_row["industry_code"].split(",")
-            if code.strip()
-        ]
-
-    company = CompanyContext(
-        company_id=company_row.get("company_id"),
-        company_name=company_row.get("company_name", ""),
-        industry_code=company_row.get("industry_code", []),
-        region=company_row.get("region", ""),
-        company_type=company_row.get("company_type"),
-        employee_count=company_row.get("employee_count"),
-        annual_revenue=company_row.get("annual_revenue"),
-        energy_cost_annual=company_row.get("energy_cost_annual"),
-    )
-    company_context = {
-        "industry_code": company.industry_code or [],
-        "region": company.region or "",
-        "company_type": company.company_type or "",
-        "employee_count": company.employee_count,
-        "annual_revenue": company.annual_revenue,
-    }
-
-    # 2. 설비 조회
-    equipment_query = (
-        db.table("equipment")
-        .select("*")
-        .eq("company_id", company_id)
-    )
-    if equipment_id:
-        equipment_query = equipment_query.eq("equipment_id", equipment_id)
-
-    equipment_result = equipment_query.execute()
-    if not equipment_result.data:
-        return {"success": False, "message": "설비 정보를 찾을 수 없습니다."}
-
-    equipment_row = equipment_result.data[0]
-    equipment_id = equipment_row.get("equipment_id")
-
-    raw_energy = equipment_row.get("energy_cost_annual")
+    # 회원가입 직후처럼 company/equipment 데이터가 갓 생성된 시점에 조회 자체가
+    # 예상치 못한 예외(일시적 Supabase 오류 등)를 낼 수 있었는데, 여기 전체가
+    # 예외 처리 없이 열려 있었다. 계산/조회 로직은 그대로 두고 예외만 잡아
+    # Render 502 대신 명확한 JSON 오류를 반환한다.
     try:
-        energy_provided = raw_energy is not None and float(raw_energy) > 0
-    except (TypeError, ValueError):
-        energy_provided = False
+        # 1. 현재 로그인 사용자가 소유한 기업 조회
+        company_result = (
+            db.table("company")
+            .select("*")
+            .eq("company_id", company_id)
+            .eq("user_id", current_user.id)
+            .execute()
+        )
+        if not company_result.data:
+            return {"success": False, "message": "기업 정보를 찾을 수 없습니다."}
 
-    equipment = EquipmentInput(
-        name=equipment_row.get("name", ""),
-        category=equipment_row.get("category", ""),
-        age_years=equipment_row.get("age_years", 0),
-        energy_cost_annual=raw_energy if energy_provided else 0,
-        defect_rate=equipment_row.get("defect_rate"),
-        maintenance_cost_annual=equipment_row.get("maintenance_cost_annual"),
-        current_capacity_value=equipment_row.get("current_capacity_value"),
-        production_qty=equipment_row.get("production_qty"),
-        process=equipment_row.get("process"),
-        contribution_margin_won=equipment_row.get("contribution_margin_won"),
-        scenario_a_investment_manwon=equipment_row.get("scenario_a_investment_manwon"),
-        scenario_b_investment_manwon=equipment_row.get("scenario_b_investment_manwon"),
-    )
+        company_row = company_result.data[0]
+        if isinstance(company_row.get("industry_code"), str):
+            company_row["industry_code"] = [
+                code.strip()
+                for code in company_row["industry_code"].split(",")
+                if code.strip()
+            ]
+
+        company = CompanyContext(
+            company_id=company_row.get("company_id"),
+            company_name=company_row.get("company_name", ""),
+            industry_code=company_row.get("industry_code", []),
+            region=company_row.get("region", ""),
+            company_type=company_row.get("company_type"),
+            employee_count=company_row.get("employee_count"),
+            annual_revenue=company_row.get("annual_revenue"),
+            energy_cost_annual=company_row.get("energy_cost_annual"),
+        )
+        company_context = {
+            "industry_code": company.industry_code or [],
+            "region": company.region or "",
+            "company_type": company.company_type or "",
+            "employee_count": company.employee_count,
+            "annual_revenue": company.annual_revenue,
+        }
+
+        # 2. 설비 조회
+        equipment_query = (
+            db.table("equipment")
+            .select("*")
+            .eq("company_id", company_id)
+        )
+        if equipment_id:
+            equipment_query = equipment_query.eq("equipment_id", equipment_id)
+
+        equipment_result = equipment_query.execute()
+        if not equipment_result.data:
+            return {"success": False, "message": "설비 정보를 찾을 수 없습니다."}
+
+        equipment_row = equipment_result.data[0]
+        equipment_id = equipment_row.get("equipment_id")
+
+        raw_energy = equipment_row.get("energy_cost_annual")
+        try:
+            energy_provided = raw_energy is not None and float(raw_energy) > 0
+        except (TypeError, ValueError):
+            energy_provided = False
+
+        equipment = EquipmentInput(
+            name=equipment_row.get("name", ""),
+            category=equipment_row.get("category", ""),
+            age_years=equipment_row.get("age_years", 0),
+            energy_cost_annual=raw_energy if energy_provided else 0,
+            defect_rate=equipment_row.get("defect_rate"),
+            maintenance_cost_annual=equipment_row.get("maintenance_cost_annual"),
+            current_capacity_value=equipment_row.get("current_capacity_value"),
+            production_qty=equipment_row.get("production_qty"),
+            process=equipment_row.get("process"),
+            contribution_margin_won=equipment_row.get("contribution_margin_won"),
+            scenario_a_investment_manwon=equipment_row.get("scenario_a_investment_manwon"),
+            scenario_b_investment_manwon=equipment_row.get("scenario_b_investment_manwon"),
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        print(f"기업/설비 조회 실패: {exc}")
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail="기업 또는 설비 정보를 조회하지 못했습니다.",
+        ) from exc
 
     # 3. 기초 시나리오 계산: 정책 지원금 0원 기준
     # 정책 검색 키워드를 만들기 위한 계산이며, 프론트 최종 결과로 쓰지 않는다.
@@ -865,49 +880,63 @@ async def analyze(
     # 5. A/B별 단 하나의 정책만 실제 지원금으로 반영
     # ROI/지원금 계산 입력 정책 집합은 deterministic ranked 후보로 고정한다.
     # LLM 재정렬 결과(matched_policies)는 표시 순위/추천 사유 용도로만 사용한다.
-    policy_pool_for_support = ranked
-    policy_applications = {
-        "scenario_a": resolve_scenario_policy_support(
-            scenario="a",
-            investment_manwon=base_roi_result.get("scenario_a", {}).get(
-                "investment_manwon"
+    # 아래 블록은 원래 예외 처리가 없어, 신규 가입 직후처럼 설비 데이터가
+    # 최소한만 채워진 경우 예상 못한 예외가 나면 그대로 프로세스를 오래 붙잡거나
+    # 처리되지 않은 예외로 이어져 Render에서 502로 보일 수 있었다. 계산 로직은
+    # 그대로 두고 예외만 잡아 502 대신 명확한 JSON 500을 반환한다.
+    try:
+        policy_pool_for_support = ranked
+        policy_applications = {
+            "scenario_a": resolve_scenario_policy_support(
+                scenario="a",
+                investment_manwon=base_roi_result.get("scenario_a", {}).get(
+                    "investment_manwon"
+                ),
+                policies=policy_pool_for_support,
+                company_context=company_context,
             ),
-            policies=policy_pool_for_support,
-            company_context=company_context,
-        ),
-        "scenario_b": resolve_scenario_policy_support(
-            scenario="b",
-            investment_manwon=base_roi_result.get("scenario_b", {}).get(
-                "investment_manwon"
+            "scenario_b": resolve_scenario_policy_support(
+                scenario="b",
+                investment_manwon=base_roi_result.get("scenario_b", {}).get(
+                    "investment_manwon"
+                ),
+                policies=policy_pool_for_support,
+                company_context=company_context,
             ),
-            policies=policy_pool_for_support,
-            company_context=company_context,
-        ),
-    }
+        }
 
-    # 6. 최종 ROI 계산: 실제 적용 지원금 반영
-    roi_result = calculate_roi(
-        equipment,
-        energy_provided=energy_provided,
-        policy_applications=policy_applications,
-    )
-    roi_result["analysis_metadata"] = {
-        "base_recommended": base_roi_result.get("recommended"),
-        "final_recommended": roi_result.get("recommended"),
-        "policy_application_status": {
-            "scenario_a": policy_applications["scenario_a"].get("status"),
-            "scenario_b": policy_applications["scenario_b"].get("status"),
-        },
-    }
+        # 6. 최종 ROI 계산: 실제 적용 지원금 반영
+        roi_result = calculate_roi(
+            equipment,
+            energy_provided=energy_provided,
+            policy_applications=policy_applications,
+        )
+        roi_result["analysis_metadata"] = {
+            "base_recommended": base_roi_result.get("recommended"),
+            "final_recommended": roi_result.get("recommended"),
+            "policy_application_status": {
+                "scenario_a": policy_applications["scenario_a"].get("status"),
+                "scenario_b": policy_applications["scenario_b"].get("status"),
+            },
+        }
 
-    frontend_matched_policies = [
-        _format_policy_for_frontend(policy)
-        for policy in matched_policies
-    ]
-    frontend_raw_candidates = [
-        _format_raw_policy_candidate_for_frontend(policy)
-        for policy in raw_candidates
-    ]
+        frontend_matched_policies = [
+            _format_policy_for_frontend(policy)
+            for policy in matched_policies
+        ]
+        frontend_raw_candidates = [
+            _format_raw_policy_candidate_for_frontend(policy)
+            for policy in raw_candidates
+        ]
+    except HTTPException:
+        raise
+    except Exception as exc:
+        print(f"ROI 최종 계산/정책 지원금 반영 실패: {exc}")
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail="ROI 계산 처리 중 오류가 발생했습니다.",
+        ) from exc
 
     # 7. 기존 분석·초안·매칭을 정리하고 final ROI 저장
     saved_roi_output = None
@@ -954,25 +983,35 @@ async def analyze(
         )
     analysis_id = str(analysis_id)
 
-    policy_ids = [
-        policy_id
-        for policy in frontend_matched_policies
-        if (policy_id := _policy_id(policy) or policy.get("policy_id") or policy.get("id"))
-    ]
-    policy_support_summary = load_policy_support_summary(db, policy_ids)
-    policy_details = _fetch_policy_details_for_snapshot(db, policy_ids)
-    policy_snapshot = _build_policy_snapshot(
-        analysis_id=analysis_id,
-        company_id=company_id,
-        equipment_id=equipment_id,
-        matched_policies=frontend_matched_policies,
-        policy_details=policy_details,
-    )
-    hydrated_frontend_policies = policy_snapshot.get("policies") or (
-        hydrate_canonical_policies_from_public_policy(db, frontend_matched_policies)
-        if frontend_matched_policies
-        else frontend_matched_policies
-    )
+    try:
+        policy_ids = [
+            policy_id
+            for policy in frontend_matched_policies
+            if (policy_id := _policy_id(policy) or policy.get("policy_id") or policy.get("id"))
+        ]
+        policy_support_summary = load_policy_support_summary(db, policy_ids)
+        policy_details = _fetch_policy_details_for_snapshot(db, policy_ids)
+        policy_snapshot = _build_policy_snapshot(
+            analysis_id=analysis_id,
+            company_id=company_id,
+            equipment_id=equipment_id,
+            matched_policies=frontend_matched_policies,
+            policy_details=policy_details,
+        )
+        hydrated_frontend_policies = policy_snapshot.get("policies") or (
+            hydrate_canonical_policies_from_public_policy(db, frontend_matched_policies)
+            if frontend_matched_policies
+            else frontend_matched_policies
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        print(f"정책 스냅샷 구성 실패: {exc}")
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail="정책 스냅샷 구성 중 오류가 발생했습니다.",
+        ) from exc
 
     try:
         snapshot_update_result = (

@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     data_go_kr_api_key: str = ""
     langfuse_public_key: str = ""
     langfuse_secret_key: str = ""
+    # Chroma/RAG 임베딩 모델(BAAI/bge-m3) 로딩이 콜드 스타트 시 30초 이상 걸려
+    # Render 저사양 환경에서 ROI 분석 요청이 502로 끊기는 원인이 됐다.
+    # 기본값 off — ROI 계산에는 영향 없음(표시/추천 근거 보조 필드만 붙는 기능).
+    enable_policy_rag_validation: bool = False
 
     model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore")
 

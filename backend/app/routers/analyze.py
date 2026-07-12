@@ -19,11 +19,15 @@ from app.agents.policy import (
     resolve_scenario_policy_support,
 )
 from app.core.auth import get_current_user
+from app.core.config import settings
 from app.core.database import get_db
 from app.models.auth import CurrentUser
 from app.models.company import CompanyContext
 from app.models.equipment import EquipmentInput
-from app.services.policy_rag_validation import attach_rag_validation_to_candidates
+from app.services.policy_rag_validation import (
+    attach_disabled_rag_metadata,
+    attach_rag_validation_to_candidates,
+)
 from app.services.policy_snapshot_hydration import (
     hydrate_canonical_policies_from_public_policy,
     hydrate_policy_snapshot_for_response,
@@ -806,12 +810,17 @@ async def analyze(
         policy_stage = "rag_validation"
         # RAG(Chroma) 문맥 검증 - 표시/추천 근거 보조 필드만 부착한다.
         # 후보 순서·개수·ROI 계산 입력값은 바꾸지 않으며, 실패해도 원본 후보로 계속 진행한다.
-        raw_candidates = attach_rag_validation_to_candidates(
-            raw_candidates,
-            queries=queries,
-            company_context=company_context,
-            equipment_name=equipment.name,
-        )
+        # Chroma 임베딩 모델(BAAI/bge-m3) 최초 로딩이 30초+ 걸려 Render 저사양
+        # 환경에서 ROI 분석 요청이 502로 끊기므로, 기본값은 비활성화(env로 제어).
+        if settings.enable_policy_rag_validation:
+            raw_candidates = attach_rag_validation_to_candidates(
+                raw_candidates,
+                queries=queries,
+                company_context=company_context,
+                equipment_name=equipment.name,
+            )
+        else:
+            raw_candidates = attach_disabled_rag_metadata(raw_candidates)
 
         policy_stage = "rank_a"
         a_candidates = rank_candidates_by_query(

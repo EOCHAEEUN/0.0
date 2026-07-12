@@ -13,8 +13,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.tools.vector_search import search_policies
-
 RAG_SOURCE = "chroma_policy_announcements"
 
 
@@ -105,6 +103,10 @@ def attach_rag_validation_to_candidates(
         ]
 
     try:
+        # Chroma/torch/sentence-transformers는 무겁고(BAAI/bge-m3 로딩 30초+),
+        # RAG가 꺼져 있을 때는 이 모듈을 아예 건드리지 않도록 지연 임포트한다.
+        from app.tools.vector_search import search_policies
+
         rag_results = search_policies(query, n_results=limit_per_query)
     except Exception as exc:
         print(f"[policy_rag_validation] Chroma 검증 실패, 원본 후보 유지: {exc}")
@@ -159,3 +161,25 @@ def attach_rag_validation_to_candidates(
         attached.append(next_policy)
 
     return attached
+
+
+def attach_disabled_rag_metadata(candidates: list[dict]) -> list[dict]:
+    """RAG 검증이 꺼져 있을 때 사용하는 no-op 버전.
+
+    Chroma/torch/sentence-transformers를 전혀 로딩하지 않고, candidates의
+    순서·개수·ROI 관련 필드는 그대로 두고 rag_* 필드만 "검증 안 함" 상태로
+    붙인다. 스냅샷/응답 스키마가 RAG 활성 여부와 무관하게 동일한 모양을
+    유지하도록 하기 위함이다.
+    """
+    return [
+        {
+            **policy,
+            "rag_validated": False,
+            "rag_similarity": None,
+            "rag_distance": None,
+            "rag_query": None,
+            "rag_evidence": None,
+            "rag_source": RAG_SOURCE,
+        }
+        for policy in candidates
+    ]

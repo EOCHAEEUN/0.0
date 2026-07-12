@@ -1326,6 +1326,15 @@ def _load_live_discovery_candidates(
     return items, total_count, None
 
 
+def _empty_live_discovery_payload() -> dict[str, Any]:
+    return {
+        "source": "current_policy_database",
+        "total_count": 0,
+        "items": [],
+        "error": None,
+    }
+
+
 def _build_overview_payload(
     *,
     mode: str,
@@ -1440,17 +1449,11 @@ def _load_analysis_snapshot_overview(
         "equipment_name": _safe_text((equipment or {}).get("name"), default="설비명 미확인"),
         "snapshot_status": "legacy_missing",
     }
-    live_items, live_total, live_error = _load_live_discovery_candidates(
-        db,
-        company=company,
-        exclude_policy_ids=set(),
-    )
-    live_discovery = {
-        "source": "current_policy_database",
-        "total_count": live_total,
-        "items": live_items,
-        "error": live_error,
-    }
+    # analysis_snapshot 모드는 스냅샷의 canonical policies만 사용한다.
+    # policy 테이블 전체를 select("*")로 스캔하는 live discovery 후보 조회는
+    # 여기서는 수행하지 않는다 (raw_text/attachment_text 포함 33MB급 스캔이
+    # 요청당 최대 2회 발생해 Render 저사양 환경에서 502를 유발했다).
+    live_discovery = _empty_live_discovery_payload()
 
     if _is_empty_policy_snapshot(snapshot):
         return _build_overview_payload(
@@ -1512,22 +1515,10 @@ def _load_analysis_snapshot_overview(
         policy_details=policy_details,
     )
 
-    exclude_ids = {
-        _normalize_policy_id(policy.get("policy_id"))
-        for policy in policies[:PRIORITY_DISPLAY_LIMIT]
-        if _normalize_policy_id(policy.get("policy_id"))
-    }
-    live_items, live_total, live_error = _load_live_discovery_candidates(
-        db,
-        company=company,
-        exclude_policy_ids=exclude_ids,
-    )
-    live_discovery = {
-        "source": "current_policy_database",
-        "total_count": live_total,
-        "items": live_items,
-        "error": live_error,
-    }
+    # 위와 동일한 이유로 analysis_snapshot 경로에서는 live discovery 후보를
+    # 다시 조회하지 않는다. live_discovery 탭 자체(_load_live_discovery_overview)는
+    # 그대로 유지된다.
+    live_discovery = _empty_live_discovery_payload()
 
     return _build_overview_payload(
         mode="analysis_snapshot",

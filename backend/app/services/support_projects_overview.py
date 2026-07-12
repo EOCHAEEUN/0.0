@@ -1482,6 +1482,18 @@ def _load_analysis_snapshot_overview(
     live_discovery = _empty_live_discovery_payload()
 
     if _is_empty_policy_snapshot(snapshot):
+        live_items, live_total, live_error = _load_live_discovery_candidates(
+            db,
+            company=company,
+            exclude_policy_ids=set(),
+        )
+        live_discovery = {
+            "source": "current_policy_database",
+            "total_count": live_total,
+            "items": live_items,
+            "error": live_error,
+        }
+        priority_policy = {"exists": True, **live_items[0]} if live_items else {"exists": False}
         return _build_overview_payload(
             mode="analysis_snapshot",
             company=company,
@@ -1490,16 +1502,18 @@ def _load_analysis_snapshot_overview(
             analysis_context=analysis_context,
             counts={
                 "policy_db_total": policy_db_total,
-                "matched_total": 0,
-                "priority_policy_count": 0,
-                "closing_soon_count": 0,
+                "matched_total": len(live_items),
+                "priority_policy_count": 1 if live_items else 0,
+                "closing_soon_count": _count_closing_soon(
+                    [{"deadline": item.get("deadline")} for item in live_items]
+                ),
             },
-            priority_policy={"exists": False},
-            priority_policies=[],
-            all_matched=[],
+            priority_policy=priority_policy,
+            priority_policies=live_items[1:],
+            all_matched=live_items,
             live_discovery=live_discovery,
-            legacy_state="POLICY_SNAPSHOT_MISSING",
-            empty_state="legacy_snapshot_missing",
+            legacy_state=None,
+            empty_state="no_matches" if not live_items else None,
         )
 
     snapshot_dict = snapshot if isinstance(snapshot, dict) else {}

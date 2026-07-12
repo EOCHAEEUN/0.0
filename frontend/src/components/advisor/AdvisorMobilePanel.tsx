@@ -24,6 +24,14 @@ import {
 } from "./advisor.constants"
 import type { AdvisorScreen } from "./advisor.types"
 
+const KAKAO_CHANNEL_URL =
+  (import.meta.env.VITE_KAKAO_CHANNEL_URL as string | undefined)?.trim() ||
+  "https://pf.kakao.com/_factofit/chat"
+
+function openKakaoChannel() {
+  window.open(KAKAO_CHANNEL_URL, "_blank", "noopener,noreferrer")
+}
+
 function BotVisual() {
   return (
     <div className="factofit-advisor-bot-visual">
@@ -98,7 +106,7 @@ function BottomNav({
       <button
         className={activeNav === "kakao" ? "active" : undefined}
         type="button"
-        onClick={() => window.open("https://pf.kakao.com/", "_blank", "noopener,noreferrer")}
+        onClick={openKakaoChannel}
       >
         <span className="factofit-advisor-nav-icon is-kakao" aria-hidden="true" />
         카카오톡
